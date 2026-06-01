@@ -164,6 +164,9 @@ except ImportError:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # 2026-06-01 v22: WhiteNoise — статика напрямую из приложения (Render не
+    # запускает nginx). Должен быть СРАЗУ после SecurityMiddleware.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     # AnonymizeIPMiddleware — ДО SessionMiddleware: затирает REMOTE_ADDR
     # до того, как любой downstream-код успеет залогировать оригинал.
     'Dolg_APP.middleware.AnonymizeIPMiddleware',
@@ -374,6 +377,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# 2026-06-01 v22: WhiteNoise storage с compression + manifest для production
+# (отдаёт .gz/.br + hash filename для cache-busting). На dev — стандарт.
+if not DEBUG and not IS_TESTING:
+    STORAGES = {
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    }
 
 # В production — ManifestStaticFilesStorage добавляет hash в имя файла
 # (pixi.abc123.js), что снимает ручной кэш-бастинг через ?v=20260506a в

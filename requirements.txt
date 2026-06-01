@@ -1,4 +1,13 @@
 Django==6.0.4
+# 2026-06-01 v22: production-сервер для Render/Heroku/любой PaaS
+gunicorn==23.0.0
+# WhiteNoise — отдача статики из Django без nginx (для Render free tier)
+whitenoise==6.11.0
+# 12-factor DATABASE_URL парсер (Render даёт postgres:// строку)
+dj-database-url==2.3.0
+# psycopg2-binary — драйвер Postgres для production. На dev — SQLite,
+# psycopg2 не загружается. binary-версия не требует libpq-dev.
+psycopg2-binary==2.9.10
 asgiref==3.11.1
 channels==4.3.2
 daphne==4.2.1

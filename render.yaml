@@ -1,0 +1,31 @@
+# DOLG Render Blueprint — описывает web-service + Postgres БД одним файлом.
+# Push в master → Render автоматически создаёт обе сущности.
+services:
+  - type: web
+    name: dolg
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: daphne -b 0.0.0.0 -p $PORT Dolg_PR.asgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dolg-db
+          property: connectionString
+      - key: DJANGO_SETTINGS_MODULE
+        value: Dolg_PR.settings
+      # Указать вручную после deploy в Render dashboard:
+      # HF_TOKEN, STRIPE_*, SENTRY_DSN, ANTHROPIC_API_KEY
+
+databases:
+  - name: dolg-db
+    plan: free
+    region: frankfurt  # ближайший регион к РФ
