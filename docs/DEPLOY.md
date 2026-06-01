@@ -6,10 +6,13 @@
 
 | Слой | Частота | Куда | Защита от |
 |------|---------|------|-----------|
-| 1. **GitHub** | при каждом `git push` | `github.com/<user>/dolg` (private) | потеря локального диска |
+| 1. **GitHub** | при каждом `git push` | `github.com/zlodey2077/Dolg` (private) | потеря локального диска |
 | 2. **hourly-snapshot.bat** | каждый час | OneDrive / `backups/` | потеря между push'ами |
-| 3. **Render** | автоматически при push в `main` | `*.onrender.com` | возможность работать без локалки |
+| 3. **Яндекс Compute Cloud** | по `./yc-update.sh` после push | `http://<VM-IP>/` | возможность работать без локалки |
 | 4. **GitHub Actions** | каждый push/PR | CI отчёт | поломка кода |
+
+**Production deployment**: см. отдельный гайд [YC_DEPLOY.md](YC_DEPLOY.md) — пошагово
+от создания VM до HTTPS-домена.
 
 ---
 

@@ -377,12 +377,23 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# 2026-06-01 v22: WhiteNoise storage с compression + manifest для production
-# (отдаёт .gz/.br + hash filename для cache-busting). На dev — стандарт.
+# Для защиты и локального запуска с DEBUG=False: если collectstatic еще не
+# прогнали, один отсутствующий manifest-entry не должен валить всю страницу.
+# В production collectstatic все равно обязателен для нормального кеширования.
+WHITENOISE_MANIFEST_STRICT = False
+# 2026-06-01 v22: WhiteNoise storage с compression. Hash-manifest включается
+# только явным env-флагом: иначе локальный DEBUG=False без collectstatic валит
+# страницы на Missing staticfiles manifest entry.
+USE_MANIFEST_STATIC = env_bool('USE_MANIFEST_STATIC', False)
 if not DEBUG and not IS_TESTING:
+    static_backend = (
+        'whitenoise.storage.CompressedManifestStaticFilesStorage'
+        if USE_MANIFEST_STATIC
+        else 'whitenoise.storage.CompressedStaticFilesStorage'
+    )
     STORAGES = {
         'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
-        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+        'staticfiles': {'BACKEND': static_backend},
     }
 
 # В production — ManifestStaticFilesStorage добавляет hash в имя файла
@@ -390,14 +401,6 @@ if not DEBUG and not IS_TESTING:
 # шаблонах и позволяет CDN кешировать статику без ограничений.
 # Включается только при DEBUG=False — при разработке хеши усложняют отладку.
 # Для тестов и dev-сервера остаётся стандартный StaticFilesStorage.
-USE_MANIFEST_STATIC = env_bool('USE_MANIFEST_STATIC', False)
-if not DEBUG and not IS_TESTING and USE_MANIFEST_STATIC:
-    STORAGES = {
-        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
-        'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage',
-        },
-    }
 
 # Media files (uploaded images)
 # https://docs.djangoproject.com/en/4.2/topics/files/
