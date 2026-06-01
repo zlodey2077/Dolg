@@ -1,0 +1,297 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}AI dataset quality · DOLG{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .mlq-wrap {
+        max-width: 1120px;
+        margin: 24px auto;
+        padding: 0 20px 40px;
+        color: #e8eef9;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .mlq-head {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .mlq-head h1 {
+        margin: 0;
+        color: #72ffad;
+        font-size: 24px;
+        line-height: 1.2;
+    }
+    .mlq-head p {
+        margin: 6px 0 0;
+        color: #9fb0cc;
+        font-size: 13px;
+    }
+    .mlq-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .mlq-actions a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(127, 219, 255, .24);
+        color: #bff4ff;
+        background: rgba(127, 219, 255, .08);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    .mlq-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .mlq-card {
+        background: linear-gradient(180deg, #1a1f2e, #151a28);
+        border: 1px solid rgba(0, 212, 255, .18);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,.22);
+    }
+    .mlq-stat b {
+        display: block;
+        color: #fff;
+        font-size: 26px;
+        line-height: 1.1;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .mlq-stat span {
+        display: block;
+        margin-top: 6px;
+        color: #9fb0cc;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+    }
+    .mlq-section {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    @media (max-width: 840px) {
+        .mlq-section { grid-template-columns: 1fr; }
+        .mlq-head { flex-direction: column; }
+        .mlq-actions { justify-content: flex-start; }
+    }
+    .mlq-card h2 {
+        margin: 0 0 12px;
+        color: #7fdbff;
+        font-size: 16px;
+    }
+    .mlq-table {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px 14px;
+        font-size: 12px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .mlq-table .k {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        color: #cbd5e1;
+    }
+    .mlq-table .v {
+        color: #72ffad;
+        font-weight: 700;
+    }
+    .mlq-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        max-height: 240px;
+        overflow: auto;
+    }
+    .mlq-list li {
+        border-top: 1px solid rgba(127, 219, 255, .10);
+        padding: 7px 0;
+        color: #cbd5e1;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+    .mlq-list li:first-child { border-top: 0; }
+    .mlq-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        background: rgba(127, 219, 255, .10);
+        color: #9ee8ff;
+        border: 1px solid rgba(127, 219, 255, .18);
+        margin-right: 6px;
+    }
+    .mlq-badge.ok {
+        background: rgba(114, 255, 173, .12);
+        color: #72ffad;
+        border-color: rgba(114, 255, 173, .28);
+    }
+    .mlq-badge.warn {
+        background: rgba(255, 196, 80, .12);
+        color: #ffc450;
+        border-color: rgba(255, 196, 80, .32);
+    }
+    .mlq-badge.err {
+        background: rgba(255, 80, 80, .12);
+        color: #ff8a8a;
+        border-color: rgba(255, 80, 80, .32);
+    }
+    .mlq-code {
+        margin: 0;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, .22);
+        border: 1px solid rgba(127, 219, 255, .14);
+        border-radius: 8px;
+        color: #dbeafe;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mlq-wrap">
+    <div class="mlq-head">
+        <div>
+            <h1>AI dataset quality</h1>
+            <p>Контроль корпуса для Self AI, PyTorch deep hint и будущих графовых моделей.</p>
+        </div>
+        <div class="mlq-actions">
+            <a href="{% url 'hello:ml_training_page' %}">Тренировка</a>
+            <a href="/admin/Dolg_APP/aitrainingexample/">AITrainingExample admin</a>
+        </div>
+    </div>
+
+    <div class="mlq-grid">
+        <div class="mlq-card mlq-stat"><b>{{ summary.total|default:0 }}</b><span>примеров</span></div>
+        <div class="mlq-card mlq-stat"><b>{{ summary.validated|default:0 }}</b><span>валидировано</span></div>
+        <div class="mlq-card mlq-stat"><b>{{ summary.with_scheme_data|default:0 }}</b><span>со схемой</span></div>
+        <div class="mlq-card mlq-stat"><b>{{ summary.with_source_ids|default:0 }}</b><span>с источниками</span></div>
+        <div class="mlq-card mlq-stat"><b>{{ validation.errors_count|default:0 }}</b><span>ошибок</span></div>
+        <div class="mlq-card mlq-stat"><b>{{ validation.warnings_count|default:0 }}</b><span>предупреждений</span></div>
+    </div>
+
+    <div class="mlq-section">
+        <div class="mlq-card">
+            <h2>Модель</h2>
+            {% if model_status.exists %}
+                <p>
+                    <span class="mlq-badge ok">model ready</span>
+                    <span class="mlq-badge{% if model_status.torch_available %} ok{% else %} warn{% endif %}">
+                        {% if model_status.torch_available %}torch ok{% else %}no torch{% endif %}
+                    </span>
+                </p>
+                <div class="mlq-table">
+                    <span class="k">path</span><span class="v">{{ model_status.path }}</span>
+                    <span class="k">size</span><span class="v">{{ model_status.size_kb }} KB</span>
+                    <span class="k">version</span><span class="v">{{ model_status.meta.model_version|default:model_status.expected_version }}</span>
+                    <span class="k">dataset</span><span class="v">{{ model_status.meta.dataset_size|default:"-" }}</span>
+                    <span class="k">curated</span><span class="v">{{ model_status.meta.curated_size|default:"-" }}</span>
+                    <span class="k">best epoch</span><span class="v">{{ model_status.meta.best_epoch|default:"-" }}</span>
+                    <span class="k">loss</span><span class="v">{{ model_status.meta.final_loss|default:"-" }}</span>
+                </div>
+                {% if model_status.meta_error %}
+                    <p><span class="mlq-badge warn">meta</span>{{ model_status.meta_error }}</p>
+                {% endif %}
+            {% else %}
+                <p><span class="mlq-badge warn">not trained</span> tiny model file is missing.</p>
+                <pre class="mlq-code">python manage.py train_tiny_circuit_ai --include-curated --epochs 80 --size 180</pre>
+            {% endif %}
+        </div>
+
+        <div class="mlq-card">
+            <h2>Команды корпуса</h2>
+            <pre class="mlq-code">python manage.py collect_ai_training_examples --source curated
+python manage.py collect_ai_training_examples --source all --limit 100
+python manage.py validate_ai_dataset --json
+python manage.py export_ai_dataset --limit 500
+python manage.py evaluate_circuit_ai --include-curated --json</pre>
+        </div>
+    </div>
+
+    <div class="mlq-section">
+        <div class="mlq-card">
+            <h2>Evidence kind</h2>
+            <div class="mlq-table">
+                {% for key, value in summary.by_evidence_kind.items %}
+                    <span class="k">{{ key }}</span><span class="v">{{ value }}</span>
+                {% empty %}
+                    <span class="k">нет данных</span><span class="v">0</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mlq-card">
+            <h2>Topology</h2>
+            <div class="mlq-table">
+                {% for key, value in summary.by_topology.items %}
+                    <span class="k">{{ key }}</span><span class="v">{{ value }}</span>
+                {% empty %}
+                    <span class="k">нет данных</span><span class="v">0</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="mlq-section">
+        <div class="mlq-card">
+            <h2>Teacher rules</h2>
+            <div class="mlq-table">
+                {% for key, value in summary.top_rules.items %}
+                    <span class="k">{{ key }}</span><span class="v">{{ value }}</span>
+                {% empty %}
+                    <span class="k">нет данных</span><span class="v">0</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mlq-card">
+            <h2>Legal sources</h2>
+            <div class="mlq-table">
+                {% for key, value in summary.top_source_ids.items %}
+                    <span class="k">{{ key }}</span><span class="v">{{ value }}</span>
+                {% empty %}
+                    <span class="k">нет данных</span><span class="v">0</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="mlq-section">
+        <div class="mlq-card">
+            <h2>Ошибки валидации</h2>
+            <ul class="mlq-list">
+                {% for item in validation.errors %}
+                    <li><span class="mlq-badge err">{{ item.code }}</span>#{{ item.id }} {{ item.message }}</li>
+                {% empty %}
+                    <li><span class="mlq-badge ok">ok</span>Ошибок нет.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="mlq-card">
+            <h2>Предупреждения</h2>
+            <ul class="mlq-list">
+                {% for item in validation.warnings %}
+                    <li><span class="mlq-badge warn">{{ item.code }}</span>#{{ item.id }} {{ item.message }}</li>
+                {% empty %}
+                    <li><span class="mlq-badge ok">ok</span>Предупреждений нет.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+# Prometheus конфиг для DOLG: один scrape-target — Django endpoint /metrics/,
+# который django-prometheus отдаёт автоматически после добавления MIDDLEWARE.
+#
+# Метрики, которые сразу появятся:
+#   django_http_requests_total_by_method           — счётчик запросов по методам
+#   django_http_responses_total_by_status          — счётчик ответов по статусам
+#   django_http_requests_latency_seconds_by_view   — гистограмма latency по view
+#   django_db_execute_total                        — счётчик SQL-запросов
+#   django_db_query_duration_seconds               — длительность SQL
+#   django_model_inserts_total / updates / deletes — мутации моделей
+#
+# Раскрутить ровно через docker compose -f deploy/docker-compose.yml up -d
+# → Grafana на http://localhost:3000 (admin/admin при первом входе),
+# Prometheus на http://localhost:9090.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'dolg-django'
+    metrics_path: '/metrics/'
+    static_configs:
+      - targets: ['web:8000']
+        labels:
+          service: 'dolg-web'
+          env: 'production'
+
+  - job_name: 'prometheus-self'
+    static_configs:
+      - targets: ['localhost:9090']

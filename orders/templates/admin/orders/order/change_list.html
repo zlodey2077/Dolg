@@ -1,0 +1,32 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+{% if order_dashboard %}
+<div class="module" style="margin-bottom: 16px;">
+    <h2>Сводка по заказам</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 12px;">
+        <div>
+            <strong style="display:block; font-size: 20px;">{{ order_dashboard.total_orders }}</strong>
+            <span>Всего заказов</span>
+        </div>
+        <div>
+            <strong style="display:block; font-size: 20px;">{{ order_dashboard.paid_orders }}</strong>
+            <span>Оплачено</span>
+        </div>
+        <div>
+            <strong style="display:block; font-size: 20px;">{{ order_dashboard.pending_orders }}</strong>
+            <span>Ожидают обработки</span>
+        </div>
+        <div>
+            <strong style="display:block; font-size: 20px;">{{ order_dashboard.cancelled_orders }}</strong>
+            <span>Отменено</span>
+        </div>
+        <div>
+            <strong style="display:block; font-size: 20px;">{{ order_dashboard.revenue }} ₽</strong>
+            <span>Оплаченная выручка</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

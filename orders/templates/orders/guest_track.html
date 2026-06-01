@@ -1,0 +1,124 @@
+{% extends "shop/base.html" %}
+{% block title %}Заказ {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 760px; margin: 2rem auto;">
+    <h1 style="color: var(--accent-cyan);">📦 Заказ {{ order.order_number }}</h1>
+
+    <div class="track-card">
+        <div class="track-row">
+            <span class="track-label">Статус</span>
+            <span class="track-value track-status">{{ order.status.name|default:'В обработке' }}</span>
+        </div>
+        <div class="track-row">
+            <span class="track-label">Дата</span>
+            <span class="track-value">{{ order.created_at|date:"d.m.Y H:i" }}</span>
+        </div>
+        <div class="track-row">
+            <span class="track-label">Получатель</span>
+            <span class="track-value">{{ order.guest_name }}</span>
+        </div>
+        <div class="track-row">
+            <span class="track-label">Email</span>
+            <span class="track-value">{{ order.guest_email }}</span>
+        </div>
+        {% if order.guest_phone %}
+        <div class="track-row">
+            <span class="track-label">Телефон</span>
+            <span class="track-value">{{ order.guest_phone }}</span>
+        </div>
+        {% endif %}
+        <div class="track-row">
+            <span class="track-label">Адрес</span>
+            <span class="track-value">
+                {{ order.shipping_address }},
+                {{ order.shipping_city }}{% if order.shipping_postal_code %}, {{ order.shipping_postal_code }}{% endif %},
+                {{ order.shipping_country }}
+            </span>
+        </div>
+        <div class="track-row">
+            <span class="track-label">Оплата</span>
+            <span class="track-value">{{ order.get_payment_method_display }}{% if order.is_paid %} <small style="color:#4ad991;">✓ оплачен</small>{% else %} <small style="color:#ffb84d;">ожидает оплаты</small>{% endif %}</span>
+        </div>
+    </div>
+
+    <h2 style="color: var(--accent-cyan); margin-top: 1.5rem;">Состав заказа</h2>
+    <div class="track-items">
+        {% for it in order.items.all %}
+        <div class="track-item">
+            <span>{{ it.product.name|default:'(товар недоступен)' }}</span>
+            <span class="track-item-meta">{{ it.quantity }} × {{ it.price }} ₽</span>
+            <span class="track-item-sum">{{ it.get_total_price }} ₽</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="track-total">
+        <strong>Итого:</strong> <span class="track-total-sum">{{ order.total_amount }} ₽</span>
+    </div>
+
+    <div style="margin-top: 1.5rem; background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.3); padding: 1rem 1.2rem; border-radius: 8px;">
+        💡 Эта ссылка работает без регистрации — сохраните её в браузере или из письма.
+        <br>Хотите управлять заказами в одном месте? <a href="{% url 'accounts:register' %}" style="color: var(--accent-cyan);">Зарегистрируйтесь</a> — будущие заказы привяжутся к аккаунту автоматически.
+    </div>
+
+    <a href="{% url 'shop:index' %}" class="btn btn-secondary" style="margin-top: 1rem; display: inline-block;">← К каталогу</a>
+</div>
+
+<style>
+.track-card {
+    background: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+}
+.track-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.15);
+    gap: 1rem;
+}
+.track-row:last-child { border-bottom: 0; }
+.track-label {
+    color: rgba(224, 224, 224, 0.6);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.track-value { color: var(--text-bright, #fff); text-align: right; }
+.track-status { color: var(--accent-cyan); font-weight: 600; }
+
+.track-items {
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+}
+.track-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.12);
+}
+.track-item:last-child { border-bottom: 0; }
+.track-item-meta { color: rgba(200, 200, 200, 0.7); font-size: 0.9rem; }
+.track-item-sum { color: #90ee90; font-weight: bold; }
+
+.track-total {
+    background: rgba(20, 30, 60, 0.5);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    padding: 0.85rem 1.2rem;
+    margin-top: 1rem;
+    text-align: right;
+    font-size: 1.1rem;
+}
+.track-total-sum { color: #90ee90; font-size: 1.3rem; }
+</style>
+{% endblock %}

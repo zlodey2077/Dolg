@@ -1,0 +1,61 @@
+{% extends "shop/base.html" %}
+{% block title %}Включение 2FA{% endblock %}
+{% block content %}
+<style>
+.tfa-card { max-width: 540px; margin: 2rem auto; padding: 1.5rem; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 10px; }
+.tfa-card h1 { margin-top: 0; font-size: 1.3rem; }
+.tfa-card .qr-box { text-align: center; padding: 1rem; background: rgba(255,255,255,.95); border-radius: 8px; margin: 1rem 0; }
+.tfa-card .qr-box img { width: 240px; height: 240px; }
+.tfa-card .secret-fallback { font-family: monospace; font-size: 0.85rem; word-break: break-all; padding: 0.5rem; background: rgba(0,0,0,.3); border-radius: 4px; color: #f1fa8c; }
+.tfa-card input[type=text] { width: 100%; box-sizing: border-box; padding: 0.6rem; font-size: 1.3rem; text-align: center; letter-spacing: 0.3em; background: rgba(0,0,0,.2); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; }
+.tfa-card ol { line-height: 1.7; padding-left: 1.5rem; }
+.tfa-card details { margin-top: 1rem; cursor: pointer; }
+.tfa-card details summary { color: var(--text-light,#a4b3d0); }
+</style>
+
+<div class="tfa-card">
+    <h1>🔐 Включение 2FA (двухфакторной аутентификации)</h1>
+
+    <ol>
+        <li>Установите приложение-аутентификатор: <strong>Google Authenticator</strong>,
+            <strong>Authy</strong>, <strong>1Password</strong>, <strong>Microsoft Authenticator</strong>
+            или любой TOTP-совместимый.</li>
+        <li>Отсканируйте QR-код ниже камерой приложения.</li>
+        <li>В приложении появится 6-значный код, который меняется каждые 30 сек.
+            Введите его в поле ниже и нажмите «Подтвердить».</li>
+    </ol>
+
+    <div class="qr-box">
+        <img src="{{ qr_data_uri }}" alt="QR-код для настройки 2FA">
+    </div>
+
+    <details>
+        <summary>Не удаётся отсканировать? Введите секрет вручную</summary>
+        <p>Скопируйте секрет в приложение (выберите «ввести ключ вручную»):</p>
+        <p class="secret-fallback">{{ secret_b32 }}</p>
+        <p style="font-size:.85rem;color:var(--text-light,#a4b3d0);">
+            Issuer: <code>DOLG</code> · Account: <code>{{ user.username }}</code> ·
+            Algorithm: SHA1 · Digits: 6 · Period: 30 sec
+        </p>
+    </details>
+
+    <form method="post" style="margin-top:1.5rem;">
+        {% csrf_token %}
+        <label for="token" style="display:block;margin-bottom:0.5rem;">
+            Введите 6-значный код из приложения:
+        </label>
+        <input type="text" name="token" id="token" inputmode="numeric" pattern="[0-9 ]*"
+               maxlength="7" placeholder="123456" autocomplete="one-time-code" autofocus>
+        <button type="submit" class="btn btn-primary" style="margin-top:1rem;width:100%;">
+            ✓ Подтвердить и включить 2FA
+        </button>
+    </form>
+
+    <p style="margin-top:1rem;font-size:.85rem;color:var(--text-light,#a4b3d0);">
+        После подтверждения мы покажем 10 резервных кодов — сохраните их на случай
+        потери телефона. Без 2FA-кода и без backup-кодов доступ восстановить нельзя.
+    </p>
+
+    <p><a href="{% url 'accounts:profile' %}">← Отмена</a></p>
+</div>
+{% endblock %}

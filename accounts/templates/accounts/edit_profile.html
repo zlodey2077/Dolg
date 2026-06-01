@@ -1,0 +1,277 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Настройки профиля{% endblock %}
+
+{% block content %}
+<div class="profile-edit-page">
+    <div class="settings-head">
+        <div>
+            <p class="settings-kicker">Личный кабинет</p>
+            <h1>Настройки профиля</h1>
+        </div>
+        <a href="{% url 'accounts:profile' %}" class="btn btn-secondary">К профилю</a>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="settings-form">
+        {% csrf_token %}
+
+        <section class="settings-section">
+            <h2>Основная информация</h2>
+            <div class="settings-grid">
+                <label>
+                    <span>Имя</span>
+                    <input type="text" name="first_name" value="{{ user.first_name }}" class="form-control" maxlength="50">
+                </label>
+                <label>
+                    <span>Фамилия</span>
+                    <input type="text" name="last_name" value="{{ user.last_name }}" class="form-control" maxlength="50">
+                </label>
+                <label>
+                    <span>Отображаемое имя</span>
+                    <input type="text" name="display_name" value="{{ profile.display_name }}" class="form-control" maxlength="80" placeholder="Например: Дмитрий, схемотехник">
+                </label>
+                <label>
+                    <span>Короткий статус</span>
+                    <input type="text" name="headline" value="{{ profile.headline }}" class="form-control" maxlength="120" placeholder="Проекты, учеба, специализация">
+                </label>
+                <label class="settings-wide">
+                    <span>Email</span>
+                    <input type="email" name="email" value="{{ user.email }}" class="form-control">
+                </label>
+                <label class="settings-wide">
+                    <span>О себе</span>
+                    <textarea name="bio" rows="4" class="form-control">{{ profile.bio }}</textarea>
+                </label>
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Контакты и доставка</h2>
+            <div class="settings-grid">
+                <label>
+                    <span>Телефон</span>
+                    <input type="tel" name="phone" value="{{ profile.phone }}" class="form-control">
+                </label>
+                <label>
+                    <span>Город</span>
+                    <input type="text" name="city" value="{{ profile.city }}" class="form-control" maxlength="100">
+                </label>
+                <label>
+                    <span>Индекс</span>
+                    <input type="text" name="postal_code" value="{{ profile.postal_code }}" class="form-control" maxlength="20">
+                </label>
+                <label>
+                    <span>Страна</span>
+                    <input type="text" name="country" value="{{ profile.country }}" class="form-control" maxlength="80">
+                </label>
+                <label class="settings-wide">
+                    <span>Адрес</span>
+                    <input type="text" name="address" value="{{ profile.address }}" class="form-control" maxlength="200">
+                </label>
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Кастомизация сайта</h2>
+            <div class="settings-grid">
+                <label>
+                    <span>Тема интерфейса</span>
+                    <select name="preferred_theme" class="form-control">
+                        {% for value, label in theme_choices %}
+                            <option value="{{ value }}" {% if profile.preferred_theme == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Акцентный цвет</span>
+                    <select name="accent_color" class="form-control">
+                        {% for value, label in accent_choices %}
+                            <option value="{{ value }}" {% if profile.accent_color == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Единицы измерения</span>
+                    <select name="default_unit_system" class="form-control">
+                        {% for value, label in unit_system_choices %}
+                            <option value="{{ value }}" {% if profile.default_unit_system == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Стартовый раздел</span>
+                    <select name="start_page" class="form-control">
+                        {% for value, label in start_page_choices %}
+                            <option value="{{ value }}" {% if profile.start_page == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Стиль AI-ответов</span>
+                    <select name="ai_tone" class="form-control">
+                        {% for value, label in ai_tone_choices %}
+                            <option value="{{ value }}" {% if profile.ai_tone == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="toggle-list">
+                    <label class="toggle-row">
+                        <input type="checkbox" name="show_profile_public" {% if profile.show_profile_public %}checked{% endif %}>
+                        <span>Разрешить показывать публичный профиль</span>
+                    </label>
+                    <label class="toggle-row">
+                        <input type="checkbox" name="show_engineering_badges" {% if profile.show_engineering_badges %}checked{% endif %}>
+                        <span>Показывать инженерные бейджи и тарифные возможности</span>
+                    </label>
+                    <label class="toggle-row">
+                        <input type="checkbox" name="allow_ai_training" {% if profile.allow_ai_training %}checked{% endif %}>
+                        <span>Разрешаю использовать мои схемы как примеры для обучения локального AI</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Изображения и брендирование</h2>
+            <div class="settings-grid">
+                <label>
+                    <span>Аватар</span>
+                    <input type="file" name="avatar" accept="image/*" class="form-control">
+                    {% if profile.avatar %}
+                        <img src="{{ profile.avatar.url }}" alt="Текущий аватар" class="preview-image">
+                    {% endif %}
+                </label>
+                <label>
+                    <span>Логотип для Pro-экспортов</span>
+                    <input type="file" name="pro_logo" accept="image/*" class="form-control">
+                    {% if profile.pro_logo %}
+                        <img src="{{ profile.pro_logo.url }}" alt="Текущий логотип" class="preview-image preview-image--logo">
+                    {% endif %}
+                    <small>Для Free загрузка логотипа заблокирована тарифом.</small>
+                </label>
+            </div>
+        </section>
+
+        <div class="settings-actions">
+            <button type="submit" class="btn btn-success">Сохранить изменения</button>
+            <a href="{% url 'accounts:profile' %}" class="btn btn-secondary">Отменить</a>
+            <a href="{% url 'hello:billing_plans' %}" class="btn btn-primary">Открыть подписки</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.profile-edit-page {
+    display: grid;
+    gap: 1.4rem;
+}
+.settings-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.2rem;
+    border: 1px solid rgba(0, 212, 255, 0.32);
+    border-radius: 8px;
+    background: rgba(10, 14, 39, 0.72);
+}
+.settings-kicker {
+    color: #8eb6c8;
+    margin: 0 0 0.25rem;
+}
+.settings-head h1 {
+    margin: 0;
+    color: #f4fbff;
+}
+.settings-form {
+    display: grid;
+    gap: 1.25rem;
+}
+.settings-section {
+    border: 1px solid rgba(0, 212, 255, 0.28);
+    border-radius: 8px;
+    background: rgba(10, 14, 39, 0.72);
+    padding: 1.25rem;
+}
+.settings-section h2 {
+    margin: 0 0 1rem;
+    color: var(--accent-cyan);
+}
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+.settings-wide {
+    grid-column: 1 / -1;
+}
+.settings-grid label,
+.toggle-list {
+    display: grid;
+    gap: 0.45rem;
+}
+.settings-grid label span,
+.toggle-row span {
+    color: #a8d8e8;
+    font-weight: 600;
+}
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(4, 11, 30, 0.74);
+    border: 1px solid rgba(0, 212, 255, 0.38);
+    border-radius: 6px;
+    color: #edfaff;
+    font-size: 1rem;
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 0.16rem rgba(0, 212, 255, 0.18);
+}
+.toggle-list {
+    align-content: start;
+    padding: 0.75rem;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(0, 212, 255, 0.06);
+}
+.toggle-row {
+    display: flex !important;
+    align-items: center;
+    gap: 0.6rem;
+}
+.toggle-row input {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+.preview-image {
+    width: 90px;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 212, 255, 0.45);
+}
+.preview-image--logo {
+    border-radius: 8px;
+    width: 130px;
+    aspect-ratio: 2.2;
+}
+.settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+@media (max-width: 760px) {
+    .settings-head,
+    .settings-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

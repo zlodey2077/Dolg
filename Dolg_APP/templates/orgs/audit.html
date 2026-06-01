@@ -1,0 +1,50 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ org.name }} — Audit{% endblock %}
+{% block content %}
+<div class="org-page">
+    <div class="org-page-header">
+        <h1>📋 Audit-log «{{ org.name }}»</h1>
+        <nav class="org-page-nav">
+            <a href="{% url 'hello:org_dashboard' org.slug %}">📊 Dashboard</a>
+            <a href="{% url 'hello:org_members' org.slug %}">👥 Команда</a>
+            <a href="{% url 'hello:org_conversation_list' org.slug %}">💬 Беседы</a>
+            <a href="{% url 'hello:org_audit' org.slug %}" class="active">📋 Audit-log</a>
+        </nav>
+    </div>
+
+    <form method="get" class="audit-filter">
+        <label>Action:
+            <select name="action">
+                <option value="">— все —</option>
+                {% for a in distinct_actions %}
+                <option value="{{ a }}" {% if a == action_filter %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Actor:
+            <input type="text" name="actor" value="{{ actor_filter }}" placeholder="username">
+        </label>
+        <button type="submit" class="btn btn-small">Применить</button>
+        <a href="{% url 'hello:org_audit' org.slug %}" class="btn btn-small">сбросить</a>
+    </form>
+
+    <table class="audit-table">
+        <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Payload</th><th>IP</th></tr></thead>
+        <tbody>
+            {% for e in entries %}
+            <tr>
+                <td>{{ e.timestamp|date:"d.m H:i:s" }}</td>
+                <td>{{ e.actor.username|default:"-" }}</td>
+                <td><code>{{ e.action }}</code></td>
+                <td>{% if e.object_type %}{{ e.object_type }}#{{ e.object_id }}{% endif %}</td>
+                <td><pre class="audit-payload">{{ e.payload }}</pre></td>
+                <td><small>{{ e.ip_address|default:"-" }}</small></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" style="text-align:center;color:#888">Нет записей.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="audit-note">Показаны последние 200 записей. Retention: 5 лет (152-ФЗ / SOX).</p>
+</div>
+{% endblock %}

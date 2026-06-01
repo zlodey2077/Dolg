@@ -1,0 +1,59 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ category.name }} — Энциклопедия ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kb-head { margin: 2rem 0 1.5rem; }
+    .kb-crumbs { color: rgba(224,224,224,.6); font-size: .85rem; margin-bottom: .5rem; }
+    .kb-crumbs a { color: var(--accent-cyan); text-decoration: none; }
+    .kb-head h1 { color: var(--accent-cyan); font-size: 2rem; margin: 0 0 .5rem; }
+    .kb-head p { color: var(--text-light); margin: 0; }
+    .kb-articles { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.1rem; margin: 2rem 0; }
+    .kb-card {
+        background: rgba(26,39,68,.55);
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 10px;
+        padding: 1.1rem 1.15rem;
+        text-decoration: none;
+        color: inherit;
+        display: flex; flex-direction: column; gap: .55rem;
+        transition: all .25s ease;
+    }
+    .kb-card:hover { transform: translateY(-3px); border-color: var(--accent-cyan); box-shadow: 0 0 18px rgba(0,212,255,.3); }
+    .kb-card-title { color: var(--accent-cyan); font-size: 1.05rem; font-weight: 600; margin: 0; }
+    .kb-card-summary { color: var(--text-light); font-size: .88rem; margin: 0; flex: 1; }
+    .kb-card-footer { display: flex; justify-content: space-between; align-items: center; gap: .45rem; font-size: .78rem; color: rgba(224,224,224,.6); }
+    .kb-card-materials {
+        margin-left: auto;
+        padding: .12rem .45rem;
+        border: 1px solid rgba(0,212,255,.24);
+        border-radius: 999px;
+        color: var(--accent-cyan);
+        background: rgba(0,212,255,.06);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kb-head">
+    <div class="kb-crumbs"><a href="{% url 'knowledge:index' %}">📚 Энциклопедия</a> / {{ category.name }}</div>
+    <h1>{{ category.icon }} {{ category.name }}</h1>
+    {% if category.description %}<p>{{ category.description }}</p>{% endif %}
+</div>
+
+<div class="kb-articles">
+    {% for a in articles %}
+    <a href="{% url 'knowledge:article' a.slug %}" class="kb-card">
+        <h3 class="kb-card-title">{{ a.title }}</h3>
+        <p class="kb-card-summary">{{ a.summary }}</p>
+        <div class="kb-card-footer">
+            <span>⏱ {{ a.reading_minutes }} мин</span>
+            {% if a.published_materials %}<span class="kb-card-materials">📎 {{ a.published_materials|length }}</span>{% endif %}
+            <span>Читать →</span>
+        </div>
+    </a>
+    {% empty %}
+    <p>В этой категории пока нет опубликованных статей.</p>
+    {% endfor %}
+</div>
+{% endblock %}

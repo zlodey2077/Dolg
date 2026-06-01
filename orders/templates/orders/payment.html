@@ -1,0 +1,378 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Платеж - Заказ {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container payment-container">
+    <div class="payment-header">
+        <h1>Оплата заказа</h1>
+        <p class="order-number">Заказ №{{ order.order_number }}</p>
+    </div>
+
+    <div class="payment-content">
+        <!-- Order Summary -->
+        <div class="order-summary">
+            <h2>Сумма к оплате</h2>
+            <div class="amount-display">
+                <span class="currency">₽</span>
+                <span class="amount">{{ amount|floatformat:2 }}</span>
+            </div>
+
+            <h3>Детали заказа</h3>
+            <div class="order-details">
+                <p><strong>Номер заказа:</strong> {{ order.order_number }}</p>
+                <p><strong>Адрес доставки:</strong> {{ order.shipping_address }}, {{ order.shipping_city }} {{ order.shipping_postal_code }}, {{ order.shipping_country }}</p>
+                <p><strong>Способ оплаты:</strong> {{ order.get_payment_method_display }}</p>
+            </div>
+
+            <h3>Товары</h3>
+            <div class="order-items-summary">
+                {% for item in order.items.all %}
+                <div class="item-summary">
+                    <span class="item-name">{{ item.product.name }}</span>
+                    <span class="item-qty">x{{ item.quantity }}</span>
+                    <span class="item-price">{{ item.get_total_price }} ₽</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Stripe Payment Form -->
+        <div class="payment-form-container">
+            <h2>Информация о платежной карте</h2>
+            <form id="payment-form">
+                {% csrf_token %}
+                
+                <div id="card-element" class="stripe-form-group">
+                    <!-- Stripe card element will be inserted here -->
+                </div>
+                
+                <div id="card-errors" class="error-message" role="alert"></div>
+                
+                <div class="payment-actions">
+                    <button type="submit" id="submit-button" class="btn btn-primary btn-lg">
+                        Оплатить {{ amount|floatformat:2 }} ₽
+                    </button>
+                    <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-secondary">
+                        Отмена
+                    </a>
+                </div>
+            </form>
+
+            <p class="payment-info">
+                <strong>Примечание:</strong> Используйте тестовую карту <code>4242 4242 4242 4242</code> 
+                с любой будущей датой и любым трехзначным кодом для тестирования.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Stripe JS -->
+<script src="https://js.stripe.com/v3/"></script>
+
+<style>
+.payment-container {
+    max-width: 1000px;
+    padding: 40px 20px;
+}
+
+.payment-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.payment-header h1 {
+    font-size: 2em;
+    margin-bottom: 10px;
+    color: var(--accent-cyan);
+}
+
+.order-number {
+    color: rgba(0, 212, 255, 0.7);
+    font-size: 1.1em;
+}
+
+.payment-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+}
+
+@media (max-width: 768px) {
+    .payment-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Order Summary */
+.order-summary {
+    background: linear-gradient(135deg, rgba(10, 14, 39, 0.95), rgba(20, 30, 60, 0.95));
+    border: 2px solid var(--accent-cyan);
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.order-summary h2 {
+    font-size: 1.3em;
+    margin-bottom: 15px;
+    border-bottom: 2px solid var(--accent-cyan);
+    padding-bottom: 10px;
+    color: var(--accent-cyan);
+}
+
+.order-summary h3 {
+    font-size: 1.1em;
+    margin-top: 25px;
+    margin-bottom: 10px;
+    color: rgba(0, 212, 255, 0.9);
+}
+
+.amount-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 25px;
+}
+
+.currency {
+    font-size: 1.2em;
+}
+
+.order-details p {
+    margin: 8px 0;
+    color: #ccc;
+}
+
+.order-details strong {
+    color: rgba(0, 212, 255, 0.9);
+}
+
+.order-items-summary {
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.item-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+}
+
+.item-summary:last-child {
+    border-bottom: none;
+}
+
+.item-name {
+    flex: 1;
+    font-weight: 500;
+    color: #ccc;
+}
+
+.item-qty {
+    color: rgba(0, 212, 255, 0.6);
+    margin-right: 15px;
+}
+
+.item-price {
+    font-weight: 600;
+    color: #90ee90;
+    min-width: 80px;
+    text-align: right;
+}
+
+/* Payment Form */
+.payment-form-container {
+    background: linear-gradient(135deg, rgba(10, 14, 39, 0.95), rgba(20, 30, 60, 0.95));
+    border: 2px solid var(--accent-cyan);
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.payment-form-container h2 {
+    font-size: 1.3em;
+    margin-bottom: 25px;
+    border-bottom: 2px solid var(--accent-cyan);
+    padding-bottom: 10px;
+    color: var(--accent-cyan);
+}
+
+.stripe-form-group {
+    background: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+    min-height: 50px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #ccc;
+}
+
+.error-message {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff6464;
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.error-message.show {
+    display: block;
+}
+
+.payment-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: rgba(0, 102, 255, 0.3);
+    color: #00d4ff;
+    border: 2px solid #0066ff;
+    flex: 1;
+}
+
+.btn-primary:hover {
+    background: rgba(0, 102, 255, 0.5);
+    box-shadow: 0 0 15px rgba(0, 102, 255, 0.5);
+}
+
+.btn-primary:disabled {
+    background: rgba(100, 100, 100, 0.3);
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: rgba(100, 100, 100, 0.3);
+    color: #aaa;
+    border: 2px solid #666;
+}
+
+.btn-secondary:hover {
+    background: rgba(100, 100, 100, 0.5);
+}
+
+.btn-lg {
+    padding: 15px 30px;
+    font-size: 1.1em;
+}
+
+.payment-info {
+    background: rgba(0, 212, 255, 0.1);
+    border-left: 4px solid var(--accent-cyan);
+    padding: 12px;
+    margin-top: 20px;
+    font-size: 0.95em;
+    color: #ccc;
+}
+
+.payment-info code {
+    background: rgba(0, 212, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    color: #00ffff;
+}
+
+#submit-button {
+    min-width: 200px;
+}
+
+#submit-button.processing {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+</style>
+
+<script>
+// Initialize Stripe
+const stripe = Stripe('{{ stripe_public_key }}');
+const elements = stripe.elements();
+const cardElement = elements.create('card');
+
+// Mount card element
+cardElement.mount('#card-element');
+
+// Handle card errors
+const cardErrors = document.getElementById('card-errors');
+
+cardElement.addEventListener('change', (event) => {
+    if (event.error) {
+        cardErrors.textContent = event.error.message;
+        cardErrors.classList.add('show');
+    } else {
+        cardErrors.textContent = '';
+        cardErrors.classList.remove('show');
+    }
+});
+
+// Handle form submission
+const form = document.getElementById('payment-form');
+const submitButton = document.getElementById('submit-button');
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    
+    // Disable button during processing
+    submitButton.disabled = true;
+    submitButton.classList.add('processing');
+    submitButton.textContent = 'Обработка...';
+
+    // Confirm payment with Stripe
+    const result = await stripe.confirmCardPayment('{{ client_secret }}', {
+        payment_method: {
+            card: cardElement,
+            billing_details: {
+                // Billing details can be added here if needed
+            }
+        }
+    });
+
+    if (result.error) {
+        // Handle error from Stripe
+        cardErrors.textContent = result.error.message;
+        cardErrors.classList.add('show');
+        
+        submitButton.disabled = false;
+        submitButton.classList.remove('processing');
+        submitButton.textContent = 'Оплатить {{ amount|floatformat:2 }} ₽';
+    } else if (result.paymentIntent.status === 'succeeded') {
+        // Payment successful
+        window.location.href = '{% url "orders:payment_success" order.id %}';
+    } else {
+        // Unexpected status
+        cardErrors.textContent = 'Неожиданный статус платежа: ' + result.paymentIntent.status;
+        cardErrors.classList.add('show');
+        
+        submitButton.disabled = false;
+        submitButton.classList.remove('processing');
+        submitButton.textContent = 'Оплатить {{ amount|floatformat:2 }} ₽';
+    }
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "shop/base.html" %}
+{% block title %}📚 Энциклопедия — ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kb-hero {
+        text-align: center;
+        padding: 3rem 0 2rem;
+        background: linear-gradient(135deg, rgba(0,102,255,0.12), rgba(93,0,102,0.08));
+        border-radius: 16px;
+        border: 1px solid var(--cosmic-light-blue);
+        margin: 2rem 0;
+        box-shadow: 0 0 30px rgba(0,212,255,0.15);
+    }
+    .kb-hero h1 {
+        font-size: 2.4rem;
+        margin-bottom: .75rem;
+        background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .kb-hero p { color: var(--text-light); max-width: 700px; margin: 0 auto; font-size: 1.05rem; }
+    .kb-meta { margin-top: 1rem; color: var(--text-bright); font-size: .9rem; }
+    .kb-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .6rem;
+        margin: 0 0 1.8rem;
+    }
+    .kb-tab {
+        border: 1px solid rgba(0, 212, 255, .35);
+        border-radius: 8px;
+        color: var(--text-bright);
+        padding: .55rem .85rem;
+        text-decoration: none;
+        background: rgba(0, 212, 255, .06);
+    }
+    .kb-tab.active {
+        background: rgba(0, 212, 255, .18);
+        color: var(--accent-cyan);
+    }
+
+    .kb-section { margin-bottom: 3rem; }
+    .kb-section-header {
+        display: flex; align-items: center; gap: .75rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: .65rem;
+        border-bottom: 1px solid rgba(0,212,255,.3);
+    }
+    .kb-section-icon { font-size: 1.8rem; }
+    .kb-section-title { color: var(--accent-cyan); font-size: 1.25rem; margin: 0; }
+    .kb-section-desc { color: var(--text-light); font-size: .9rem; margin: 0 0 0 auto; }
+
+    .kb-articles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.1rem; }
+    .kb-card {
+        background: linear-gradient(135deg, rgba(26,39,68,.55), rgba(10,14,39,.55));
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 10px;
+        padding: 1.1rem 1.15rem;
+        display: flex; flex-direction: column; gap: .55rem;
+        transition: all .25s ease;
+        text-decoration: none;
+        color: inherit;
+    }
+    .kb-card:hover { transform: translateY(-3px); border-color: var(--accent-cyan); box-shadow: 0 0 20px rgba(0,212,255,.3); }
+    .kb-card-title { color: var(--accent-cyan); font-size: 1rem; font-weight: 600; margin: 0; line-height: 1.3; }
+    .kb-card-summary { color: var(--text-light); font-size: .87rem; line-height: 1.45; margin: 0; flex: 1; }
+    .kb-card-footer { display: flex; justify-content: space-between; align-items: center; font-size: .78rem; color: rgba(224,224,224,.6); margin-top: auto; }
+    .kb-card-reading::before { content: '⏱ '; }
+    .kb-card-materials {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+        padding: .12rem .45rem;
+        border: 1px solid rgba(0,212,255,.24);
+        border-radius: 999px;
+        color: var(--accent-cyan);
+        background: rgba(0,212,255,.06);
+    }
+
+    .kb-empty { text-align: center; padding: 1.5rem; color: var(--text-light); opacity: .7; font-style: italic; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kb-hero">
+    <h1>📚 Энциклопедия электроники</h1>
+    <p>Справочные статьи по физике, компонентам, корпусам и инженерной практике — для студентов, радиолюбителей и тех, кто хочет разобраться в устройстве деталей из каталога.</p>
+    <div class="kb-meta">Статей в базе: <strong>{{ total_articles }}</strong></div>
+</div>
+
+{% for cat in categories %}
+<section class="kb-section">
+    <div class="kb-section-header">
+        <span class="kb-section-icon">{{ cat.icon }}</span>
+        <h2 class="kb-section-title"><a href="{% url 'knowledge:category' cat.slug %}" style="color:inherit; text-decoration:none;">{{ cat.name }}</a></h2>
+        {% if cat.description %}<span class="kb-section-desc">{{ cat.description }}</span>{% endif %}
+    </div>
+
+    {% if cat.articles.all %}
+    <div class="kb-articles">
+        {% for a in cat.articles.all %}
+        <a href="{% url 'knowledge:article' a.slug %}" class="kb-card">
+            <h3 class="kb-card-title">{{ a.title }}</h3>
+            <p class="kb-card-summary">{{ a.summary }}</p>
+            <div class="kb-card-footer">
+                <span class="kb-card-reading">{{ a.reading_minutes }} мин</span>
+                {% if a.published_materials %}<span class="kb-card-materials">📎 {{ a.published_materials|length }}</span>{% endif %}
+                <span>Читать →</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="kb-empty">Скоро здесь появятся статьи.</p>
+    {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

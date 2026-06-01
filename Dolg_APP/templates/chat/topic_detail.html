@@ -1,0 +1,283 @@
+{% extends "shop/base.html" %}
+{% load shop_extras %}
+{% load static %}
+{% block title %}{{ topic.title }} — Чат{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'chat/chat.css' %}">
+<script defer src="{% static 'chat/chat-toast.js' %}"></script>
+{% endblock %}
+{% block content %}
+
+<p><a href="{% url 'hello:chat_list' %}">← к списку топиков</a></p>
+
+{% if request.GET.error %}
+<div class="chat-error">⚠ {{ request.GET.error }}</div>
+{% endif %}
+
+<div class="chat-layout">
+    <div>
+        <div class="topic-card">
+            <h1>{% if topic.is_pinned %}📌 {% endif %}{{ topic.title }} {% if topic.is_resolved %}<span class="accepted-badge">✓ решено</span>{% endif %}</h1>
+            <div class="topic-header-meta">
+                <span class="chip">{{ topic.get_category_display }}</span>
+                <span>👤 {% if topic.author %}{{ topic.author.username }}{% else %}—{% endif %}</span>
+                <span>{{ topic.created_at|date:"d.m.Y H:i" }}</span>
+                <span>👁 {{ topic.views_count }}</span>
+                <span>💬 {{ replies|length }} ответ{{ replies|length|pluralize:"а,ов" }}</span>
+            </div>
+
+            <div class="topic-body">{{ topic_body_html|safe }}</div>
+
+            {% if topic.attached_project %}
+            <div class="topic-attached">
+                📎 Прикреплён проект: <strong>{{ topic.attached_project.name }}</strong>
+                <small style="color:var(--text-light);">({{ topic.attached_project.get_category_display }})</small>
+            </div>
+            {% endif %}
+
+            <div class="reactions-row" data-target-type="topic" data-target-id="{{ topic.id }}">
+                {% for r in topic_reactions %}
+                <button class="reaction-btn" data-emoji="{{ r.emoji }}">{{ r.emoji }}<span class="count">{{ r.count }}</span></button>
+                {% endfor %}
+                {% if can_post %}
+                <button class="reaction-add" onclick="this.nextElementSibling.classList.toggle('open')">＋ реакция</button>
+                <div class="reaction-emoji-picker">
+                    {% if is_pro_viewer %}
+                        {% for e in allowed_emojis_pro %}<button data-emoji="{{ e }}">{{ e }}</button>{% endfor %}
+                    {% else %}
+                        {% for e in allowed_emojis_free %}<button data-emoji="{{ e }}">{{ e }}</button>{% endfor %}
+                        <small style="color:var(--text-light);align-self:center;">Pro → любые emoji</small>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="topic-actions">
+                {% if is_pro_viewer and is_topic_author %}
+                <form method="post" action="{% url 'hello:chat_topic_pin_toggle' topic.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary btn-small">{% if topic.is_pinned %}📌 Открепить{% else %}📌 Закрепить{% endif %}</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="replies-section">
+            <h2>💬 Ответы (<span id="replies-count">{{ replies|length }}</span>)</h2>
+            <div id="replies-container">
+                {% for reply, body_html in rendered_replies %}
+                <div class="reply {% if reply.is_accepted_answer %}accepted{% endif %} {% if reply.parent_id %}nested{% endif %}" data-reply-id="{{ reply.id }}">
+                    <div class="reply-head">
+                        <span><span class="reply-author">{{ reply.author.username|default:"—" }}</span> · {{ reply.created_at|date:"d.m H:i" }}</span>
+                        {% if reply.is_accepted_answer %}<span class="accepted-badge">✓ принятый ответ</span>{% endif %}
+                    </div>
+                    <div class="reply-body">{{ body_html|safe }}</div>
+                    <div class="reactions-row" data-target-type="reply" data-target-id="{{ reply.id }}">
+                        {% with rxs=reply_reactions|default_if_none:'' %}
+                            {% for r in rxs|get_item:reply.id %}
+                            <button class="reaction-btn" data-emoji="{{ r.emoji }}">{{ r.emoji }}<span class="count">{{ r.count }}</span></button>
+                            {% endfor %}
+                        {% endwith %}
+                        {% if can_post %}
+                        <button class="reaction-add" onclick="this.nextElementSibling.classList.toggle('open')">＋</button>
+                        <div class="reaction-emoji-picker">
+                            {% if is_pro_viewer %}
+                                {% for e in allowed_emojis_pro %}<button data-emoji="{{ e }}">{{ e }}</button>{% endfor %}
+                            {% else %}
+                                {% for e in allowed_emojis_free %}<button data-emoji="{{ e }}">{{ e }}</button>{% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="reply-actions">
+                        {% if can_post %}
+                        <button onclick="document.querySelector('#new-reply-parent').value='{{ reply.id }}';document.querySelector('#new-reply-textarea').focus();">↩ ответить</button>
+                        {% endif %}
+                        {% if is_topic_author and not reply.is_accepted_answer %}
+                        <form method="post" action="{% url 'hello:chat_reply_accept_answer' topic.id reply.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit">✓ пометить как ответ</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p style="color:var(--text-light);">Ответов пока нет. Будьте первым!</p>
+                {% endfor %}
+            </div>
+
+            {% if can_post %}
+            <form method="post" action="{% url 'hello:chat_reply_create' topic.id %}" class="reply-form" id="reply-form">
+                {% csrf_token %}
+                <input type="hidden" name="parent_id" id="new-reply-parent" value="">
+                <textarea name="body" id="new-reply-textarea" placeholder="{% if is_pro_viewer %}Markdown поддерживается. ``` для блока кода.{% else %}Ваш ответ...{% endif %}" required></textarea>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem;">
+                    <small class="reply-form-hint" id="reply-parent-hint"></small>
+                    <button type="submit" class="btn btn-primary btn-small">📨 Отправить</button>
+                </div>
+            </form>
+            {% else %}
+            <p style="color:var(--text-light);">
+                Для ответа нужна <a href="{% url 'accounts:login' %}">авторизация</a>.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% include "chat/_announcements_sidebar.html" %}
+</div>
+
+<script>
+(function() {
+    'use strict';
+    const TOPIC_ID = {{ topic.id }};
+    const POLL_URL = '{% url "hello:chat_topic_poll" topic.id %}';
+    const REACT_URL = '{% url "hello:chat_reaction_toggle" %}';
+    const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+
+    // Polling: каждые 9 сек проверяем новые reply
+    let lastReplyId = 0;
+    document.querySelectorAll('.reply').forEach(el => {
+        const id = parseInt(el.dataset.replyId);
+        if (id > lastReplyId) lastReplyId = id;
+    });
+
+    function appendReply(reply) {
+        if (!reply || reply.id <= lastReplyId) return;
+        const container = document.getElementById('replies-container');
+        // Удаляем пустой плейсхолдер «Ответов пока нет», если он был
+        const emptyHint = container.querySelector('p[style*="color"]');
+        if (emptyHint && /Ответов пока нет/.test(emptyHint.textContent)) emptyHint.remove();
+        const div = document.createElement('div');
+        div.className = 'reply' + (reply.parent_id ? ' nested' : '');
+        div.dataset.replyId = reply.id;
+        div.innerHTML = `
+            <div class="reply-head">
+                <span><span class="reply-author">${escapeHTML(reply.author)}</span> · ${new Date(reply.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            <div class="reply-body">${reply.body_html}</div>
+        `;
+        container.appendChild(div);
+        lastReplyId = reply.id;
+        document.getElementById('replies-count').textContent = container.querySelectorAll('.reply').length;
+    }
+
+    async function poll() {
+        try {
+            const r = await fetch(`${POLL_URL}?since_id=${lastReplyId}`, {credentials: 'same-origin'});
+            const data = await r.json();
+            if (!data.ok || !data.replies.length) return;
+            for (const reply of data.replies) appendReply(reply);
+        } catch (e) { /* network down — silent */ }
+    }
+
+    // ── WebSocket: основной канал realtime, polling — fallback ──
+    // Если WS не подключается за 4с — стартует polling. При reconnect WS
+    // polling останавливается. Один из двух всегда работает.
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = `${wsProto}//${location.host}/ws/chat/topic/${TOPIC_ID}/`;
+    let ws = null;
+    let pollTimer = null;
+    let wsReconnectDelay = 1000;
+
+    function startPolling() {
+        if (pollTimer) return;
+        pollTimer = setInterval(poll, 9000);
+    }
+    function stopPolling() {
+        if (!pollTimer) return;
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
+    function connectWS() {
+        try { ws = new WebSocket(WS_URL); }
+        catch (e) { startPolling(); return; }
+
+        let connectGuard = setTimeout(() => {
+            if (ws && ws.readyState !== WebSocket.OPEN) {
+                // Подключение не успело — переходим на polling
+                startPolling();
+            }
+        }, 4000);
+
+        ws.addEventListener('open', () => {
+            clearTimeout(connectGuard);
+            wsReconnectDelay = 1000;
+            stopPolling();
+            // Догоняем сообщения за то время пока WS не было — через POLL_URL
+            poll();
+        });
+        ws.addEventListener('message', (e) => {
+            try {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'reply.created') appendReply(msg.reply);
+            } catch (err) { /* ignore */ }
+        });
+        ws.addEventListener('close', () => {
+            startPolling();
+            // Backoff reconnect: 1с → 2с → 4с → ... до 30с
+            setTimeout(connectWS, Math.min(wsReconnectDelay, 30000));
+            wsReconnectDelay *= 2;
+        });
+        ws.addEventListener('error', () => {
+            // Закрытие триггерится отдельно — здесь ничего не делаем
+        });
+    }
+    connectWS();
+
+    // Keep-alive: каждые 25с пингуем (некоторые прокси режут idle 30с+)
+    setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            try { ws.send(JSON.stringify({type: 'ping'})); } catch (e) { /* ignore */ }
+        }
+    }, 25000);
+
+    function escapeHTML(s) {
+        const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+    }
+
+    // Reactions: делегируем клик
+    document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.reaction-btn, .reaction-emoji-picker button');
+        if (!btn) return;
+        const row = btn.closest('.reactions-row');
+        if (!row) return;
+        const emoji = btn.dataset.emoji;
+        if (!emoji) return;
+        try {
+            const r = await fetch(REACT_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    target_type: row.dataset.targetType,
+                    target_id: parseInt(row.dataset.targetId),
+                    emoji: emoji,
+                }),
+            });
+            const data = await r.json();
+            if (data.ok) {
+                // Тупой re-load для простоты — UI agg будет корректным
+                window.location.reload();
+            } else {
+                dolgToast(data.message || 'Не удалось добавить реакцию', 'error');
+            }
+        } catch (e) { dolgToast('Сетевая ошибка', 'error'); }
+    });
+
+    // Hint о parent_id при ответе
+    const parentInput = document.getElementById('new-reply-parent');
+    const hint = document.getElementById('reply-parent-hint');
+    if (parentInput && hint) {
+        const obs = new MutationObserver(() => {
+            hint.textContent = parentInput.value ? `↩ ответ на reply #${parentInput.value} (× очистить)` : '';
+            hint.style.cursor = parentInput.value ? 'pointer' : 'default';
+        });
+        obs.observe(parentInput, {attributes: true, attributeFilter: ['value']});
+        hint.addEventListener('click', () => { if (parentInput.value) { parentInput.value = ''; hint.textContent = ''; }});
+    }
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ org.name }} — API tokens{% endblock %}
+{% block content %}
+<div class="org-page">
+    <div class="org-page-header">
+        <h1>🔑 API tokens «{{ org.name }}»</h1>
+        <nav class="org-page-nav">
+            <a href="{% url 'hello:org_dashboard' org.slug %}">📊 Dashboard</a>
+            <a href="{% url 'hello:org_api_tokens' org.slug %}" class="active">🔑 API tokens</a>
+        </nav>
+    </div>
+
+    {% if just_created_token %}
+    <div class="api-token-just-created">
+        <strong>🎉 Токен создан. Сохраните его сейчас — больше показывать не будем.</strong>
+        <code class="api-token-value">{{ just_created_token }}</code>
+        <button onclick="navigator.clipboard.writeText('{{ just_created_token }}');this.textContent='✓ Скопировано'">📋 Copy</button>
+    </div>
+    {% endif %}
+
+    <div class="org-invite-form">
+        <h3>＋ Создать новый токен</h3>
+        <form method="post" action="{% url 'hello:org_api_token_create' org.slug %}">
+            {% csrf_token %}
+            <input type="text" name="name" placeholder="Название (CI/CD, ERP-sync, ...)" required>
+            <select name="scope">
+                <option value="projects.read">projects.read</option>
+                <option value="projects.read,bom.read">projects.read + bom.read</option>
+                <option value="projects.read,projects.write">projects.read + projects.write</option>
+                <option value="*">всё (* — для админских интеграций)</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Создать</button>
+        </form>
+    </div>
+
+    <h3>Активные tokens ({{ tokens|length }})</h3>
+    <table class="org-members-table">
+        <thead><tr><th>Name</th><th>Scope</th><th>Created</th><th>Last used</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for t in tokens %}
+            <tr>
+                <td>{{ t.name }}</td>
+                <td><code>{{ t.scope|join:', ' }}</code></td>
+                <td>{{ t.created_at|date:"d.m.Y" }}</td>
+                <td>{{ t.last_used_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                <td>
+                    {% if t.revoked_at %}
+                        <span style="color:#ff6b6b">revoked {{ t.revoked_at|date:"d.m" }}</span>
+                    {% else %}
+                        <span style="color:#50fa7b">active</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not t.revoked_at %}
+                    <form method="post" action="{% url 'hello:org_api_token_revoke' org.slug t.id %}" class="inline-form"
+                          onsubmit="return confirm('Отозвать токен? Интеграции перестанут работать.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-small btn-danger">Revoke</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="audit-note">
+        Использование: <code>curl -H "Authorization: Bearer dolg_xxx" https://dolg.app/api/v1/projects/?org={{ org.slug }}</code>
+    </div>
+</div>
+{% endblock %}

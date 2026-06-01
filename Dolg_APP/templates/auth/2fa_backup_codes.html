@@ -1,0 +1,50 @@
+{% extends "shop/base.html" %}
+{% block title %}Backup-коды 2FA{% endblock %}
+{% block content %}
+<style>
+.tfa-card { max-width: 540px; margin: 2rem auto; padding: 1.5rem; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 10px; }
+.tfa-card h1 { margin-top: 0; }
+.codes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; padding: 1rem; background: rgba(0,0,0,.3); border-radius: 6px; margin: 1rem 0; }
+.codes-grid code { padding: 0.3rem 0.6rem; background: rgba(241,250,140,.1); color: #f1fa8c; border-radius: 4px; text-align: center; }
+.warn-box { background: rgba(255,184,108,.15); border: 1px solid rgba(255,184,108,.4); padding: 0.8rem; border-radius: 6px; }
+</style>
+
+<div class="tfa-card">
+    {% if is_freshly_generated %}
+    <h1>🔑 Ваши backup-коды</h1>
+    <div class="warn-box">
+        ⚠ <strong>Сохраните эти коды СЕЙЧАС.</strong> После закрытия страницы
+        мы НЕ сможем показать их снова — только перегенерировать (старые отзовутся).
+    </div>
+    <div class="codes-grid">
+        {% for code in backup_codes %}
+        <code>{{ code }}</code>
+        {% endfor %}
+    </div>
+    <p style="font-size:.85rem;color:var(--text-light,#a4b3d0);">
+        Каждый код одноразовый (8 символов, без учёта регистра). Используйте
+        один из них вместо TOTP-кода при потере доступа к Authenticator.
+        Распечатайте или сохраните в менеджере паролей.
+    </p>
+    <button type="button" onclick="window.print()" class="btn btn-secondary">🖨 Распечатать</button>
+    <a href="{% url 'accounts:profile' %}" class="btn btn-primary">Сохранил, перейти в профиль →</a>
+
+    {% else %}
+    <h1>🔑 Backup-коды 2FA</h1>
+    <p>Осталось неиспользованных кодов: <strong>{{ remaining }}</strong> из 10.</p>
+    {% if remaining <= 3 %}
+    <div class="warn-box">
+        ⚠ Кодов мало — рекомендуем перегенерировать новые. Старые автоматически
+        отзовутся.
+    </div>
+    {% endif %}
+    <form method="post" action="{% url 'hello:two_factor_backup_regenerate' %}"
+          onsubmit="return confirm('Перегенерировать backup-коды? Все старые перестанут работать.');"
+          style="margin-top:1rem;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">🔄 Перегенерировать backup-коды</button>
+    </form>
+    <p style="margin-top:1rem;"><a href="{% url 'accounts:profile' %}">← К профилю</a></p>
+    {% endif %}
+</div>
+{% endblock %}

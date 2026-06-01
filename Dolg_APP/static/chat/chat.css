@@ -1,0 +1,648 @@
+/* Стили для чата (public Q&A + Enterprise беседы + sidebar с Announcement).
+ * Раньше эти CSS-блоки жили внутри <style> в шаблонах:
+ *   - Dolg_APP/templates/chat/list.html
+ *   - Dolg_APP/templates/chat/topic_detail.html
+ *   - Dolg_APP/templates/orgs/conversation_detail.html
+ *   - Dolg_APP/templates/chat/_announcements_sidebar.html
+ *   - Dolg_APP/templates/orgs/conversation_list.html
+ * Выделено в общий файл 2026-05-19 чтобы шаблоны были чище и кеш браузера
+ * работал нормально (одна загрузка вместо четырёх duplicate <style>).
+ */
+
+/* ====================================================================
+ * Общий layout (двухколоночный: контент + sidebar)
+ * ==================================================================== */
+.chat-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 1.5rem;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .chat-layout { grid-template-columns: 1fr; }
+}
+
+/* ====================================================================
+ * Header страниц чата
+ * ==================================================================== */
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.chat-header h1 { margin: 0; }
+
+.chat-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.chat-filters a, .chat-filters .chat-filter-search {
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    background: rgba(255,255,255,.05);
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.9rem;
+    border: 1px solid rgba(255,255,255,.08);
+}
+.chat-filters a.active {
+    background: #6272a4;
+    color: #fff;
+    border-color: #6272a4;
+}
+
+/* ====================================================================
+ * Список топиков (chat/list.html)
+ * ==================================================================== */
+.chat-topic-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.chat-topic-row {
+    padding: 1rem;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 8px;
+    transition: background 120ms;
+}
+.chat-topic-row:hover { background: rgba(255,255,255,.06); }
+.chat-topic-row.pinned { border-left: 3px solid #f1fa8c; }
+.chat-topic-row.resolved { opacity: 0.7; }
+.chat-topic-row a.title {
+    font-weight: 600;
+    font-size: 1.05rem;
+    text-decoration: none;
+    color: inherit;
+}
+.chat-topic-row a.title:hover { color: #8be9fd; }
+.chat-topic-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-top: 0.4rem;
+    flex-wrap: wrap;
+}
+.chat-topic-meta .category-chip {
+    padding: 0.1rem 0.5rem;
+    background: rgba(98,114,164,.4);
+    border-radius: 4px;
+}
+.chat-topic-meta .resolved-mark { color: #50fa7b; }
+.chat-topic-meta .attached-mark { color: #bd93f9; }
+
+/* ====================================================================
+ * Форма создания нового топика
+ * ==================================================================== */
+.chat-new-form {
+    background: rgba(98,114,164,.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(98,114,164,.3);
+}
+.chat-new-form h3 { margin-top: 0; }
+.chat-new-form input[type="text"],
+.chat-new-form select,
+.chat-new-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 0.6rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(0,0,0,.2);
+    color: inherit;
+}
+.chat-new-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+.chat-new-form .row {
+    display: flex;
+    gap: 0.8rem;
+}
+.chat-new-form .row > * { flex: 1; }
+.chat-new-form .toggle-form {
+    background: none;
+    color: #8be9fd;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    font: inherit;
+}
+
+/* ====================================================================
+ * Детальный топик (chat/topic_detail.html)
+ * ==================================================================== */
+.topic-card {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+}
+.topic-card h1 { margin-top: 0; }
+.topic-header-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 1rem;
+}
+.topic-header-meta .chip {
+    padding: 0.2rem 0.6rem;
+    background: rgba(98,114,164,.4);
+    border-radius: 4px;
+}
+.topic-body { line-height: 1.6; }
+.topic-body pre {
+    background: #1e1e2e;
+    padding: 0.8rem;
+    border-radius: 6px;
+    overflow-x: auto;
+}
+.topic-body code {
+    background: rgba(0,0,0,.3);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+.topic-body pre code { background: transparent; padding: 0; }
+.topic-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.topic-attached {
+    margin-top: 1rem;
+    padding: 0.7rem;
+    background: rgba(189,147,249,.1);
+    border: 1px solid rgba(189,147,249,.3);
+    border-radius: 6px;
+}
+
+/* Реакции (emoji-кнопки) */
+.reactions-row {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+    flex-wrap: wrap;
+}
+.reaction-btn {
+    padding: 0.25rem 0.6rem;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: inherit;
+}
+.reaction-btn:hover { background: rgba(255,255,255,.12); }
+.reaction-btn .count {
+    margin-left: 0.3rem;
+    font-weight: 600;
+    color: #8be9fd;
+}
+.reaction-add {
+    padding: 0.25rem 0.5rem;
+    background: rgba(98,114,164,.2);
+    border: 1px dashed rgba(98,114,164,.5);
+    border-radius: 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: var(--text-light);
+}
+.reaction-emoji-picker {
+    display: none;
+    gap: 0.3rem;
+    padding: 0.5rem;
+    background: rgba(0,0,0,.4);
+    border-radius: 6px;
+    margin-top: 0.4rem;
+}
+.reaction-emoji-picker.open { display: flex; }
+.reaction-emoji-picker button {
+    background: rgba(255,255,255,.05);
+    border: 0;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    color: inherit;
+}
+.reaction-emoji-picker button:hover { background: rgba(255,255,255,.15); }
+
+/* Ответы */
+.replies-section { margin-top: 1.5rem; }
+.replies-section h2 { margin-bottom: 0.8rem; }
+.reply {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.7rem;
+}
+.reply.accepted {
+    border-color: #50fa7b;
+    background: rgba(80,250,123,.06);
+}
+.reply.nested {
+    margin-left: 2rem;
+    border-left: 2px solid rgba(98,114,164,.4);
+}
+.reply-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 0.4rem;
+}
+.reply-author {
+    font-weight: 600;
+    color: #f8f8f2;
+}
+.reply-body { line-height: 1.55; }
+.reply-body pre {
+    background: #1e1e2e;
+    padding: 0.6rem;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+.reply-body code {
+    background: rgba(0,0,0,.3);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+}
+.reply-actions {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.reply-actions button, .reply-actions a {
+    background: none;
+    border: 0;
+    color: var(--text-light);
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+}
+.reply-actions button:hover {
+    color: #8be9fd;
+    background: rgba(255,255,255,.05);
+}
+.accepted-badge {
+    color: #50fa7b;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.reply-form {
+    background: rgba(98,114,164,.1);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+}
+.reply-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 90px;
+    padding: 0.6rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(0,0,0,.2);
+    color: inherit;
+    resize: vertical;
+}
+.reply-form-hint {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 0.3rem;
+}
+
+/* ====================================================================
+ * Sidebar (информационный канал)
+ * ==================================================================== */
+.chat-sidebar {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    padding: 1rem;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+.chat-sidebar-title {
+    margin: 0 0 0.8rem;
+    font-size: 1rem;
+}
+.announcement-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+.announcement {
+    padding: 0.7rem;
+    border-radius: 6px;
+    border-left: 3px solid #6272a4;
+    background: rgba(98,114,164,.1);
+}
+.announcement--info     { border-left-color: #8be9fd; }
+.announcement--warning  { border-left-color: #f1fa8c; background: rgba(241,250,140,.08); }
+.announcement--critical { border-left-color: #ff5555; background: rgba(255,85,85,.08); }
+.announcement-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin-bottom: 0.3rem;
+}
+.announcement-title {
+    display: block;
+    font-size: 0.92rem;
+    margin-bottom: 0.3rem;
+}
+.announcement-body {
+    font-size: 0.83rem;
+    color: rgba(255,255,255,.8);
+    line-height: 1.4;
+}
+.announcement-pinned-mark {
+    display: inline-block;
+    margin-top: 0.4rem;
+    font-size: 0.7rem;
+    color: #f1fa8c;
+}
+.announcement-empty {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-style: italic;
+}
+.chat-sidebar-hint {
+    margin-top: 1rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+/* ====================================================================
+ * Пагинация
+ * ==================================================================== */
+.chat-pagination {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+.chat-pagination a, .chat-pagination span {
+    padding: 0.4rem 0.8rem;
+    background: rgba(255,255,255,.05);
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+}
+.chat-pagination .current {
+    background: #6272a4;
+    color: #fff;
+}
+
+/* ====================================================================
+ * Баннеры (quota, errors, info)
+ * ==================================================================== */
+.chat-quota-banner {
+    background: rgba(241,250,140,.1);
+    border: 1px solid rgba(241,250,140,.3);
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+.chat-error {
+    background: rgba(255,85,85,.15);
+    border: 1px solid rgba(255,85,85,.4);
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    color: #ff8888;
+}
+
+/* ====================================================================
+ * Org-conversation list (orgs/conversation_list.html)
+ * ==================================================================== */
+.conv-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+.conv-row {
+    padding: 1rem 1.2rem;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    transition: background 120ms;
+}
+.conv-row:hover { background: rgba(255,255,255,.06); }
+.conv-row a.title {
+    font-weight: 600;
+    text-decoration: none;
+    color: inherit;
+    font-size: 1.05rem;
+}
+.conv-row a.title:hover { color: #8be9fd; }
+.conv-row.archived { opacity: 0.6; }
+.conv-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-top: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.conv-create-form {
+    background: rgba(98,114,164,.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(98,114,164,.3);
+}
+.conv-create-form h3 { margin-top: 0; }
+.conv-create-form input,
+.conv-create-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: rgba(0,0,0,.2);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 4px;
+    color: inherit;
+}
+.conv-create-form textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+/* ====================================================================
+ * Org-conversation detail (приватный канал с сообщениями)
+ * ==================================================================== */
+.conv-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.conv-detail-header h1 { margin: 0; }
+.conv-archived-banner {
+    background: rgba(241,250,140,.1);
+    border: 1px solid rgba(241,250,140,.3);
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.conv-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: rgba(0,0,0,.15);
+    border-radius: 8px;
+}
+.conv-msg {
+    padding: 0.7rem 1rem;
+    background: rgba(255,255,255,.04);
+    border-radius: 6px;
+    border-left: 3px solid #6272a4;
+}
+.conv-msg.nested {
+    margin-left: 2rem;
+    border-left-color: #bd93f9;
+}
+.conv-msg-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-bottom: 0.3rem;
+}
+.conv-msg-author {
+    font-weight: 600;
+    color: #f8f8f2;
+}
+.conv-msg-body { line-height: 1.5; }
+.conv-msg-body pre {
+    background: #1e1e2e;
+    padding: 0.6rem;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+.conv-msg-body code {
+    background: rgba(0,0,0,.3);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+}
+.conv-msg-actions button {
+    background: none;
+    border: 0;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+}
+.conv-msg-actions button:hover {
+    color: #8be9fd;
+    background: rgba(255,255,255,.05);
+}
+
+.conv-form {
+    margin-top: 1rem;
+    background: rgba(98,114,164,.1);
+    padding: 0.8rem;
+    border-radius: 6px;
+}
+.conv-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 70px;
+    padding: 0.6rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(0,0,0,.2);
+    color: inherit;
+    resize: vertical;
+}
+
+.members-list {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+}
+.members-list .member {
+    padding: 0.15rem 0.5rem;
+    background: rgba(98,114,164,.3);
+    border-radius: 10px;
+    cursor: pointer;
+}
+.members-list .member:hover { background: rgba(98,114,164,.5); }
+
+/* ====================================================================
+ * Toast notifications (минимальный, для чата вместо alert())
+ * Появляется в правом нижнем углу, fade-out через 4 сек.
+ * ==================================================================== */
+.dolg-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 10000;
+    pointer-events: none;
+}
+.dolg-toast {
+    background: #282a36;
+    color: #f8f8f2;
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #6272a4;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    max-width: 320px;
+    font-size: 0.88rem;
+    pointer-events: auto;
+    animation: dolg-toast-in 0.2s ease-out;
+}
+.dolg-toast.error    { border-left-color: #ff5555; }
+.dolg-toast.warning  { border-left-color: #f1fa8c; }
+.dolg-toast.success  { border-left-color: #50fa7b; }
+.dolg-toast.info     { border-left-color: #8be9fd; }
+.dolg-toast.fade-out { animation: dolg-toast-out 0.25s ease-in forwards; }
+@keyframes dolg-toast-in {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes dolg-toast-out {
+    from { transform: translateY(0);   opacity: 1; }
+    to   { transform: translateY(8px); opacity: 0; }
+}

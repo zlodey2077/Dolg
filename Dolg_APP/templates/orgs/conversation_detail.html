@@ -1,0 +1,176 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% block title %}{{ conversation.title }} — {{ org.name }}{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'chat/chat.css' %}">
+{% endblock %}
+{% block content %}
+
+<p><a href="{% url 'hello:org_conversation_list' org.slug %}">← к беседам «{{ org.name }}»</a></p>
+
+<div class="conv-detail-header">
+    <h1>💬 {{ conversation.title }}</h1>
+    <div style="display:flex;gap:0.5rem;">
+        {% if can_archive %}
+        <form method="post" action="{% url 'hello:org_conversation_archive' org.slug conversation.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary btn-small">{% if conversation.is_archived %}♻ Восстановить{% else %}📦 Архив{% endif %}</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% if conversation.is_archived %}
+<div class="conv-archived-banner">📦 Канал в архиве — отправка новых сообщений отключена.</div>
+{% endif %}
+
+{% if conversation.description %}
+<p style="color:var(--text-light);">{{ conversation.description }}</p>
+{% endif %}
+
+<div class="conv-messages" id="conv-messages">
+    {% for msg, body_html in rendered_messages %}
+    <div class="conv-msg {% if msg.parent_id %}nested{% endif %}" data-msg-id="{{ msg.id }}">
+        <div class="conv-msg-head">
+            <span><span class="conv-msg-author">{{ msg.author.username|default:"—" }}</span> · {{ msg.created_at|date:"d.m H:i" }}</span>
+            {% if msg.is_edited %}<span style="font-size:0.75rem;color:var(--text-light);">отредактировано</span>{% endif %}
+        </div>
+        <div class="conv-msg-body">{{ body_html|safe }}</div>
+        {% if can_post and not conversation.is_archived %}
+        <div class="conv-msg-actions">
+            <button onclick="document.querySelector('#conv-parent').value='{{ msg.id }}';document.querySelector('#conv-textarea').focus();">↩ ответить</button>
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <p style="text-align:center;padding:2rem;color:var(--text-light);">Сообщений ещё нет. Начните обсуждение!</p>
+    {% endfor %}
+</div>
+
+{% if can_post and not conversation.is_archived %}
+<form method="post" action="{% url 'hello:org_conversation_message_create' org.slug conversation.id %}" class="conv-form" id="conv-form">
+    {% csrf_token %}
+    <input type="hidden" name="parent_id" id="conv-parent" value="">
+    <textarea name="body" id="conv-textarea" placeholder="Сообщение... поддерживается Markdown, упоминания через @username" required></textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem;">
+        <small style="color:var(--text-light);" id="conv-parent-hint"></small>
+        <button type="submit" class="btn btn-primary btn-small">📨 Отправить</button>
+    </div>
+    {% if org_members %}
+    <div class="members-list">
+        <small style="color:var(--text-light);align-self:center;">@упомянуть:</small>
+        {% for m in org_members %}
+        <span class="member" onclick="insertMention('{{ m.user.username }}')">@{{ m.user.username }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</form>
+{% endif %}
+
+<script>
+(function() {
+    'use strict';
+    const POLL_URL = '{% url "hello:org_conversation_poll" org.slug conversation.id %}';
+    const ORG_SLUG = '{{ org.slug|escapejs }}';
+    const CONV_ID = {{ conversation.id }};
+    let lastMsgId = 0;
+    document.querySelectorAll('.conv-msg').forEach(el => {
+        const id = parseInt(el.dataset.msgId);
+        if (id > lastMsgId) lastMsgId = id;
+    });
+
+    function appendMessage(m) {
+        if (!m || m.id <= lastMsgId) return;
+        const container = document.getElementById('conv-messages');
+        const div = document.createElement('div');
+        div.className = 'conv-msg' + (m.parent_id ? ' nested' : '');
+        div.dataset.msgId = m.id;
+        div.innerHTML = `
+            <div class="conv-msg-head">
+                <span><span class="conv-msg-author">${escapeHTML(m.author)}</span> · ${new Date(m.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            <div class="conv-msg-body">${m.body_html}</div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        lastMsgId = m.id;
+    }
+
+    async function poll() {
+        try {
+            const r = await fetch(`${POLL_URL}?since_id=${lastMsgId}`, {credentials: 'same-origin'});
+            const data = await r.json();
+            if (!data.ok || !data.messages.length) return;
+            for (const m of data.messages) appendMessage(m);
+        } catch (e) { /* silent */ }
+    }
+
+    // WebSocket primary + polling fallback (см. chat/topic_detail.html — та же стратегия)
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = `${wsProto}//${location.host}/ws/orgs/${ORG_SLUG}/conversations/${CONV_ID}/`;
+    let ws = null;
+    let pollTimer = null;
+    let wsReconnectDelay = 1000;
+    function startPolling() { if (!pollTimer) pollTimer = setInterval(poll, 8000); }
+    function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+    function connectWS() {
+        try { ws = new WebSocket(WS_URL); } catch (e) { startPolling(); return; }
+        const connectGuard = setTimeout(() => {
+            if (ws && ws.readyState !== WebSocket.OPEN) startPolling();
+        }, 4000);
+        ws.addEventListener('open', () => {
+            clearTimeout(connectGuard);
+            wsReconnectDelay = 1000;
+            stopPolling();
+            poll();   // догоняем пропуск, если был
+        });
+        ws.addEventListener('message', (e) => {
+            try {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'message.created') appendMessage(msg.message);
+            } catch (err) { /* ignore */ }
+        });
+        ws.addEventListener('close', () => {
+            startPolling();
+            setTimeout(connectWS, Math.min(wsReconnectDelay, 30000));
+            wsReconnectDelay *= 2;
+        });
+    }
+    connectWS();
+    setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            try { ws.send(JSON.stringify({type: 'ping'})); } catch (e) { /* ignore */ }
+        }
+    }, 25000);
+
+    function escapeHTML(s) {
+        const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+    }
+
+    window.insertMention = function(username) {
+        const ta = document.getElementById('conv-textarea');
+        if (!ta) return;
+        const pos = ta.selectionStart;
+        ta.value = ta.value.slice(0, pos) + `@${username} ` + ta.value.slice(pos);
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = pos + username.length + 2;
+    };
+
+    const parentInput = document.getElementById('conv-parent');
+    const hint = document.getElementById('conv-parent-hint');
+    if (parentInput && hint) {
+        const obs = new MutationObserver(() => {
+            hint.textContent = parentInput.value ? `↩ ответ на сообщение #${parentInput.value} (× очистить)` : '';
+            hint.style.cursor = parentInput.value ? 'pointer' : 'default';
+        });
+        obs.observe(parentInput, {attributes: true, attributeFilter: ['value']});
+        hint.addEventListener('click', () => { if (parentInput.value) { parentInput.value = ''; hint.textContent = ''; }});
+    }
+
+    // Авто-скролл к низу при загрузке
+    const messages = document.getElementById('conv-messages');
+    if (messages) messages.scrollTop = messages.scrollHeight;
+})();
+</script>
+{% endblock %}

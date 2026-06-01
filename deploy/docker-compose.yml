@@ -1,0 +1,123 @@
+# Production stack: Django (gunicorn) + Postgres 16 + nginx-reverse-proxy.
+# Использование (из корня проекта):
+#   1. Скопировать .env.example → .env, заполнить SECRET_KEY и пароли
+#   2. docker compose -f deploy/docker-compose.yml up -d
+#   3. http://localhost/ → DOLG (через nginx)
+#
+# Файлы deploy-инфры (Dockerfile, entrypoint.sh, nginx.conf, .dockerignore)
+# собраны в этой папке, чтобы корень проекта не загромождать.
+#
+# Volumes (named):
+#   pgdata     — данные Postgres
+#   media      — пользовательские загрузки (avatars/)
+#   staticfiles — собранная статика (используется и nginx-ом, и Django)
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dolg_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dolg}
+      POSTGRES_USER: ${POSTGRES_USER:-dolg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dolg}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    # Build context = корень проекта (там requirements.txt, manage.py и т.п.).
+    # Dockerfile живёт в deploy/Dockerfile.
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: dolg_web
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Django
+      SECRET_KEY:    ${SECRET_KEY:?need SECRET_KEY in .env}
+      DEBUG:         "${DEBUG:-0}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1}"
+      CSRF_TRUSTED_ORIGINS: "${CSRF_TRUSTED_ORIGINS:-https://*.trycloudflare.com,https://*.ngrok-free.app}"
+      # БД (формируется из POSTGRES_*)
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-dolg}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-dolg}"
+      # AI / Sentry / Email — опциональные, отсутствуют → demo-режим
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      SENTRY_DSN:        "${SENTRY_DSN:-}"
+      DEFAULT_FROM_EMAIL: "${DEFAULT_FROM_EMAIL:-DOLG <noreply@dolg.local>}"
+      EMAIL_BACKEND: "${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}"
+      # Авто-superuser при первом запуске (из entrypoint.sh)
+      DJANGO_SUPERUSER_USERNAME: "${DJANGO_SUPERUSER_USERNAME:-admin}"
+      DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD:-DolgAdmin2026}"
+      DJANGO_SUPERUSER_EMAIL:    "${DJANGO_SUPERUSER_EMAIL:-admin@dolg.local}"
+    volumes:
+      - media:/app/media
+      - staticfiles:/app/staticfiles
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: dolg_nginx
+    depends_on:
+      - web
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      # nginx.conf лежит рядом с этим compose-файлом в deploy/
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - staticfiles:/var/www/static:ro
+      - media:/var/www/media:ro
+    restart: unless-stopped
+
+  # ─── Observability stack ──────────────────────────────────────────
+  # Prometheus собирает /metrics/ с Django (django-prometheus отдаёт его
+  # автоматически). Grafana подцепляется к Prometheus как datasource и
+  # рендерит дашборды из deploy/grafana/dashboards/*.json.
+  prometheus:
+    image: prom/prometheus:v3.7.5
+    container_name: dolg_prometheus
+    depends_on:
+      - web
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=14d'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: dolg_grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  staticfiles:
+  prometheus_data:
+  grafana_data:

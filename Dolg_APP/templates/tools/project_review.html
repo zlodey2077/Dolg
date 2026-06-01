@@ -1,0 +1,785 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Проверка схемы - {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .review-page {
+        margin: 1.5rem 0 3rem;
+    }
+    .review-hero {
+        border: 1px solid rgba(0, 212, 255, .24);
+        background:
+            linear-gradient(135deg, rgba(0, 212, 255, .12), rgba(114, 255, 173, .07)),
+            rgba(10, 14, 39, .72);
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+        gap: 1rem;
+        align-items: stretch;
+    }
+    .review-kicker {
+        margin: 0 0 .45rem;
+        color: rgba(224, 224, 224, .72);
+        font-size: .9rem;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+    }
+    .review-hero h1 {
+        margin: .1rem 0 .65rem;
+        color: #fff;
+        font-size: clamp(1.7rem, 2.8vw, 2.5rem);
+        line-height: 1.08;
+        overflow-wrap: anywhere;
+    }
+    .review-summary {
+        margin: 0;
+        color: rgba(224, 224, 224, .82);
+        line-height: 1.45;
+        max-width: 70ch;
+    }
+    .review-score-card {
+        border: 1px solid rgba(0, 212, 255, .24);
+        background: rgba(7, 10, 28, .52);
+        border-radius: 8px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: .45rem;
+        min-width: 0;
+    }
+    .review-score {
+        display: inline-flex;
+        align-items: baseline;
+        gap: .35rem;
+        color: var(--accent-cyan);
+        font-weight: 900;
+        font-size: 2.45rem;
+        line-height: 1;
+    }
+    .review-score span {
+        font-size: 1rem;
+        color: rgba(224,224,224,.7);
+    }
+    .review-status {
+        display: inline-flex;
+        width: fit-content;
+        max-width: 100%;
+        border-radius: 999px;
+        padding: .35rem .55rem;
+        background: rgba(0, 212, 255, .1);
+        color: #7fdbff;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+    }
+    .review-status-critical .review-status,
+    .severity-error {
+        background: rgba(255, 77, 109, .13);
+        color: #ff8ea4;
+        border-color: rgba(255, 77, 109, .28);
+    }
+    .review-status-risk .review-status,
+    .severity-risk {
+        background: rgba(255, 184, 77, .14);
+        color: #ffd18a;
+        border-color: rgba(255, 184, 77, .3);
+    }
+    .review-status-ready .review-status {
+        background: rgba(114, 255, 173, .12);
+        color: #72ffad;
+    }
+    .severity-warning {
+        background: rgba(255, 211, 77, .12);
+        color: #ffe08a;
+        border-color: rgba(255, 211, 77, .26);
+    }
+    .severity-recommendation {
+        background: rgba(0, 212, 255, .1);
+        color: #7fdbff;
+        border-color: rgba(0, 212, 255, .28);
+    }
+    .review-actions {
+        display: flex;
+        gap: .75rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+    }
+    .review-actions a {
+        border: 1px solid rgba(0, 212, 255, .3);
+        border-radius: 6px;
+        padding: .6rem .78rem;
+        color: var(--accent-cyan);
+        text-decoration: none;
+        background: rgba(0, 212, 255, .08);
+        font-weight: 700;
+    }
+    .review-metric-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: .75rem;
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        border: 1px solid rgba(0, 212, 255, .18);
+        background: rgba(26, 39, 68, .46);
+        border-radius: 8px;
+        padding: .85rem;
+        min-width: 0;
+    }
+    .metric-card span {
+        display: block;
+        color: rgba(224,224,224,.66);
+        font-size: .78rem;
+        margin-bottom: .25rem;
+    }
+    .metric-card strong {
+        display: block;
+        color: #fff;
+        font-size: 1.15rem;
+        line-height: 1.18;
+        overflow-wrap: anywhere;
+    }
+    .review-3d-section {
+        margin-bottom: 1rem;
+        background:
+            radial-gradient(circle at 18% 12%, rgba(0, 212, 255, .16), transparent 30%),
+            radial-gradient(circle at 86% 14%, rgba(114, 255, 173, .11), transparent 26%),
+            rgba(11, 16, 38, .78);
+    }
+    .review-3d-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: .85rem;
+    }
+    .review-3d-title {
+        margin: 0;
+        color: #fff;
+        font-size: 1.18rem;
+        line-height: 1.2;
+    }
+    .review-3d-subtitle {
+        display: block;
+        margin-top: .25rem;
+        color: rgba(224,224,224,.68);
+        font-size: .86rem;
+        line-height: 1.35;
+    }
+    .review-3d-score {
+        flex: 0 0 auto;
+        border: 1px solid rgba(114, 255, 173, .26);
+        background: rgba(114, 255, 173, .08);
+        border-radius: 8px;
+        padding: .52rem .7rem;
+        color: #72ffad;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+    .review-3d-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(210px, 280px);
+        gap: 1rem;
+        align-items: stretch;
+    }
+    .review-3d-stage {
+        position: relative;
+        min-height: 420px;
+        border: 1px solid rgba(0, 212, 255, .18);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #081126;
+        box-shadow: inset 0 0 32px rgba(0, 212, 255, .12);
+        cursor: grab;
+        touch-action: none;
+    }
+    .review-3d-stage:active {
+        cursor: grabbing;
+    }
+    .review-3d-stage canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+    .review-3d-legend,
+    .review-3d-bars {
+        border: 1px solid rgba(0, 212, 255, .14);
+        background: rgba(7, 10, 28, .34);
+        border-radius: 8px;
+        padding: .8rem;
+    }
+    .review-3d-bars {
+        margin-top: .75rem;
+        max-height: 250px;
+        overflow: auto;
+    }
+    .review-3d-legend h3,
+    .review-3d-bars h3 {
+        margin: 0 0 .55rem;
+        color: var(--accent-cyan);
+        font-size: .92rem;
+    }
+    .review-3d-legend-row,
+    .review-3d-bar-row,
+    .review-3d-fallback-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: .45rem;
+        align-items: center;
+        color: rgba(224,224,224,.8);
+        font-size: .82rem;
+        line-height: 1.25;
+        padding: .24rem 0;
+    }
+    .review-3d-dot {
+        width: .7rem;
+        height: .7rem;
+        border-radius: 999px;
+        box-shadow: 0 0 12px currentColor;
+    }
+    .review-3d-bar-row strong,
+    .review-3d-fallback-row strong {
+        overflow-wrap: anywhere;
+    }
+    .review-3d-fallback {
+        height: 100%;
+        padding: 1rem;
+        color: rgba(224,224,224,.78);
+        display: flex;
+        flex-direction: column;
+        gap: .35rem;
+    }
+    .review-3d-fallback > strong {
+        color: #ffd34d;
+        font-size: 1rem;
+    }
+    .review-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+    .review-panel,
+    .learning-review {
+        border: 1px solid rgba(0, 212, 255, .2);
+        background: rgba(26, 39, 68, .48);
+        border-radius: 8px;
+        padding: 1rem;
+        min-width: 0;
+    }
+    .review-panel h2,
+    .learning-review h2 {
+        margin: 0 0 .75rem;
+        color: var(--accent-cyan);
+        font-size: 1.08rem;
+    }
+    .review-panel-wide {
+        grid-column: 1 / -1;
+    }
+    .review-list {
+        margin: 0;
+        padding-left: 1.1rem;
+        color: var(--text-light);
+    }
+    .review-list li {
+        margin: .4rem 0;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .finding-grid,
+    .fault-grid,
+    .measurement-grid,
+    .learning-review-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: .85rem;
+    }
+    .finding-card,
+    .fault-card,
+    .measurement-card,
+    .learning-review-card {
+        border: 1px solid rgba(0, 212, 255, .18);
+        background: rgba(7, 10, 28, .34);
+        border-radius: 8px;
+        padding: .9rem;
+        min-width: 0;
+    }
+    .finding-head {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: .55rem;
+    }
+    .finding-rule,
+    .finding-severity,
+    .measurement-status {
+        display: inline-flex;
+        border: 1px solid rgba(0, 212, 255, .22);
+        border-radius: 999px;
+        padding: .22rem .48rem;
+        font-size: .78rem;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+    }
+    .finding-rule {
+        color: #7fdbff;
+        background: rgba(0, 212, 255, .08);
+    }
+    .finding-card h3,
+    .fault-card h3,
+    .measurement-card h3 {
+        margin: 0 0 .5rem;
+        color: #fff;
+        font-size: 1rem;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+    .finding-card p,
+    .fault-card p,
+    .measurement-card p,
+    .learning-review p {
+        margin: .35rem 0 0;
+        color: rgba(224,224,224,.78);
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .evidence-list {
+        margin: .65rem 0 0;
+        padding: .55rem;
+        background: rgba(0, 0, 0, .18);
+        border-radius: 6px;
+        color: rgba(224,224,224,.76);
+        font-size: .84rem;
+    }
+    .evidence-list div {
+        display: flex;
+        gap: .45rem;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255,255,255,.06);
+        padding: .25rem 0;
+    }
+    .evidence-list div:last-child {
+        border-bottom: 0;
+    }
+    .evidence-list code {
+        color: #7fdbff;
+        overflow-wrap: anywhere;
+    }
+    .source-list {
+        margin: .65rem 0 0;
+        padding: .55rem;
+        border: 1px solid rgba(114, 255, 173, .18);
+        background: rgba(114, 255, 173, .06);
+        border-radius: 6px;
+        font-size: .82rem;
+        color: rgba(224,224,224,.78);
+    }
+    .source-list strong {
+        display: block;
+        color: #72ffad;
+        margin-bottom: .35rem;
+    }
+    .source-list a {
+        display: block;
+        color: #7fdbff;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+        margin-top: .2rem;
+    }
+    .learning-review {
+        margin-top: 1rem;
+        border-color: rgba(114, 255, 173, .22);
+        background: rgba(10, 14, 39, .42);
+    }
+    .learning-review h2 {
+        color: #72ffad;
+    }
+    .learning-review-card {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+    }
+    .learning-review-card strong {
+        color: var(--accent-cyan);
+        display: block;
+        margin-bottom: .35rem;
+        overflow-wrap: anywhere;
+    }
+    .learning-review-card span {
+        display: block;
+        color: rgba(224,224,224,.72);
+        font-size: .86rem;
+        line-height: 1.35;
+    }
+    .learning-review-meta {
+        margin-top: .55rem;
+        color: #72ffad !important;
+        font-size: .78rem !important;
+    }
+    @media (max-width: 760px) {
+        .review-hero {
+            grid-template-columns: 1fr;
+        }
+        .review-score-card {
+            align-items: flex-start;
+        }
+        .review-3d-layout {
+            grid-template-columns: 1fr;
+        }
+        .review-3d-stage {
+            min-height: 340px;
+        }
+        .review-3d-header {
+            flex-direction: column;
+        }
+    }
+
+    /* 2026-05-31 recovery A.1: cross-probing — clickable finding-card */
+    .finding-card[data-component-refs] {
+        cursor: pointer;
+        transition: transform .15s ease-out, box-shadow .15s ease-out;
+    }
+    .finding-card[data-component-refs]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0, 212, 255, 0.25);
+        outline: 1px solid rgba(0, 212, 255, 0.5);
+    }
+    .finding-card[data-component-refs]::after {
+        content: '🎯';
+        position: absolute;
+        top: 8px; right: 8px;
+        font-size: 0.85rem;
+        opacity: 0.5;
+    }
+    .finding-card { position: relative; }
+    .review-topology-thumb.flash-highlight {
+        animation: flashHighlight 1.2s ease-out;
+    }
+    @keyframes flashHighlight {
+        0%   { box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.0); }
+        25%  { box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.8); }
+        100% { box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.0); }
+    }
+
+    /* 2026-05-31 recovery A.2: sparkline истории score */
+    .review-score-history {
+        margin-top: .55rem;
+        padding-top: .5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.72rem;
+        opacity: 0.85;
+    }
+    .review-score-history-row {
+        display: flex; align-items: center; gap: .5rem;
+        line-height: 1;
+    }
+    .review-score-history svg {
+        height: 18px;
+        flex: 1;
+        overflow: visible;
+    }
+    .review-score-history-delta.up   { color: #22d3ee; }
+    .review-score-history-delta.down { color: #ff8a8a; }
+    .review-score-history-delta.flat { color: #94a3b8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="review-page">
+    <section class="review-hero review-status-{{ review_display.status }}">
+        <div>
+            <p class="review-kicker">Engineering Review / проверка схемы</p>
+            <h1>{{ project.name }}</h1>
+            <p class="review-summary">{{ review_display.summary }}</p>
+            <div class="review-actions">
+                <a href="{% url 'hello:project_review_pdf' review.id %}">PDF-отчет</a>
+                <a href="{% url 'hello:simulation' %}?project={{ project.id }}">Открыть в симуляторе</a>
+                <a href="{% url 'hello:projects' %}">К проектам</a>
+            </div>
+            {% if review_display.topology_thumbnail_svg %}
+            <figure class="review-topology-thumb" style="margin: 1.1rem 0 .2rem 0; padding: .8rem; background: rgba(255,255,255,.05); border-radius: 10px; max-width: 360px;">
+                <div style="max-width: 100%; height: auto;">{{ review_display.topology_thumbnail_svg|safe }}</div>
+                <figcaption style="font-size: .72rem; color: #94a3b8; margin-top: .3rem;">Тип топологии распознан автоматически — упрощённый эскиз для контекста отчёта.</figcaption>
+            </figure>
+            {% endif %}
+        </div>
+        <aside class="review-score-card" data-project-id="{{ project.id }}" data-current-score="{{ review_display.score }}">
+            <div class="review-score">{{ review_display.score }}<span>/100</span></div>
+            <div class="review-status">{{ review_display.status_label }}</div>
+            <div class="review-score-history" id="review-score-history" hidden>
+                <div class="review-score-history-row">
+                    <svg id="review-score-spark" preserveAspectRatio="none" viewBox="0 0 80 18"></svg>
+                    <span class="review-score-history-delta" id="review-score-delta"></span>
+                </div>
+            </div>
+            {% if review_display.score_breakdown %}
+            <details class="review-score-breakdown" style="margin-top:.6rem; font-size:.78rem; opacity:.85;">
+                <summary style="cursor:pointer; user-select:none;">Что снизило балл</summary>
+                <ul style="list-style:none; padding:.4rem 0 0 0; margin:0; line-height:1.45;">
+                    {% for item in review_display.score_breakdown %}
+                        <li><span style="opacity:.7;">{{ item.label }}</span> &nbsp;<strong>{{ item.delta }}</strong> <span style="opacity:.55;">(×{{ item.count }})</span></li>
+                    {% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+        </aside>
+    </section>
+
+    {% if review_display.metric_rows %}
+    <section class="review-metric-strip" aria-label="Метрики проверки">
+        {% for item in review_display.metric_rows %}
+            <div class="metric-card">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+            </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if review_display.review_3d_payload.enabled %}
+    <section class="review-panel review-panel-wide review-3d-section" aria-label="3D РіСЂР°С„РёРєРё РёРЅР¶РµРЅРµСЂРЅРѕРіРѕ Р°РЅР°Р»РёР·Р°">
+        <div class="review-3d-header">
+            <div>
+                <h2 class="review-3d-title">{{ review_display.review_3d_payload.title }}</h2>
+                <span class="review-3d-subtitle">Score, DRC/ERC, BOM, РёР·РјРµСЂРµРЅРёСЏ Рё СЂРёСЃРєРё СЃРѕР±СЂР°РЅС‹ РІ РѕРґРЅСѓ РѕР±СЉРµРјРЅСѓСЋ РєР°СЂС‚Сѓ. РњРѕРґРµР»СЊ РјРѕР¶РЅРѕ РІСЂР°С‰Р°С‚СЊ РјС‹С€СЊСЋ.</span>
+            </div>
+            <div class="review-3d-score">{{ review_display.score }}/100 В· {{ review_display.status_label }}</div>
+        </div>
+        <div class="review-3d-layout">
+            <div id="review-3d-stage" class="review-3d-stage" role="img" aria-label="3D РІРёР·СѓР°Р»РёР·Р°С†РёСЏ РјРµС‚СЂРёРє Engineering Review"></div>
+            <aside>
+                <div class="review-3d-legend">
+                    <h3>РЎС‚Р°С‚СѓСЃС‹</h3>
+                    {% for item in review_display.review_3d_payload.legend %}
+                    <div class="review-3d-legend-row">
+                        <span class="review-3d-dot" style="background: {{ item.color }}"></span>
+                        <span>{{ item.label }}</span>
+                        <span></span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="review-3d-bars">
+                    <h3>Р§С‚Рѕ РїРѕРєР°Р·Р°РЅРѕ</h3>
+                    {% for item in review_display.review_3d_payload.columns %}
+                    <div class="review-3d-bar-row">
+                        <span class="review-3d-dot" style="background: {{ item.color }}"></span>
+                        <strong>{{ item.label }}</strong>
+                        <span>{{ item.value_label }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </aside>
+        </div>
+        {{ review_display.review_3d_payload|json_script:"review-3d-data" }}
+    </section>
+    {% endif %}
+
+    <div class="review-grid">
+        <section class="review-panel">
+            <h2>Ошибки</h2>
+            <ul class="review-list">
+                {% for item in review_display.errors %}
+                    <li>{{ item }}</li>
+                {% empty %}
+                    <li>Критичных ошибок не найдено.</li>
+                {% endfor %}
+            </ul>
+        </section>
+        <section class="review-panel">
+            <h2>Предупреждения</h2>
+            <ul class="review-list">
+                {% for item in review_display.warnings %}
+                    <li>{{ item }}</li>
+                {% empty %}
+                    <li>Предупреждений нет.</li>
+                {% endfor %}
+            </ul>
+        </section>
+        <section class="review-panel">
+            <h2>Рекомендации</h2>
+            <ul class="review-list">
+                {% for item in review_display.recommendations %}
+                    <li>{{ item }}</li>
+                {% empty %}
+                    <li>Запустите симуляцию и сохраните измерения для более полного отчета.</li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        {% if review_display.expert_findings %}
+        <section class="review-panel review-panel-wide">
+            <h2>Экспертные правила</h2>
+            <div class="finding-grid">
+                {% for item in review_display.expert_findings %}
+                <article class="finding-card" data-rule-id="{{ item.rule_id }}"{% if item.evidence.led_reverse_polarity_refs %} data-component-refs="{{ item.evidence.led_reverse_polarity_refs|join:',' }}"{% elif item.evidence.dangling_named_net_refs %} data-component-refs="{{ item.evidence.dangling_named_net_refs|join:',' }}"{% elif item.evidence.transistor_pinout_swap_refs %} data-component-refs="{{ item.evidence.transistor_pinout_swap_refs|join:',' }}"{% endif %}>
+                    <div class="finding-head">
+                        <span class="finding-rule">{{ item.rule_id }}</span>
+                        <span class="finding-severity severity-{{ item.severity }}">{{ item.severity_label }}</span>
+                    </div>
+                    <h3>{{ item.title }}</h3>
+                    <p>{{ item.recommendation }}</p>
+                    {% if item.evidence %}
+                    <div class="evidence-list">
+                        {% for key, value in item.evidence.items %}
+                            <div><code>{{ key }}</code><span>{{ value }}</span></div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if item.source_references %}
+                    <div class="source-list">
+                        <strong>Источники проверки</strong>
+                        {% for source in item.source_references|slice:":3" %}
+                            <a href="{{ source.url }}" target="_blank" rel="noopener">{{ source.title }}</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if review_display.faults %}
+        <section class="review-panel review-panel-wide">
+            <h2>Сценарии неисправностей</h2>
+            <div class="fault-grid">
+                {% for item in review_display.faults %}
+                <article class="fault-card">
+                    <h3>{{ item.title }}</h3>
+                    {% if item.symptom %}<p>{{ item.symptom }}</p>{% endif %}
+                    {% if item.recommendation %}<p><strong>Что сделать:</strong> {{ item.recommendation }}</p>{% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if review_display.measurement_rows %}
+        <section class="review-panel review-panel-wide">
+            <h2>Сохраненные измерения</h2>
+            <div class="measurement-grid">
+                {% for item in review_display.measurement_rows %}
+                <article class="measurement-card">
+                    <div class="finding-head">
+                        <span class="finding-rule">{{ item.metric }}</span>
+                        <span class="measurement-status">{{ item.status }}</span>
+                    </div>
+                    <h3>{{ item.label }}</h3>
+                    <p>{{ item.value }}</p>
+                    {% if item.expected %}
+                    <p style="margin-top:.35rem; font-size:.78rem; opacity:.8;">
+                        Ожидалось: <strong>{{ item.expected }}</strong>{% if item.delta %} &nbsp; Δ&nbsp;<strong>{{ item.delta }}</strong>{% endif %}{% if item.tolerance %} &nbsp; допуск&nbsp;{{ item.tolerance }}{% endif %}
+                    </p>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </div>
+
+    {% if learning_suggestions %}
+    <section class="learning-review">
+        <h2>Learning by Review / практикум по проверке</h2>
+        <p>Система связывает найденные ошибки с практикумом: можно открыть урок, который помогает исправить проблему проекта.</p>
+        <div class="learning-review-grid">
+            {% for item in learning_suggestions %}
+            <a class="learning-review-card" href="{{ item.url }}">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.reason }}</span>
+                <span class="learning-review-meta">{{ item.track }} · {{ item.task_count }} заданий</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% if review_display.review_3d_payload.enabled %}
+<script src="{% static 'lib/three.min.js' %}?v=r140"></script>
+<script src="{% static 'review/review-3d.js' %}?v=20260531a"></script>
+{% endif %}
+
+<script>
+// 2026-05-31 recovery A.1 + A.2: cross-probing + sparkline истории
+(function () {
+    // ── A.1. Клик по finding-card с data-component-refs → flash + scroll к топологии
+    const thumb = document.querySelector('.review-topology-thumb');
+    document.querySelectorAll('.finding-card[data-component-refs]').forEach(card => {
+        const refs = (card.dataset.componentRefs || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (!refs.length) return;
+        card.setAttribute('title', 'Клик: показать в схеме (' + refs.join(', ') + ')');
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('a')) return;
+            if (!thumb) return;
+            thumb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            thumb.classList.remove('flash-highlight');
+            void thumb.offsetWidth;
+            thumb.classList.add('flash-highlight');
+            const svg = thumb.querySelector('svg');
+            if (svg) {
+                refs.forEach(ref => {
+                    const el = svg.querySelector('[id="' + ref + '"], [data-ref="' + ref + '"], .cmp-' + ref);
+                    if (el) {
+                        const orig = el.getAttribute('stroke');
+                        el.setAttribute('stroke', '#00d4ff');
+                        el.setAttribute('stroke-width', '3');
+                        setTimeout(() => {
+                            if (orig) el.setAttribute('stroke', orig); else el.removeAttribute('stroke');
+                            el.removeAttribute('stroke-width');
+                        }, 1500);
+                    }
+                });
+            }
+        });
+    });
+
+    // ── A.2. Sparkline истории score (last 5)
+    const card = document.querySelector('.review-score-card');
+    if (!card) return;
+    const projectId = card.dataset.projectId;
+    const currentScore = parseFloat(card.dataset.currentScore);
+    if (!projectId || !isFinite(currentScore)) return;
+    const storageKey = 'dolg.reviewHistory.' + projectId;
+    let history = [];
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) history = JSON.parse(raw) || [];
+    } catch (_e) {}
+    const now = Date.now();
+    history = history.filter(h => h && (now - (h.t || 0)) < 7 * 24 * 3600 * 1000);
+    const last = history[history.length - 1];
+    if (!last || last.score !== currentScore || (now - last.t) > 60000) {
+        history.push({ score: currentScore, t: now });
+    }
+    if (history.length > 5) history = history.slice(-5);
+    try { localStorage.setItem(storageKey, JSON.stringify(history)); } catch (_e) {}
+
+    if (history.length < 2) return;
+    const wrap = document.getElementById('review-score-history');
+    const svg = document.getElementById('review-score-spark');
+    const delta = document.getElementById('review-score-delta');
+    if (!wrap || !svg || !delta) return;
+    wrap.hidden = false;
+    const W = 80, H = 18;
+    const xs = history.map((_, i) => (i / (history.length - 1)) * W);
+    const ys = history.map(h => {
+        const s = Math.max(0, Math.min(100, h.score));
+        return H - (s / 100) * (H - 2) - 1;
+    });
+    const d = xs.map((x, i) => (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + ys[i].toFixed(1)).join(' ');
+    const last2 = history[history.length - 1].score;
+    const prev = history[history.length - 2].score;
+    const diff = last2 - prev;
+    svg.innerHTML =
+        '<path d="' + d + '" stroke="#22d3ee" stroke-width="1.5" fill="none"/>' +
+        '<circle cx="' + xs[xs.length - 1].toFixed(1) + '" cy="' + ys[ys.length - 1].toFixed(1) + '" r="2" fill="#22d3ee"/>';
+    if (diff > 0)      { delta.className = 'review-score-history-delta up';   delta.textContent = '↑ +' + diff.toFixed(0); }
+    else if (diff < 0) { delta.className = 'review-score-history-delta down'; delta.textContent = '↓ ' + diff.toFixed(0); }
+    else               { delta.className = 'review-score-history-delta flat'; delta.textContent = '→ 0'; }
+})();
+</script>
+{% endblock %}

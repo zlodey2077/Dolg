@@ -1,0 +1,97 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% block title %}Чат — обсуждения{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'chat/chat.css' %}">
+{% endblock %}
+{% block content %}
+
+<div class="chat-header">
+    <h1>💬 Чат — технические обсуждения</h1>
+    <a href="{% url 'hello:chat_list' %}" class="btn btn-secondary">🔄 Обновить</a>
+</div>
+
+{% if request.GET.error %}
+<div class="chat-error">⚠ {{ request.GET.error }}</div>
+{% endif %}
+
+<div class="chat-filters">
+    <a href="?" class="{% if not active_category %}active{% endif %}">Все</a>
+    {% for slug, name in categories %}
+        <a href="?category={{ slug }}" class="{% if active_category == slug %}active{% endif %}">{{ name }}</a>
+    {% endfor %}
+    <form method="get" style="display:inline-flex;align-items:center;gap:0.4rem;">
+        <input type="text" name="q" placeholder="🔍 поиск..." value="{{ query }}"
+               style="padding:0.3rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.2);color:inherit;">
+        {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
+        <label style="font-size:0.85rem;"><input type="checkbox" name="resolved" value="1" {% if only_resolved %}checked{% endif %}> только решённые</label>
+    </form>
+</div>
+
+<div class="chat-layout">
+    <div>
+        {% if can_post %}
+        <div class="chat-new-form">
+            <h3>✍ Создать новый топик</h3>
+            <form method="post" action="{% url 'hello:chat_topic_create' %}">
+                {% csrf_token %}
+                <input type="text" name="title" placeholder="Заголовок вопроса (макс 200 симв.)" maxlength="200" required>
+                <div class="row">
+                    <select name="category">
+                        {% for slug, name in categories %}
+                            <option value="{{ slug }}" {% if active_category == slug %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <textarea name="body" placeholder="{% if is_pro_viewer %}Markdown поддерживается: **жирный**, `код`, ```python ... ```{% else %}Обычный текст. Pro даёт Markdown + подсветка кода.{% endif %}" required></textarea>
+                <button type="submit" class="btn btn-primary">📝 Опубликовать</button>
+                {% if not is_pro_viewer %}<small style="color:var(--text-light);margin-left:0.6rem;">Free лимит: 5 топиков в день.</small>{% endif %}
+            </form>
+        </div>
+        {% else %}
+        <div class="chat-quota-banner">
+            <strong>Чтение открыто всем</strong>, но для создания топиков и ответов
+            нужна <a href="{% url 'accounts:register' %}">регистрация</a> или
+            <a href="{% url 'accounts:login' %}">вход</a>.
+        </div>
+        {% endif %}
+
+        <div class="chat-topic-list">
+            {% for topic in topics %}
+            <div class="chat-topic-row {% if topic.is_pinned %}pinned{% endif %} {% if topic.is_resolved %}resolved{% endif %}">
+                <a class="title" href="{% url 'hello:chat_topic_detail' topic.id %}">
+                    {% if topic.is_pinned %}📌 {% endif %}{{ topic.title }}
+                </a>
+                <div class="chat-topic-meta">
+                    <span class="category-chip">{{ topic.get_category_display }}</span>
+                    <span>👤 {% if topic.author %}{{ topic.author.username }}{% else %}—{% endif %}</span>
+                    <span>💬 {{ topic.replies_total }} ответ{{ topic.replies_total|pluralize:"а,ов" }}</span>
+                    <span>👁 {{ topic.views_count }}</span>
+                    <span>{{ topic.last_activity_at|date:"d.m H:i" }}</span>
+                    {% if topic.is_resolved %}<span class="resolved-mark">✓ решено</span>{% endif %}
+                    {% if topic.attached_project %}<span class="attached-mark">📎 проект</span>{% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align:center;padding:2rem;color:var(--text-light);">
+                Пока нет топиков. {% if can_post %}Будьте первым!{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <nav class="chat-pagination">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if active_category %}&category={{ active_category }}{% endif %}{% if query %}&q={{ query }}{% endif %}">← назад</a>
+            {% endif %}
+            <span class="current">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if active_category %}&category={{ active_category }}{% endif %}{% if query %}&q={{ query }}{% endif %}">вперёд →</a>
+            {% endif %}
+        </nav>
+        {% endif %}
+    </div>
+
+    {% include "chat/_announcements_sidebar.html" %}
+</div>
+{% endblock %}

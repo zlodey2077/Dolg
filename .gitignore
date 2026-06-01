@@ -1,0 +1,89 @@
+# ───── Secrets / env ─────
+.env
+.env.*
+!.env.example
+
+# ───── Python кэш / байт-код ─────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ───── SQLite БД и временные файлы ─────
+db.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# ───── Тесты / покрытие ─────
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# ───── Сборка / сторонние ─────
+*.egg-info/
+build/
+dist/
+.tox/
+
+# ───── IDE / OS ─────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ───── Юзер-данные (генерируются) ─────
+media/avatars/
+staticfiles/
+media/products/
+media/search/
+media/ml/
+media/org_logos/
+
+# Структура media/ — оставляем .gitkeep чтобы папка существовала
+!media/.gitkeep
+!media/*/.gitkeep
+
+# ───── Временные файлы / резервные копии ─────
+*.log
+*.tmp
+*.bak
+*~
+*.recovered
+*.20260*.recovered
+README.md.tmp
+
+# ───── venv ─────
+.venv/
+venv/
+env/
+
+# ───── ML/artifacts ─────
+media/ml/*.pt
+Dolg_APP/ml/dataset/external/
+Dolg_APP/ml/dataset/hf_cache/
+Dolg_APP/ml/dataset/cache/
+*.parquet
+*.safetensors
+*.onnx
+
+# ───── Большие бинарники в deploy/ ─────
+# cloudflared.exe (65 МБ) — Cloudflare Tunnel binary,
+# скачивается отдельно с github.com/cloudflare/cloudflared/releases
+deploy/cloudflared.exe
+
+# ───── Snapshot бэкапы (восстановление simulation.html) ─────
+*.recovery-*
+*.recovery-v*
+
+# ───── Backup tarballs от hourly-snapshot.bat ─────
+backups/
+*.tar.gz

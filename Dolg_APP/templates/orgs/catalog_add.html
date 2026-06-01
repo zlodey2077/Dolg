@@ -1,0 +1,256 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ org.name }} — Добавить товар в каталог{% endblock %}
+
+{% block extra_css %}
+<style>
+    .org-page { max-width: 920px; margin: 24px auto; padding: 0 20px; color: #e8eef9; }
+    .org-page-header h1 { color: var(--accent-cyan); margin: 0 0 4px; }
+    .org-page-plan { color: #94a3b8; font-size: 13px; }
+    .catalog-form {
+        background: linear-gradient(180deg, #1a1f2e 0%, #161b29 100%);
+        border: 1px solid rgba(0,212,255,.22);
+        border-radius: 12px; padding: 22px;
+        margin-top: 18px;
+    }
+    .form-row { display: grid; grid-template-columns: 180px 1fr; gap: 14px; align-items: start; margin: 10px 0; }
+    .form-row label { color: #cfe; font-size: 13px; padding-top: 6px; }
+    .form-row label .required { color: #ff8a8a; }
+    .form-row input[type=text], .form-row input[type=number], .form-row input[type=url],
+    .form-row select, .form-row textarea {
+        background: rgba(255,255,255,.08); border: 1px solid rgba(0,212,255,.30);
+        color: #fff; padding: 8px 10px; border-radius: 6px; font-size: 14px;
+        width: 100%; box-sizing: border-box; font-family: inherit;
+    }
+    .form-row textarea { min-height: 80px; resize: vertical; }
+    /* Native <option> внутри <select> ОС-ные — на dark-теме они выглядят как
+       чёрный текст на белом, что почти нечитаемо. Принудительно красим
+       и фон, и текст. Не все браузеры это поддерживают (Safari частично),
+       но Chrome/Firefox/Edge применяют корректно. */
+    .form-row select option {
+        background: #1a1f2e;
+        color: #e8eef9;
+        padding: 4px 8px;
+    }
+    .form-row select option:checked,
+    .form-row select option:hover {
+        background: #2c7be5;
+        color: #fff;
+    }
+    /* File input — на dark-theme дефолтный «Choose File» выглядит белой плашкой.
+       Делаем его тёмным с акцент-кнопкой. */
+    .form-row input[type=file] {
+        color: #cfe; font-size: 13px;
+    }
+    .form-row input[type=file]::-webkit-file-upload-button {
+        background: rgba(110,68,255,.20);
+        color: #fff;
+        border: 1px solid rgba(110,68,255,.50);
+        border-radius: 4px;
+        padding: 4px 12px;
+        cursor: pointer;
+        font-weight: 600;
+        margin-right: 10px;
+    }
+    .form-row input[type=file]::-webkit-file-upload-button:hover {
+        background: rgba(110,68,255,.35);
+    }
+    .form-row .hint { color: #94a3b8; font-size: 12px; margin-top: 4px; display: block; }
+    .form-actions { display: flex; gap: 12px; margin-top: 18px; }
+    .btn-submit {
+        background: linear-gradient(135deg, #6e44ff, #2c7be5);
+        color: #fff; border: none; padding: 10px 26px;
+        border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(110,68,255,.35); }
+    .btn-cancel {
+        background: rgba(255,255,255,.08); color: #cfe;
+        border: 1px solid rgba(255,255,255,.18); padding: 10px 26px;
+        border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none;
+    }
+    .errors {
+        background: rgba(255,80,80,.12); border: 1px solid rgba(255,80,80,.40);
+        color: #ff8a8a; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;
+    }
+    .errors ul { margin: 0; padding-left: 20px; }
+    .section-title {
+        color: #72ffad; font-size: 14px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        margin: 22px 0 6px; padding-bottom: 4px;
+        border-bottom: 1px solid rgba(114,255,173,.20);
+    }
+    .section-title:first-of-type { margin-top: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="org-page">
+    <div class="org-page-header">
+        <h1>🆕 Добавить товар в каталог</h1>
+        <span class="org-page-plan">
+            Организация <strong>{{ org.name }}</strong> · автор: {{ request.user.username }}
+        </span>
+    </div>
+
+    {% if errors %}
+    <div class="errors">
+        <strong>Проверьте поля:</strong>
+        <ul>
+        {% for err in errors %}
+            <li>{{ err }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form class="catalog-form" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="section-title">Основное</div>
+
+        <div class="form-row">
+            <label for="id-name">Название <span class="required">*</span></label>
+            <div>
+                <input type="text" id="id-name" name="name" required maxlength="300"
+                       value="{{ form_data.name|default:'' }}"
+                       placeholder="например, Резистор 10 кОм 0805 1%">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-category">Категория <span class="required">*</span></label>
+            <div>
+                <select id="id-category" name="category_id" required>
+                    <option value="">— выберите —</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}"
+                            {% if form_data.category_id == cat.id|stringformat:"s" %}selected{% endif %}>
+                        {{ cat.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-description">Описание <span class="required">*</span></label>
+            <div>
+                <textarea id="id-description" name="description" required
+                          placeholder="Краткое описание для карточки каталога — 1-3 предложения.">{{ form_data.description|default:'' }}</textarea>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-price">Цена, ₽ <span class="required">*</span></label>
+            <div>
+                <input type="number" id="id-price" name="price" required min="0" step="0.01"
+                       value="{{ form_data.price|default:'' }}"
+                       placeholder="например, 15.50">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-stock">Запас, шт.</label>
+            <div>
+                <input type="number" id="id-stock" name="stock" min="0" step="1"
+                       value="{{ form_data.stock|default:'0' }}">
+                <span class="hint">0 = нет в наличии (карточка покажет «✕ Нет в наличии»).</span>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-image">Фото (опционально)</label>
+            <div>
+                <input type="file" id="id-image" name="image" accept="image/*">
+                <span class="hint">PNG/JPG/WebP. Если не загрузите — карточка покажет category-плейсхолдер.</span>
+            </div>
+        </div>
+
+        <div class="section-title">Технические поля</div>
+
+        <div class="form-row">
+            <label for="id-manufacturer">Производитель</label>
+            <div>
+                <select id="id-manufacturer" name="manufacturer">
+                    {% for code, label in manufacturer_choices %}
+                    <option value="{{ code }}"
+                            {% if form_data.manufacturer == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-part-number">Part Number</label>
+            <div>
+                <input type="text" id="id-part-number" name="part_number" maxlength="100"
+                       value="{{ form_data.part_number|default:'' }}"
+                       placeholder="например, RC0805FR-0710KL">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-package-type">Корпус</label>
+            <div>
+                <input type="text" id="id-package-type" name="package_type" maxlength="50"
+                       value="{{ form_data.package_type|default:'' }}"
+                       placeholder="например, SMD 0805 или TO-220">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-datasheet-file">Datasheet PDF</label>
+            <div>
+                <input type="file" id="id-datasheet-file" name="datasheet_file" accept=".pdf,application/pdf">
+                <span class="hint">
+                    Загрузите PDF — он сохранится в <code>media/datasheets/&lt;slug&gt;.pdf</code> и
+                    станет datasheet'ом товара. Если PDF не нужен — оставьте поле пустым и
+                    впишите URL ниже.
+                </span>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-datasheet-url">Datasheet URL (опц.)</label>
+            <div>
+                <input type="url" id="id-datasheet-url" name="datasheet_url"
+                       value="{{ form_data.datasheet_url|default:'' }}"
+                       placeholder="https://…/datasheet.pdf — если файл не загружаете">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="id-lifecycle-status">Lifecycle</label>
+            <div>
+                <select id="id-lifecycle-status" name="lifecycle_status">
+                    {% for code, label in lifecycle_choices %}
+                    <option value="{{ code }}"
+                            {% if form_data.lifecycle_status == code or not form_data.lifecycle_status and code == 'active' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <span class="hint">Только не-active бейдж виден в карточке.</span>
+            </div>
+        </div>
+
+        <div class="section-title">Свободные параметры (опционально)</div>
+
+        <div class="form-row">
+            <label for="id-parameters-raw">key=value</label>
+            <div>
+                <textarea id="id-parameters-raw" name="parameters_raw"
+                          placeholder="resistance=10 кОм&#10;tolerance=1%&#10;power=0.125 Вт&#10;mounting=SMD"
+                          rows="6">{{ form_data.parameters_raw|default:'' }}</textarea>
+                <span class="hint">
+                    По одному параметру в строке: <code>key=value</code>. Они появятся как чипы
+                    в карточке. Ключи с префиксом <code>_</code> зарезервированы для системных
+                    маркеров — не показываются юзеру.
+                </span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">💾 Добавить в каталог</button>
+            <a href="{% url 'hello:org_dashboard' org.slug %}" class="btn-cancel">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,222 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}🎓 О проекте — ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .about-hero {
+        text-align: center;
+        padding: 2.5rem 1rem 1.5rem;
+        background: linear-gradient(135deg, rgba(0, 102, 255, 0.18), rgba(26, 39, 68, 0.5));
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 14px;
+        margin: 1rem 0 2rem;
+    }
+    .about-hero h1 { color: var(--accent-cyan); margin: 0 0 0.5rem; font-size: 2rem; }
+    .about-hero .lead { color: var(--text-light); font-size: 1.05rem; max-width: 720px; margin: 0 auto; }
+
+    .about-stats {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+        margin: 1.5rem 0;
+    }
+    .about-stat {
+        background: rgba(0, 102, 255, 0.12);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+    }
+    .about-stat .num { color: var(--accent-cyan); font-size: 1.6rem; font-weight: bold; }
+    .about-stat .lbl { color: var(--text-light); font-size: 0.85rem; margin-top: 0.25rem; }
+
+    .about-section { margin: 2.5rem 0; }
+    .about-section h2 {
+        color: var(--accent-cyan);
+        border-left: 4px solid var(--accent-cyan);
+        padding-left: 0.75rem;
+        margin: 0 0 1rem;
+    }
+    .about-section p { color: var(--text-light); line-height: 1.65; }
+
+    .modules-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;
+    }
+    .module-card {
+        background: rgba(26, 39, 68, 0.6);
+        border: 1px solid rgba(0, 212, 255, 0.25);
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+    }
+    .module-card h3 { color: var(--accent-cyan); margin: 0 0 0.5rem; font-size: 1.05rem; }
+    .module-card p  { color: var(--text-light); font-size: 0.9rem; margin: 0 0 0.5rem; }
+    .module-card a  { color: #ffcc66; text-decoration: none; font-size: 0.88rem; }
+    .module-card a:hover { text-decoration: underline; }
+
+    .stack-list { list-style: none; padding: 0; columns: 2; column-gap: 2rem; }
+    .stack-list li { padding: 4px 0; color: var(--text-light); break-inside: avoid; }
+    .stack-list strong { color: var(--accent-cyan); }
+
+    .scenario {
+        background: rgba(10, 14, 39, 0.5);
+        border-left: 3px solid #00ff88;
+        padding: 0.75rem 1rem;
+        margin: 0.75rem 0;
+        border-radius: 0 6px 6px 0;
+    }
+    .scenario .scen-title { color: #00ff88; font-weight: 600; }
+
+    @media (max-width: 760px) {
+        .about-stats { grid-template-columns: repeat(2, 1fr); }
+        .stack-list { columns: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="about-hero">
+    <h1>🎓 ДОЛГ — учебная платформа схемотехника</h1>
+    <p class="lead">
+        Web-приложение, объединяющее <strong>магазин радиоэлектронных компонентов</strong>,
+        <strong>редактор электрических схем с симулятором ngspice.wasm</strong>, простой
+        <strong>2D CAD</strong>, <strong>энциклопедию</strong> и автоматическую
+        <strong>сборку BOM</strong> прямо из нарисованной схемы.
+    </p>
+</div>
+
+<div class="about-stats">
+    <div class="about-stat">
+        <div class="num">{{ stats.products }}</div>
+        <div class="lbl">товаров в каталоге</div>
+    </div>
+    <div class="about-stat">
+        <div class="num">{{ stats.reb_products }}</div>
+        <div class="lbl">из них РЭБ-компонентов</div>
+    </div>
+    <div class="about-stat">
+        <div class="num">{{ stats.categories }}</div>
+        <div class="lbl">категорий</div>
+    </div>
+    <div class="about-stat">
+        <div class="num">{{ stats.demo_projects }}</div>
+        <div class="lbl">демо-схем для защиты</div>
+    </div>
+</div>
+
+<div class="about-section">
+    <h2>Зачем</h2>
+    <p>
+        Идея: вместо того чтобы инженеру держать в голове три отдельных приложения —
+        каталог поставщика, симулятор и CAD, — сделать одну точку входа. Открыл
+        страницу, нарисовал схему, прогнал ngspice, скачал BOM-список, сразу добавил
+        все компоненты в корзину магазина. На защите дипломного проекта это
+        демонстрирует полный цикл «идея → симуляция → закупка».
+    </p>
+</div>
+
+<div class="about-section">
+    <h2>Модули</h2>
+    <div class="modules-grid">
+        <div class="module-card">
+            <h3>🛒 Магазин РЭБ + потребительская электроника</h3>
+            <p>{{ stats.products }} компонентов в {{ stats.categories }} категориях с lifecycle-статусом,
+               datasheet-ссылками, параметрической таблицей. Sidebar-фильтры по
+               производителю / lifecycle / корпусу. Автодополнение поиска.</p>
+            <a href="{% url 'shop:index' %}">→ Открыть каталог</a>
+        </div>
+        <div class="module-card">
+            <h3>⚖️ Сравнение</h3>
+            <p>До 4 товаров рядом, авто-анализатор «лучше = меньше / больше» по типу
+               параметра (цена, TDP, частота…). Чемпион по числу побед — выделен
+               золотой плашкой.</p>
+            <a href="{% url 'shop:compare' %}">→ Перейти в сравнение</a>
+        </div>
+        <div class="module-card">
+            <h3>⚙️ Редактор схем + симулятор</h3>
+            <p>Canvas 2D с ГОСТ-обозначениями, ортогональная маршрутизация, узлы,
+               транзисторы NPN/PNP. <strong>Реальный ngspice.wasm</strong> —
+               анализы DC, переходный процесс и АЧХ/ФЧХ. JS-MNA как fallback.</p>
+            {% if user.is_authenticated %}
+            <a href="{% url 'hello:simulation' %}">→ Открыть симулятор</a>
+            {% else %}
+            <a href="{% url 'accounts:login' %}">→ Войдите, чтобы открыть</a>
+            {% endif %}
+        </div>
+        <div class="module-card">
+            <h3>📐 2D CAD-чертёж</h3>
+            <p>Базовые примитивы (линия, прямоугольник, окружность, эллипс, дуга,
+               размер, текст), штриховка, слои, шаблоны рамок ГОСТ 2.104.
+               Snap к сетке / ортогональный режим.</p>
+            {% if user.is_authenticated %}
+            <a href="{% url 'hello:cad' %}">→ Открыть CAD</a>
+            {% else %}
+            <a href="{% url 'accounts:login' %}">→ Войдите, чтобы открыть</a>
+            {% endif %}
+        </div>
+        <div class="module-card">
+            <h3>📋 BOM из схемы</h3>
+            <p>Прямо из симулятора: одна кнопка — список материалов с матчингом
+               на каталог, выбором альтернатив, live-пересчётом цены и
+               «Добавить всё в корзину» одним действием.</p>
+        </div>
+        <div class="module-card">
+            <h3>📚 Энциклопедия</h3>
+            <p>{{ stats.articles }}+ статей по теории сигналов, аналоговой и цифровой
+               схемотехнике, диагностике плюс 4 обучающих трека с 13 уроками и 29
+               заданиями. URL-адреса с кириллицей через кастомный slug-converter.</p>
+            <a href="{% url 'knowledge:index' %}">→ Открыть энциклопедию</a>
+        </div>
+    </div>
+</div>
+
+<div class="about-section">
+    <h2>Возможности</h2>
+
+    <div class="scenario">
+        <div class="scen-title">Полный цикл «схема → BOM → корзина»</div>
+        Открыть демо-схему «🎚 Двухкаскадный усилитель класса А» → запустить DC-анализ →
+        нажать «📋 BOM» → выбрать альтернативы → «🛒 Добавить всё в корзину» →
+        оформить заказ. ~2 минуты.
+    </div>
+
+    <div class="scenario">
+        <div class="scen-title">АЧХ/ФЧХ фильтра</div>
+        Открыть демо «📊 Двухкаскадный RC-фильтр» → переключить тип анализа на
+        «АЧХ/ФЧХ (AC)» → запустить → увидеть спад −40 дБ/дек.
+    </div>
+
+    <div class="scenario">
+        <div class="scen-title">Стресс-тест ngspice</div>
+        Открыть «🪜 Лестница R-2R ×100» (≈600 элементов) → запустить DC →
+        ngspice.wasm решает за миллисекунды.
+    </div>
+
+    <div class="scenario">
+        <div class="scen-title">Сравнение товаров с авто-аналитикой</div>
+        Из каталога добавить 3 товара в сравнение → таблица с авто-определением
+        «лучше/хуже» по типу параметра, чемпион по числу побед — золотой плашкой.
+    </div>
+</div>
+
+<div class="about-section">
+    <h2>Технологический стек</h2>
+    <ul class="stack-list">
+        <li><strong>Backend:</strong> Django 6.0, Python 3.14</li>
+        <li><strong>База данных:</strong> SQLite (dev), PostgreSQL-готов</li>
+        <li><strong>Frontend:</strong> ванильный JS + Canvas 2D</li>
+        <li><strong>Симулятор:</strong> ngspice 33 в WebAssembly</li>
+        <li><strong>JS-fallback:</strong> собственный MNA-солвер (Гаусс)</li>
+        <li><strong>PDF:</strong> reportlab (гарантия, сертификат)</li>
+        <li><strong>Worker:</strong> Web Worker для ngspice + MNA</li>
+        <li><strong>Public access:</strong> Cloudflare Tunnel</li>
+        <li><strong>Стандарты:</strong> ГОСТ 2.728, 2.730, 2.104</li>
+        <li><strong>Тесты:</strong> pytest-django + coverage ({{ stats.tests }}+ тестов)</li>
+    </ul>
+</div>
+
+<div class="about-section" style="text-align:center; opacity:0.85;">
+    <p style="color: var(--text-light); font-size: 0.9rem;">
+        Дипломный проект · 2026
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,176 @@
+{% load shop_extras %}
+
+<div class="product-card" data-category="{{ product.category.slug }}">
+    <div class="product-card-topbar">
+        <a class="product-category-chip product-category-chip--link"
+           href="{% url 'shop:category' product.category.slug %}"
+           title="Открыть категорию {{ product.category.name }}">
+            {% category_icon product.category.slug %} {{ product.category.name }}
+        </a>
+        {% comment %}
+        Lifecycle-бейдж показываем ТОЛЬКО для не-ACTIVE состояний: NRND, EOL,
+        OBSOLETE — это сигнал «обрати внимание, для новых проектов лучше не брать».
+        Для ACTIVE (большинство товаров) бейдж не несёт новой информации
+        и только засоряет topbar — раньше «ACTIVE» висел на каждой карточке
+        зря. Tooltip объясняет аббревиатуру пользователю-новичку.
+        {% endcomment %}
+        {% if product.lifecycle_status != 'active' %}
+        <span class="badge-lifecycle badge-{{ product.lifecycle_status }}"
+              title="{% if product.lifecycle_status == 'nrnd' %}Not Recommended for New Designs — компонент ещё в производстве, но для новых проектов лучше выбрать аналог{% elif product.lifecycle_status == 'eol' %}End of Life — компонент снимается с производства, заказы могут не подтверждаться{% elif product.lifecycle_status == 'obsolete' %}Снят с производства, доступны только остатки{% else %}{{ product.get_lifecycle_status_display }}{% endif %}">
+            {{ product.get_lifecycle_status_display }}
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="product-image">
+        {% if product.image and not product.image|is_stock_image %}
+            <img src="{{ product.image.url }}" alt="{{ product.name }}" loading="lazy" class="product-photo">
+        {% else %}
+            {% comment %}
+            Последний UI fallback: вместо одной и той же «кухонной фотки»
+            для всей категории рисуем минималистичный значок с эмодзи.
+            Цвет рамки — категорийный (из data-category на .product-card,
+            см. cosmic_theme.css). Обычно сюда не доходим: media-policy
+            заранее ставит реальное raster-фото или generated UGO PNG.
+            {% endcomment %}
+            <div class="product-photo product-photo--placeholder" role="img"
+                 aria-label="Изображение товара не загружено — {{ product.category.name }}">
+                <div class="product-placeholder-icon">{% category_icon product.category.slug %}</div>
+                <div class="product-placeholder-label">{{ product.category.name }}</div>
+                <div class="product-placeholder-hint">фото уточняется</div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="product-body">
+        <div class="product-name" title="{{ product.name }}">{{ product.name }}</div>
+
+        {% with rating=product|product_rating %}
+        <div class="product-rating" title="Средняя оценка {{ rating.value }} из 5 ({{ rating.count }} отзывов)">
+            <span class="rating-stars" aria-label="Рейтинг {{ rating.value }} из 5">
+                {% for _ in rating.full_range %}<span class="star star-full">★</span>{% endfor %}
+                {% for _ in rating.empty_range %}<span class="star star-empty">★</span>{% endfor %}
+            </span>
+            <span class="rating-value">{{ rating.value }}</span>
+            <span class="rating-count">({{ rating.count }})</span>
+        </div>
+        {% endwith %}
+
+        {% if product.part_number %}
+        <div class="product-pn">{{ product.part_number }}</div>
+        {% endif %}
+
+        {% comment %}
+        Мета-строка: brand-badge (цветной пилюль с буквой бренда + полное
+        имя на hover) + package_type. Для 'other' значка нет (бесполезный
+        шум). При нажатии на badge → переход в категорию с фильтром по
+        этому производителю — сразу видишь весь его ассортимент.
+        {% endcomment %}
+        <div class="product-meta-row">
+            {% with brand=product|brand_badge %}
+            {% if brand %}
+            <a class="brand-badge" href="{% url 'shop:category' product.category.slug %}?manufacturer={{ product.manufacturer }}"
+               style="background:{{ brand.color }};"
+               title="{{ brand.name }} — открыть товары этого производителя">
+                <span class="brand-letter">{{ brand.letter }}</span>
+                <span class="brand-name">{{ brand.name }}</span>
+            </a>
+            {% endif %}
+            {% endwith %}
+            {% if product.package_type %}
+            <a class="pkg-tag-mini pkg-tag-mini--link"
+               href="{% url 'shop:category' product.category.slug %}?package={{ product.package_type|urlencode }}"
+               title="Найти товары в корпусе {{ product.package_type }}">{{ product.package_type }}</a>
+            {% endif %}
+        </div>
+
+        {% comment %}
+        Signal-chips: набор для РЭБ и консьюмер-электроники.
+        Datasheet / SPICE / Mounting рендерятся только у РЭБ (у них поля заполнены).
+        Дубль «📚 Документация» убран — конфликтовал с datasheet-chip-ом и кнопкой «Подробнее» (та и так ведёт на detail-page).
+        {% endcomment %}
+        <div class="product-signals">
+            {% if product.datasheet_url %}<a class="product-signal product-signal-doc" href="{{ product.datasheet_url }}" target="_blank" rel="noopener" title="Открыть datasheet PDF">PDF</a>{% endif %}
+            {% if product.parameters.datasheet_extracted %}<a class="product-signal product-signal-doc" href="{% url 'shop:product_detail' product.slug %}#datasheet-intel" title="Поля извлечены из datasheet и карточки">Данные</a>{% endif %}
+            {% if product.parameters.spice_model %}<a class="product-signal product-signal-spice" href="{% url 'shop:category' product.category.slug %}?has_spice_model=1" title="Показать товары со SPICE-моделью">SPICE</a>{% endif %}
+        </div>
+
+        {% comment %}
+        Лимит 5: с шириной карточки 240px помещается ~5 чипов (2-3 на ряд).
+        Раньше было 3 → SSD/RAM-карточки казались полупустыми. Высота поля
+        фиксированная (min-height: 4.4rem) — лишние ряды не растягивают карту.
+        {% endcomment %}
+        {% with preview=product.parameters|parameter_preview:5 %}
+        {% if preview %}
+        <div class="product-params">
+            {% for item in preview %}
+                {% with filter_name=item.key|chip_filter_name group=item.key|chip_group %}
+                {% chip_value_valid param_filter_options item.key item.value as is_clickable %}
+                {% if filter_name and is_clickable %}
+                {% comment %}
+                Кликабельный чип-фильтр: переход в категорию с активным
+                значением — «найти такие же по этому параметру».
+                Кликабельный ТОЛЬКО если значение реально есть в фильтре
+                (chip_value_valid проверяет по param_filter_options) —
+                иначе чип вёл на пустой результат и фрустрировал юзера.
+                {% endcomment %}
+                {% url 'shop:category' product.category.slug as category_url %}
+                {% catalog_filter_url category_url filter_name item.value as chip_url %}
+                {% catalog_filter_active filter_name item.value as chip_active %}
+                <a class="param-chip param-chip--clickable param-chip--{{ group }}{% if item.wide %} param-chip--wide{% endif %} {{ chip_active }}"
+                   href="{{ chip_url }}"
+                   title="{{ item.label }}: {{ item.value }} — нажмите чтобы найти такие же">
+                    <span class="param-label">{{ item.label }}</span>
+                    <span class="param-value">{{ item.value }}</span>
+                </a>
+                {% else %}
+                <span class="param-chip param-chip--{{ group }}{% if item.wide %} param-chip--wide{% endif %}"
+                      title="{{ item.label }}: {{ item.value }}">
+                    <span class="param-label">{{ item.label }}</span>
+                    <span class="param-value">{{ item.value }}</span>
+                </span>
+                {% endif %}
+                {% endwith %}
+            {% endfor %}
+        </div>
+        {% comment %}
+        Категории вроде «Аксессуары» дают всего 1-2 чипа — карточка казалась
+        полупустой. Если параметров явно мало, добавляем краткое описание
+        под чипами, чтобы заполнить «воздух» и сразу дать ещё контекста.
+        Чипов 3+ — описание не нужно, и так насыщенно.
+        {% endcomment %}
+        {% if preview|length < 3 and product.description %}
+        <div class="product-desc product-desc--complement">{{ product.description|truncatewords:14 }}</div>
+        {% endif %}
+        {% else %}
+        <div class="product-desc">{{ product.description|truncatewords:10 }}</div>
+        {% endif %}
+        {% endwith %}
+
+        {% comment %}
+        Футер: вертикальный стек цена → сток → delivery-hint.
+        Раньше footer был flex-row с space-between, при flex-wrap
+        ✓ 50 шт. съезжала ОТ цены к правому краю отдельной строкой.
+        Сейчас каждая запись на своей строке, выровнены по левому краю.
+        {% endcomment %}
+        <div class="product-footer">
+            <div class="product-price">{{ product.price }} <small>₽</small></div>
+            {% if product.is_available %}
+            <div class="badge-stock-ok stock-ok">✓ {{ product.stock }} шт.</div>
+            {% else %}
+            <div class="badge-stock-out stock-out">✕ Нет в наличии</div>
+            {% endif %}
+            {% with delivery=product|delivery_hint %}
+            <div class="delivery-hint {{ delivery.css_class }}" title="Статус доставки рассчитывается по складскому остатку">
+                <span class="delivery-icon">{{ delivery.icon }}</span>
+                <span class="delivery-label">{{ delivery.label }}</span>
+            </div>
+            {% endwith %}
+        </div>
+
+        <a href="{% url 'shop:product_detail' product.slug %}" class="btn-detail">
+            <span class="btn-detail-text">Подробнее</span>
+            <span class="btn-detail-arrow">→</span>
+        </a>
+    </div>
+</div>

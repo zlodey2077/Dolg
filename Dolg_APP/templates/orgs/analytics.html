@@ -1,0 +1,63 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ org.name }} — Analytics{% endblock %}
+{% block content %}
+<div class="org-page">
+    <div class="org-page-header">
+        <h1>📊 Analytics «{{ org.name }}»</h1>
+        <nav class="org-page-nav">
+            <a href="{% url 'hello:org_dashboard' org.slug %}">📊 Dashboard</a>
+            <a href="{% url 'hello:org_analytics' org.slug %}" class="active">📈 Analytics</a>
+            <a href="{% url 'hello:org_audit' org.slug %}">📋 Audit</a>
+        </nav>
+    </div>
+
+    <p class="audit-note">Период анализа: последние {{ period_days }} дней.</p>
+
+    <div class="org-stats-grid">
+        <div class="org-stat">
+            <span class="org-stat-label">⏳ Pending review</span>
+            <span class="org-stat-value">{{ pending }}</span>
+        </div>
+        <div class="org-stat">
+            <span class="org-stat-label">✅ Approved</span>
+            <span class="org-stat-value" style="color:#50fa7b">{{ approved }}</span>
+        </div>
+        <div class="org-stat">
+            <span class="org-stat-label">❌ Rejected</span>
+            <span class="org-stat-value" style="color:#ff6b6b">{{ rejected }}</span>
+        </div>
+    </div>
+
+    <h3>🏆 Top-10 active users</h3>
+    {% if top_actors %}
+    <table class="org-members-table">
+        <thead><tr><th>#</th><th>User</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for a in top_actors %}
+            <tr><td>{{ forloop.counter }}</td><td>{{ a.actor__username }}</td><td>{{ a.n }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="audit-note">Нет активности за период.</p>
+    {% endif %}
+
+    <h3 style="margin-top:1.5rem">📊 Action breakdown</h3>
+    {% if action_counts %}
+    <table class="org-members-table">
+        <thead><tr><th>Action</th><th>Count</th><th>Bar</th></tr></thead>
+        <tbody>
+        {% for action, n in action_counts %}
+            <tr>
+                <td><code>{{ action }}</code></td>
+                <td>{{ n }}</td>
+                <td>{% widthratio n 1 12 as bar_width %}<div style="height:8px; background:linear-gradient(90deg,#bd93f9,#ff79c6); width:{{ bar_width }}px; border-radius:4px"></div></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="audit-note">Нет действий за период.</p>
+    {% endif %}
+</div>
+{% endblock %}

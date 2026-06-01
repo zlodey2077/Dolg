@@ -1,0 +1,176 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% load shop_extras %}
+
+{% block title %}Сравнение товаров — ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .compare-head { margin: 1.5rem 0 1rem; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+    .compare-head h1 { color: var(--accent-cyan); margin: 0; font-size: 1.8rem; }
+    .compare-head .hint { color: var(--text-light); font-size: .9rem; }
+    .compare-clear { color: #ff9999; text-decoration: none; font-size: .85rem; background: transparent; border: 0; cursor: pointer; padding: 0; }
+    .compare-clear:hover { text-decoration: underline; }
+
+    .compare-empty {
+        text-align: center; padding: 3rem 1rem;
+        background: rgba(26,39,68,.4);
+        border: 1px dashed var(--cosmic-light-blue);
+        border-radius: 12px;
+        color: var(--text-light);
+    }
+
+    .compare-wrap { overflow-x: auto; border: 1px solid var(--cosmic-light-blue); border-radius: 12px; }
+    .compare-table { width: 100%; border-collapse: collapse; background: rgba(10,14,39,.4); }
+    .compare-table th, .compare-table td {
+        padding: .75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(0,212,255,.15);
+        vertical-align: top;
+    }
+    .compare-table thead th {
+        background: rgba(0,102,255,.15);
+        color: var(--accent-cyan);
+        font-size: .95rem;
+        min-width: 200px;
+    }
+    .compare-table thead th:first-child { background: rgba(0,102,255,.25); min-width: 160px; }
+    .compare-table tbody th {
+        color: var(--text-bright);
+        font-weight: 500;
+        background: rgba(26,39,68,.4);
+        width: 160px;
+        position: sticky; left: 0;
+    }
+    .compare-table td { color: var(--text-light); font-size: .9rem; }
+
+    .compare-image {
+        width: 80px; height: 80px;
+        display: block;
+        margin-bottom: .5rem;
+        background: rgba(0,212,255,.08);
+        border: 1px solid rgba(0,212,255,.2);
+        border-radius: 6px;
+        object-fit: cover;
+    }
+
+    /* Анализатор: подсветка ячейки-лидера в строке */
+    .compare-table td.cell-best {
+        background: rgba(0,200,100,.12);
+        position: relative;
+    }
+    .compare-table td.cell-best::after {
+        content: '★';
+        position: absolute; top: 4px; right: 8px;
+        color: #00c864; font-size: .9rem; font-weight: 700;
+    }
+    .compare-table tr.row-skip th { color: rgba(224,224,224,.5); font-weight: 400; }
+
+    /* Сводка побед сверху */
+    .compare-summary {
+        display: flex; flex-wrap: wrap; gap: 1rem;
+        background: rgba(0,200,100,.08);
+        border: 1px solid rgba(0,200,100,.3);
+        border-radius: 10px;
+        padding: .9rem 1.1rem;
+        margin-bottom: 1rem;
+        align-items: center;
+    }
+    .compare-summary-title { color: #00c864; font-weight: 600; font-size: .95rem; margin-right: .5rem; }
+    .compare-summary-item { font-size: .9rem; color: var(--text-light); }
+    .compare-summary-item.lead { color: #ffcc66; font-weight: 600; }
+    .compare-summary-wins { font-family: 'Consolas',monospace; color: #00c864; margin-left: .35rem; }
+    .compare-legend { color: rgba(224,224,224,.6); font-size: .78rem; margin-top: .5rem; }
+    .compare-name { color: var(--accent-cyan); font-weight: 600; text-decoration: none; display: block; margin-bottom: .25rem; }
+    .compare-name:hover { text-decoration: underline; }
+    .compare-remove {
+        display: inline-block;
+        margin-top: .5rem;
+        background: rgba(255,100,100,.15);
+        border: 1px solid rgba(255,100,100,.4);
+        color: #ff9999;
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: .75rem;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .compare-remove:hover { background: rgba(255,100,100,.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="compare-head">
+    <h1>⚖️ Сравнение товаров</h1>
+    <span class="hint">В сравнении: <strong>{{ products|length }}</strong> из {{ max_compare }}</span>
+    {% if products %}
+    <form method="post" action="{% url 'shop:compare_clear' %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="compare-clear">🗑 Очистить</button>
+    </form>
+    {% endif %}
+</div>
+
+{% if not products %}
+    <div class="compare-empty">
+        <p>Список сравнения пуст.</p>
+        <p>Откройте карточку товара и нажмите «⚖️ Сравнить» — до {{ max_compare }} позиций одновременно.</p>
+        <a href="{% url 'shop:index' %}" class="btn btn-primary" style="margin-top:1rem">→ В каталог</a>
+    </div>
+{% else %}
+
+{% if products|length > 1 %}
+<div class="compare-summary">
+    <span class="compare-summary-title">📊 Лидеры по характеристикам:</span>
+    {% for entry in summary %}
+        <span class="compare-summary-item {% if forloop.counter0 == overall_best %}lead{% endif %}">
+            {% if forloop.counter0 == overall_best %}🏆 {% endif %}{{ entry.0.name|truncatechars:32 }}
+            <span class="compare-summary-wins">{{ entry.1 }} ★</span>
+        </span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="compare-wrap">
+    <table class="compare-table">
+        <thead>
+            <tr>
+                <th>Параметр</th>
+                {% for p in products %}
+                <th>
+                    {% if p.image %}
+                        <img src="{{ p.image.url }}" alt="{{ p.name }}" class="compare-image">
+                    {% else %}
+                        <div class="compare-image" style="display:flex; align-items:center; justify-content:center; font-size:2rem;">{% category_icon p.category.slug %}</div>
+                    {% endif %}
+                    <a href="{% url 'shop:product_detail' p.slug %}" class="compare-name">{{ p.name }}</a>
+                    <form method="post" action="{% url 'shop:compare_toggle' p.slug %}">
+                        {% csrf_token %}
+                        <button type="submit" class="compare-remove">✕ Убрать</button>
+                    </form>
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr {% if row.best_idx is None %}class="row-skip"{% endif %}>
+                <th>{{ row.label }}</th>
+                {% for val in row.values %}
+                    {% if forloop.counter0 == row.best_idx %}
+                        <td class="cell-best" title="Лидер по этой характеристике">{{ val }}</td>
+                    {% else %}
+                        <td>{{ val }}</td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="compare-legend">
+    ★ — лучшее значение в строке. Цена / вес / потребление / задержка считаются «лучше = меньше»;
+    остальные числовые характеристики — «лучше = больше». Производитель, категория, корпус, lifecycle не сравниваются.
+</p>
+{% endif %}
+{% endblock %}

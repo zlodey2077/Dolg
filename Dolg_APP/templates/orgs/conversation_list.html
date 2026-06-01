@@ -1,0 +1,74 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% block title %}{{ org.name }} — Беседы{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'chat/chat.css' %}">
+{% endblock %}
+{% block content %}
+
+<div class="org-page">
+    <div class="org-page-header">
+        <h1>💬 Беседы «{{ org.name }}»</h1>
+        <nav class="org-page-nav">
+            <a href="{% url 'hello:org_dashboard' org.slug %}">📊 Dashboard</a>
+            <a href="{% url 'hello:org_members' org.slug %}">👥 Команда</a>
+            <a href="{% url 'hello:org_conversation_list' org.slug %}" class="active">💬 Беседы</a>
+        </nav>
+    </div>
+
+    {% if request.GET.error %}
+    <div style="background:rgba(255,85,85,.15);border:1px solid rgba(255,85,85,.4);padding:0.6rem 1rem;border-radius:6px;margin-bottom:1rem;color:#ff8888;">⚠ {{ request.GET.error }}</div>
+    {% endif %}
+
+    {% if can_create %}
+    <div class="conv-create-form">
+        <h3>➕ Создать новый канал</h3>
+        <form method="post" action="{% url 'hello:org_conversation_create' org.slug %}">
+            {% csrf_token %}
+            <input type="text" name="title" placeholder="Название канала (макс 200)" maxlength="200" required>
+            <textarea name="description" placeholder="Описание (опц.) — для чего канал, кому участвовать"></textarea>
+            <button type="submit" class="btn btn-primary">Создать</button>
+            <small style="color:var(--text-light);margin-left:0.6rem;">Доступно только admin/owner.</small>
+        </form>
+    </div>
+    {% endif %}
+
+    <h2>Активные каналы ({{ conversations|length }})</h2>
+    <div class="conv-list">
+        {% for c in conversations %}
+        <div class="conv-row">
+            <a class="title" href="{% url 'hello:org_conversation_detail' org.slug c.id %}">💬 {{ c.title }}</a>
+            {% if c.description %}<div style="font-size:0.88rem;color:var(--text-light);margin-top:0.2rem;">{{ c.description|truncatewords:20 }}</div>{% endif %}
+            <div class="conv-meta">
+                <span>👤 создал: {% if c.created_by %}{{ c.created_by.username }}{% else %}—{% endif %}</span>
+                <span>📅 {{ c.created_at|date:"d.m.Y" }}</span>
+                <span>🕒 активность: {{ c.last_activity_at|date:"d.m H:i" }}</span>
+                <span>💬 {{ c.message_count }} сообщ.</span>
+                {% if c.attached_project %}<span style="color:#bd93f9;">📎 проект: {{ c.attached_project.name }}</span>{% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <p style="color:var(--text-light);">
+            Каналов пока нет. {% if can_create %}Создайте первый канал сверху.{% else %}Ждите, пока admin создаст канал.{% endif %}
+        </p>
+        {% endfor %}
+    </div>
+
+    {% if archived %}
+    <details style="margin-top:2rem;">
+        <summary style="cursor:pointer;color:var(--text-light);">📦 Архивированные ({{ archived|length }})</summary>
+        <div class="conv-list" style="margin-top:0.7rem;">
+            {% for c in archived %}
+            <div class="conv-row archived">
+                <a class="title" href="{% url 'hello:org_conversation_detail' org.slug c.id %}">{{ c.title }}</a>
+                <div class="conv-meta">
+                    <span>архив. {{ c.updated_at|date:"d.m.Y" }}</span>
+                    <span>💬 {{ c.message_count }} сообщ.</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+</div>
+{% endblock %}

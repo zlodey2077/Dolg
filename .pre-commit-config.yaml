@@ -1,0 +1,47 @@
+# pre-commit hooks. Установка:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Сразу проверить весь репо:
+#   pre-commit run --all-files
+#
+# Хуки бегут только на стейджированных файлах при `git commit`.
+# Если хочется skip разово: `git commit --no-verify` (но это плохая идея).
+
+repos:
+  # === Базовые гигиенические проверки ===
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: \.svg$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: \.(vscode|claude)/.*\.json$
+      - id: check-added-large-files
+        args: ['--maxkb=512']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # === Ruff: линтер + формат + isort, всё в одном бинаре ===
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.13
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # === Django-специфичные ===
+  - repo: local
+    hooks:
+      - id: django-check
+        name: Django system check
+        entry: python manage.py check
+        language: system
+        pass_filenames: false
+        # Не самый дешёвый хук, гоняем только при изменении settings/urls/views
+        files: \.(py)$
+        stages: [pre-commit]

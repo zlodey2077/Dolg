@@ -1,0 +1,107 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ org.name }} — Настройки{% endblock %}
+{% block content %}
+<div class="org-page">
+    <div class="org-page-header">
+        <h1>⚙ Настройки «{{ org.name }}»</h1>
+        <nav class="org-page-nav">
+            <a href="{% url 'hello:org_dashboard' org.slug %}">📊 Dashboard</a>
+            <a href="{% url 'hello:org_members' org.slug %}">👥 Команда</a>
+            <a href="{% url 'hello:org_conversation_list' org.slug %}">💬 Беседы</a>
+            <a href="{% url 'hello:org_settings' org.slug %}" class="active">⚙ Настройки</a>
+        </nav>
+    </div>
+
+    <form method="post" class="org-settings-form" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <fieldset>
+            <legend>Основное</legend>
+            <label>Название
+                <input type="text" name="name" value="{{ org.name }}" maxlength="200">
+            </label>
+            <label>Биллинг-email
+                <input type="email" name="billing_email" value="{{ org.billing_email }}">
+            </label>
+            <label>Plan: <strong>{{ org.get_plan_display }}</strong> ({{ org.seats_max }} seats)</label>
+        </fieldset>
+
+        <fieldset>
+            <legend>🎨 Branding (Pro/Enterprise)</legend>
+            {% if org.custom_logo %}
+                <p><strong>Текущий логотип:</strong> <img src="{{ org.custom_logo.url }}" alt="" style="max-height:50px;vertical-align:middle"></p>
+            {% endif %}
+            <label>Загрузить новый логотип (PNG/SVG, до 5 МБ)
+                <input type="file" name="custom_logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+            </label>
+            <label>Акцентный цвет (HEX, опц.)
+                <input type="text" name="custom_color" value="{{ org.custom_color }}" placeholder="#bd93f9" maxlength="20">
+            </label>
+        </fieldset>
+
+        <fieldset>
+            <legend>🔐 SSO (Enterprise)</legend>
+            <label class="checkbox-row">
+                <input type="checkbox" name="policy_sso_enabled"
+                       {% if org.settings.sso_enabled %}checked{% endif %}>
+                Включить SSO для этой org (mock-OIDC)
+            </label>
+            <label>SSO провайдер:
+                <select name="sso_provider">
+                    <option value="">— не выбран —</option>
+                    <option value="azure"  {% if org.settings.sso_provider == 'azure' %}selected{% endif %}>Azure AD</option>
+                    <option value="okta"   {% if org.settings.sso_provider == 'okta' %}selected{% endif %}>Okta</option>
+                    <option value="google" {% if org.settings.sso_provider == 'google' %}selected{% endif %}>Google Workspace</option>
+                </select>
+            </label>
+            {% if org.settings.sso_enabled %}
+            <p class="audit-note">
+                URL для login: <code>/sso/{{ org.slug }}/redirect/</code>
+            </p>
+            {% endif %}
+        </fieldset>
+
+        <fieldset>
+            <legend>🔒 Security policies</legend>
+            <label class="checkbox-row">
+                <input type="checkbox" name="policy_require_2fa"
+                       {% if org.settings.require_2fa %}checked{% endif %}>
+                Требовать 2FA для всех members
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="policy_disable_ai"
+                       {% if org.settings.disable_ai %}checked{% endif %}>
+                Запретить AI-ассистент (если внутр.полицей запрет на отправку данных третьим)
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="policy_disable_public_sharing"
+                       {% if org.settings.disable_public_sharing %}checked{% endif %}>
+                Запретить публичные share-links (только internal)
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="policy_require_order_approval"
+                       {% if org.settings.require_order_approval %}checked{% endif %}>
+                Требовать reviewer-approval для каждого order (SOX-style)
+            </label>
+            <label>Разрешённые email-домены (через запятую, для auto-join):
+                <input type="text" name="allowed_domains"
+                       value="{{ org.settings.allowed_domains|join:',' }}"
+                       placeholder="company.com, subsidiary.com">
+            </label>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+
+    {% if can_delete %}
+    <div class="org-danger-zone">
+        <h3>⚠ Опасная зона</h3>
+        <p>Удаление организации — необратимо после 30-дневного grace-периода. Все проекты, members,
+           audit-log будут удалены. Для отмены подписки используйте <a href="{% url 'hello:billing_plans' %}">Billing</a>.</p>
+        <button type="button" class="btn btn-danger" disabled title="Удаление через support — для дипломной версии">
+            🗑 Удалить организацию (TODO)
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

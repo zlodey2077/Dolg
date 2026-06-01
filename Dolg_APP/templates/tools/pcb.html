@@ -1,0 +1,242 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}PCB: {{ project.name }} - DOLG{% endblock %}
+
+{% block content %}
+<style>
+.pcb-wrap { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; color: #e0e0e0; }
+.pcb-wrap h1 { color: #00d4ff; margin-bottom: 0.5rem; }
+.pcb-meta { color: #aab; font-size: 0.9rem; margin-bottom: 1rem; }
+.pcb-svg-wrap {
+    background: #1b5e20;          /* FR-4 зелёный — узнаваемая «плата» */
+    padding: 12px; border-radius: 8px; margin: 1rem 0;
+    border: 2px solid #0d3a14;
+}
+.pcb-svg-wrap svg { width: 100%; height: auto; display: block; }
+.pcb-actions { display: flex; gap: 12px; margin: 1rem 0; }
+.pcb-actions a, .pcb-actions button {
+    padding: 8px 16px; border-radius: 6px; text-decoration: none;
+    font-weight: 500; cursor: pointer; border: none;
+}
+.pcb-actions .primary {
+    background: linear-gradient(135deg, #6e44ff, #2c7be5); color: #fff;
+}
+.pcb-actions .secondary {
+    background: rgba(0, 212, 255, 0.12); color: #7fdbff;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+}
+.pcb-stats {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin: 1rem 0;
+}
+.pcb-stat {
+    background: rgba(15, 22, 45, 0.85);
+    border: 1px solid rgba(0, 212, 255, 0.25);
+    border-radius: 8px; padding: 10px 14px;
+}
+.pcb-stat-label { font-size: 0.75rem; color: #889; text-transform: uppercase; }
+.pcb-stat-value { font-size: 1.4rem; color: #7fdbff; font-weight: 600; }
+.pcb-warning {
+    background: rgba(255, 200, 0, 0.1); border-left: 3px solid #ffd166;
+    padding: 8px 14px; margin: 1rem 0; color: #ffd166; font-size: 0.85rem;
+}
+.pcb-actions .accent {
+    background: linear-gradient(135deg, #ff9800, #ff5722); color: #fff;
+}
+.pcb-actions .accent:hover { filter: brightness(1.1); }
+.pcb-actions button:disabled { opacity: 0.55; cursor: wait; }
+.pcb-autoroute-info {
+    background: rgba(0, 212, 255, 0.08);
+    border-left: 3px solid #00d4ff;
+    padding: 8px 14px; margin: 1rem 0; color: #7fdbff; font-size: 0.85rem;
+    display: none;
+}
+.pcb-autoroute-info.visible { display: block; }
+.pcb-autoroute-info b { color: #fff; }
+</style>
+
+<div class="pcb-wrap">
+    <h1>🧬 PCB: {{ project.name }}</h1>
+    <p class="pcb-meta">
+        Авто-разводка (MVP) из принципиальной схемы.
+        <a href="{% url 'hello:projects' %}" style="color:#7fdbff;">← К проектам</a> ·
+        <a href="{% url 'hello:simulation' %}" style="color:#7fdbff;">⚙️ Открыть в симуляторе</a>
+    </p>
+
+    <div class="pcb-warning">
+        ⚠️ MVP-экспорт: расстановка по координатам схемы, прямые трассы (без обхода).
+        Реальную плату делайте в KiCad после DRC.
+    </div>
+
+    <div class="pcb-stats">
+        <div class="pcb-stat">
+            <div class="pcb-stat-label">Размер платы</div>
+            <div class="pcb-stat-value">{{ layout.pcb_w_mm|floatformat:1 }} × {{ layout.pcb_h_mm|floatformat:1 }} мм</div>
+        </div>
+        <div class="pcb-stat">
+            <div class="pcb-stat-label">Компонентов</div>
+            <div class="pcb-stat-value">{{ layout.comps|length }}</div>
+        </div>
+        <div class="pcb-stat">
+            <div class="pcb-stat-label">Контактных площадок</div>
+            <div class="pcb-stat-value">{{ layout.pads|length }}</div>
+        </div>
+        <div class="pcb-stat">
+            <div class="pcb-stat-label">Трасс</div>
+            <div class="pcb-stat-value">{{ layout.traces|length }}</div>
+        </div>
+    </div>
+
+    <div class="pcb-actions">
+        {% comment %}
+        Disclaimer перед скачиванием Gerber — юридически важно: пользователь
+        соглашается с тем, что MVP-экспорт нельзя слать на производство без
+        ручной проверки. Без этого DOLG несёт риск претензий за брак платы.
+        {% endcomment %}
+        <a class="primary" href="{% url 'hello:pcb_gerber_download' project.id %}"
+           onclick="return confirm('⚠️ Внимание: это MVP-экспорт (top-copper + drill, без DRC). Перед изготовлением:\n\n• Проверьте файлы в KiCad/gerbview\n• Запустите DRC проверку\n• Сравните с design rules вашего производителя\n\nDOLG не несёт ответственности за брак из-за ошибок в экспорте.\n\nПродолжить?')">
+            💾 Скачать Gerber + Drill (ZIP)
+        </a>
+        <button class="accent" id="pcb-autoroute-btn"
+                title="A* по сетке 0.5мм с штрафом за поворот — трассы реально обходят компоненты.">
+            🤖 Auto-route (A*)
+        </button>
+        <button class="secondary" onclick="window.print()">🖨️ Печать SVG</button>
+    </div>
+
+    <div class="pcb-autoroute-info" id="pcb-autoroute-info"></div>
+
+    <div class="pcb-svg-wrap">
+        {% comment %}
+        SVG сам по себе — простая 1-к-1 проекция мм-координат на пиксели viewBox.
+        Зрителю удобно сохранять/печатать.
+        {% endcomment %}
+        <svg xmlns="http://www.w3.org/2000/svg"
+             viewBox="0 0 {{ layout.pcb_w_mm|floatformat:1 }} {{ layout.pcb_h_mm|floatformat:1 }}"
+             preserveAspectRatio="xMidYMid meet">
+            <!-- Фон платы -->
+            <rect x="0" y="0" width="{{ layout.pcb_w_mm }}" height="{{ layout.pcb_h_mm }}"
+                  fill="#0e3d1b" stroke="#073" stroke-width="0.3"/>
+
+            <!-- Трассы (медь) — после A* перерисовываем JS-ом в этот <g>. -->
+            <g id="pcb-traces-group">
+            {% for tr in layout.traces %}
+            <line x1="{{ tr.from.x_mm }}" y1="{{ tr.from.y_mm }}"
+                  x2="{{ tr.to.x_mm }}" y2="{{ tr.to.y_mm }}"
+                  stroke="#c0a060" stroke-width="0.5" stroke-linecap="round"/>
+            {% endfor %}
+            </g>
+
+            <!-- Pads (медные площадки) -->
+            {% for pad in layout.pads %}
+            <circle cx="{{ pad.x_mm }}" cy="{{ pad.y_mm }}" r="0.8"
+                    fill="#d4af37" stroke="#a0741a" stroke-width="0.1"/>
+            {% endfor %}
+
+            <!-- Силкскрин (контуры компонентов + подписи).
+                 x_left_mm / y_top_mm считаются в pcb_layout.py из центра
+                 (compute_pcb_layout сохраняет cx_mm/cy_mm как геом-центр).
+                 Подпись — над компонентом, центрируется text-anchor="middle".
+                 Stroke вокруг текста — чтобы белая надпись не сливалась
+                 с медью трасс/PCB-фоном. Font-size 3 mm — на плате 100-200мм
+                 читается без зума. -->
+            {% for comp in layout.comps %}
+            <g>
+                <rect x="{{ comp.x_left_mm }}" y="{{ comp.y_top_mm }}"
+                      width="{{ comp.w_mm }}" height="{{ comp.h_mm }}"
+                      fill="none" stroke="#ffffff" stroke-width="0.18"
+                      stroke-dasharray="0.6 0.35"
+                      rx="0.3" ry="0.3"/>
+                <text x="{{ comp.label_x_mm }}" y="{{ comp.label_y_mm }}"
+                      fill="#ffffff" stroke="#0b3014" stroke-width="0.5"
+                      paint-order="stroke fill"
+                      font-size="3" font-family="Arial, sans-serif"
+                      font-weight="700" text-anchor="middle">
+                    {% if comp.label %}{{ comp.label }}{% else %}{{ comp.type }}{{ comp.id }}{% endif %}
+                </text>
+            </g>
+            {% endfor %}
+        </svg>
+    </div>
+
+    <p class="pcb-meta">
+        Содержимое ZIP: top-copper Gerber (RS-274X), drill (Excellon NC), README.
+        Откройте gerbview / KiCad → File → Open Gerber для просмотра.
+    </p>
+</div>
+
+<script>
+// Block C1 — A* autorouter UI handler.
+// POST /pcb/<id>/autoroute/ → JSON {ok, stats, traces}. Перерисовываем
+// группу #pcb-traces-group, считаем статы, обновляем «Трасс» счётчик.
+(function () {
+    const btn = document.getElementById('pcb-autoroute-btn');
+    if (!btn) return;
+    const info = document.getElementById('pcb-autoroute-info');
+    const group = document.getElementById('pcb-traces-group');
+    const tracesCounter = document.querySelectorAll('.pcb-stat-value')[3];  // 4-я карточка = «Трасс»
+
+    function csrf() {
+        return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    }
+
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = '⏳ Считаю A*…';
+        info.classList.remove('visible');
+        try {
+            const resp = await fetch('{% url "hello:api_pcb_autoroute" project.id %}', {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'X-CSRFToken': csrf(), 'Content-Type': 'application/json'},
+                body: '{}',
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            if (!data.ok) throw new Error(data.error || 'unknown error');
+
+            // Перерисовываем трассы
+            const ns = 'http://www.w3.org/2000/svg';
+            group.innerHTML = '';
+            for (const tr of (data.traces || [])) {
+                const line = document.createElementNS(ns, 'line');
+                line.setAttribute('x1', tr.from.x_mm);
+                line.setAttribute('y1', tr.from.y_mm);
+                line.setAttribute('x2', tr.to.x_mm);
+                line.setAttribute('y2', tr.to.y_mm);
+                line.setAttribute('stroke', '#ff9966');  // оранжевый — отличаем A*-трассы от naive
+                line.setAttribute('stroke-width', tr.width_mm || 0.5);
+                line.setAttribute('stroke-linecap', 'round');
+                group.appendChild(line);
+            }
+            if (tracesCounter) tracesCounter.textContent = (data.traces || []).length;
+
+            // Показываем статы
+            const s = data.stats || {};
+            const failedTxt = s.failed
+                ? ` · <span style="color:#ff7676">не разведены: ${s.failed}</span>`
+                : '';
+            info.innerHTML = (
+                `🤖 <b>${s.algorithm || 'A*'}</b> · `
+                + `разведено ${s.routed} / ${s.routed + s.failed} net'ов${failedTxt} · `
+                + `средняя длина <b>${s.avg_length_mm} мм</b> · `
+                + `всего <b>${s.total_length_mm} мм</b> · `
+                + `grid ${s.grid_w}×${s.grid_h} (${s.cells_per_mm} cells/мм)`
+            );
+            info.classList.add('visible');
+        } catch (err) {
+            info.innerHTML = `❌ Не удалось разводить: ${err.message || err}`;
+            info.classList.add('visible');
+            info.style.borderLeftColor = '#ff7676';
+            info.style.color = '#ff7676';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    });
+})();
+</script>
+
+{% endblock %}

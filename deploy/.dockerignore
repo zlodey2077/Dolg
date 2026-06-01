@@ -1,0 +1,41 @@
+# Python / venv
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Git / IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+
+# Local dev artifacts
+db.sqlite3
+db.sqlite3-journal
+*.log
+.test_*.log
+.coverage
+htmlcov/
+
+# Static collection (соберётся внутри контейнера через collectstatic)
+staticfiles/
+
+# Media (volume-маунт, не embed-им в образ)
+media/
+
+# Docs / тяжёлые артефакты (не нужны в runtime)
+docs/*.pdf
+docs/*.docx
+docs/Дипломная*
+
+# Tests log + outputs
+.pytest_cache/
+
+# Touring local files
+test_waypoint_drag.html
+.env
+.env.local
+*.local

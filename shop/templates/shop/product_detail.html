@@ -1,0 +1,1048 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% load shop_extras %}
+
+{% block title %}{{ product.name }} — ДОЛГ{% endblock %}
+
+{% block content %}
+<div class="container">
+    <nav class="breadcrumbs" aria-label="Хлебные крошки">
+        <a href="{% url 'shop:index' %}">🏠 Каталог</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'shop:category' product.category.slug %}">{% category_icon product.category.slug %} {{ product.category.name }}</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{{ product.name }}</span>
+    </nav>
+
+    <div class="product-detail">
+        <!-- Image -->
+        <div class="product-image-section">
+            {% if product.image %}
+                <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-detail-image" loading="lazy">
+            {% else %}
+                <div class="product-image-placeholder-large product-photo-missing">
+                    <strong>Фото товара не загружено</strong>
+                    <span>{{ product.category.name }}</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Info -->
+        <div class="product-info-section">
+            <!-- Name + badges -->
+            <div style="display:flex; align-items:flex-start; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                <h1 style="margin:0; font-size:1.6rem; flex:1;">{{ product.name }}</h1>
+                <span class="lc-badge lc-{{ product.lifecycle_status }}">{{ product.get_lifecycle_status_display }}</span>
+            </div>
+
+            {% if product.part_number %}
+            <div class="part-number-line">
+                <span class="pn-label">Part Number:</span>
+                <span class="pn-value">{{ product.part_number }}</span>
+            </div>
+            {% endif %}
+
+            <p class="meta-line">
+                <a href="{% url 'shop:category' product.category.slug %}">{{ product.category.name }}</a>
+                {% if product.manufacturer and product.manufacturer != 'other' %}
+                &nbsp;·&nbsp; {{ product.get_manufacturer_display }}
+                {% endif %}
+                {% if product.package_type %}&nbsp;·&nbsp; <span class="pkg-tag">{{ product.package_type }}</span>{% endif %}
+            </p>
+
+            <!-- Description -->
+            <div class="product-description">
+                <p>{{ product.description }}</p>
+            </div>
+
+            {% if product.datasheet_url %}
+            <a href="{{ product.datasheet_url }}" target="_blank" rel="noopener" class="datasheet-link">
+                📄 Открыть Datasheet (PDF)
+            </a>
+            {% endif %}
+
+            {% if official_resources %}
+            <div class="official-resources">
+                <div class="official-resources-title">Официальные ресурсы</div>
+                <div class="official-resource-list">
+                    {% for resource in official_resources %}
+                    <a href="{{ resource.url }}" target="_blank" rel="noopener" class="official-resource official-resource-{{ resource.kind }}">
+                        {{ resource.label }} ↗
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% comment %}
+            Те же 5 ключевых чипов + signal-chips, что и в каталоге.
+            Единый визуальный язык: на карточке-превью и на детальной странице
+            пользователь видит одни и те же фишки в той же стилистике.
+            Полная таблица параметров идёт ниже («📊 Характеристики»).
+            {% endcomment %}
+            <div class="product-signals">
+                {% if product.datasheet_url %}<a class="product-signal product-signal-doc" href="{{ product.datasheet_url }}" target="_blank" rel="noopener">📄 Datasheet</a>{% endif %}
+                {% if product.parameters.datasheet_extracted %}<a class="product-signal product-signal-doc" href="#datasheet-intel">DI: данные извлечены</a>{% endif %}
+                {% if product.parameters.spice_model %}<a class="product-signal product-signal-spice" href="{% url 'shop:category' product.category.slug %}?has_spice_model=1">⚙ SPICE-модель</a>{% endif %}
+                <a class="product-signal product-signal-docs" href="{% url 'shop:product_warranty' product.slug %}">📚 Документация</a>
+                {% if product.parameters.mounting %}<a class="product-signal product-signal-mount" href="{% url 'shop:category' product.category.slug %}?mounting={{ product.parameters.mounting|urlencode }}">{{ product.parameters.mounting }}</a>{% endif %}
+                {% if product.is_available %}<span class="product-signal product-signal-stock">✓ {{ product.stock }} шт. на складе</span>{% endif %}
+            </div>
+
+            {% with preview=product.parameters|parameter_preview:5 %}
+            {% if preview %}
+            <div class="product-params">
+                {% for item in preview %}
+                    {% with filter_name=item.key|chip_filter_name group=item.key|chip_group %}
+                    {% if filter_name %}
+                    <a class="param-chip param-chip--clickable param-chip--{{ group }}{% if item.wide %} param-chip--wide{% endif %}"
+                       href="{% url 'shop:category' product.category.slug %}?{{ filter_name }}={{ item.value }}"
+                       title="Найти такие же по «{{ item.label }}»">
+                        <span class="param-label">{{ item.label }}</span>
+                        <span class="param-value">{{ item.value }}</span>
+                    </a>
+                    {% else %}
+                    <span class="param-chip param-chip--{{ group }}{% if item.wide %} param-chip--wide{% endif %}"
+                          title="{{ item.label }}: {{ item.value }}">
+                        <span class="param-label">{{ item.label }}</span>
+                        <span class="param-value">{{ item.value }}</span>
+                    </span>
+                    {% endif %}
+                    {% endwith %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% comment %}
+            Типичное применение — текстовое поле в parameters.applications,
+            заполнено по slug категории через CATEGORY_APPLICATIONS в
+            enrich_product_parameters.py. Длинная строка, не лезет в
+            чип-превью — поэтому отдельная секция со своим визуалом.
+            {% endcomment %}
+            {% if product.parameters.applications %}
+            <div class="applications-block">
+                <h3>💡 Типичное применение</h3>
+                <p>{{ product.parameters.applications }}</p>
+            </div>
+            {% endif %}
+
+            {% with ds=product.parameters|datasheet_summary %}
+            {% if ds %}
+            <div id="datasheet-intel" class="datasheet-intel-block">
+                <h3>📄 Datasheet Intelligence</h3>
+                <div class="datasheet-intel-meta">
+                    <span>Источник: {{ ds.extractor }}</span>
+                    {% if ds.confidence %}<span>Доверие: {{ ds.confidence }}</span>{% endif %}
+                </div>
+                <div class="datasheet-field-chips">
+                    {% for field in ds.fields %}
+                    <span>{{ field.label }}</span>
+                    {% endfor %}
+                </div>
+                <ul class="datasheet-snippets">
+                    {% for item in ds.snippets %}
+                    <li><strong>{{ item.label }}:</strong> {{ item.text }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- Technical parameters — grouped -->
+            {% with grouped=product.parameters|group_parameters %}
+            {% if grouped %}
+            <div class="specs-block">
+                <h3>📊 Характеристики</h3>
+                {% for group_name, items in grouped %}
+                <div class="specs-group">
+                    <div class="specs-group-title">{{ group_name }}</div>
+                    <table class="specs-table">
+                        {% for label, value in items %}
+                        <tr>
+                            <td class="spec-key">{{ label }}</td>
+                            <td class="spec-val">{{ value }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- Base info -->
+            <div class="product-details">
+                <h3>Основные сведения</h3>
+                <ul>
+                    {% if product.part_number %}
+                    <li><strong>Part Number:</strong> {{ product.part_number }}</li>
+                    {% else %}
+                    <li><strong>Артикул:</strong> DOLG-{{ product.id }}</li>
+                    {% endif %}
+                    <li><strong>Наличие:</strong> <span class="badge badge-info">{{ product.stock }} шт.</span></li>
+                    <li><strong>Категория:</strong> <a href="{% url 'shop:category' product.category.slug %}">{{ product.category.name }}</a></li>
+                    <li><strong>Производитель:</strong> {{ product.get_manufacturer_display }}</li>
+                    {% if product.package_type %}<li><strong>Корпус:</strong> {{ product.package_type }}</li>{% endif %}
+                    <li><strong>Lifecycle:</strong> {{ product.get_lifecycle_status_display }}</li>
+                    <li><strong>Добавлен:</strong> {{ product.created_at|date:"d.m.Y" }}</li>
+                </ul>
+            </div>
+
+            <!-- Purchase -->
+            <div class="product-purchase">
+                <div class="price">
+                    <span class="price-value">{{ product.price }} ₽</span>
+                    <span class="price-note">за 1 шт.</span>
+                </div>
+                {% if product.is_available %}
+                    <form method="post" action="{% url 'shop:add_to_cart' product.slug %}" class="add-to-cart-form">
+                        {% csrf_token %}
+                        <div class="quantity-section">
+                            <label for="quantity">Кол-во:</label>
+                            <input type="number" id="quantity" name="quantity" value="1" min="1" max="{{ product.stock }}">
+                        </div>
+                        <button type="submit" class="btn btn-success">➕ В корзину</button>
+                    </form>
+                {% else %}
+                    <p class="out-of-stock">❌ Нет в наличии</p>
+                {% endif %}
+
+                <form method="post" action="{% url 'shop:compare_toggle' product.slug %}" style="margin-top:0.6rem;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary" style="display:inline-block; text-decoration:none;">
+                    {% if product.slug in compare_slugs %}✓ В сравнении — убрать{% else %}⚖️ Сравнить{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <section class="engineering-hub" aria-label="Инженерные связи товара">
+        <div class="hub-header">
+            <div>
+                <h2>Инженерное применение</h2>
+                <p>Связь товара с CAD/SIM, статьями, аналогами и рисками для BOM.</p>
+            </div>
+        </div>
+
+        <div class="hub-tabs" role="tablist">
+            <button type="button" class="hub-tab active" data-hub-tab="warnings">Проверка</button>
+            <button type="button" class="hub-tab" data-hub-tab="schemes">Схемы</button>
+            <button type="button" class="hub-tab" data-hub-tab="articles">Статьи</button>
+            <button type="button" class="hub-tab" data-hub-tab="analogs">Аналоги</button>
+        </div>
+
+        <div class="hub-panel active" data-hub-panel="warnings">
+            {% if engineering_warnings %}
+                {% for warning in engineering_warnings %}
+                <div class="hub-warning">{{ warning }}</div>
+                {% endfor %}
+            {% else %}
+                <div class="hub-ok">Критичных предупреждений нет: товар активен, есть на складе и готов к использованию в спецификации.</div>
+            {% endif %}
+        </div>
+
+        <div class="hub-panel" data-hub-panel="schemes">
+            <div class="hub-grid">
+                {% for title, description, url in compatible_templates %}
+                <a class="hub-card" href="{{ url }}">
+                    <span class="hub-card-kicker">CAD/SIM</span>
+                    <strong>{{ title }}</strong>
+                    <span>{{ description }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="hub-panel" data-hub-panel="articles">
+            {% if related_articles %}
+            <div class="hub-grid">
+                {% for article in related_articles %}
+                <a class="hub-card" href="{% url 'knowledge:article' article.slug %}">
+                    <span class="hub-card-kicker">{{ article.category.name }} · {{ article.reading_minutes }} мин</span>
+                    <strong>{{ article.title }}</strong>
+                    <span>{{ article.summary|truncatewords:18 }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="hub-empty">Связанных статей пока нет. Это хороший кандидат для пополнения энциклопедии.</div>
+            {% endif %}
+        </div>
+
+        <div class="hub-panel" data-hub-panel="analogs">
+            {% if alternative_products %}
+            <div class="hub-grid">
+                {% for alt in alternative_products %}
+                <a class="hub-card" href="{% url 'shop:product_detail' alt.slug %}">
+                    <span class="hub-card-kicker">{{ alt.get_lifecycle_status_display }} · {{ alt.stock }} шт.</span>
+                    <strong>{{ alt.name }}</strong>
+                    <span>{% if alt.part_number %}{{ alt.part_number }} · {% endif %}{{ alt.price }} ₽</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="hub-empty">Автоматически подобранных аналогов в наличии нет.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Extra info -->
+    <div class="product-extra-info">
+        <!-- Documentation -->
+        <div class="info-section">
+            <h3>📋 Документация</h3>
+            <ul class="doc-list">
+                {% if product.datasheet_url %}
+                <li><span class="doc-icon">📄</span>
+                    <span class="doc-name">Datasheet / Техническая спецификация</span>
+                    <a href="{{ product.datasheet_url }}" target="_blank" rel="noopener" class="doc-dl">Открыть ↗</a>
+                </li>
+                {% else %}
+                <li><span class="doc-icon">📄</span>
+                    <span class="doc-name">Техническая спецификация</span>
+                    <span class="doc-note">по запросу</span>
+                </li>
+                {% endif %}
+                <li><span class="doc-icon">🛡️</span>
+                    <span class="doc-name">Гарантийный талон (12 мес.)</span>
+                    <a href="{% url 'shop:product_warranty' product.slug %}" class="doc-dl">Скачать PDF</a>
+                </li>
+                <li><span class="doc-icon">✅</span>
+                    <span class="doc-name">Сертификат качества (РФ + RoHS)</span>
+                    <a href="{% url 'shop:product_certificate' product.slug %}" class="doc-dl">Скачать PDF</a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Delivery -->
+        <div class="info-section">
+            <h3>🚚 Доставка и возврат</h3>
+            <ul>
+                <li>✓ Доставка по России: 3–7 дней</li>
+                <li>✓ Бесплатная доставка от 5 000 ₽</li>
+                <li>✓ Возврат в течение 30 дней</li>
+                <li>✓ Гарантия: 1 год</li>
+            </ul>
+        </div>
+
+        {% comment %}
+        Раньше тут были seeded-рейтинг (4.8★, N отзывов) и 4 dummy-отзыва.
+        Это бутафория — реальной системы reviews нет, всё генерилось
+        детерминированно по product.id. Пользователь явно сказал: не нужно
+        синтетических данных. Удалили. Когда (если) появится таблица Review,
+        вернём — с реальными данными.
+        {% endcomment %}
+    </div>
+
+    <!-- Related -->
+    {% if related_products %}
+    <div class="related-products">
+        <h2>Похожие товары</h2>
+        <div class="products-grid">
+            {% for rp in related_products %}
+            {% include "shop/includes/product_card.html" with product=rp %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recently viewed (session-based, до 5 товаров, без текущего) -->
+    {% if recently_viewed %}
+    <div class="related-products" style="margin-top: 2rem;">
+        <h2>👁 Недавно смотрели</h2>
+        <div class="products-grid">
+            {% for rv in recently_viewed %}
+            {% include "shop/includes/product_card.html" with product=rv %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Lifecycle badge */
+.lc-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 0.3rem;
+}
+.lc-active   { background: rgba(0,200,100,0.18); color: #00c864; border: 1px solid rgba(0,200,100,0.35); }
+.lc-nrnd     { background: rgba(255,160,0,0.18);  color: #ffa000; border: 1px solid rgba(255,160,0,0.35); }
+.lc-eol      { background: rgba(255,70,70,0.18);  color: #ff4646; border: 1px solid rgba(255,70,70,0.35); }
+.lc-obsolete { background: rgba(150,150,150,0.18);color: #999;    border: 1px solid rgba(150,150,150,0.35); }
+
+/* Part number */
+.part-number-line { margin-bottom: 0.4rem; }
+.pn-label { font-size: 0.75rem; color: var(--text-light); margin-right: 0.4rem; }
+.pn-value { font-family: monospace; font-size: 0.95rem; color: var(--accent-cyan); font-weight: 600; }
+
+/* Meta line */
+.meta-line { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1rem; }
+.meta-line a { color: var(--accent-cyan); text-decoration: none; }
+.meta-line a:hover { text-decoration: underline; }
+.pkg-tag {
+    display: inline-block;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.75rem;
+    color: var(--accent-cyan);
+}
+
+/* Datasheet link */
+.datasheet-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.9rem;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.35);
+    border-radius: 6px;
+    color: var(--accent-cyan);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.5rem 0 1rem 0;
+    transition: all 0.2s ease;
+}
+.datasheet-link:hover { background: rgba(0,212,255,0.2); box-shadow: 0 0 12px rgba(0,212,255,0.4); }
+
+.official-resources {
+    margin: 0.25rem 0 1rem;
+    padding: .85rem;
+    border: 1px solid rgba(0,212,255,.2);
+    border-radius: 8px;
+    background: rgba(0,212,255,.055);
+}
+.official-resources-title {
+    color: var(--accent-cyan);
+    font-weight: 700;
+    font-size: .88rem;
+    margin-bottom: .55rem;
+}
+.official-resource-list {
+    display: flex;
+    gap: .45rem;
+    flex-wrap: wrap;
+}
+.official-resource {
+    padding: .35rem .58rem;
+    border-radius: 6px;
+    border: 1px solid rgba(0,212,255,.24);
+    background: rgba(10,14,39,.45);
+    color: var(--text-bright);
+    text-decoration: none;
+    font-size: .78rem;
+    font-weight: 600;
+}
+.official-resource:hover {
+    color: var(--accent-cyan);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(0,212,255,.18);
+}
+
+/* Блок «Типичное применение» — короткий текстовый блок между описанием
+   и специфичными характеристиками. Отделён градиентным фоном и левой
+   акцент-полосой, чтобы пользователь сразу видел «зачем это нужно»
+   до длинного списка спек. */
+.applications-block {
+    margin: 1rem 0;
+    padding: 0.75rem 0.95rem 0.75rem 1.1rem;
+    background: linear-gradient(135deg, rgba(189, 147, 249, 0.10), rgba(0, 212, 255, 0.06));
+    border-left: 3px solid #bd93f9;
+    border-radius: 6px;
+}
+.applications-block h3 {
+    color: #bd93f9;
+    font-size: 0.95rem;
+    margin: 0 0 0.4rem 0;
+}
+.applications-block p {
+    margin: 0;
+    color: var(--text-light);
+    line-height: 1.5;
+    font-size: 0.88rem;
+}
+
+.datasheet-intel-block {
+    margin: 1rem 0;
+    padding: 0.85rem 0.95rem;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.11), rgba(80, 250, 123, 0.07));
+    border: 1px solid rgba(0, 212, 255, 0.22);
+    border-left: 3px solid var(--accent-cyan);
+    border-radius: 6px;
+}
+.datasheet-intel-block h3 {
+    color: var(--accent-cyan);
+    font-size: 0.95rem;
+    margin: 0 0 0.55rem 0;
+}
+.datasheet-intel-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 0.65rem;
+}
+.datasheet-intel-meta span,
+.datasheet-field-chips span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    padding: 0.28rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 212, 255, 0.22);
+    background: rgba(0, 20, 40, 0.42);
+    color: var(--text-bright);
+    font-size: 0.76rem;
+    line-height: 1.25;
+}
+.datasheet-field-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0.4rem 0 0.65rem 0;
+}
+.datasheet-field-chips span {
+    border-color: rgba(80, 250, 123, 0.25);
+    color: #a8ffcf;
+}
+.datasheet-snippets {
+    margin: 0.45rem 0 0 0;
+    padding-left: 1.1rem;
+    color: var(--text-light);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+.datasheet-snippets li {
+    margin: 0.25rem 0;
+    overflow-wrap: anywhere;
+}
+
+/* Technical specs table */
+.specs-block { margin: 1rem 0 1.5rem 0; }
+.specs-block h3 { color: var(--accent-cyan); font-size: 1.05rem; margin-bottom: 0.75rem; }
+.specs-group { margin-bottom: 1.1rem; }
+.specs-group-title {
+    font-size: 0.78rem;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px dashed rgba(0,212,255,0.25);
+    opacity: 0.85;
+}
+.specs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.specs-table tr:nth-child(odd) { background: rgba(0,212,255,0.04); }
+.spec-key {
+    padding: 0.4rem 0.75rem;
+    color: var(--text-light);
+    font-weight: 500;
+    width: 45%;
+    border-bottom: 1px solid rgba(0,212,255,0.1);
+}
+.spec-val {
+    padding: 0.4rem 0.75rem;
+    color: var(--text-bright);
+    border-bottom: 1px solid rgba(0,212,255,0.1);
+}
+
+/* Price note */
+.price-note { font-size: 0.78rem; color: var(--text-light); margin-left: 0.3rem; }
+
+.engineering-hub {
+    margin-top: 2rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(0,212,255,.24);
+    border-radius: 8px;
+    background: rgba(10,14,39,.42);
+}
+.hub-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: .9rem;
+}
+.hub-header h2 {
+    margin: 0 0 .25rem;
+    color: var(--accent-cyan);
+    font-size: 1.2rem;
+}
+.hub-header p {
+    margin: 0;
+    color: var(--text-light);
+    font-size: .88rem;
+}
+.hub-tabs {
+    display: flex;
+    gap: .45rem;
+    flex-wrap: wrap;
+    margin-bottom: .9rem;
+}
+.hub-tab {
+    padding: .45rem .75rem;
+    border: 1px solid rgba(0,212,255,.25);
+    border-radius: 6px;
+    background: rgba(26,39,68,.55);
+    color: var(--text-light);
+    cursor: pointer;
+    font-weight: 700;
+}
+.hub-tab.active,
+.hub-tab:hover {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: rgba(0,212,255,.1);
+}
+.hub-panel { display: none; }
+.hub-panel.active { display: block; }
+.hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .75rem;
+}
+.hub-card {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    padding: .8rem .9rem;
+    border: 1px solid rgba(0,212,255,.2);
+    border-radius: 7px;
+    background: rgba(26,39,68,.42);
+    color: inherit;
+    text-decoration: none;
+    transition: all .2s ease;
+}
+.hub-card:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+}
+.hub-card strong { color: var(--text-bright); line-height: 1.25; }
+.hub-card span { color: var(--text-light); font-size: .82rem; line-height: 1.35; }
+.hub-card-kicker {
+    color: var(--accent-cyan) !important;
+    font-size: .68rem !important;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.hub-warning,
+.hub-ok,
+.hub-empty {
+    padding: .75rem .85rem;
+    border-radius: 7px;
+    margin-bottom: .55rem;
+    color: var(--text-light);
+    font-size: .9rem;
+}
+.hub-warning {
+    border: 1px solid rgba(255,160,0,.32);
+    background: rgba(255,160,0,.1);
+}
+.hub-ok {
+    border: 1px solid rgba(0,200,100,.32);
+    background: rgba(0,200,100,.1);
+}
+.hub-empty {
+    border: 1px dashed rgba(0,212,255,.28);
+    background: rgba(0,212,255,.05);
+}
+@media (max-width: 700px) {
+    .hub-header { flex-direction: column; }
+}
+
+.product-extra-info {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 2px solid rgba(0, 212, 255, 0.2);
+}
+
+.info-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(26, 39, 68, 0.5);
+    border-left: 4px solid #00d4ff;
+    border-radius: 8px;
+}
+
+.info-section h3 {
+    color: #00d4ff;
+    margin-top: 0;
+}
+
+.info-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+.info-section li {
+    padding: 8px 0;
+    color: #ccc;
+}
+
+.info-section a {
+    color: #00d4ff;
+    text-decoration: none;
+}
+
+.info-section a:hover {
+    text-decoration: underline;
+}
+
+/* Documentation list */
+.doc-list { list-style: none; padding: 0; margin: 0; }
+.doc-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid rgba(0,212,255,0.1);
+}
+.doc-list li:last-child { border-bottom: none; }
+.doc-icon { font-size: 1.3rem; flex-shrink: 0; }
+.doc-name { flex: 1; color: #ddd; font-size: 0.9rem; }
+.doc-dl {
+    flex-shrink: 0;
+    padding: 0.3rem 0.75rem;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.4);
+    border-radius: 5px;
+    color: var(--accent-cyan) !important;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.doc-dl:hover {
+    background: rgba(0,212,255,0.25);
+    box-shadow: 0 0 10px rgba(0,212,255,0.5);
+}
+.doc-note {
+    font-size: 0.8rem;
+    color: #888;
+    font-style: italic;
+}
+
+.reviews-list {
+    margin-top: 20px;
+}
+
+.review-item {
+    padding: 15px;
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    border-radius: 5px;
+    margin-bottom: 15px;
+    background: rgba(10, 14, 39, 0.3);
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.reviewer-name {
+    font-weight: bold;
+    color: #fff;
+}
+
+.review-date {
+    color: #999;
+}
+
+.review-stars {
+    color: #ffd700;
+}
+
+.review-text {
+    color: #ccc;
+    margin: 0;
+}
+
+.rating-display {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.stars {
+    font-size: 1.5rem;
+    color: #ffd700;
+}
+
+.rating-value {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #00d4ff;
+    margin: 5px 0;
+}
+
+.review-count {
+    color: #999;
+    margin: 0;
+}
+
+.product-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.product-image {
+    width: 100%;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 39, 68, 0.5);
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.product-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.product-image-placeholder {
+    font-size: 3rem;
+}
+
+.related-products .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.25rem;
+}
+
+.related-products .product-card {
+    background: linear-gradient(135deg, rgba(26,39,68,0.85), rgba(10,14,39,0.7));
+    border: 1px solid var(--cosmic-light-blue);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px rgba(0,212,255,0.12);
+}
+
+.related-products .product-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 0 25px rgba(0,212,255,0.4);
+    border-color: var(--accent-cyan);
+}
+
+.related-products .product-card-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+    min-height: 30px;
+    padding: 0.55rem 0.65rem 0;
+}
+
+.related-products .product-category-chip {
+    max-width: 68%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px solid rgba(0,212,255,0.22);
+    border-radius: 999px;
+    padding: 0.14rem 0.45rem;
+    background: rgba(0,212,255,0.07);
+    color: var(--text-light);
+    font-size: 0.68rem;
+}
+
+.related-products .product-image {
+    width: 100%;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,14,39,0.6);
+    border-radius: 0;
+    margin-bottom: 0;
+    overflow: hidden;
+}
+
+.related-products .product-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.related-products .icon-placeholder { font-size: 3.5rem; }
+
+.related-products .product-body {
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 0.35rem;
+}
+
+.related-products .product-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    line-height: 1.3;
+}
+
+.related-products .product-pn {
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: var(--accent-cyan);
+    opacity: 0.8;
+}
+
+.related-products .product-meta-row,
+.related-products .product-signals {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.related-products .product-meta-row {
+    min-height: 20px;
+    color: var(--text-light);
+    font-size: 0.72rem;
+    opacity: 0.78;
+}
+
+.related-products .product-meta-row span {
+    border-right: 1px solid rgba(255,255,255,0.18);
+    padding-right: 0.35rem;
+}
+
+.related-products .product-meta-row span:last-child {
+    border-right: 0;
+    padding-right: 0;
+}
+
+.related-products .product-signals { min-height: 20px; }
+
+.related-products .product-signal {
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.related-products .product-signal-doc { background: rgba(0,212,255,0.12); color: var(--accent-cyan); }
+.related-products .product-signal-spice { background: rgba(164,255,92,0.12); color: #a4ff5c; }
+.related-products .product-signal-mount { background: rgba(255,255,255,0.08); color: var(--text-light); }
+
+.related-products .product-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.1rem;
+}
+
+.related-products .param-chip {
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 4px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
+    color: var(--accent-cyan);
+    white-space: nowrap;
+}
+
+.related-products .param-label {
+    font-size: 0.62rem;
+    color: rgba(0,212,255,0.62);
+    margin-right: 0.16rem;
+}
+
+.related-products .product-desc {
+    font-size: 0.78rem;
+    color: var(--text-light);
+    line-height: 1.4;
+    flex: 1;
+}
+
+.related-products .product-footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 0.5rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.related-products .product-price { font-size: 1rem; font-weight: 700; color: var(--text-bright); }
+.related-products .product-price small { font-size: 0.75rem; font-weight: 400; color: var(--text-light); }
+
+.related-products .badge-lifecycle {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.related-products .badge-active  { background: rgba(0,200,100,0.2); color: #00c864; border: 1px solid rgba(0,200,100,0.4); }
+.related-products .badge-nrnd    { background: rgba(255,160,0,0.2);  color: #ffa000; border: 1px solid rgba(255,160,0,0.4); }
+.related-products .badge-eol     { background: rgba(255,70,70,0.2);  color: #ff4646; border: 1px solid rgba(255,70,70,0.4); }
+.related-products .badge-obsolete{ background: rgba(150,150,150,0.2);color: #999;    border: 1px solid rgba(150,150,150,0.4); }
+
+.related-products .badge-stock-ok  { font-size: 0.7rem; color: #00c864; }
+.related-products .badge-stock-out { font-size: 0.7rem; color: #ff4646; }
+
+.related-products .btn-detail {
+    display: block;
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem;
+    text-align: center;
+    background: linear-gradient(135deg, var(--cosmic-blue), var(--accent-cyan));
+    color: var(--cosmic-black);
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.related-products .btn-detail:hover { box-shadow: 0 0 15px rgba(0,212,255,0.6); }
+</style>
+
+<script>
+document.querySelectorAll('[data-hub-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const tab = button.dataset.hubTab;
+        document.querySelectorAll('[data-hub-tab]').forEach((item) => {
+            item.classList.toggle('active', item === button);
+        });
+        document.querySelectorAll('[data-hub-panel]').forEach((panel) => {
+            panel.classList.toggle('active', panel.dataset.hubPanel === tab);
+        });
+    });
+});
+</script>
+{% endblock %}

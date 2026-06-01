@@ -1,0 +1,13 @@
+# Auto-provisioning папки с дашбордами. Файлы dashboards/*.json пикапаются.
+apiVersion: 1
+
+providers:
+  - name: 'DOLG'
+    orgId: 1
+    folder: 'DOLG'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

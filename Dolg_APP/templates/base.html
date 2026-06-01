@@ -1,0 +1,78 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DOLG{% endblock %}</title>
+    {# 2026-06-01: пустой data-URL favicon чтобы браузер не лез за /favicon.ico (404 в DevTools). #}
+    {# TODO: заменить на реальный favicon.ico перед production-deploy. См. memory: project_favicon_todo #}
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="{% static 'shop/cosmic_theme.css' %}">
+    <link rel="stylesheet" href="{% static 'shop/cosmic_flex.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sticky Header с навигацией -->
+    <header class="py-lg px-lg">
+        <div class="container-xl flex-between flex-wrap gap-lg">
+            <div class="flex-row gap-md" style="align-items: center;">
+                <h1 style="margin: 0; font-size: 1.5rem; color: #00d4ff;"><a href="{% url 'shop:index' %}" style="color: #00d4ff; text-decoration: none;">🎓 DOLG</a></h1>
+            </div>
+            
+            <nav class="flex-row gap-lg" style="flex-wrap: wrap;">
+                <a href="{% url 'shop:index' %}" class="nav-link">🏠 Главная</a>
+                <a href="{% url 'hello:billing_plans' %}" class="nav-link">💎 Подписки</a>
+                
+                <details class="nav-dropdown">
+                    <summary class="nav-link">🛠️ Инструменты</summary>
+                    <div class="dropdown-menu">
+                        <a href="{% url 'hello:simulation' %}">⚙️ Симуляция</a>
+                        <a href="{% url 'hello:cad' %}">📐 2D САПР</a>
+                        <a href="{% url 'hello:projects' %}">📁 Проекты</a>
+                    </div>
+                </details>
+
+                {% if user.is_authenticated %}
+                    <details class="nav-dropdown">
+                        <summary class="nav-link">👤 {{ user.username }}</summary>
+                        <div class="dropdown-menu">
+                            <a href="{% url 'accounts:profile' %}">👤 Профиль</a>
+                            <a href="{% url 'accounts:edit_profile' %}">🎛 Настройки</a>
+                            <a href="{% url 'hello:billing_plans' %}">💎 Подписка</a>
+                            <a href="{% url 'hello:two_factor_setup' %}">🔐 2FA</a>
+                            <a href="{% url 'accounts:logout' %}">🚪 Выход</a>
+                        </div>
+                    </details>
+                {% else %}
+                    {% comment %}
+                    Одна точка входа «Войти» — стандартный паттерн e-commerce.
+                    На login-странице есть ссылка «📝 Регистрация →» в footer'е формы.
+                    {% endcomment %}
+                    <a href="{% url 'accounts:login' %}" class="nav-link">🔑 Войти</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <!-- Основное содержимое -->
+    <main class="flex-1">
+        <div class="page-container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Липкий подвал -->
+    <footer class="py-lg px-lg mt-lg">
+        <div class="container-xl flex-center gap-xl flex-wrap">
+            <p style="margin: 0;">&copy; 2026 DOLG - Дипломная работа</p>
+            <div class="flex-row gap-lg">
+                <a href="{% url 'hello:privacy' %}" class="nav-link" style="padding: 0;">📋 Приватность</a>
+                <a href="{% url 'hello:terms' %}" class="nav-link" style="padding: 0;">⚖️ Условия</a>
+            </div>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

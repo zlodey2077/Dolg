@@ -1,0 +1,41 @@
+{% extends "shop/base.html" %}
+{% block title %}SSO Sign-in — {{ org.name }}{% endblock %}
+{% block content %}
+<div class="auth-form-card sso-mock-card">
+    <h1>🔐 SSO Sign-in</h1>
+    <p class="auth-form-hint">
+        Это <strong>mock-страница</strong> провайдера <code>{{ provider }}</code>.
+        В production здесь была бы страница вашего IdP (Azure AD / Okta / Google).
+    </p>
+
+    <div class="sso-provider-card">
+        <div class="sso-provider-logo">
+            {% if provider == 'azure' %}🅰️{% elif provider == 'okta' %}🅾️{% elif provider == 'google' %}🇬{% else %}🔐{% endif %}
+        </div>
+        <div class="sso-provider-meta">
+            <strong>{{ org.name }}</strong>
+            <span>Login via {{ provider|upper }}</span>
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'hello:sso_callback' org.slug %}">
+        {% csrf_token %}
+        <input type="hidden" name="nonce" value="{{ nonce }}">
+        <p class="auth-form-hint">
+            <small>В реальной системе ваш email берётся из JWT-токена IdP.
+            Здесь — введите вручную (для демо).</small>
+        </p>
+        <label>
+            Email сотрудника:
+            <input type="email" name="email" value="{{ suggested_email }}" required>
+        </label>
+        <button type="submit" class="btn btn-primary btn-large">
+            ✓ Confirm sign-in
+        </button>
+    </form>
+
+    <p class="auth-form-link">
+        <a href="{% url 'accounts:login' %}">← Назад к обычному login</a>
+    </p>
+</div>
+{% endblock %}

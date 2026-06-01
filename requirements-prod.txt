@@ -1,0 +1,6 @@
+# Дополнительные пакеты для прод-контейнера. В dev (.venv) не обязательны.
+# Базовые зависимости — в requirements.txt.
+
+gunicorn==23.0.0          # WSGI-сервер для прода (вместо runserver)
+psycopg2-binary==2.9.10   # PostgreSQL-драйвер (binary — без C-toolchain в образе)
+sentry-sdk==2.23.1        # Отчёты об ошибках; включается через env SENTRY_DSN

@@ -1,0 +1,16 @@
+{% extends "shop/base.html" %}
+
+{% block title %}Обучение — DOLG{% endblock %}
+
+{% block content %}
+<section class="container" style="padding: 2rem 0;">
+    <h1 style="color: var(--accent-cyan); margin-bottom: .75rem;">Обучение переехало</h1>
+    <p style="color: var(--text-light); max-width: 720px; line-height: 1.55;">
+        Старый раздел <code>/learn/</code> оставлен только для совместимости и
+        перенаправляет в новый практикум с маршрутами, задачами, схемами и измерениями.
+    </p>
+    <p style="margin-top: 1rem;">
+        <a class="btn btn-primary" href="{% url 'knowledge:learning_index' %}">Открыть обучение</a>
+    </p>
+</section>
+{% endblock %}

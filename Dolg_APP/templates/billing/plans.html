@@ -1,0 +1,152 @@
+{% extends "shop/base.html" %}
+{% block title %}Тарифы DOLG{% endblock %}
+
+{% block content %}
+<div class="billing-page">
+    <div class="billing-header">
+        <h1>💎 Тарифы DOLG</h1>
+        <p class="billing-subtitle">
+            Free для обучения и pet-проектов · Pro для серьёзной работы и контента
+        </p>
+    </div>
+
+    {% if subscription %}
+    <div class="billing-current">
+        <div class="billing-current-info">
+            <span class="quota-tier quota-tier--{{ subscription.tier }}">{{ subscription.tier|upper }}</span>
+            <span class="billing-status">Статус: <strong>{{ subscription.get_status_display }}</strong></span>
+            {% if subscription.period_end %}
+                <span class="billing-period">До: <strong>{{ subscription.period_end|date:"d.m.Y" }}</strong>
+                {% if is_pro_active %}({{ subscription.days_left }} дн.){% endif %}</span>
+            {% endif %}
+        </div>
+        {% if is_pro_active and subscription.auto_renew %}
+            <form method="post" action="{% url 'hello:billing_cancel' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary"
+                        onclick="return confirm('Отменить подписку? Доступ останется до окончания оплаченного периода.');">
+                    Отменить подписку
+                </button>
+            </form>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="billing-cards">
+        <!-- FREE -->
+        <div class="billing-card">
+            <div class="billing-card-header">
+                <h2>Free</h2>
+                <div class="billing-price">0 ₽ <small>/ навсегда</small></div>
+            </div>
+            <ul class="billing-features">
+                <li>📁 До <strong>{{ free_tier.max_projects }}</strong> проектов</li>
+                <li>⚙ <strong>{{ free_tier.simulations_per_day }}</strong> симуляций в день</li>
+                <li>🤖 <strong>{{ free_tier.ai_requests_per_day }}</strong> AI-запросов в день</li>
+                <li>🔗 <strong>{{ free_tier.max_active_share_links }}</strong> share-link'ов</li>
+                <li>📦 Up to {{ free_tier.max_upload_mb }} MB upload</li>
+                <li>💬 Комментарии: <strong>plain-text</strong></li>
+                <li>🎨 CAD-тема: Default</li>
+                <li>🔍 AI: <strong>2 базовых</strong> режима (аналоги + DRC++)</li>
+            </ul>
+            {% if not subscription or subscription.tier == 'free' %}
+            <div class="billing-action billing-action--current">Текущий план</div>
+            {% endif %}
+        </div>
+
+        <!-- PRO -->
+        <div class="billing-card billing-card--featured">
+            <div class="billing-card-badge">РЕКОМЕНДУЕМ</div>
+            <div class="billing-card-header">
+                <h2>Pro</h2>
+                <div class="billing-price">499 ₽ <small>/ мес</small></div>
+                <div class="billing-price-trial">или 14 дней бесплатно</div>
+            </div>
+            <ul class="billing-features">
+                <li>📁 <strong>Без лимита</strong> проектов</li>
+                <li>⚙ <strong>Безлимит</strong> симуляций</li>
+                <li>🤖 <strong>{{ pro_tier.ai_requests_per_day }}</strong> AI-запросов в день</li>
+                <li>🔗 <strong>{{ pro_tier.max_active_share_links }}</strong> share-link'ов</li>
+                <li>📦 До {{ pro_tier.max_upload_mb }} MB upload (4K-картинки)</li>
+                <li>💬 Комментарии: <strong>Markdown + код + @ + реакции + картинки 25MB</strong></li>
+                <li>🎨 <strong>4 темы</strong> CAD: Default / Blueprint / Sepia / Terminal</li>
+                <li>🔍 AI: <strong>все 4 режима</strong> (+ объяснение схемы + рекомендация компонента)</li>
+                <li>🏷 Свой <strong>логотип на PDF/Gerber-экспортах</strong></li>
+                <li>🛒 Marketplace: <strong>публикация шаблонов</strong></li>
+                <li>🚀 Beta-канал: ранние фичи</li>
+            </ul>
+            <div class="billing-action">
+                {% if request.user.is_authenticated %}
+                    {% if is_pro_active %}
+                        <div class="billing-action--current">У вас уже Pro</div>
+                    {% else %}
+                        {% if subscription and not subscription.trial_used %}
+                        <form method="post" action="{% url 'hello:billing_activate_trial' %}" style="margin-bottom:0.5rem;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success btn-block">
+                                🎁 Активировать {{ trial_days }} дней trial
+                            </button>
+                        </form>
+                        {% endif %}
+                        <form method="post" action="{% url 'hello:billing_activate_pro' %}"
+                              onsubmit="return confirm('Mock-режим (без реальной оплаты): активировать Pro на 1 месяц?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="months" value="1">
+                            <button type="submit" class="btn btn-primary btn-block">
+                                💎 Купить Pro (mock)
+                            </button>
+                        </form>
+                        <p class="billing-disclaimer">
+                            ⚠️ Это <strong>mock-режим</strong> для дипломного проекта. В production здесь Stripe / CloudPayments.
+                        </p>
+                    {% endif %}
+                {% else %}
+                    <a href="{% url 'accounts:register' %}?next={% url 'hello:billing_plans' %}" class="btn btn-primary btn-block">
+                        📝 Зарегистрироваться чтобы попробовать
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ENTERPRISE -->
+        <div class="billing-card">
+            <div class="billing-card-header">
+                <h2>Enterprise</h2>
+                <div class="billing-price">Командный <small>/ org-level</small></div>
+                <div class="billing-price-trial">для лабораторий, команд и защиты проектов</div>
+            </div>
+            <ul class="billing-features">
+                <li><strong>Всё из Pro</strong>: FFT, Bode, Monte Carlo, sweep и fallback-solver</li>
+                <li><strong>Командная память AI</strong>: проект, BOM, review, комментарии и артефакты</li>
+                <li><strong>Роли и модерация</strong>: owner, admin, engineer, reviewer, moderator, viewer</li>
+                <li><strong>Audit-log</strong>, approval workflow, API tokens, SSO/2FA policies</li>
+                <li><strong>Экспорт trace</strong>: AI/review evidence для отчета проекта</li>
+            </ul>
+            <div class="billing-action">
+                <a href="{% url 'hello:org_list' %}" class="btn btn-secondary btn-block">
+                    Открыть команды
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="billing-faq">
+        <h3>❓ FAQ</h3>
+        <details>
+            <summary>Что будет когда trial закончится?</summary>
+            <p>Автоматическое понижение до Free. Ваши проекты остаются — но новые лимиты применяются.
+               Если у вас было больше 10 проектов, лишние станут read-only.</p>
+        </details>
+        <details>
+            <summary>Можно ли использовать trial повторно?</summary>
+            <p>Нет — один trial на email. Это анти-абьюз.</p>
+        </details>
+        <details>
+            <summary>Что значит «mock-оплата»?</summary>
+            <p>Это дипломный проект — реальная оплата через Stripe/CloudPayments не подключена.
+               Кнопка «Купить» сразу активирует Pro без списания денег. В production здесь будет
+               настоящий чек-аут.</p>
+        </details>
+    </div>
+</div>
+{% endblock %}

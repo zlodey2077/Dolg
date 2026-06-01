@@ -1,0 +1,898 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}📐 Мои проекты - ДИПЛОМ{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="tools-header">
+        <h1>📐 Мои проекты</h1>
+        <p class="subtitle">Управление вашими электронными проектами и разработками</p>
+        <button class="btn btn-success" onclick="showCreateProjectModal()" style="margin-top: 15px;">+ Создать новый проект</button>
+    </div>
+
+    <div class="projects-container">
+        <!-- Фильтры и сортировка -->
+        <div class="filters-bar">
+            <input type="text" id="search-projects" placeholder="🔍 Поиск проектов..." 
+                   onkeyup="filterProjects()" class="search-input">
+            
+            <select id="status-filter" onchange="filterProjects()" class="filter-select">
+                <option value="">Все статусы</option>
+                <option value="draft">Черновик</option>
+                <option value="inprogress">В работе</option>
+                <option value="completed">Завершено</option>
+            </select>
+
+            <select id="sort-select" onchange="sortProjects()" class="filter-select">
+                <option value="date-desc">Новые сначала</option>
+                <option value="date-asc">Старые сначала</option>
+                <option value="name">По названию</option>
+                <option value="modified">Недавно изменены</option>
+            </select>
+        </div>
+
+        <!-- Панель проектов -->
+        <div id="projects-grid" class="projects-grid">
+            <!-- Проекты загружаются здесь -->
+        </div>
+
+        <!-- Пустое состояние -->
+        <div id="empty-state" class="empty-projects" style="display: none;">
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p><b>Здесь будут ваши схемы</b></p>
+                <p class="empty-description">
+                    Создайте первый проект — каждая ваша схема симулятора и история запусков SPICE
+                    будут жить в своей карточке. Можно начать с пустого холста, либо открыть
+                    готовое демо («🎚 Усилитель класса А», «🌊 Мост Греца» и др.) из вкладки
+                    «Демо-проекты» внизу.
+                </p>
+                <button class="btn btn-primary" onclick="showCreateProjectModal()">+ Создать первый проект</button>
+            </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-icon">📊</span>
+                <div>
+                    <span class="stat-label">Всего проектов</span>
+                    <span class="stat-value" id="total-projects">0</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-icon">▶️</span>
+                <div>
+                    <span class="stat-label">В работе</span>
+                    <span class="stat-value" id="inprogress-projects">0</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-icon">✓</span>
+                <div>
+                    <span class="stat-label">Завершено</span>
+                    <span class="stat-value" id="completed-projects">0</span>
+                </div>
+            </div>
+            <div class="stat-item" title="Схемы доступны по публичной ссылке /s/<token>/">
+                <span class="stat-icon">🔗</span>
+                <div>
+                    <span class="stat-label">Публичные</span>
+                    <span class="stat-value" id="shared-projects-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания проекта -->
+    <div id="create-project-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Создать новый проект</h2>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            
+            <form onsubmit="createProject(event)" class="project-form">
+                <label>
+                    <span>Название проекта:</span>
+                    <input type="text" id="project-name" placeholder="Например: Светодиодная лента" required>
+                </label>
+
+                <label>
+                    <span>Описание:</span>
+                    <textarea id="project-description" placeholder="Описание вашего проекта..."></textarea>
+                </label>
+
+                <label>
+                    <span>Категория:</span>
+                    <select id="project-category">
+                        <option value="led">💡 LED проект</option>
+                        <option value="audio">🔊 Аудио</option>
+                        <option value="power">🔋 Блок питания</option>
+                        <option value="sensor">📊 Сенсор</option>
+                        <option value="arduino">🚀 Arduino</option>
+                        <option value="other">📦 Другое</option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Статус:</span>
+                    <select id="project-status">
+                        <option value="draft">Черновик</option>
+                        <option value="inprogress">В работе</option>
+                        <option value="completed">Завершено</option>
+                    </select>
+                </label>
+
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-success">✓ Создать проект</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModals()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования проекта -->
+    <div id="edit-project-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактировать проект</h2>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            
+            <form onsubmit="updateProject(event)" class="project-form">
+                <input type="hidden" id="edit-project-id">
+
+                <label>
+                    <span>Название:</span>
+                    <input type="text" id="edit-project-name" required>
+                </label>
+
+                <label>
+                    <span>Описание:</span>
+                    <textarea id="edit-project-description"></textarea>
+                </label>
+
+                <label>
+                    <span>Статус:</span>
+                    <select id="edit-project-status">
+                        <option value="draft">Черновик</option>
+                        <option value="inprogress">В работе</option>
+                        <option value="completed">Завершено</option>
+                    </select>
+                </label>
+
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-success">✓ Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModals()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Кабинет сеанса проектирования -->
+    <div id="project-session-modal" class="modal" style="display: none;">
+        <div class="modal-content project-session-content">
+            <div class="modal-header">
+                <h2>Сеанс проектирования</h2>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div id="project-session-body" class="project-session-body">
+                <p>Загрузка...</p>
+            </div>
+        </div>
+    </div>
+
+    <a href="{% url 'shop:index' %}" class="btn btn-secondary" style="margin-top: 20px;">← Вернуться на главную</a>
+</div>
+
+<style>
+.projects-container {
+    margin-top: 20px;
+}
+
+.filters-bar {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(26, 39, 68, 0.5);
+    border-radius: 8px;
+    border: 1px solid var(--cosmic-light-blue);
+}
+
+.search-input,
+.filter-select {
+    flex: 1;
+    background: rgba(10, 14, 39, 0.9);
+    border: 1px solid var(--cosmic-light-blue);
+    color: var(--accent-cyan);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.search-input::placeholder {
+    color: rgba(0, 212, 255, 0.5);
+}
+
+.search-input:focus,
+.filter-select:focus {
+    outline: none;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    border-color: var(--accent-cyan);
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+    min-height: 200px;
+}
+
+.project-card {
+    background: linear-gradient(135deg, rgba(93, 0, 102, 0.3), rgba(26, 39, 68, 0.6));
+    border: 1px solid var(--cosmic-light-blue);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    border-color: var(--accent-cyan);
+}
+
+.project-session-content {
+    max-width: 920px;
+    width: min(920px, calc(100vw - 32px));
+}
+
+.project-session-body {
+    display: grid;
+    gap: 16px;
+}
+
+.session-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.session-tile,
+.session-panel {
+    background: rgba(10, 14, 39, 0.72);
+    border: 1px solid rgba(0, 212, 255, 0.35);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.session-tile b {
+    display: block;
+    color: var(--accent-cyan);
+    font-size: 1.35rem;
+}
+
+.session-panel h3 {
+    color: var(--accent-cyan);
+    margin: 0 0 8px;
+}
+
+.session-events {
+    display: grid;
+    gap: 8px;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.session-event {
+    border-left: 3px solid var(--accent-cyan);
+    padding: 7px 10px;
+    background: rgba(0, 212, 255, 0.08);
+    border-radius: 6px;
+}
+
+.session-event small {
+    color: rgba(255, 255, 255, 0.64);
+}
+
+.project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 10px;
+}
+
+.project-icon {
+    font-size: 1.5rem;
+}
+
+.project-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.project-share-badge {
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(110, 68, 255, 0.25), rgba(44, 123, 229, 0.25));
+    color: #aacfff;
+    border: 1px solid rgba(110, 68, 255, 0.5);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.status-draft {
+    background: rgba(100, 100, 100, 0.3);
+    color: #999;
+}
+
+.status-inprogress {
+    background: rgba(0, 212, 255, 0.2);
+    color: var(--accent-cyan);
+}
+
+.status-completed {
+    background: rgba(40, 167, 69, 0.2);
+    color: #90ee90;
+}
+
+.project-title {
+    color: white;
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.project-description {
+    color: #ccc;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.project-meta {
+    color: rgba(204, 204, 204, 0.6);
+    font-size: 0.8rem;
+    margin-bottom: 15px;
+}
+
+.project-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;     /* 5 кнопок узкими карточками иногда не влезают в один ряд */
+}
+
+/* Раньше под селектором был только `button` — PCB-ссылка (<a>) выпадала из
+   общего стиля и визуально отличалась от соседних. Теперь и a, и button
+   получают одинаковый flex/padding/font. */
+.project-actions button,
+.project-actions a {
+    flex: 1 1 0;
+    min-width: 70px;
+    padding: 8px;
+    font-size: 0.8rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    box-sizing: border-box;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.btn-view {
+    background: rgba(0, 212, 255, 0.3);
+    color: var(--accent-cyan);
+    border: 1px solid var(--cosmic-light-blue);
+    font-weight: 600;
+}
+
+.btn-view:hover {
+    background: rgba(0, 212, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    transform: scale(1.02);
+}
+
+.btn-edit {
+    background: rgba(0, 212, 255, 0.2);
+    color: var(--accent-cyan);
+    border: 1px solid var(--cosmic-light-blue);
+}
+
+.btn-edit:hover {
+    background: rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+}
+
+.btn-delete {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff6464;
+    border: 1px solid rgba(255, 100, 100, 0.5);
+}
+
+.btn-delete:hover {
+    background: rgba(255, 100, 100, 0.4);
+    box-shadow: 0 0 10px rgba(255, 100, 100, 0.3);
+}
+
+.empty-projects {
+    text-align: center;
+    padding: 60px 20px;
+    background: rgba(26, 39, 68, 0.4);
+    border: 2px dashed var(--cosmic-light-blue);
+    border-radius: 12px;
+    grid-column: 1 / -1;
+}
+
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    padding: 20px;
+    background: rgba(26, 39, 68, 0.5);
+    border: 1px solid var(--cosmic-light-blue);
+    border-radius: 8px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(10, 14, 39, 0.5);
+    border-radius: 6px;
+}
+
+.stat-icon {
+    font-size: 1.5rem;
+}
+
+.stat-label {
+    display: block;
+    color: #ccc;
+    font-size: 0.85rem;
+}
+
+.stat-value {
+    display: block;
+    color: var(--accent-cyan);
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+/* Модальные окна */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background: rgba(10, 14, 39, 0.95);
+    border: 2px solid var(--cosmic-light-blue);
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    color: var(--accent-cyan);
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--accent-cyan);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+    color: var(--accent-purple);
+    text-shadow: 0 0 10px rgba(179, 0, 255, 0.5);
+}
+
+.project-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.project-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: #ccc;
+}
+
+.project-form label span {
+    font-weight: 500;
+    color: var(--accent-cyan);
+}
+
+.project-form input,
+.project-form textarea,
+.project-form select {
+    background: rgba(26, 39, 68, 0.8);
+    border: 1px solid var(--cosmic-light-blue);
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: inherit;
+}
+
+.project-form textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.project-form input:focus,
+.project-form textarea:focus,
+.project-form select:focus {
+    outline: none;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    border-color: var(--accent-cyan);
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.modal-buttons button {
+    flex: 1;
+}
+</style>
+
+<script>
+const API = {
+    list:   '{% url "hello:api_projects_list" %}',
+    create: '{% url "hello:api_project_create" %}',
+    update: (id) => `/projects/api/${id}/update/`,
+    del:    (id) => `/projects/api/${id}/delete/`,
+    review: (id) => `/projects/api/${id}/review/`,
+    dashboard: (id) => `/projects/api/${id}/dashboard/`,
+};
+
+let projects = [];
+let currentEditId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadProjects();
+});
+
+function getCsrfToken() {
+    const m = document.cookie.match(/(^| )csrftoken=([^;]+)/);
+    return m ? m[2] : '';
+}
+
+async function apiFetch(url, options = {}) {
+    const res = await fetch(url, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+            ...(options.headers || {}),
+        },
+        credentials: 'same-origin',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return data;
+}
+
+async function loadProjects() {
+    try {
+        const data = await apiFetch(API.list);
+        projects = data.projects || [];
+        renderProjects(projects);
+        updateStats();
+    } catch (e) {
+        showNotification('⚠️ Ошибка загрузки: ' + e.message, 'warning');
+    }
+}
+
+function renderProjects(list) {
+    const grid = document.getElementById('projects-grid');
+    const empty = document.getElementById('empty-state');
+
+    if (list.length === 0) {
+        grid.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+    }
+
+    grid.style.display = 'grid';
+    empty.style.display = 'none';
+
+    grid.innerHTML = list.map(project => `
+        <div class="project-card">
+            <div class="project-header">
+                <span class="project-icon">${getCategoryIcon(project.category)}</span>
+                <span class="project-status status-${project.status}">${getStatusLabel(project.status)}</span>
+                ${project.is_shared ? '<span class="project-share-badge" title="Доступна по публичной ссылке">🔗 публичная</span>' : ''}
+            </div>
+            <div class="project-title">${escapeHtml(project.name)}</div>
+            <p class="project-description">${escapeHtml(project.description)}</p>
+            <div class="project-meta">
+                📅 ${new Date(project.created).toLocaleDateString('ru-RU')}
+                ${project.has_scheme ? ' · 🔬 есть схема' : ''}
+            </div>
+            <div class="project-actions">
+                <button class="btn-view" onclick="openInSimulation(${project.id})">🔬 Открыть</button>
+                <button class="btn-edit" onclick="openProjectSession(${project.id})" title="Схема, версии, симуляции, review, BOM и история">Сеанс</button>
+                <button class="btn-edit" onclick="editProject(${project.id})">✏️ Редактировать</button>
+                <a class="btn-edit" href="/pcb/${project.id}/" title="PCB-разводка + Gerber-экспорт" style="text-decoration:none;text-align:center;">🧬 PCB</a>
+                <button class="btn-edit" onclick="runProjectReview(${project.id})" title="Engineering Review: DRC, BOM, measurements, derating">Review</button>
+                ${project.is_shared
+                    ? `<button class="btn-edit" onclick="copyShareLink('${project.share_token}')" title="Скопировать публичную ссылку">📋 Ссылка</button>`
+                    : ''}
+                <button class="btn-delete" onclick="deleteProject(${project.id})">🗑️ Удалить</button>
+            </div>
+        </div>
+    `).join('');
+    // Счётчик публичных схем — обновляется при каждом render-е.
+    const sharedCount = list.filter(p => p.is_shared).length;
+    const sharedEl = document.getElementById('shared-projects-count');
+    if (sharedEl) sharedEl.textContent = sharedCount;
+}
+
+async function copyShareLink(token) {
+    if (!token) return;
+    const url = window.location.origin + '/s/' + token + '/';
+    try { await navigator.clipboard.writeText(url); showNotification('✓ Скопировано: ' + url); }
+    catch (e) { window.prompt('Скопируй ссылку:', url); }
+}
+
+async function runProjectReview(id) {
+    try {
+        const data = await apiFetch(API.review(id), { method: 'POST', body: JSON.stringify({}) });
+        if (data.review && data.review.url) {
+            window.location.href = data.review.url;
+            return;
+        }
+        showNotification('Review saved');
+    } catch (e) {
+        showNotification('Review error: ' + e.message, 'warning');
+    }
+}
+
+function showCreateProjectModal() {
+    document.getElementById('create-project-modal').style.display = 'flex';
+}
+
+function closeModals() {
+    document.getElementById('create-project-modal').style.display = 'none';
+    document.getElementById('edit-project-modal').style.display = 'none';
+    document.getElementById('project-session-modal').style.display = 'none';
+}
+
+async function openProjectSession(id) {
+    const modal = document.getElementById('project-session-modal');
+    const body = document.getElementById('project-session-body');
+    modal.style.display = 'flex';
+    body.innerHTML = '<p>Загрузка сеанса...</p>';
+    try {
+        const data = await apiFetch(API.dashboard(id));
+        body.innerHTML = renderProjectSession(data);
+    } catch (e) {
+        body.innerHTML = `<p class="empty-description">Не удалось загрузить сеанс: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+function renderProjectSession(data) {
+    const p = data.project || {};
+    const review = data.latest_review;
+    const events = data.events || [];
+    const runs = data.simulation_runs || [];
+    const measurements = data.measurements || [];
+    const bom = data.bom || {};
+    return `
+        <div>
+            <h3 style="margin:0;color:var(--accent-cyan);">${escapeHtml(p.name || 'Проект')}</h3>
+            <p class="empty-description">${escapeHtml(p.description || 'Сеанс проектирования связывает схему, расчеты, измерения, review и BOM.')}</p>
+        </div>
+        <div class="session-summary-grid">
+            <div class="session-tile"><b>${data.scheme?.components ?? 0}</b><span>компонентов</span></div>
+            <div class="session-tile"><b>${p.versions_count ?? 0}</b><span>версий схемы</span></div>
+            <div class="session-tile"><b>${runs.length}</b><span>последних запусков</span></div>
+            <div class="session-tile"><b>${measurements.length}</b><span>измерений</span></div>
+            <div class="session-tile"><b>${review ? review.score + '/100' : 'нет'}</b><span>Engineering Review</span></div>
+            <div class="session-tile"><b>${bom.matched_count ?? 0}/${(bom.matched_count ?? 0) + (bom.missing_catalog_count ?? 0)}</b><span>BOM-связь</span></div>
+        </div>
+        <div class="session-panel">
+            <h3>Последние события</h3>
+            <div class="session-events">
+                ${events.length ? events.map(renderProjectEvent).join('') : '<p class="empty-description">История появится после сохранения схемы, симуляции или review.</p>'}
+            </div>
+        </div>
+        <div class="session-panel">
+            <h3>Симуляции и измерения</h3>
+            <p>${runs.map(r => `${escapeHtml(r.analysis_type)}: ${escapeHtml(r.status)} (${r.elapsed_ms} мс)`).join('<br>') || 'Запусков пока нет.'}</p>
+            <p>${measurements.map(m => `${escapeHtml(m.label || m.metric)} = ${m.value} ${escapeHtml(m.unit || '')}`).join('<br>') || 'Измерений пока нет.'}</p>
+        </div>
+    `;
+}
+
+function renderProjectEvent(event) {
+    const payload = event.payload || {};
+    const details = Object.entries(payload).slice(0, 4).map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(String(v))}`).join(' · ');
+    return `
+        <div class="session-event">
+            <b>${escapeHtml(event.event_label || event.event_type)}</b>
+            <small>${new Date(event.created).toLocaleString('ru-RU')}${event.user ? ' · ' + escapeHtml(event.user) : ''}</small>
+            ${details ? `<div>${details}</div>` : ''}
+        </div>
+    `;
+}
+
+async function createProject(event) {
+    event.preventDefault();
+    const payload = {
+        name: document.getElementById('project-name').value,
+        description: document.getElementById('project-description').value,
+        category: document.getElementById('project-category').value,
+        status: document.getElementById('project-status').value,
+    };
+    try {
+        await apiFetch(API.create, { method: 'POST', body: JSON.stringify(payload) });
+        await loadProjects();
+        closeModals();
+        document.querySelector('#create-project-modal .project-form').reset();
+        showNotification('✓ Проект создан успешно');
+    } catch (e) {
+        showNotification('❌ ' + e.message, 'warning');
+    }
+}
+
+function editProject(id) {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+
+    currentEditId = id;
+    document.getElementById('edit-project-id').value = id;
+    document.getElementById('edit-project-name').value = project.name;
+    document.getElementById('edit-project-description').value = project.description;
+    document.getElementById('edit-project-status').value = project.status;
+
+    document.getElementById('edit-project-modal').style.display = 'flex';
+}
+
+async function updateProject(event) {
+    event.preventDefault();
+    const payload = {
+        name: document.getElementById('edit-project-name').value,
+        description: document.getElementById('edit-project-description').value,
+        status: document.getElementById('edit-project-status').value,
+    };
+    try {
+        await apiFetch(API.update(currentEditId), { method: 'POST', body: JSON.stringify(payload) });
+        await loadProjects();
+        closeModals();
+        showNotification('✓ Проект обновлен');
+    } catch (e) {
+        showNotification('❌ ' + e.message, 'warning');
+    }
+}
+
+async function deleteProject(id) {
+    if (!confirm('Удалить проект навсегда?\n\nСхема, история симуляций и share-ссылка перестанут работать.\nДействие нельзя отменить.')) return;
+    try {
+        await apiFetch(API.del(id), { method: 'POST' });
+        await loadProjects();
+        showNotification('✓ Проект удален');
+    } catch (e) {
+        showNotification('❌ ' + e.message, 'warning');
+    }
+}
+
+function filterProjects() {
+    const search = document.getElementById('search-projects').value.toLowerCase();
+    const status = document.getElementById('status-filter').value;
+    const filtered = projects.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search) ||
+                           p.description.toLowerCase().includes(search);
+        const matchStatus = !status || p.status === status;
+        return matchSearch && matchStatus;
+    });
+    renderProjects(filtered);
+}
+
+function sortProjects() {
+    const sortType = document.getElementById('sort-select').value;
+    const sorted = [...projects];
+    switch(sortType) {
+        case 'date-desc': sorted.sort((a, b) => new Date(b.created) - new Date(a.created)); break;
+        case 'date-asc':  sorted.sort((a, b) => new Date(a.created) - new Date(b.created)); break;
+        case 'name':      sorted.sort((a, b) => a.name.localeCompare(b.name)); break;
+        case 'modified':  sorted.sort((a, b) => new Date(b.modified) - new Date(a.modified)); break;
+    }
+    renderProjects(sorted);
+}
+
+function updateStats() {
+    document.getElementById('total-projects').textContent = projects.length;
+    document.getElementById('inprogress-projects').textContent = projects.filter(p => p.status === 'inprogress').length;
+    document.getElementById('completed-projects').textContent = projects.filter(p => p.status === 'completed').length;
+}
+
+function getCategoryIcon(category) {
+    const icons = { 'led': '💡', 'audio': '🔊', 'power': '🔋', 'sensor': '📊', 'arduino': '🚀', 'other': '📦' };
+    return icons[category] || '📦';
+}
+
+function getStatusLabel(status) {
+    const labels = { 'draft': 'Черновик', 'inprogress': 'В работе', 'completed': 'Завершено' };
+    return labels[status] || status;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showNotification(msg, type = 'info') {
+    const notif = document.createElement('div');
+    notif.textContent = msg;
+    const bg = type === 'warning' ? 'rgba(255, 180, 0, 0.95)' : 'rgba(0, 212, 255, 0.9)';
+    notif.style.cssText = `
+        position: fixed; top: 20px; right: 20px;
+        background: ${bg}; color: #000;
+        padding: 12px 20px; border-radius: 6px;
+        z-index: 9999; font-weight: 600;
+    `;
+    document.body.appendChild(notif);
+    setTimeout(() => notif.remove(), 3000);
+}
+
+function openInSimulation(projectId) {
+    // Передаём только id — симулятор подтянет данные через API
+    sessionStorage.setItem('currentProjectId', String(projectId));
+    window.location.href = '{% url "hello:simulation" %}';
+}
+</script>
+{% endblock %}
+

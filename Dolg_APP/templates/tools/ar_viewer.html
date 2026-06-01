@@ -1,0 +1,263 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ title|default:"DOLG · AR-просмотр" }}</title>
+    {% comment %}
+        Google model-viewer — webcomponent для отображения glTF/GLB-моделей.
+        Загружаем с jsdelivr; альтернатива — положить локально в shop/static/lib/.
+        Поддерживает AR-кнопку на мобильных (SceneViewer/QuickLook), QR-код
+        рисуем сами через qrcode.min.js (уже подключён в проекте).
+    {% endcomment %}
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
+    <script src="{% static 'lib/qrcode.min.js' %}?v=1.0.0"></script>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0e1421;
+            --panel: #18233a;
+            --panel-2: #131c2e;
+            --accent: #72ffad;
+            --accent-dim: #4ea874;
+            --text: #e8eef9;
+            --muted: #94a3b8;
+            --border: rgba(255,255,255,.08);
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .ar-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            grid-template-rows: 1fr;
+            height: 100vh;
+        }
+        @media (max-width: 880px) {
+            .ar-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+                overflow: auto;
+            }
+        }
+        .ar-stage {
+            background: linear-gradient(135deg, #0a0f1b 0%, #131c2e 100%);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .ar-stage-header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: .9rem 1.1rem;
+            background: linear-gradient(180deg, rgba(14,20,33,.92) 0%, rgba(14,20,33,.0) 100%);
+            display: flex;
+            align-items: center;
+            gap: .8rem;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .ar-stage-header h1 {
+            font-size: 1rem;
+            margin: 0;
+            color: var(--accent);
+            font-weight: 600;
+            text-shadow: 0 1px 3px rgba(0,0,0,.6);
+        }
+        .ar-stage-header .ar-subtitle {
+            color: var(--muted);
+            font-size: .78rem;
+        }
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            --poster-color: transparent;
+            --progress-bar-color: var(--accent);
+            --progress-mask: transparent;
+        }
+        .ar-button-custom {
+            background: var(--accent);
+            color: #0e1421;
+            border: none;
+            padding: .55rem 1.1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: .9rem;
+            position: absolute;
+            bottom: 1.2rem;
+            right: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(114,255,173,.35);
+            transition: transform .12s ease;
+        }
+        .ar-button-custom:hover { transform: translateY(-1px); }
+        .ar-info {
+            background: var(--panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 1.2rem 1.1rem;
+            gap: 1rem;
+        }
+        .ar-info section h2 {
+            font-size: .85rem;
+            margin: 0 0 .4rem 0;
+            color: var(--accent);
+            font-weight: 600;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+        }
+        .ar-info p {
+            margin: 0 0 .25rem 0;
+            color: var(--muted);
+            font-size: .8rem;
+            line-height: 1.5;
+        }
+        .ar-info code {
+            background: rgba(255,255,255,.08);
+            color: var(--text);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: .76rem;
+            font-family: ui-monospace, Menlo, monospace;
+        }
+        .ar-info strong { color: var(--text); }
+        #qrcode {
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: fit-content;
+            margin: 0 auto;
+        }
+        #qrcode canvas, #qrcode img { display: block; }
+        .no-model {
+            color: #ff9d9d;
+            background: rgba(255,80,80,.1);
+            padding: .8rem 1rem;
+            border-radius: 8px;
+            font-size: .85rem;
+            margin: 4rem auto;
+            max-width: 480px;
+            text-align: center;
+        }
+        .ar-back {
+            display: inline-block;
+            margin-top: .3rem;
+            padding: .4rem .85rem;
+            background: rgba(114,255,173,.1);
+            color: var(--accent);
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: .78rem;
+            font-weight: 600;
+            border: 1px solid var(--accent-dim);
+        }
+        .ar-back:hover { background: rgba(114,255,173,.18); }
+        .ar-divider {
+            border: 0;
+            height: 1px;
+            background: var(--border);
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="ar-layout">
+    <section class="ar-stage">
+        <header class="ar-stage-header">
+            <h1>📱 {{ title|default:"AR-просмотр платы" }}</h1>
+            <span class="ar-subtitle">glTF 2.0 · WebXR / SceneViewer / QuickLook</span>
+        </header>
+        {% if model_url %}
+            <model-viewer
+                id="modelViewer"
+                src="{{ model_url|escape }}"
+                ar
+                ar-modes="webxr scene-viewer quick-look"
+                camera-controls
+                touch-action="pan-y"
+                shadow-intensity="0.8"
+                exposure="1.0"
+                environment-image="neutral"
+                interaction-prompt="auto"
+                auto-rotate
+                auto-rotate-delay="3000"
+                rotation-per-second="14deg"
+                alt="3D-модель печатной платы DOLG">
+                <button slot="ar-button" class="ar-button-custom">
+                    🔍 Открыть в AR
+                </button>
+            </model-viewer>
+        {% else %}
+            <div class="no-model">
+                Модель не указана. Вернитесь в редактор симуляции и нажмите «📱 AR-просмотр» в тулбаре 3D-просмотра.
+            </div>
+        {% endif %}
+    </section>
+
+    <aside class="ar-info">
+        <section>
+            <h2>QR для телефона</h2>
+            <div id="qrcode" title="QR на текущую страницу"></div>
+            <p style="text-align:center; margin-top:.5rem;">Отсканируйте код камерой — страница откроется на телефоне</p>
+        </section>
+
+        <hr class="ar-divider">
+
+        <section>
+            <h2>На телефоне</h2>
+            <p><strong>Android:</strong> Google SceneViewer (нативная AR-кнопка после загрузки модели).</p>
+            <p><strong>iOS:</strong> QuickLook через <code>.usdz</code> — конвертация на лету в <code>model-viewer</code>.</p>
+        </section>
+
+        <hr class="ar-divider">
+
+        <section>
+            <h2>Десктоп</h2>
+            <p><code>ЛКМ</code> — вращение · <code>колесо</code> — зум · <code>ПКМ</code> — pan.</p>
+            <p>Авто-вращение включится через 3 секунды без действий.</p>
+            <a class="ar-back" href="javascript:window.close();">← Закрыть окно</a>
+        </section>
+
+        <hr class="ar-divider">
+
+        <section>
+            <h2>Защита</h2>
+            <p>QR прямо со слайда → плата в AR на телефоне комиссии. Без логина, без приложений.</p>
+        </section>
+    </aside>
+</div>
+
+<script>
+    (function () {
+        var qrTarget = document.getElementById('qrcode');
+        if (!qrTarget || typeof QRCode === 'undefined') return;
+        try {
+            new QRCode(qrTarget, {
+                text: window.location.href,
+                width: 180,
+                height: 180,
+                colorDark: '#0e1421',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M,
+            });
+        } catch (e) {
+            qrTarget.textContent = 'QR недоступен';
+        }
+    })();
+</script>
+</body>
+</html>

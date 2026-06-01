@@ -1,0 +1,77 @@
+{% extends "shop/base.html" %}
+{% load tier_tags %}
+{% block title %}{{ org.name }} — Dashboard{% endblock %}
+{% block content %}
+<div class="org-page">
+    <div class="org-page-header">
+        <div class="org-page-title">
+            {% if org.custom_logo %}
+                <img class="org-page-logo" src="{{ org.custom_logo.url }}" alt="">
+            {% else %}
+                <div class="org-page-logo org-page-logo--placeholder">{{ org.name|slice:":1" }}</div>
+            {% endif %}
+            <div>
+                <h1>{{ org.name }}</h1>
+                <span class="org-page-plan">{{ org.get_plan_display }} · ваша роль: <strong>{{ role }}</strong></span>
+            </div>
+        </div>
+        <nav class="org-page-nav">
+            <a href="{% url 'hello:org_dashboard' org.slug %}" class="active">📊 Dashboard</a>
+            <a href="{% url 'hello:org_members' org.slug %}">👥 Команда</a>
+            <a href="{% url 'hello:org_conversation_list' org.slug %}">💬 Беседы</a>
+            {% if can_catalog_add %}<a href="{% url 'hello:org_catalog_add' org.slug %}">🆕 Добавить товар</a>{% endif %}
+            {% if can_audit %}<a href="{% url 'hello:org_audit' org.slug %}">📋 Audit-log</a>{% endif %}
+            {% if can_settings %}<a href="{% url 'hello:org_settings' org.slug %}">⚙ Настройки</a>{% endif %}
+        </nav>
+    </div>
+
+    <div class="org-stats-grid">
+        <div class="org-stat">
+            <span class="org-stat-label">👥 Members</span>
+            <span class="org-stat-value">{{ members_total }} / {{ org.seats_max }}</span>
+        </div>
+        <div class="org-stat">
+            <span class="org-stat-label">📁 Projects</span>
+            <span class="org-stat-value">{{ projects_total }}</span>
+        </div>
+        <div class="org-stat">
+            <span class="org-stat-label">⏳ На ревью</span>
+            <span class="org-stat-value">{{ pending_reviews }}</span>
+        </div>
+    </div>
+
+    <div class="org-audit-card">
+        <h3>Enterprise-возможности</h3>
+        <ul class="org-audit-list">
+            <li><code>plan</code> — {{ entitlements.plan|upper }}</li>
+            <li><code>team_ai_memory</code> — {% if entitlements.flags.enterprise_team_ai_memory %}активно{% else %}нужна Enterprise-подписка{% endif %}</li>
+            <li><code>audit_log</code> — {% if entitlements.flags.enterprise_audit_log %}активно{% else %}нужна Enterprise-подписка{% endif %}</li>
+            <li><code>api_tokens</code> — {% if entitlements.flags.enterprise_api_tokens %}активно{% else %}нужна Enterprise-подписка{% endif %}</li>
+            <li><code>approval_workflow</code> — {% if entitlements.flags.enterprise_approval_workflow %}активно{% else %}нужна Enterprise-подписка{% endif %}</li>
+        </ul>
+    </div>
+
+    {% if recent_audit %}
+    <div class="org-audit-card">
+        <h3>📋 Недавняя активность</h3>
+        <ul class="org-audit-list">
+            {% for entry in recent_audit %}
+            <li>
+                <span class="org-audit-time">{{ entry.timestamp|date:"H:i d.m" }}</span>
+                <strong>{{ entry.actor.username|default:"система" }}</strong>:
+                <code>{{ entry.action }}</code>
+                {% if entry.object_type %}<span class="org-audit-target">→ {{ entry.object_type }}#{{ entry.object_id }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        <a href="{% url 'hello:org_audit' org.slug %}" class="org-audit-more">Все записи →</a>
+    </div>
+    {% endif %}
+
+    {% if can_invite and members_total < org.seats_max %}
+    <div class="org-cta">
+        <a href="{% url 'hello:org_members' org.slug %}" class="btn btn-primary">＋ Пригласить нового члена команды</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

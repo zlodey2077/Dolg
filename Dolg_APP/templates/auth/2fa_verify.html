@@ -1,0 +1,31 @@
+{% extends "shop/base.html" %}
+{% block title %}Подтверждение 2FA{% endblock %}
+{% block content %}
+<style>
+.tfa-card { max-width: 420px; margin: 4rem auto; padding: 1.5rem; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 10px; text-align: center; }
+.tfa-card h1 { margin-top: 0; }
+.tfa-card input[type=text] { width: 100%; box-sizing: border-box; padding: 0.7rem; font-size: 1.4rem; text-align: center; letter-spacing: 0.3em; background: rgba(0,0,0,.2); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; margin: 1rem 0; }
+.tfa-hint { font-size: 0.82rem; color: var(--text-light,#a4b3d0); margin-top: 1rem; }
+</style>
+
+<div class="tfa-card">
+    <h1>🔐 Подтверждение 2FA</h1>
+    <p>Вход для <strong>{{ username }}</strong>.<br>
+    Введите 6-значный код из приложения-аутентификатора:</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="text" name="token" inputmode="text" maxlength="10"
+               placeholder="123456" autocomplete="one-time-code" autofocus>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Войти</button>
+    </form>
+
+    <p class="tfa-hint">
+        Не получается? Используйте один из <strong>backup-кодов</strong>
+        (8 символов, выданы при настройке 2FA) — введите вместо TOTP.
+    </p>
+    <p class="tfa-hint">
+        Потеряли и телефон, и backup-коды? Напишите в <a href="mailto:support@dolg.local">support</a>.
+    </p>
+</div>
+{% endblock %}

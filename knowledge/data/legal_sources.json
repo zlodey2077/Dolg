@@ -1,0 +1,671 @@
+[
+  {
+    "id": "all_about_circuits_textbook",
+    "title": "All About Circuits Textbook",
+    "url": "https://www.allaboutcircuits.com/textbook/",
+    "topic": "electronics",
+    "description": "Открытый учебник по DC/AC-цепям, полупроводникам, цифровым схемам, RF и справочным разделам.",
+    "license_note": "Free/open online textbook; use as link and source of general concepts, not copied chapters.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "ohm",
+      "ом",
+      "kirchhoff",
+      "кирхгоф",
+      "gnd",
+      "ground",
+      "rc",
+      "divider",
+      "делитель",
+      "led",
+      "transistor",
+      "транзистор",
+      "power",
+      "мощность"
+    ],
+    "rule_ids": [
+      "erc.missing_ground",
+      "topology.divider_without_output",
+      "derating.power_or_thermal_risk",
+      "erc.led_reverse_polarity",
+      "erc.source_short_to_ground",
+      "topology.transistor_pinout_swap"
+    ],
+    "learning_topics": [
+      "ohm",
+      "divider",
+      "rc",
+      "gnd",
+      "units"
+    ],
+    "related_article_slugs": [
+      "закон-ома-фундамент-электротехники",
+      "законы-кирхгофа-анализ-сложных-цепей",
+      "мощность-и-тепловой-режим-компонентов",
+      "rc-цепи-задержка-фильтрация-и-сглаживание",
+      "резистор-назначение-номиналы-и-точность",
+      "конденсатор-заряд-ёмкость-и-диэлектрик",
+      "диод-и-транзистор-от-выпрямления-до-усиления",
+      "операционный-усилитель-питание-входы-и-обратная-связь"
+    ],
+    "order": 10
+  },
+  {
+    "id": "openstax_university_physics_2",
+    "title": "OpenStax University Physics Volume 2",
+    "url": "https://openstax.org/details/books/university-physics-volume-2/",
+    "topic": "physics",
+    "description": "Открытый университетский учебник: электричество, магнетизм, цепи постоянного тока, RC-цепи и измерения.",
+    "license_note": "OpenStax open textbook; cite and link to source, reuse only within license terms.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "physics",
+      "электричество",
+      "circuit",
+      "цепь",
+      "ohm",
+      "ом",
+      "kirchhoff",
+      "rc",
+      "capacitor",
+      "конденсатор",
+      "transistor",
+      "транзистор"
+    ],
+    "rule_ids": [
+      "topology.divider_without_output",
+      "topology.transistor_pinout_swap"
+    ],
+    "learning_topics": [
+      "ohm",
+      "divider",
+      "rc"
+    ],
+    "related_article_slugs": [
+      "закон-ома-фундамент-электротехники",
+      "законы-кирхгофа-анализ-сложных-цепей",
+      "rc-цепи-задержка-фильтрация-и-сглаживание"
+    ],
+    "order": 20
+  },
+  {
+    "id": "ngspice_docs",
+    "title": "ngspice Documentation",
+    "url": "https://ngspice.sourceforge.io/docs.html",
+    "topic": "cad_spice",
+    "description": "Официальная документация ngspice: netlist, DC/AC/TRAN-анализ, модели и поведение SPICE-симулятора.",
+    "license_note": "Official documentation; use for implementation references and citations.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "ngspice",
+      "spice",
+      "netlist",
+      "нетлист",
+      "dc",
+      "ac",
+      "tran",
+      "simulation",
+      "симуляция",
+      "gnd",
+      "ground",
+      "node",
+      "узел"
+    ],
+    "rule_ids": [
+      "erc.missing_ground",
+      "erc.missing_source",
+      "simulation.no_saved_measurements",
+      "import.unsupported_items",
+      "erc.parallel_voltage_sources",
+      "erc.source_short_to_ground"
+    ],
+    "learning_topics": [
+      "gnd",
+      "spice",
+      "rc"
+    ],
+    "related_article_slugs": [
+      "rc-цепи-задержка-фильтрация-и-сглаживание",
+      "drc-и-подготовка-gerber-финальная-проверка-платы"
+    ],
+    "order": 30
+  },
+  {
+    "id": "ltspice_analog_devices",
+    "title": "LTspice by Analog Devices",
+    "url": "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html",
+    "topic": "cad_spice",
+    "description": "Официальная страница LTspice: schematic capture, SPICE-симуляция и waveform viewer для аналоговых схем.",
+    "license_note": "Official vendor page; use as reference for analog simulation workflow.",
+    "usable_for_learning": true,
+    "usable_for_ai": false,
+    "keywords": [
+      "ltspice",
+      "spice",
+      "asc",
+      "waveform",
+      "осциллограмма",
+      "simulation",
+      "симуляция",
+      "bode",
+      "ac",
+      "tran"
+    ],
+    "rule_ids": [
+      "simulation.no_saved_measurements"
+    ],
+    "learning_topics": [
+      "spice",
+      "rc"
+    ],
+    "related_article_slugs": [
+      "rc-цепи-задержка-фильтрация-и-сглаживание",
+      "операционный-усилитель-питание-входы-и-обратная-связь"
+    ],
+    "order": 40
+  },
+  {
+    "id": "kicad_docs",
+    "title": "KiCad Documentation",
+    "url": "https://docs.kicad.org/",
+    "topic": "cad_pcb",
+    "description": "Официальная документация KiCad: проект, schematic editor, PCB, ERC/DRC, библиотеки, SPICE и производственные файлы.",
+    "license_note": "Official documentation; use as CAD workflow comparison and implementation reference.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "kicad",
+      "cad",
+      "pcb",
+      "erc",
+      "drc",
+      "gerber",
+      "footprint",
+      "symbol",
+      "schematic",
+      "net",
+      "gnd"
+    ],
+    "rule_ids": [
+      "erc.missing_ground",
+      "erc.missing_source",
+      "topology.floating_fragments",
+      "simulation.no_saved_measurements",
+      "import.unsupported_items",
+      "erc.parallel_voltage_sources",
+      "erc.dangling_named_net",
+      "bom.missing_catalog_binding"
+    ],
+    "learning_topics": [
+      "gnd",
+      "drc",
+      "spice"
+    ],
+    "related_article_slugs": [
+      "печатная-плата-слои-переходы-и-траектории-сигналов",
+      "footprint-и-посадочное-место-где-чаще-всего-ошибаются",
+      "drc-и-подготовка-gerber-финальная-проверка-платы",
+      "разводка-питания-конденсаторы-полигоны-и-токовые-петли"
+    ],
+    "order": 50
+  },
+  {
+    "id": "django_docs",
+    "title": "Django Documentation",
+    "url": "https://docs.djangoproject.com/",
+    "topic": "backend",
+    "description": "Официальная документация Django: модели, views, forms, auth, admin, tests и security-практики.",
+    "license_note": "Official documentation; use for backend implementation references.",
+    "usable_for_learning": false,
+    "usable_for_ai": false,
+    "keywords": [
+      "django",
+      "python",
+      "backend",
+      "models",
+      "views",
+      "admin",
+      "tests",
+      "auth"
+    ],
+    "rule_ids": [],
+    "learning_topics": [],
+    "related_article_slugs": [],
+    "order": 60
+  },
+  {
+    "id": "django_channels_docs",
+    "title": "Django Channels Documentation",
+    "url": "https://channels.readthedocs.io/",
+    "topic": "backend",
+    "description": "Документация Channels для WebSocket/async-уведомлений project-session, simulation progress и review events.",
+    "license_note": "Official project documentation; use for async/websocket implementation references.",
+    "usable_for_learning": false,
+    "usable_for_ai": false,
+    "keywords": [
+      "django",
+      "channels",
+      "websocket",
+      "async",
+      "project session",
+      "simulation progress",
+      "уведомления"
+    ],
+    "rule_ids": [],
+    "learning_topics": [],
+    "related_article_slugs": [],
+    "order": 70
+  },
+  {
+    "id": "python_docs",
+    "title": "Python Documentation",
+    "url": "https://docs.python.org/",
+    "topic": "backend",
+    "description": "Официальная документация Python: стандартная библиотека, pathlib, json/csv, typing, unittest и runtime-поведение.",
+    "license_note": "Official documentation; use for implementation references.",
+    "usable_for_learning": false,
+    "usable_for_ai": false,
+    "keywords": [
+      "python",
+      "json",
+      "csv",
+      "pathlib",
+      "typing",
+      "unittest",
+      "runtime"
+    ],
+    "rule_ids": [],
+    "learning_topics": [],
+    "related_article_slugs": [],
+    "order": 80
+  },
+  {
+    "id": "networkx_algorithms",
+    "title": "NetworkX Algorithms",
+    "url": "https://networkx.org/documentation/stable/reference/algorithms/index.html",
+    "topic": "graph_formula",
+    "description": "Официальный справочник NetworkX по связности, путям, компонентам, циклам и графовым метрикам.",
+    "license_note": "Official documentation; use for graph analysis implementation references.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "networkx",
+      "graph",
+      "граф",
+      "connectivity",
+      "связность",
+      "floating",
+      "path",
+      "cycle",
+      "topology"
+    ],
+    "rule_ids": [
+      "topology.floating_fragments",
+      "erc.dangling_named_net"
+    ],
+    "learning_topics": [
+      "drc",
+      "gnd"
+    ],
+    "related_article_slugs": [
+      "законы-кирхгофа-анализ-сложных-цепей",
+      "drc-и-подготовка-gerber-финальная-проверка-платы"
+    ],
+    "order": 90
+  },
+  {
+    "id": "sympy_docs",
+    "title": "SymPy Documentation",
+    "url": "https://docs.sympy.org/",
+    "topic": "graph_formula",
+    "description": "Официальная документация SymPy для символьных формул, эквивалентности выражений и математических шагов.",
+    "license_note": "Official documentation; use for formula and symbolic checking references.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "sympy",
+      "formula",
+      "формула",
+      "expression",
+      "выражение",
+      "ohm",
+      "rc",
+      "equivalent",
+      "эквивалент"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "ohm",
+      "divider",
+      "rc"
+    ],
+    "related_article_slugs": [
+      "закон-ома-фундамент-электротехники",
+      "rc-цепи-задержка-фильтрация-и-сглаживание"
+    ],
+    "order": 100
+  },
+  {
+    "id": "pint_docs",
+    "title": "Pint Documentation",
+    "url": "https://pint.readthedocs.io/",
+    "topic": "units",
+    "description": "Документация Pint для физических величин, единиц измерения и unit-safe parsing номиналов.",
+    "license_note": "Official documentation; use for unit parsing and validation references.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "pint",
+      "units",
+      "единицы",
+      "ом",
+      "kohm",
+      "nf",
+      "uf",
+      "watt",
+      "вольт",
+      "parse",
+      "номинал"
+    ],
+    "rule_ids": [
+      "derating.power_or_thermal_risk"
+    ],
+    "learning_topics": [
+      "units",
+      "ohm",
+      "rc"
+    ],
+    "related_article_slugs": [
+      "резистор-назначение-номиналы-и-точность",
+      "конденсатор-заряд-ёмкость-и-диэлектрик",
+      "мощность-и-тепловой-режим-компонентов"
+    ],
+    "order": 110
+  },
+  {
+    "id": "lark_docs",
+    "title": "Lark Documentation",
+    "url": "https://lark-parser.readthedocs.io/",
+    "topic": "import_parsing",
+    "description": "Документация Lark для грамматик и parser layer LTspice/SPICE/KiCad subset.",
+    "license_note": "Official documentation; use for CAD import parser references.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "lark",
+      "parser",
+      "grammar",
+      "грамматика",
+      "spice",
+      "ltspice",
+      "kicad",
+      "import",
+      "netlist"
+    ],
+    "rule_ids": [
+      "import.unsupported_items"
+    ],
+    "learning_topics": [
+      "spice"
+    ],
+    "related_article_slugs": [
+      "drc-и-подготовка-gerber-финальная-проверка-платы"
+    ],
+    "order": 120
+  },
+  {
+    "id": "z3_guide",
+    "title": "Z3 Guide",
+    "url": "https://microsoft.github.io/z3guide/",
+    "topic": "constraints",
+    "description": "Официальный guide по SMT/constraint solving для подбора номиналов по ограничениям.",
+    "license_note": "Official Microsoft Research guide; use for constraint solver references.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "z3",
+      "smt",
+      "constraint",
+      "solver",
+      "ограничения",
+      "подбор",
+      "divider",
+      "led",
+      "rc",
+      "ne555"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "constraints",
+      "divider",
+      "rc"
+    ],
+    "related_article_slugs": [
+      "резистор-назначение-номиналы-и-точность",
+      "стабилизаторы-питания-линейные-и-импульсные",
+      "rc-цепи-задержка-фильтрация-и-сглаживание"
+    ],
+    "order": 130
+  },
+  {
+    "id": "scikit_fuzzy_docs",
+    "title": "scikit-fuzzy Documentation",
+    "url": "https://scikit-fuzzy.github.io/scikit-fuzzy/",
+    "topic": "risk",
+    "description": "Документация scikit-fuzzy для мягкой оценки риска: перегрев, слабый запас, BOM-риск и сомнительные режимы.",
+    "license_note": "Official project documentation; use for fuzzy-risk implementation references.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "scikit-fuzzy",
+      "fuzzy",
+      "risk",
+      "риск",
+      "перегрев",
+      "derating",
+      "bom",
+      "thermal"
+    ],
+    "rule_ids": [
+      "derating.power_or_thermal_risk"
+    ],
+    "learning_topics": [],
+    "related_article_slugs": [
+      "мощность-и-тепловой-режим-компонентов",
+      "как-подбирать-замену-компонента-без-риска"
+    ],
+    "order": 140
+  },
+  {
+    "id": "pytorch_tutorials",
+    "title": "PyTorch Tutorials",
+    "url": "https://docs.pytorch.org/tutorials/",
+    "topic": "ai",
+    "description": "Официальные tutorials PyTorch: datasets, training loop, inference и практический ML-workflow.",
+    "license_note": "Official documentation; use for optional neural backend implementation references.",
+    "usable_for_learning": false,
+    "usable_for_ai": false,
+    "keywords": [
+      "pytorch",
+      "torch",
+      "dataset",
+      "training",
+      "inference",
+      "neural",
+      "нейронка",
+      "deep hint"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "ai"
+    ],
+    "related_article_slugs": [],
+    "order": 150
+  },
+  {
+    "id": "dive_into_deep_learning",
+    "title": "Dive into Deep Learning",
+    "url": "https://d2l.ai/",
+    "topic": "ai",
+    "description": "Открытая интерактивная книга по deep learning с кодом и математикой, включая PyTorch/NumPy варианты.",
+    "license_note": "Open online book; use as ML learning reference, not as raw training corpus.",
+    "usable_for_learning": false,
+    "usable_for_ai": false,
+    "keywords": [
+      "d2l",
+      "deep learning",
+      "pytorch",
+      "neural",
+      "dataset",
+      "training",
+      "machine learning"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "ai"
+    ],
+    "related_article_slugs": [],
+    "order": 160
+  },
+  {
+    "id": "ipc_standards_store",
+    "title": "IPC Standards Store",
+    "url": "https://shop.ipc.org/",
+    "topic": "pcb_standards",
+    "description": "Official IPC standards catalogue used as bibliography marker for PCB, assembly, footprint, clearance and testability checks.",
+    "license_note": "Commercial standards catalogue; cite only metadata and standard identifiers, do not copy standard text.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "ipc",
+      "ipc-2221",
+      "ipc-a-610",
+      "ipc-7351",
+      "pcb",
+      "clearance",
+      "assembly",
+      "testability"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "drc"
+    ],
+    "related_article_slugs": [],
+    "order": 170
+  },
+  {
+    "id": "iec_webstore",
+    "title": "IEC Webstore",
+    "url": "https://webstore.iec.ch/",
+    "topic": "electrical_standards",
+    "description": "Official IEC standards catalogue used as bibliography marker for safety, EMC and insulation/creepage references.",
+    "license_note": "Commercial standards catalogue; cite only metadata and standard identifiers, do not copy standard text.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "iec",
+      "iec 60664",
+      "en 55032",
+      "emc",
+      "creepage",
+      "clearance",
+      "safety"
+    ],
+    "rule_ids": [],
+    "learning_topics": [],
+    "related_article_slugs": [],
+    "order": 180
+  },
+  {
+    "id": "eu_rohs_directive",
+    "title": "European Commission RoHS Directive",
+    "url": "https://environment.ec.europa.eu/topics/waste-and-recycling/rohs-directive_en",
+    "topic": "compliance",
+    "description": "European Commission overview of RoHS restrictions for electrical and electronic equipment.",
+    "license_note": "Official public EU information page; cite and link, do not mirror full text.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "rohs",
+      "eu",
+      "compliance",
+      "restriction",
+      "hazardous substances"
+    ],
+    "rule_ids": [],
+    "learning_topics": [],
+    "related_article_slugs": [],
+    "order": 190
+  },
+  {
+    "id": "eu_ce_marking",
+    "title": "European Commission CE marking",
+    "url": "https://single-market-economy.ec.europa.eu/single-market/ce-marking_en",
+    "topic": "compliance",
+    "description": "European Commission overview of CE marking requirements and conformity context.",
+    "license_note": "Official public EU information page; cite and link, do not mirror full text.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "ce",
+      "ce marking",
+      "eu",
+      "conformity",
+      "compliance"
+    ],
+    "rule_ids": [],
+    "learning_topics": [],
+    "related_article_slugs": [],
+    "order": 200
+  },
+  {
+    "id": "jlcpcb_capabilities",
+    "title": "JLCPCB PCB Capabilities",
+    "url": "https://jlcpcb.com/capabilities/pcb-capabilities",
+    "topic": "pcb_manufacturing",
+    "description": "PCB manufacturing capability reference for practical via, trace and fabrication constraints.",
+    "license_note": "Vendor capability page; cite for manufacturing constraints, do not copy tables wholesale.",
+    "usable_for_learning": false,
+    "usable_for_ai": true,
+    "keywords": [
+      "jlcpcb",
+      "pcbway",
+      "pcb capabilities",
+      "via",
+      "trace width",
+      "clearance"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "drc"
+    ],
+    "related_article_slugs": [],
+    "order": 210
+  },
+  {
+    "id": "coilcraft_inductor_resources",
+    "title": "Coilcraft Inductor Resources",
+    "url": "https://www.coilcraft.com/en-us/edu/",
+    "topic": "components",
+    "description": "Manufacturer educational resources for inductors, saturation current and practical selection.",
+    "license_note": "Vendor educational resource; cite and link, do not copy long passages.",
+    "usable_for_learning": true,
+    "usable_for_ai": true,
+    "keywords": [
+      "coilcraft",
+      "inductor",
+      "saturation",
+      "current",
+      "dc resistance"
+    ],
+    "rule_ids": [],
+    "learning_topics": [
+      "units"
+    ],
+    "related_article_slugs": [],
+    "order": 220
+  }
+]

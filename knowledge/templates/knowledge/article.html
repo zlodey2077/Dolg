@@ -1,0 +1,510 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ article.title }} — Энциклопедия ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kb-article {
+        max-width: 860px;
+        margin: 2rem auto;
+        background: rgba(26,39,68,.55);
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 12px;
+        padding: 2.25rem 2.5rem;
+        box-shadow: 0 0 30px rgba(0,212,255,.12);
+    }
+    .kb-crumbs { color: rgba(224,224,224,.6); font-size: .85rem; margin-bottom: .75rem; }
+    .kb-crumbs a { color: var(--accent-cyan); text-decoration: none; }
+    .kb-article h1 { color: var(--accent-cyan); font-size: 2rem; margin: 0 0 .4rem; line-height: 1.2; }
+    .kb-meta { font-size: .8rem; color: rgba(224,224,224,.55); margin-bottom: 1.5rem; }
+    .kb-summary {
+        font-size: 1.05rem; line-height: 1.55;
+        color: var(--text-bright);
+        margin-bottom: 1.5rem;
+        padding: .85rem 1rem;
+        background: rgba(0,212,255,.07);
+        border-left: 3px solid var(--accent-cyan);
+        border-radius: 4px;
+    }
+    .kb-body { color: var(--text-light); font-size: 1rem; line-height: 1.65; }
+    .kb-body p { margin: 0 0 1rem; }
+    .kb-body h3 { color: var(--accent-cyan); margin: 1.6rem 0 .6rem; font-size: 1.15rem; }
+    .kb-body ul, .kb-body ol { margin: 0 0 1rem 1.5rem; }
+    .kb-body li { margin-bottom: .3rem; }
+    .kb-body code {
+        background: rgba(0,212,255,.12);
+        color: #7fdbff;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-family: 'Consolas','Courier New',monospace;
+        font-size: .92em;
+    }
+    .kb-body strong { color: var(--text-bright); }
+
+    .kb-practice-panel {
+        margin-top: 2rem;
+        padding: 1.05rem 1.15rem;
+        border: 1px solid rgba(0,212,255,.22);
+        border-radius: 8px;
+        background: rgba(0,212,255,.05);
+    }
+    .kb-practice-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    .kb-practice-head h2 {
+        color: var(--accent-cyan);
+        font-size: 1.15rem;
+        margin: 0;
+    }
+    .kb-practice-head p {
+        color: var(--text-light);
+        font-size: .85rem;
+        line-height: 1.45;
+        margin: .25rem 0 0;
+    }
+    .kb-practice-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .65rem;
+        justify-content: flex-end;
+    }
+    .kb-practice-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: .45rem .75rem;
+        border: 1px solid rgba(0,212,255,.32);
+        border-radius: 6px;
+        color: var(--accent-cyan);
+        background: rgba(10,16,32,.42);
+        text-decoration: none;
+        font-size: .82rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .kb-practice-action:hover { border-color: var(--accent-cyan); box-shadow: 0 0 14px rgba(0,212,255,.18); }
+    .kb-calc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: .85rem;
+    }
+    .kb-calc {
+        padding: .9rem;
+        border: 1px solid rgba(0,212,255,.18);
+        border-radius: 8px;
+        background: rgba(10,16,32,.48);
+    }
+    .kb-calc-title { color: var(--text-bright); font-weight: 700; margin-bottom: .25rem; }
+    .kb-calc-desc { color: var(--text-light); font-size: .78rem; line-height: 1.35; margin-bottom: .75rem; }
+    .kb-calc-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .55rem;
+    }
+    .kb-calc label {
+        display: flex;
+        flex-direction: column;
+        gap: .25rem;
+        color: rgba(224,224,224,.7);
+        font-size: .75rem;
+    }
+    .kb-calc input {
+        width: 100%;
+        min-height: 34px;
+        border: 1px solid rgba(0,212,255,.25);
+        border-radius: 5px;
+        background: rgba(5,10,24,.72);
+        color: var(--text-bright);
+        padding: .35rem .5rem;
+    }
+    .kb-calc-result {
+        margin-top: .75rem;
+        min-height: 40px;
+        padding: .55rem .65rem;
+        border-radius: 6px;
+        background: rgba(0,212,255,.07);
+        color: var(--text-bright);
+        font-size: .82rem;
+        line-height: 1.45;
+    }
+    .kb-products {
+        max-width: 1100px;
+        margin: 2rem auto;
+    }
+    .kb-products h2 {
+        color: var(--accent-cyan);
+        font-size: 1.15rem;
+        margin: 0 0 1rem;
+    }
+    .kb-product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+        gap: .9rem;
+    }
+
+    .kb-related {
+        margin-top: 2rem;
+        padding: 1rem 1.15rem;
+        background: rgba(0,212,255,.05);
+        border: 1px solid rgba(0,212,255,.2);
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: .95rem;
+    }
+    .kb-related-title { color: var(--accent-cyan); font-weight: 600; margin-bottom: .4rem; }
+
+    .kb-materials {
+        margin-top: 2rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid rgba(0,212,255,.2);
+    }
+    .kb-materials h2 {
+        color: var(--accent-cyan);
+        font-size: 1.15rem;
+        margin: 0 0 .9rem;
+    }
+    .kb-material-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: .85rem;
+    }
+    .kb-material {
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
+        align-items: flex-start;
+        padding: .85rem .95rem;
+        background: rgba(10,16,32,.55);
+        border: 1px solid rgba(0,212,255,.22);
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+        transition: all .2s ease;
+    }
+    .kb-material:hover { border-color: rgba(0,212,255,.38); }
+    .kb-material-link:hover { border-color: var(--accent-cyan); transform: translateY(-2px); }
+    .kb-material-head {
+        display: flex;
+        gap: .75rem;
+        align-items: flex-start;
+        width: 100%;
+    }
+    .kb-material-wide { grid-column: span 2; }
+    .kb-material-icon { font-size: 1.35rem; line-height: 1; flex: 0 0 auto; }
+    .kb-material-title { display: block; color: var(--text-bright); font-weight: 600; font-size: .92rem; margin-bottom: .2rem; }
+    .kb-material-meta { display: block; color: var(--accent-cyan); font-size: .72rem; text-transform: uppercase; letter-spacing: 0; }
+    .kb-material-desc { display: block; color: var(--text-light); font-size: .8rem; line-height: 1.35; margin-top: .25rem; }
+    .kb-material-preview,
+    .kb-material-video,
+    .kb-material-frame {
+        width: 100%;
+        border: 1px solid rgba(0,212,255,.18);
+        border-radius: 6px;
+        background: rgba(0,0,0,.22);
+    }
+    .kb-material-preview {
+        display: block;
+        height: 220px;
+        object-fit: cover;
+        object-position: center;
+    }
+    .kb-material-video,
+    .kb-material-frame {
+        aspect-ratio: 16 / 9;
+    }
+    .kb-material-frame {
+        display: block;
+        border: 0;
+    }
+    .kb-material-action {
+        color: var(--accent-cyan);
+        font-size: .82rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .kb-material-action:hover { text-decoration: underline; }
+    @media (max-width: 700px) {
+        .kb-material-wide { grid-column: span 1; }
+        .kb-practice-head { flex-direction: column; }
+        .kb-practice-actions { justify-content: flex-start; }
+        .kb-calc-fields { grid-template-columns: 1fr; }
+    }
+
+    .kb-nav {
+        max-width: 860px;
+        margin: 0 auto 2rem;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .kb-nav a { color: var(--accent-cyan); text-decoration: none; font-size: .9rem; }
+    .kb-nav a:hover { text-decoration: underline; }
+
+    .kb-related-articles {
+        max-width: 860px; margin: 2rem auto;
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .9rem;
+    }
+    .kb-mini-card {
+        background: rgba(26,39,68,.45);
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 8px;
+        padding: .85rem 1rem;
+        text-decoration: none;
+        color: inherit;
+        transition: all .2s ease;
+    }
+    .kb-mini-card:hover { border-color: var(--accent-cyan); transform: translateY(-2px); }
+    .kb-mini-title { color: var(--accent-cyan); font-size: .92rem; font-weight: 600; margin-bottom: .3rem; }
+    .kb-mini-summary { color: var(--text-light); font-size: .8rem; line-height: 1.35; }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="kb-article">
+    <div class="kb-crumbs">
+        <a href="{% url 'knowledge:index' %}">📚 Энциклопедия</a> /
+        <a href="{% url 'knowledge:category' article.category.slug %}">{{ article.category.name }}</a> /
+        {{ article.title|truncatechars:50 }}
+    </div>
+    <h1>{{ article.title }}</h1>
+    <div class="kb-meta">⏱ {{ article.reading_minutes }} мин чтения · обновлено {{ article.updated_at|date:"d.m.Y" }}</div>
+    <div class="kb-summary">{{ article.summary }}</div>
+    <div class="kb-body">{{ article.body|safe }}</div>
+
+    <section class="kb-practice-panel">
+        <div class="kb-practice-head">
+            <div>
+                <h2>Практика по теме</h2>
+                <p>Быстрый переход от статьи к проверке: можно открыть редактор, симулятор или посчитать базовые параметры прямо здесь.</p>
+            </div>
+            <div class="kb-practice-actions">
+                <a class="kb-practice-action" href="{% url 'hello:cad' %}?article={{ article.slug }}">Открыть в CAD</a>
+                <a class="kb-practice-action" href="{% url 'hello:simulation' %}?article={{ article.slug }}">Проверить в симуляции</a>
+            </div>
+        </div>
+
+        {% if calculator_tools %}
+        <div class="kb-calc-grid">
+            {% for tool in calculator_tools %}
+            <div class="kb-calc" data-calc="{{ tool.kind }}">
+                <div class="kb-calc-title">{{ tool.title }}</div>
+                <div class="kb-calc-desc">{{ tool.description }}</div>
+
+                {% if tool.kind == 'ohm' %}
+                <div class="kb-calc-fields">
+                    <label>U, В <input type="number" step="any" data-field="voltage" placeholder="5"></label>
+                    <label>I, мА <input type="number" step="any" data-field="current" placeholder="20"></label>
+                    <label>R, Ом <input type="number" step="any" data-field="resistance" placeholder="150"></label>
+                </div>
+                {% elif tool.kind == 'divider' %}
+                <div class="kb-calc-fields">
+                    <label>Uвх, В <input type="number" step="any" data-field="vin" placeholder="5"></label>
+                    <label>R1, Ом <input type="number" step="any" data-field="r1" placeholder="10000"></label>
+                    <label>R2, Ом <input type="number" step="any" data-field="r2" placeholder="4700"></label>
+                </div>
+                {% elif tool.kind == 'rc' %}
+                <div class="kb-calc-fields">
+                    <label>R, Ом <input type="number" step="any" data-field="resistance" placeholder="10000"></label>
+                    <label>C, мкФ <input type="number" step="any" data-field="capacitance" placeholder="0.1"></label>
+                </div>
+                {% elif tool.kind == 'led' %}
+                <div class="kb-calc-fields">
+                    <label>Uпит, В <input type="number" step="any" data-field="vin" placeholder="5"></label>
+                    <label>U LED, В <input type="number" step="any" data-field="vf" placeholder="2"></label>
+                    <label>I LED, мА <input type="number" step="any" data-field="current" placeholder="20"></label>
+                </div>
+                {% elif tool.kind == 'power' %}
+                <div class="kb-calc-fields">
+                    <label>U, В <input type="number" step="any" data-field="voltage" placeholder="5"></label>
+                    <label>I, мА <input type="number" step="any" data-field="current" placeholder="20"></label>
+                    <label>R, Ом <input type="number" step="any" data-field="resistance" placeholder="250"></label>
+                </div>
+                {% endif %}
+
+                <div class="kb-calc-result" data-result>Введите исходные данные.</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% if article.published_materials %}
+    <section class="kb-materials">
+        <h2>Дополнительные материалы</h2>
+        <div class="kb-material-grid">
+            {% for material in article.published_materials %}
+            <div class="kb-material {% if material.href and not material.renders_inline %}kb-material-link{% endif %} {% if material.renders_inline %}kb-material-wide{% endif %}">
+                <div class="kb-material-head">
+                <span class="kb-material-icon">
+                    {% if material.material_type == 'datasheet' %}📄
+                    {% elif material.material_type == 'calculator' %}🧮
+                    {% elif material.material_type == 'example' %}🔬
+                    {% elif material.material_type == 'checklist' %}✅
+                    {% elif material.material_type == 'image' %}🖼️
+                    {% elif material.material_type == 'animation' %}🎞️
+                    {% elif material.material_type == 'video' %}▶️
+                    {% elif material.material_type == 'file' %}📎
+                    {% else %}🔗{% endif %}
+                </span>
+                <span>
+                    <span class="kb-material-meta">{{ material.get_material_type_display }}</span>
+                    <span class="kb-material-title">{{ material.title }}</span>
+                    {% if material.description %}<span class="kb-material-desc">{{ material.description }}</span>{% endif %}
+                </span>
+                </div>
+
+                {% if material.is_inline_image %}
+                    {% if material.href %}<a href="{{ material.href }}" {% if not material.is_internal_link %}target="_blank" rel="noopener"{% endif %}><img class="kb-material-preview" src="{{ material.href }}" alt="{{ material.title }}" loading="lazy"></a>{% endif %}
+                {% elif material.embed_url %}
+                    <iframe class="kb-material-frame" src="{{ material.embed_url }}" title="{{ material.title }}" allowfullscreen loading="lazy"></iframe>
+                {% elif material.is_video_file %}
+                    <video class="kb-material-video" src="{{ material.href }}" controls preload="metadata"></video>
+                {% endif %}
+
+                {% if material.href %}
+                <a class="kb-material-action" href="{{ material.href }}" {% if not material.is_internal_link %}target="_blank" rel="noopener"{% endif %}>
+                    {% if material.renders_inline %}Открыть отдельно{% else %}Открыть материал{% endif %}
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if article.related_components_note %}
+    <div class="kb-related">
+        <div class="kb-related-title">🛒 В каталоге</div>
+        <div>{{ article.related_components_note }}</div>
+    </div>
+    {% endif %}
+</article>
+
+{% if related %}
+<div class="kb-related-articles">
+    {% for a in related %}
+    <a href="{% url 'knowledge:article' a.slug %}" class="kb-mini-card">
+        <div class="kb-mini-title">{{ a.title }}</div>
+        <div class="kb-mini-summary">{{ a.summary|truncatewords:16 }}</div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if related_products %}
+<section class="kb-products">
+    <h2>Связанные товары из каталога</h2>
+    <div class="kb-product-grid">
+        {% for product in related_products %}
+            {% include "shop/includes/product_card.html" %}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<div class="kb-nav">
+    <a href="{% url 'knowledge:category' article.category.slug %}">← Все статьи: {{ article.category.name }}</a>
+    <a href="{% url 'knowledge:index' %}">📚 К энциклопедии</a>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const fmt = (value, unit) => {
+        if (!Number.isFinite(value)) return '';
+        const abs = Math.abs(value);
+        const digits = abs >= 100 ? 1 : abs >= 10 ? 2 : 3;
+        return `${Number(value.toFixed(digits))} ${unit}`;
+    };
+    const read = (card, name) => {
+        const input = card.querySelector(`[data-field="${name}"]`);
+        if (!input || input.value.trim() === '') return NaN;
+        return Number.parseFloat(input.value.replace(',', '.'));
+    };
+    const write = (card, html) => {
+        const result = card.querySelector('[data-result]');
+        if (result) result.innerHTML = html || 'Введите исходные данные.';
+    };
+
+    function calcOhm(card) {
+        let voltage = read(card, 'voltage');
+        let currentMa = read(card, 'current');
+        let resistance = read(card, 'resistance');
+        let current = Number.isFinite(currentMa) ? currentMa / 1000 : NaN;
+        if (!Number.isFinite(voltage) && Number.isFinite(current) && Number.isFinite(resistance)) voltage = current * resistance;
+        if (!Number.isFinite(current) && Number.isFinite(voltage) && Number.isFinite(resistance)) current = voltage / resistance;
+        if (!Number.isFinite(resistance) && Number.isFinite(voltage) && Number.isFinite(current) && current !== 0) resistance = voltage / current;
+        if (!Number.isFinite(voltage) || !Number.isFinite(current) || !Number.isFinite(resistance)) return write(card);
+        write(card, `U = ${fmt(voltage, 'В')}<br>I = ${fmt(current * 1000, 'мА')}<br>R = ${fmt(resistance, 'Ом')}<br>P = ${fmt(voltage * current, 'Вт')}`);
+    }
+
+    function calcDivider(card) {
+        const vin = read(card, 'vin');
+        const r1 = read(card, 'r1');
+        const r2 = read(card, 'r2');
+        if (![vin, r1, r2].every(Number.isFinite) || (r1 + r2) === 0) return write(card);
+        const vout = vin * r2 / (r1 + r2);
+        const current = vin / (r1 + r2);
+        write(card, `Uвых = ${fmt(vout, 'В')}<br>I делителя = ${fmt(current * 1000, 'мА')}<br>P R1 = ${fmt(current * current * r1, 'Вт')}<br>P R2 = ${fmt(current * current * r2, 'Вт')}`);
+    }
+
+    function calcRc(card) {
+        const resistance = read(card, 'resistance');
+        const capacitance = read(card, 'capacitance') * 1e-6;
+        if (!Number.isFinite(resistance) || !Number.isFinite(capacitance) || resistance <= 0 || capacitance <= 0) return write(card);
+        const tau = resistance * capacitance;
+        const cutoff = 1 / (2 * Math.PI * resistance * capacitance);
+        write(card, `Tau = ${fmt(tau * 1000, 'мс')}<br>fсреза = ${fmt(cutoff, 'Гц')}<br>5Tau = ${fmt(tau * 5000, 'мс')}`);
+    }
+
+    function calcLed(card) {
+        const vin = read(card, 'vin');
+        const vf = read(card, 'vf');
+        const current = read(card, 'current') / 1000;
+        if (![vin, vf, current].every(Number.isFinite) || current <= 0 || vin <= vf) return write(card);
+        const resistance = (vin - vf) / current;
+        const power = (vin - vf) * current;
+        write(card, `R = ${fmt(resistance, 'Ом')}<br>P резистора = ${fmt(power, 'Вт')}<br>Ближайший запас по мощности: не ниже ${fmt(power * 2, 'Вт')}`);
+    }
+
+    function calcPower(card) {
+        const voltage = read(card, 'voltage');
+        const current = read(card, 'current') / 1000;
+        const resistance = read(card, 'resistance');
+        let power = NaN;
+        if (Number.isFinite(voltage) && Number.isFinite(current)) power = voltage * current;
+        else if (Number.isFinite(current) && Number.isFinite(resistance)) power = current * current * resistance;
+        else if (Number.isFinite(voltage) && Number.isFinite(resistance) && resistance !== 0) power = voltage * voltage / resistance;
+        if (!Number.isFinite(power)) return write(card);
+        write(card, `P = ${fmt(power, 'Вт')}<br>Рекомендуемый запас: ${fmt(power * 1.5, 'Вт')} - ${fmt(power * 2, 'Вт')}`);
+    }
+
+    const calculators = {
+        ohm: calcOhm,
+        divider: calcDivider,
+        rc: calcRc,
+        led: calcLed,
+        power: calcPower,
+    };
+
+    document.querySelectorAll('.kb-calc').forEach((card) => {
+        const update = calculators[card.dataset.calc];
+        if (!update) return;
+        card.querySelectorAll('input').forEach((input) => input.addEventListener('input', () => update(card)));
+        update(card);
+    });
+});
+</script>
+
+{% load tier_tags %}
+{% comment %}
+Comments widget — Free plain-text / Pro Markdown. Скрипт shop/static/shop/comments.js.
+Pro-tier через template-tag is_pro_user (безопасно без Subscription записи).
+{% endcomment %}
+<div data-dolg-comments
+     data-target-type="article"
+     data-target-id="{{ article.id }}"
+     data-can-comment="{% if user.is_authenticated %}1{% else %}0{% endif %}"
+     data-is-pro="{% if user|is_pro_user %}1{% else %}0{% endif %}">
+</div>
+{% endblock %}

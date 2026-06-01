@@ -1,0 +1,293 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Оформление заказа{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style=\"color: var(--accent-cyan);\">Оформление заказа</h1>
+
+    <div class="checkout-container">
+        <div class="checkout-form">
+            <form method="post" class="form">
+                {% csrf_token %}
+
+                {% if is_guest %}
+                <div class="form-section">
+                    <h2>👤 Контактные данные (гостевой заказ)</h2>
+                    <p style="color: rgba(200,200,200,0.7); font-size: 0.9rem; margin-bottom: 1rem;">
+                        Без регистрации. На email придёт ссылка для отслеживания заказа — сохраните её.
+                        <a href="{% url 'accounts:register' %}?next={% url 'orders:checkout' %}" style="color: var(--accent-cyan);">Хочу зарегистрироваться</a>
+                    </p>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" name="guest_email" required class="form-control"
+                               value="{{ guest_form.email|default:'' }}" placeholder="you@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Имя *</label>
+                        <input type="text" name="guest_name" required class="form-control"
+                               value="{{ guest_form.name|default:'' }}" placeholder="Иван Иванов">
+                    </div>
+                    <div class="form-group">
+                        <label>Телефон *</label>
+                        <input type="tel" name="guest_phone" required class="form-control"
+                               value="{{ guest_form.phone|default:'' }}" placeholder="+7 999 123-45-67">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2>📦 Адрес доставки</h2>
+                    <div class="form-group">
+                        <label>Адрес *</label>
+                        <input type="text" name="shipping_address" required class="form-control"
+                               value="{{ guest_form.address|default:'' }}" placeholder="ул. Пример, д. 1, кв. 2">
+                    </div>
+                    <div class="form-group">
+                        <label>Город *</label>
+                        <input type="text" name="shipping_city" required class="form-control"
+                               value="{{ guest_form.city|default:'' }}" placeholder="Москва">
+                    </div>
+                    <div class="form-group">
+                        <label>Индекс</label>
+                        <input type="text" name="shipping_postal_code" class="form-control"
+                               value="{{ guest_form.postal_code|default:'' }}" placeholder="123456">
+                    </div>
+                    <div class="form-group">
+                        <label>Страна</label>
+                        <input type="text" name="shipping_country" class="form-control"
+                               value="{{ guest_form.country|default:'Россия' }}" placeholder="Россия">
+                    </div>
+                </div>
+                {% else %}
+                <div class="form-section">
+                    <h2>Адрес доставки</h2>
+                    {% if addresses %}
+                        <div class="form-group">
+                            <label>Выберите адрес доставки:</label>
+                            {% for address in addresses %}
+                            <div class="address-option">
+                                <input type="radio" id="address_{{ address.id }}" name="address" value="{{ address.id }}"
+                                    {% if address.is_default or forloop.first %}checked{% endif %} required>
+                                <label for="address_{{ address.id }}" class="address-label">
+                                    <strong>{{ address.title }}</strong><br>
+                                    {{ address.address }}<br>
+                                    {{ address.postal_code }}, {{ address.city }}, {{ address.country }}
+                                    {% if address.is_default %}<span class="badge">По умолчанию</span>{% endif %}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <p><a href="{% url 'accounts:add_address' %}">Добавить новый адрес</a></p>
+                    {% else %}
+                        <p>У вас нет сохраненных адресов. <a href="{% url 'accounts:add_address' %}">Добавьте адрес</a></p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="form-section">
+                    <h2>Способ оплаты</h2>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="radio" name="payment_method" value="card" checked> Кредитная карта
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="radio" name="payment_method" value="bank_transfer"> Банковский перевод
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="radio" name="payment_method" value="cash"> Наличные при доставке
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="radio" name="payment_method" value="wallet"> Электронный кошелек
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2>Примечание к заказу</h2>
+                    <textarea name="notes" rows="4" placeholder="Например: оставить у дверей, доставить после 18:00" class="form-control"></textarea>
+                </div>
+
+                <div class="form-section">
+                    <h2>Подтверждение</h2>
+                    <label>
+                        <input type="checkbox" name="confirm" required> Я согласен с условиями доставки и оплаты
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-success btn-large">Оформить заказ</button>
+            </form>
+        </div>
+
+        <div class="checkout-summary">
+            <h2>Ваш заказ</h2>
+            
+            <div class="order-items">
+                {% for item in cart_items %}
+                <div class="order-item">
+                    <div>
+                        <p class="item-name">{{ item.product.name }}</p>
+                        <p class="item-qty">Количество: {{ item.quantity }}</p>
+                    </div>
+                    <p class="item-price">{{ item.get_total_price }} ₽</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="order-total">
+                <p><strong>Итого:</strong> <span class="total-amount">{{ total_amount }} ₽</span></p>
+            </div>
+
+            <a href="{% url 'shop:cart' %}" class="btn btn-secondary btn-full">Вернуться в корзину</a>
+        </div>
+    </div>
+</div>
+
+<style>
+.checkout-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.form-section {
+    background-color: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+}
+
+.form-section h2 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    color: var(--accent-cyan);
+}
+
+.address-option {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    border: 2px solid rgba(0, 212, 255, 0.4);
+    background-color: rgba(20, 30, 60, 0.4);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+
+.address-option input[type="radio"] {
+    margin-top: 0.25rem;
+}
+
+.address-label {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #ccc;
+}
+
+.badge {
+    display: inline-block;
+    background-color: rgba(0, 212, 255, 0.2);
+    border: 1px solid var(--accent-cyan);
+    color: var(--accent-cyan);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    border-radius: 4px;
+    color: #ccc;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #00ffff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.3);
+}
+
+.checkout-summary {
+    background-color: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+    height: fit-content;
+}
+
+.checkout-summary h2 {
+    color: var(--accent-cyan);
+}
+
+.order-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.item-name {
+    margin: 0;
+    font-weight: 500;
+    color: #ccc;
+}
+
+.item-qty {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(200, 200, 200, 0.7);
+}
+
+.item-price {
+    margin: 0;
+    font-weight: bold;
+    color: #90ee90;
+}
+
+.order-total {
+    background-color: rgba(20, 30, 60, 0.4);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    text-align: right;
+}
+
+.order-total p {
+    color: #ccc;
+}
+
+.total-amount {
+    font-size: 1.3rem;
+    color: #90ee90;
+}
+
+.btn-large {
+    width: 100%;
+}
+
+.btn-full {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .checkout-container {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

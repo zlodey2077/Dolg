@@ -1,0 +1,446 @@
+from django.core.management.base import BaseCommand
+
+from shop.models import Category, Product
+
+
+class Command(BaseCommand):
+    help = 'Populate database with real REB electronic components'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--clear', action='store_true',
+            help='Remove existing REB products before adding new ones'
+        )
+
+    def handle(self, *args, **options):
+        reb_slugs = {'resistors', 'capacitors', 'transistors', 'ics', 'diodes', 'inductors', 'connectors', 'relays'}
+
+        if options['clear']:
+            deleted, _ = Product.objects.filter(category__slug__in=reb_slugs).delete()
+            self.stdout.write(f'Removed {deleted} existing REB products')
+
+        cats = {c.slug: c for c in Category.objects.filter(slug__in=reb_slugs)}
+        missing = reb_slugs - set(cats.keys())
+        if missing:
+            self.stderr.write(f'Missing categories (run: python manage.py shell to create them): {missing}')
+            return
+
+        products = [
+            # --- РЕЗИСТОРЫ ---
+            {
+                'name': 'Yageo RC0402FR-0710KL', 'category': cats['resistors'],
+                'part_number': 'RC0402FR-0710KL', 'manufacturer': 'yageo',
+                'description': 'Толстоплёночный резистор SMD 0402, 10 кОм, 1%, 0.1 Вт. Серия RC — универсальная для массового применения.',
+                'price': 2.50, 'stock': 5000, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0402',
+                'datasheet_url': 'https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf',
+                'parameters': {'resistance': '10 кОм', 'tolerance': '1%', 'power': '0.1 Вт', 'temp_coef': '100 ppm/°C', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Vishay CRCW08051K00FKEA', 'category': cats['resistors'],
+                'part_number': 'CRCW08051K00FKEA', 'manufacturer': 'vishay',
+                'description': 'Толстоплёночный резистор SMD 0805, 1 кОм, 1%, 0.125 Вт. Серия CRCW — высокая надёжность.',
+                'price': 4.80, 'stock': 3000, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0805',
+                'datasheet_url': 'https://www.vishay.com/doc?20035',
+                'parameters': {'resistance': '1 кОм', 'tolerance': '1%', 'power': '0.125 Вт', 'temp_coef': '100 ppm/°C', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Bourns 3386P-1-103TLF', 'category': cats['resistors'],
+                'part_number': '3386P-1-103TLF', 'manufacturer': 'bourns',
+                'description': 'Подстроечный резистор 10 кОм, однооборотный, корпус 3/8", вертикальный монтаж.',
+                'price': 89.00, 'stock': 200, 'lifecycle_status': 'active',
+                'package_type': 'THT 3/8"',
+                'datasheet_url': 'https://www.bourns.com/docs/Product-Datasheets/3386.pdf',
+                'parameters': {'resistance': '10 кОм', 'tolerance': '10%', 'power': '0.5 Вт', 'turns': '1', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Vishay Dale RN60C1002FB14', 'category': cats['resistors'],
+                'part_number': 'RN60C1002FB14', 'manufacturer': 'vishay',
+                'description': 'Металлоплёночный прецизионный резистор THT, 10 кОм, 1%, 0.25 Вт, осевые выводы.',
+                'price': 18.50, 'stock': 1000, 'lifecycle_status': 'active',
+                'package_type': 'THT MF (axial)',
+                'datasheet_url': 'https://www.vishay.com/doc?30219',
+                'parameters': {'resistance': '10 кОм', 'tolerance': '1%', 'power': '0.25 Вт', 'temp_coef': '50 ppm/°C', 'mounting': 'THT'},
+            },
+
+            # --- КОНДЕНСАТОРЫ ---
+            {
+                'name': 'Murata GRM188R71H104KA93D', 'category': cats['capacitors'],
+                'part_number': 'GRM188R71H104KA93D', 'manufacturer': 'murata',
+                'description': 'Многослойный керамический конденсатор (MLCC) SMD 0603, 100 нФ, 50 В, X7R, ±10%.',
+                'price': 5.20, 'stock': 10000, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0603',
+                'datasheet_url': 'https://www.murata.com/en-us/products/productdata/8796738519070/JDSXXXXXGJXXXAN.pdf',
+                'parameters': {'capacitance': '100 нФ', 'voltage': '50 В', 'dielectric': 'X7R', 'tolerance': '±10%', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'KEMET C0805C104K5RACTU', 'category': cats['capacitors'],
+                'part_number': 'C0805C104K5RACTU', 'manufacturer': 'kemet',
+                'description': 'Керамический конденсатор SMD 0805, 100 нФ, 50 В, X7R, ±10%. Высокая стабильность.',
+                'price': 8.90, 'stock': 5000, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0805',
+                'datasheet_url': 'https://www.kemet.com/content/dam/kemet/lightning/migration-pdfs/AutoECML/TS0004.pdf',
+                'parameters': {'capacitance': '100 нФ', 'voltage': '50 В', 'dielectric': 'X7R', 'tolerance': '±10%', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Nichicon UWT1V100MCL1GS', 'category': cats['capacitors'],
+                'part_number': 'UWT1V100MCL1GS', 'manufacturer': 'nichicon',
+                'description': 'Электролитический конденсатор SMD, 10 мкФ, 35 В, 105°C, серия UWT (низкий импеданс).',
+                'price': 28.00, 'stock': 2000, 'lifecycle_status': 'active',
+                'package_type': 'SMD (4×5.4 мм)',
+                'datasheet_url': 'https://www.nichicon.co.jp/english/products/pdfs/e-uwt.pdf',
+                'parameters': {'capacitance': '10 мкФ', 'voltage': '35 В', 'type': 'Электролитический', 'max_temp': '105°C', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Panasonic EEUFK1V100', 'category': cats['capacitors'],
+                'part_number': 'EEUFK1V100', 'manufacturer': 'panasonic',
+                'description': 'Электролитический конденсатор THT, 10 мкФ, 35 В, 105°C, Ø5×11 мм.',
+                'price': 22.00, 'stock': 3000, 'lifecycle_status': 'active',
+                'package_type': 'THT (Ø5×11 мм)',
+                'datasheet_url': 'https://industrial.panasonic.com/ww/products/pt/aluminum-electrolytic/series/138',
+                'parameters': {'capacitance': '10 мкФ', 'voltage': '35 В', 'type': 'Электролитический', 'max_temp': '105°C', 'mounting': 'THT'},
+            },
+
+            # --- ТРАНЗИСТОРЫ ---
+            {
+                'name': 'ON Semi BC547B', 'category': cats['transistors'],
+                'part_number': 'BC547B', 'manufacturer': 'onsemi',
+                'description': 'Биполярный NPN транзистор TO-92, Vceo 45 В, Ic 100 мА. Классика для усилительных каскадов и ключей.',
+                'price': 12.00, 'stock': 2000, 'lifecycle_status': 'active',
+                'package_type': 'THT TO-92',
+                'datasheet_url': 'https://www.onsemi.com/pdf/datasheet/bc546-d.pdf',
+                'parameters': {'type': 'NPN', 'vceo': '45 В', 'ic': '100 мА', 'hfe': '200-450', 'ft': '150 МГц', 'mounting': 'THT'},
+            },
+            {
+                'name': 'ST 2N2222A', 'category': cats['transistors'],
+                'part_number': '2N2222A', 'manufacturer': 'st',
+                'description': 'Биполярный NPN транзистор TO-18 (металл), Vceo 40 В, Ic 600 мА. Один из наиболее распространённых транзисторов.',
+                'price': 35.00, 'stock': 500, 'lifecycle_status': 'active',
+                'package_type': 'THT TO-18',
+                'datasheet_url': 'https://www.st.com/resource/en/datasheet/2n2222a.pdf',
+                'parameters': {'type': 'NPN', 'vceo': '40 В', 'ic': '600 мА', 'hfe': '100-300', 'ft': '300 МГц', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Infineon IRF540NPBF', 'category': cats['transistors'],
+                'part_number': 'IRF540NPBF', 'manufacturer': 'infineon',
+                'description': 'N-канальный MOSFET TO-220, Vds 100 В, Id 33 А, Rds(on) 44 мОм. Силовые ключи, преобразователи.',
+                'price': 95.00, 'stock': 300, 'lifecycle_status': 'active',
+                'package_type': 'THT TO-220',
+                'datasheet_url': 'https://www.infineon.com/dgdl/irf540npbf.pdf',
+                'parameters': {'type': 'N-MOSFET', 'vds': '100 В', 'id': '33 А', 'rds_on': '44 мОм', 'mounting': 'THT'},
+            },
+            {
+                'name': 'ON Semi BS170', 'category': cats['transistors'],
+                'part_number': 'BS170', 'manufacturer': 'onsemi',
+                'description': 'N-канальный MOSFET TO-92, Vds 60 В, Id 500 мА. Маломощные ключи в цифровых схемах.',
+                'price': 18.00, 'stock': 1500, 'lifecycle_status': 'active',
+                'package_type': 'THT TO-92',
+                'datasheet_url': 'https://www.onsemi.com/pdf/datasheet/bs170-d.pdf',
+                'parameters': {'type': 'N-MOSFET', 'vds': '60 В', 'id': '500 мА', 'rds_on': '5 Ом', 'mounting': 'THT'},
+            },
+
+            # --- МИКРОСХЕМЫ ---
+            {
+                'name': 'Texas Instruments NE555DR', 'category': cats['ics'],
+                'part_number': 'NE555DR', 'manufacturer': 'ti',
+                'description': 'Таймер NE555 в корпусе SOIC-8. Генераторы прямоугольных импульсов, одновибраторы, ШИМ.',
+                'price': 45.00, 'stock': 1000, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOIC-8',
+                'datasheet_url': 'https://www.ti.com/lit/ds/symlink/ne555.pdf',
+                'parameters': {'type': 'Таймер', 'supply_voltage': '4.5–16 В', 'output_current': '200 мА', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'ST LM358DT', 'category': cats['ics'],
+                'part_number': 'LM358DT', 'manufacturer': 'st',
+                'description': 'Двойной операционный усилитель SOIC-8, питание 3–32 В (однополярное). Компаратор, усилитель.',
+                'price': 38.00, 'stock': 800, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOIC-8',
+                'datasheet_url': 'https://www.st.com/resource/en/datasheet/lm358.pdf',
+                'parameters': {'type': 'ОУ', 'channels': '2', 'supply_voltage': '3–32 В', 'gbw': '1.1 МГц', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'NXP 74HC08D', 'category': cats['ics'],
+                'part_number': '74HC08D', 'manufacturer': 'nxp',
+                'description': 'Четыре логических элемента И (AND) в корпусе SOIC-14. Стандарт HC CMOS, 2–6 В.',
+                'price': 25.00, 'stock': 2000, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOIC-14',
+                'datasheet_url': 'https://www.nxp.com/docs/en/data-sheet/74HC_HCT08.pdf',
+                'parameters': {'type': 'Логика AND', 'gates': '4', 'supply_voltage': '2–6 В', 'family': 'HC CMOS', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Microchip ATmega328P-PU', 'category': cats['ics'],
+                'part_number': 'ATMEGA328P-PU', 'manufacturer': 'other',
+                'description': 'Микроконтроллер AVR ATmega328P DIP-28, 32 КБ Flash, 2 КБ RAM, 23 I/O. Основа Arduino Uno.',
+                'price': 350.00, 'stock': 200, 'lifecycle_status': 'active',
+                'package_type': 'THT DIP-28',
+                'datasheet_url': 'https://ww1.microchip.com/downloads/en/DeviceDoc/ATmega48A-PA-88A-PA-168A-PA-328-P-DS-DS40002061B.pdf',
+                'parameters': {'type': 'МК AVR', 'flash': '32 КБ', 'ram': '2 КБ', 'freq': '20 МГц', 'io_pins': '23', 'mounting': 'THT'},
+            },
+
+            # --- ДИОДЫ ---
+            {
+                'name': 'Vishay 1N4148W-E3-18', 'category': cats['diodes'],
+                'part_number': '1N4148W-E3-18', 'manufacturer': 'vishay',
+                'description': 'Быстродействующий сигнальный диод SMD SOD-123, 100 В, 150 мА, trr 4 нс.',
+                'price': 4.50, 'stock': 10000, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOD-123',
+                'datasheet_url': 'https://www.vishay.com/doc?81857',
+                'parameters': {'type': 'Сигнальный', 'vrrm': '100 В', 'if': '150 мА', 'trr': '4 нс', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'ON Semi 1N4007RL', 'category': cats['diodes'],
+                'part_number': '1N4007RL', 'manufacturer': 'onsemi',
+                'description': 'Выпрямительный диод THT DO-41, 1000 В, 1 А. Стандарт для сетевых выпрямителей.',
+                'price': 8.00, 'stock': 5000, 'lifecycle_status': 'active',
+                'package_type': 'THT DO-41',
+                'datasheet_url': 'https://www.onsemi.com/pdf/datasheet/1n4001-d.pdf',
+                'parameters': {'type': 'Выпрямительный', 'vrrm': '1000 В', 'if': '1 А', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Vishay BZX55C5V1-TR', 'category': cats['diodes'],
+                'part_number': 'BZX55C5V1-TR', 'manufacturer': 'vishay',
+                'description': 'Стабилитрон DO-35, 5.1 В, 0.5 Вт. Стабилизация опорного напряжения.',
+                'price': 10.00, 'stock': 3000, 'lifecycle_status': 'active',
+                'package_type': 'THT DO-35',
+                'datasheet_url': 'https://www.vishay.com/doc?85604',
+                'parameters': {'type': 'Стабилитрон', 'vz': '5.1 В', 'power': '0.5 Вт', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Vishay SS34-E3/57T', 'category': cats['diodes'],
+                'part_number': 'SS34-E3/57T', 'manufacturer': 'vishay',
+                'description': 'Диод Шоттки SMD DO-214AC (SMA), 40 В, 3 А. Низкое прямое падение напряжения (0.55 В).',
+                'price': 22.00, 'stock': 2000, 'lifecycle_status': 'active',
+                'package_type': 'SMD DO-214AC (SMA)',
+                'datasheet_url': 'https://www.vishay.com/doc?88746',
+                'parameters': {'type': 'Шоттки', 'vrrm': '40 В', 'if': '3 А', 'vf': '0.55 В', 'mounting': 'SMD'},
+            },
+
+            # --- ДРОССЕЛИ И КАТУШКИ ---
+            {
+                'name': 'Würth WE-CI 744301100', 'category': cats['inductors'],
+                'part_number': '744301100', 'manufacturer': 'wurth',
+                'description': 'Индуктивность SMD 0805, 10 мкГн, 300 мА, 1.2 Ом. Фильтры питания и ВЧ-схемы.',
+                'price': 32.00, 'stock': 1500, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0805',
+                'datasheet_url': 'https://www.we-online.com/catalog/datasheet/744301100.pdf',
+                'parameters': {'inductance': '10 мкГн', 'current': '300 мА', 'dcr': '1.2 Ом', 'srf': '70 МГц', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Bourns SRR1260-101Y', 'category': cats['inductors'],
+                'part_number': 'SRR1260-101Y', 'manufacturer': 'bourns',
+                'description': 'Силовой дроссель SMD 12×12 мм, 100 мкГн, 1.5 А. DC-DC преобразователи.',
+                'price': 145.00, 'stock': 300, 'lifecycle_status': 'active',
+                'package_type': 'SMD (12×12×6 мм)',
+                'datasheet_url': 'https://www.bourns.com/docs/Product-Datasheets/SRR1260.pdf',
+                'parameters': {'inductance': '100 мкГн', 'current': '1.5 А', 'dcr': '0.22 Ом', 'mounting': 'SMD'},
+            },
+
+            # --- РАЗЪЁМЫ ---
+            {
+                'name': 'Würth 61300211121 PinHeader 2P', 'category': cats['connectors'],
+                'part_number': '61300211121', 'manufacturer': 'wurth',
+                'description': 'Штыревой разъём PinHeader 2×1, шаг 2.54 мм, позолоченные контакты, THT вертикальный.',
+                'price': 15.00, 'stock': 5000, 'lifecycle_status': 'active',
+                'package_type': 'THT 2.54 мм',
+                'datasheet_url': 'https://www.we-online.com/catalog/datasheet/61300211121.pdf',
+                'parameters': {'pins': '2', 'pitch': '2.54 мм', 'type': 'PinHeader', 'mounting': 'THT'},
+            },
+            {
+                'name': 'JST B3B-PH-K-S', 'category': cats['connectors'],
+                'part_number': 'B3B-PH-K-S', 'manufacturer': 'other',
+                'description': 'Разъём JST PH 3-контактный, шаг 2.0 мм, тип гнездо на плату (вертикальный, THT).',
+                'price': 28.00, 'stock': 2000, 'lifecycle_status': 'active',
+                'package_type': 'THT (шаг 2.0 мм)',
+                'datasheet_url': 'https://www.jst-mfg.com/product/pdf/eng/ePH.pdf',
+                'parameters': {'pins': '3', 'pitch': '2.0 мм', 'type': 'JST PH', 'mounting': 'THT'},
+            },
+
+            # --- РЕЛЕ ---
+            {
+                'name': 'Omron G5V-1-DC5', 'category': cats['relays'],
+                'part_number': 'G5V-1-DC5', 'manufacturer': 'other',
+                'description': 'Сигнальное реле SPDT, катушка 5 В DC, контакты 0.5 А/125 В AC. Корпус DIP-6.',
+                'price': 185.00, 'stock': 200, 'lifecycle_status': 'active',
+                'package_type': 'THT DIP-6',
+                'datasheet_url': 'https://omronfs.omron.com/en_US/ecb/products/pdf/en-g5v_1.pdf',
+                'parameters': {'type': 'SPDT', 'coil_voltage': '5 В DC', 'contact_rating': '0.5 А / 125 В AC', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Finder 40.52.9.012.0000', 'category': cats['relays'],
+                'part_number': '40.52.9.012.0000', 'manufacturer': 'other',
+                'description': 'Электромеханическое реле DPDT 12 В DC, контакты 8 А/250 В AC. Монтаж на плату.',
+                'price': 490.00, 'stock': 80, 'lifecycle_status': 'active',
+                'package_type': 'THT (монтаж на плату)',
+                'datasheet_url': 'https://www.findernet.com/en/worldwide/series/40-series-miniature-relays/type/40-52',
+                'parameters': {'type': 'DPDT', 'coil_voltage': '12 В DC', 'contact_rating': '8 А / 250 В AC', 'mounting': 'THT'},
+            },
+
+            # --- РАСШИРЕНИЕ АССОРТИМЕНТА ---
+            {
+                'name': 'Yageo RC0603FR-074K7L', 'category': cats['resistors'],
+                'part_number': 'RC0603FR-074K7L', 'manufacturer': 'yageo',
+                'description': 'Толстоплёночный SMD-резистор 0603, 4.7 кОм, 1%, 0.1 Вт. Универсальный номинал для подтяжек и делителей.',
+                'price': 2.90, 'stock': 6500, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0603',
+                'datasheet_url': 'https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf',
+                'parameters': {'resistance': '4.7 кОм', 'tolerance': '1%', 'power': '0.1 Вт', 'temp_coef': '100 ppm/°C', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'Vishay WSL2512R0100FEA', 'category': cats['resistors'],
+                'part_number': 'WSL2512R0100FEA', 'manufacturer': 'vishay',
+                'description': 'Токовый шунт 0.01 Ом в корпусе 2512, 1 Вт, 1%. Подходит для измерения тока в силовых цепях.',
+                'price': 115.00, 'stock': 420, 'lifecycle_status': 'active',
+                'package_type': 'SMD 2512',
+                'datasheet_url': 'https://www.vishay.com/doc?30100',
+                'parameters': {'resistance': '0.01 Ом', 'tolerance': '1%', 'power': '1 Вт', 'type': 'Шунт', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'Murata GRM21BR61E226ME44L', 'category': cats['capacitors'],
+                'part_number': 'GRM21BR61E226ME44L', 'manufacturer': 'murata',
+                'description': 'MLCC SMD 0805, 22 мкФ, 25 В, X5R, ±20%. Блокировка питания и локальные буферы DC-DC.',
+                'price': 38.00, 'stock': 1800, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0805',
+                'datasheet_url': 'https://www.murata.com/en-us/products/productdetail?partno=GRM21BR61E226ME44L',
+                'parameters': {'capacitance': '22 мкФ', 'voltage': '25 В', 'dielectric': 'X5R', 'tolerance': '±20%', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'KEMET R82EC3100Z350J', 'category': cats['capacitors'],
+                'part_number': 'R82EC3100Z350J', 'manufacturer': 'kemet',
+                'description': 'Плёночный конденсатор 100 нФ, 63 В, ±5%, радиальные выводы. Стабильный вариант для аналоговых цепей.',
+                'price': 46.00, 'stock': 730, 'lifecycle_status': 'active',
+                'package_type': 'THT radial',
+                'datasheet_url': 'https://www.kemet.com/en/us/capacitors/film/r82-metallized-polyester-film-capacitors.html',
+                'parameters': {'capacitance': '100 нФ', 'voltage': '63 В', 'type': 'Плёночный', 'tolerance': '±5%', 'mounting': 'THT'},
+            },
+            {
+                'name': 'onsemi BSS138LT1G', 'category': cats['transistors'],
+                'part_number': 'BSS138LT1G', 'manufacturer': 'onsemi',
+                'description': 'N-канальный MOSFET малой мощности в SOT-23, 50 В, 200 мА. Часто применяется в согласовании логических уровней.',
+                'price': 18.00, 'stock': 3500, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOT-23',
+                'datasheet_url': 'https://www.onsemi.com/pdf/datasheet/bss138lt1-d.pdf',
+                'parameters': {'type': 'N-MOSFET', 'vds': '50 В', 'id': '200 мА', 'rds_on': '3.5 Ом', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'Infineon IRLML2502TRPBF', 'category': cats['transistors'],
+                'part_number': 'IRLML2502TRPBF', 'manufacturer': 'infineon',
+                'description': 'Логик-уровневый N-MOSFET SOT-23, 20 В, до 4.2 А. Удобен для ключей малой нагрузки от GPIO.',
+                'price': 42.00, 'stock': 1200, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOT-23',
+                'datasheet_url': 'https://www.infineon.com/dgdl/irlml2502pbf.pdf?fileId=5546d462533600a401535668ec91261c',
+                'parameters': {'type': 'Logic N-MOSFET', 'vds': '20 В', 'id': '4.2 А', 'rds_on': '45 мОм', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'Texas Instruments TL072CDR', 'category': cats['ics'],
+                'part_number': 'TL072CDR', 'manufacturer': 'ti',
+                'description': 'Двухканальный JFET-входной операционный усилитель SOIC-8. Подходит для аудио и аналоговых фильтров.',
+                'price': 96.00, 'stock': 520, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOIC-8',
+                'datasheet_url': 'https://www.ti.com/lit/ds/symlink/tl072.pdf',
+                'parameters': {'type': 'ОУ x2', 'supply_voltage': '±3.5...±18 В', 'gbw': '3 МГц', 'slew_rate': '13 В/мкс', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'ST L7805CV', 'category': cats['ics'],
+                'part_number': 'L7805CV', 'manufacturer': 'st',
+                'description': 'Линейный стабилизатор 5 В в корпусе TO-220, выходной ток до 1.5 А при достаточном теплоотводе.',
+                'price': 62.00, 'stock': 900, 'lifecycle_status': 'nrnd',
+                'package_type': 'THT TO-220',
+                'datasheet_url': 'https://www.st.com/resource/en/datasheet/l78.pdf',
+                'parameters': {'type': 'LDO/linear', 'voltage': '5 В', 'current': '1.5 А', 'dropout': '2 В', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Microchip MCP6002-I/SN', 'category': cats['ics'],
+                'part_number': 'MCP6002-I/SN', 'manufacturer': 'other',
+                'description': 'Двухканальный rail-to-rail операционный усилитель SOIC-8, питание 1.8-6 В. Хороший выбор для датчиков.',
+                'price': 74.00, 'stock': 760, 'lifecycle_status': 'active',
+                'package_type': 'SMD SOIC-8',
+                'datasheet_url': 'https://ww1.microchip.com/downloads/en/DeviceDoc/21733j.pdf',
+                'parameters': {'type': 'ОУ x2', 'supply_voltage': '1.8...6 В', 'gbw': '1 МГц', 'package': 'SOIC-8', 'mounting': 'SMD', 'spice_model': 'Да'},
+            },
+            {
+                'name': 'Kingbright L-53HD', 'category': cats['diodes'],
+                'part_number': 'L-53HD', 'manufacturer': 'other',
+                'description': 'Красный светодиод 5 мм, THT, 625 нм. Индикаторы питания, статуса и учебные макеты.',
+                'price': 9.00, 'stock': 4200, 'lifecycle_status': 'active',
+                'package_type': 'THT 5 мм',
+                'datasheet_url': 'https://www.kingbrightusa.com/images/catalog/SPEC/L-53HD.pdf',
+                'parameters': {'type': 'LED', 'vf': '2.0 В', 'if': '20 мА', 'wavelength': '625 нм', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Vishay SMBJ5.0A-E3/52', 'category': cats['diodes'],
+                'part_number': 'SMBJ5.0A-E3/52', 'manufacturer': 'vishay',
+                'description': 'TVS-диод 5 В, однонаправленный, корпус SMB. Защита линий питания и интерфейсов от импульсных перенапряжений.',
+                'price': 31.00, 'stock': 1700, 'lifecycle_status': 'active',
+                'package_type': 'SMD DO-214AA (SMB)',
+                'datasheet_url': 'https://www.vishay.com/doc?88392',
+                'parameters': {'type': 'TVS', 'vrrm': '5 В', 'power': '600 Вт', 'vf': '9.2 В clamp', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'TDK MLZ2012M4R7WT000', 'category': cats['inductors'],
+                'part_number': 'MLZ2012M4R7WT000', 'manufacturer': 'tdk',
+                'description': 'Ферритовая индуктивность SMD 0805, 4.7 мкГн, 500 мА. Фильтрация питания цифровых узлов.',
+                'price': 24.00, 'stock': 2300, 'lifecycle_status': 'active',
+                'package_type': 'SMD 0805',
+                'datasheet_url': 'https://product.tdk.com/en/search/inductor/inductor/smd/info?part_no=MLZ2012M4R7WT000',
+                'parameters': {'inductance': '4.7 мкГн', 'current': '500 мА', 'dcr': '0.45 Ом', 'type': 'Ferrite', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Würth 74437324047', 'category': cats['inductors'],
+                'part_number': '74437324047', 'manufacturer': 'wurth',
+                'description': 'Экранированный силовой дроссель 4.7 мкГн, ток насыщения до 4.3 А. Для компактных DC-DC преобразователей.',
+                'price': 118.00, 'stock': 360, 'lifecycle_status': 'active',
+                'package_type': 'SMD 4020',
+                'datasheet_url': 'https://www.we-online.com/catalog/datasheet/74437324047.pdf',
+                'parameters': {'inductance': '4.7 мкГн', 'current': '4.3 А', 'dcr': '55 мОм', 'type': 'Power', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Würth 632723300011 USB-C', 'category': cats['connectors'],
+                'part_number': '632723300011', 'manufacturer': 'wurth',
+                'description': 'Разъём USB Type-C receptacle, 24 контакта, горизонтальный SMD. Для плат питания и интерфейсных модулей.',
+                'price': 165.00, 'stock': 540, 'lifecycle_status': 'active',
+                'package_type': 'SMD USB-C',
+                'datasheet_url': 'https://www.we-online.com/catalog/datasheet/632723300011.pdf',
+                'parameters': {'pins': '24', 'type': 'USB-C receptacle', 'current': '5 А', 'mounting': 'SMD'},
+            },
+            {
+                'name': 'Phoenix Contact 1725656 MKDS 1/2-3.5', 'category': cats['connectors'],
+                'part_number': '1725656', 'manufacturer': 'other',
+                'description': 'Клеммник на плату 2 контакта, шаг 3.5 мм, винтовой зажим. Удобен для питания и внешней проводки.',
+                'price': 58.00, 'stock': 1100, 'lifecycle_status': 'active',
+                'package_type': 'THT terminal block',
+                'datasheet_url': 'https://www.phoenixcontact.com/en-pc/products/pcb-terminal-block-mkds-1-2-35-1725656',
+                'parameters': {'pins': '2', 'pitch': '3.5 мм', 'type': 'Screw terminal', 'current': '10 А', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Panasonic TX2-5V', 'category': cats['relays'],
+                'part_number': 'TX2-5V', 'manufacturer': 'panasonic',
+                'description': 'Сигнальное реле DPDT, катушка 5 В DC, контакты 2 А. Компактный корпус для телеком- и измерительных плат.',
+                'price': 265.00, 'stock': 140, 'lifecycle_status': 'active',
+                'package_type': 'THT DIP',
+                'datasheet_url': 'https://api.pim.na.industrial.panasonic.com/file_stream/main/fileversion/244',
+                'parameters': {'type': 'DPDT', 'coil_voltage': '5 В DC', 'contact_rating': '2 А / 30 В DC', 'mounting': 'THT'},
+            },
+            {
+                'name': 'Omron G6K-2F-Y-DC5', 'category': cats['relays'],
+                'part_number': 'G6K-2F-Y-DC5', 'manufacturer': 'other',
+                'description': 'Миниатюрное сигнальное реле DPDT, катушка 5 В DC, SMD-монтаж. Для плотных коммутационных модулей.',
+                'price': 310.00, 'stock': 95, 'lifecycle_status': 'active',
+                'package_type': 'SMD relay',
+                'datasheet_url': 'https://omronfs.omron.com/en_US/ecb/products/pdf/en-g6k.pdf',
+                'parameters': {'type': 'DPDT', 'coil_voltage': '5 В DC', 'contact_rating': '1 А / 30 В DC', 'mounting': 'SMD'},
+            },
+        ]
+
+        created = 0
+        for data in products:
+            _, is_new = Product.objects.get_or_create(
+                part_number=data['part_number'],
+                defaults=data,
+            )
+            if is_new:
+                created += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f'Done: {created} new REB products added ({len(products) - created} already existed)'
+        ))

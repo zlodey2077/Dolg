@@ -1,0 +1,33 @@
+[run]
+source = .
+omit =
+    manage.py
+    check_waypoint_drag.py
+    test_waypoint_drag*
+    */tests_browser.py
+    Dolg_PR/asgi.py
+    Dolg_PR/wsgi.py
+    */management/commands/*
+    */migrations/*
+    */__pycache__/*
+    .venv/*
+    scripts/generate_dolg_report.py
+
+[report]
+show_missing = True
+skip_covered = True
+omit =
+    manage.py
+    check_waypoint_drag.py
+    test_waypoint_drag*
+    */tests_browser.py
+    Dolg_PR/asgi.py
+    Dolg_PR/wsgi.py
+    */management/commands/*
+    */migrations/*
+    */__pycache__/*
+    .venv/*
+    scripts/generate_dolg_report.py
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

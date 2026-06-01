@@ -1,0 +1,28 @@
+{% comment %}
+    Правый сайдбар с официальными объявлениями.
+    Подключается через {% include "chat/_announcements_sidebar.html" %}.
+    Принимает context-переменную: announcements (QuerySet[Announcement]).
+{% endcomment %}
+<aside class="chat-sidebar" aria-label="Информационный канал">
+    <h3 class="chat-sidebar-title">📢 Информационный канал</h3>
+    {% if announcements %}
+        <ul class="announcement-list">
+            {% for a in announcements %}
+            <li class="announcement announcement--{{ a.level }} {% if a.is_pinned %}announcement--pinned{% endif %}">
+                <div class="announcement-head">
+                    <span class="announcement-level">{{ a.get_level_display }}</span>
+                    <span class="announcement-date">{{ a.created_at|date:"d.m H:i" }}</span>
+                </div>
+                <strong class="announcement-title">{{ a.title }}</strong>
+                <div class="announcement-body">{{ a.body|linebreaksbr }}</div>
+                {% if a.is_pinned %}<span class="announcement-pinned-mark">📌 закреплено</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="announcement-empty">Объявлений пока нет. Здесь будут публиковаться релизы и важные новости проекта.</p>
+    {% endif %}
+    <div class="chat-sidebar-hint">
+        Объявления публикуются только администраторами. Для обсуждения вопросов используйте основной чат.
+    </div>
+</aside>

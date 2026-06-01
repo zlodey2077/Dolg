@@ -1,0 +1,94 @@
+[tool.ruff]
+# Минимальный конфиг — гоняем ruff на проекте, чтобы ловить простые баги
+# (unused imports, ловушки f-string, лишние pass). Реальный type-check
+# планируется через mypy отдельно (Phase D).
+line-length = 110
+target-version = "py314"
+
+# Исключаем то, что не наше: миграции авто-генерируются, venv/staticfiles
+# вообще не код. tests/ оставляем — нам нужны они чистыми.
+extend-exclude = [
+    "*/migrations/*",
+    ".venv",
+    "staticfiles",
+    "scripts/__pycache__",
+    "node_modules",
+    "frontend/node_modules",
+    "build",
+    "dist",
+    ".pytest_cache",
+]
+
+[tool.ruff.lint]
+# E/W — pycodestyle, F — pyflakes (unused/undefined), I — isort,
+# B — bugbear (mutable-defaults, ловушки), UP — pyupgrade,
+# DJ — Django-specific, RUF — ruff-own checks.
+select = ["E", "W", "F", "I", "B", "UP", "DJ", "RUF"]
+ignore = [
+    "E501",   # long lines — иногда оправдано (URL, regex)
+    "B008",   # function calls in defaults — Django uses `default=timezone.now`
+    "UP006",  # `Dict` → `dict` — много кода ещё с typing.Dict
+    "UP035",  # deprecated import alias — пока трогать не надо
+    "DJ001",  # CharField(null=True) — много legacy
+    "DJ008",  # Model __str__ — есть, просто не везде явно
+    "DJ012",  # unordered-body-content-in-model — cosmetic ordering Meta/fields
+    "RUF012", # mutable class attrs annotated — Django models
+    # Кириллица в коде/комментариях — основная масса (642 ошибки):
+    "RUF001", # ambiguous-unicode-character-string  (с, а, о vs c, a, o)
+    "RUF002", # ambiguous-unicode-character-docstring
+    "RUF003", # ambiguous-unicode-character-comment
+    "RUF005", # collection-literal-concatenation — list + list читается лучше unpack
+    "RUF046", # unnecessary-cast-to-int — explicit > implicit (round() возвращает float в py)
+    "RUF059", # unused unpacked variable — `_, count = ...` иногда осмысленно (контекст)
+    # Стилевые предупреждения, не баги:
+    "E402",   # module-import-not-at-top-of-file — lazy imports внутри функций
+    "E702",   # multiple-statements-on-one-line-semicolon — намеренно компактные init/save
+    "E731",   # lambda-assignment — FONT_TITLE = lambda: ... в product_images.py намеренно
+    "UP028",  # yield-in-for-loop — generator expressions не всегда подходят
+    "UP031",  # printf-string-formatting — `%s` форматирование OK в logging/legacy
+    "B007",   # unused-loop-control-variable — `for proc, name in ...` для cleanup
+    "B017",   # assert-raises-exception — широкий assertRaises в тестах
+    "B028",   # no-explicit-stacklevel в warnings.warn — diploma-уровень не критично
+    "B905",   # zip без strict= — потеря данных не критична в текущих usecase
+]
+
+[tool.ruff.lint.per-file-ignores]
+"Dolg_PR/settings*.py" = ["F405", "F403"]  # star-imports намеренно
+"tests.py" = ["S101"]                       # assert OK в тестах
+"scripts/*.py" = ["E741"]                    # one-shot скрипты диплома, краткие имена ok
+
+[tool.ruff.lint.isort]
+known-first-party = ["Dolg_APP", "shop", "accounts", "orders", "knowledge"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+# ════════════════════════════════════════════════════════════════════
+# pytest-django + pytest-cov
+#
+# Запуск:
+#   pytest                       # все тесты, без coverage
+#   pytest --cov                 # с coverage (использует .coveragerc)
+#   pytest -k chat               # фильтр по подстроке имени
+#   pytest --reuse-db            # не пере-создаём test DB (быстро при rerun)
+# ════════════════════════════════════════════════════════════════════
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "Dolg_PR.settings"
+python_files = ["test_*.py", "tests.py", "tests_*.py"]
+python_classes = ["Test*", "*Tests"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",                            # show short summary of all non-pass results
+    "--strict-markers",
+    "--tb=short",
+    "-p", "no:cacheprovider",         # отключаем .pytest_cache (не нужен)
+]
+markers = [
+    "slow: tests that take > 5 seconds",
+    "integration: end-to-end integration tests requiring full stack",
+]
+# FAST_TESTS=1 — env-флаг в settings.py, пропускает миграции (быстрее в 5x).
+filterwarnings = [
+    "ignore::DeprecationWarning:django.*",
+]

@@ -1,0 +1,2414 @@
+import json
+import logging
+import shutil
+import subprocess
+import tempfile
+import time
+from io import BytesIO
+from pathlib import Path
+
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.db.models import Max, Q
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.cache import never_cache
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+from shop.models import Product
+
+from .models import ProjectEvent, ProjectMeasurement, ProjectReview, ProjectVersion, SchematicProject, SimulationRun
+from .quotas import (
+    check_active_share_links,
+    enforce_daily_quota,
+    enforce_project_limit,
+    get_limit,
+    usage_summary,
+)
+from .schematic_validation import COMPONENT_TO_CATEGORY, validate_scheme_data
+from .services.cad_import import import_preview
+from .services.entitlements import (
+    feature_denied_response,
+    feature_summary,
+    get_effective_plan,
+    has_feature,
+)
+from .services.learning_by_review import learning_suggestions_from_review
+from .services.project_review import build_design_review, compare_measurement
+from .services.review_i18n import build_measurement_rows, build_metric_rows, localize_review_report, status_label_ru
+from .services.rule_ai import build_ai_scheme_context, build_rule_based_reply
+from .simulation_quota import quota_dict
+
+
+logger = logging.getLogger(__name__)
+
+
+def _simulation_analysis():
+    """Import numerical Pro helpers only when a simulation endpoint needs them."""
+    from .services import simulation_analysis
+
+    return simulation_analysis
+
+# ---------------------------------------------------------------------------
+# Page views
+# ---------------------------------------------------------------------------
+
+@never_cache
+@ensure_csrf_cookie
+def simulation(request):
+    # 2026-06-01 v13: @never_cache гарантирует что HTML страница не кэшируется.
+    # Каждый F5 пользователь получает свежий HTML с актуальным ?v=cache-bump'ом,
+    # подтягивая обновлённые JS/CSS. Без этого "подтяжки" не работают.
+    context = {
+        'user': request.user,
+        'is_guest_demo': not request.user.is_authenticated,
+        'entitlements': feature_summary(request.user),
+        'page_title': 'Симуляция электроники',
+        'page_description': 'Инструмент для симуляции поведения электронных компонентов'
+    }
+    return render(request, 'tools/simulation.html', context)
+
+
+def ar_viewer(request):
+    """AR-предпросмотр 3D-модели платы через Google <model-viewer>.
+
+    Source 3D-модели передаётся через query-параметр `model` (обычно blob-URL
+    из текущей вкладки симулятора — см. exportGlb/downloadGlb в scheme-3d.js).
+    Страница рендерится в новом окне, генерирует QR-код для AR-просмотра на
+    телефоне (Android SceneViewer / iOS QuickLook через model-viewer's встроенную
+    AR-кнопку) и работает без login: модель остаётся на стороне клиента.
+    """
+    return render(request, 'tools/ar_viewer.html', {
+        'model_url': request.GET.get('model', ''),
+        'title': request.GET.get('title', 'DOLG 3D-модель'),
+    })
+
+
+@ensure_csrf_cookie
+def cad(request):
+    """CAD-редактор. Открыт для guest в read-only режиме: можно
+    смотреть, изменять локально, экспортировать — но save/load/projects
+    отключены через is_guest флаг в шаблоне."""
+    reb_products = (
+        Product.objects
+        .select_related('category')
+        .filter(category__slug__in=[
+            'resistors', 'capacitors', 'transistors', 'ics',
+            'diodes', 'inductors', 'connectors', 'relays',
+        ])
+        .order_by('category__slug', 'price', 'name')[:48]
+    )
+    catalog = []
+    for product in reb_products:
+        catalog.append({
+            'id': product.id,
+            'slug': product.slug,
+            'name': product.name,
+            'part_number': product.part_number,
+            'category': product.category.name,
+            'category_slug': product.category.slug,
+            'manufacturer': product.get_manufacturer_display(),
+            'package_type': product.package_type,
+            'price': float(product.price),
+            'stock': product.stock,
+            'lifecycle_status': product.lifecycle_status,
+            'lifecycle_display': product.get_lifecycle_status_display(),
+            'datasheet_url': product.datasheet_url,
+            'parameters': product.parameters or {},
+            'url': f'/product/{product.slug}/',
+            'image_url': product.image.url if product.image else '',
+        })
+
+    knowledge = []
+    try:
+        from knowledge.models import Article
+        for article in (
+            Article.objects
+            .select_related('category')
+            .filter(is_published=True)
+            .order_by('category__order', 'order', 'title')[:36]
+        ):
+            knowledge.append({
+                'title': article.title,
+                'summary': article.summary,
+                'category': article.category.name,
+                'topic': article.category.topic,
+                'slug': article.slug,
+                'url': f'/knowledge/article/{article.slug}/',
+                'related': article.related_components_note,
+            })
+    except Exception:
+        knowledge = []
+
+    context = {
+        'user': request.user,
+        'page_title': '2D САПР',
+        'page_description': 'Двумерный инструмент автоматизированного проектирования (САПР)',
+        # Guest-флаг: шаблон отключает кнопки save/load/projects + показывает
+        # CTA-баннер «Войдите чтобы сохранить». Изменения локальные не
+        # блокируются — пользователь может рисовать, экспорт работает.
+        'is_guest': not request.user.is_authenticated,
+    }
+    context['cad_catalog'] = catalog
+    context['cad_knowledge'] = knowledge
+    return render(request, 'tools/cad.html', context)
+
+
+@ensure_csrf_cookie
+@login_required(login_url='accounts:login')
+def projects(request):
+    context = {
+        'user': request.user,
+        'page_title': 'Мои проекты',
+        'page_description': 'Управление вашими электронными проектами'
+    }
+    return render(request, 'tools/projects.html', context)
+
+
+def terms(request):
+    return render(request, 'tools/terms.html')
+
+
+def privacy(request):
+    return render(request, 'tools/privacy.html')
+
+
+def cookies(request):
+    """Cookie-policy — раскрывает категории cookies (necessary/analytics/marketing),
+    цели сбора, сроки хранения, как изменить consent. Обязательна по GDPR/152-ФЗ
+    при использовании cookie-banner с granular consent."""
+    return render(request, 'tools/cookies.html')
+
+
+def billing_plans(request):
+    """Страница «Тарифы» — сравнение Free vs Pro + кнопки активации.
+    Доступна всем (чтобы guest видел ценность регистрации + Pro).
+    """
+    from . import billing as billing_mod
+    from .quotas import FREE_TIER, PRO_TIER
+
+    user_sub = None
+    if request.user.is_authenticated:
+        user_sub = billing_mod.get_or_create_subscription(request.user)
+
+    context = {
+        'free_tier': FREE_TIER,
+        'pro_tier': PRO_TIER,
+        'subscription': user_sub,
+        'trial_days': billing_mod.TRIAL_DAYS,
+        'is_pro_active': user_sub.is_pro_active() if user_sub else False,
+        'entitlements': feature_summary(request.user),
+    }
+    return render(request, 'billing/plans.html', context)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def billing_activate_trial(request):
+    """Активация 14-дневного Pro-trial. Один раз на аккаунт."""
+    from django.contrib import messages
+
+    from . import billing as billing_mod
+    success, msg = billing_mod.activate_trial(request.user)
+    (messages.success if success else messages.warning)(request, msg)
+    return redirect('hello:billing_plans')
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def billing_activate_pro(request):
+    """Покупка Pro: если Stripe live → redirect на Stripe Checkout,
+    иначе fallback на mock-activate (как было)."""
+    from django.contrib import messages
+
+    from . import billing as billing_mod
+    from . import stripe_billing
+
+    try:
+        months = max(1, min(12, int(request.POST.get('months', 1))))
+    except (TypeError, ValueError):
+        months = 1
+
+    if stripe_billing.is_stripe_live():
+        ok, url_or_msg, _session_id = stripe_billing.create_checkout_session(request.user, request)
+        if ok:
+            return redirect(url_or_msg)
+        # Stripe API дёрнулся → возвращаем pretty error
+        messages.error(request, f'Не удалось создать оплату Stripe: {url_or_msg}')
+        return redirect('hello:billing_plans')
+
+    # Demo-mode: моментальная активация без реального платежа
+    success, msg = billing_mod.activate_pro(request.user, months=months, provider='manual')
+    (messages.success if success else messages.warning)(request, msg)
+    return redirect('hello:billing_plans')
+
+
+@login_required(login_url='accounts:login')
+def billing_checkout_success(request):
+    """Stripe вернул юзера сюда после успешной оплаты.
+
+    Note: на этот момент webhook checkout.session.completed МОЖЕТ ещё не успеть
+    долететь (latency). Поэтому если is_pro_active() == False — показываем
+    «Платёж принят, активация через минуту» и юзер обновит страницу.
+    """
+    from django.contrib import messages
+
+    from . import billing as billing_mod
+    sub = billing_mod.get_or_create_subscription(request.user)
+
+    session_id = request.GET.get('session_id', '')
+    if sub.is_pro_active():
+        messages.success(request, f'🎉 Pro-подписка активирована! Действует до {sub.period_end.date()}.')
+    elif session_id:
+        messages.info(request, '✓ Платёж принят. Активация обычно занимает несколько секунд — обновите страницу через минуту.')
+    else:
+        messages.warning(request, 'Нет данных о checkout-сессии. Если оплата прошла — обновите страницу.')
+    return redirect('hello:billing_plans')
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def billing_cancel(request):
+    """Отменить auto-renew. Если есть stripe_subscription_id — через Stripe API,
+    иначе локальный mock-cancel."""
+    from django.contrib import messages
+
+    from . import billing as billing_mod
+    from . import stripe_billing
+
+    sub = billing_mod.get_or_create_subscription(request.user)
+    if sub.stripe_subscription_id and stripe_billing.is_stripe_live():
+        success, msg = stripe_billing.cancel_at_period_end(sub)
+    else:
+        success, msg = billing_mod.cancel(request.user)
+    (messages.success if success else messages.warning)(request, msg)
+    return redirect('hello:billing_plans')
+
+
+@csrf_exempt
+@require_POST
+def billing_stripe_webhook(request):
+    """Stripe POSTs subscription events here.
+
+    Эндпойнт обрабатывает события Pro-подписки. Для одноразовых Order
+    платежей есть отдельный orders.payment_views.stripe_webhook.
+    Stripe-URL в Dashboard:
+      https://<domain>/billing/stripe-webhook/
+      Events: checkout.session.completed, customer.subscription.updated,
+              customer.subscription.deleted, invoice.payment_failed
+    """
+    from . import stripe_billing
+    if not stripe_billing.is_stripe_live():
+        # В demo-mode принимаем всё как 200, чтобы локальное тестирование не падало.
+        return JsonResponse({'status': 'demo_mode'}, status=200)
+
+    import stripe
+    payload = request.body
+    sig = request.META.get('HTTP_STRIPE_SIGNATURE', '')
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig, settings.STRIPE_WEBHOOK_SECRET,
+        )
+    except ValueError:
+        return JsonResponse({'error': 'invalid_payload'}, status=400)
+    except stripe.error.SignatureVerificationError:
+        return JsonResponse({'error': 'invalid_signature'}, status=400)
+
+    et = event.get('type', '')
+    data = (event.get('data') or {}).get('object') or {}
+
+    handlers = {
+        'checkout.session.completed': stripe_billing.handle_checkout_completed,
+        'customer.subscription.updated': stripe_billing.handle_subscription_updated,
+        'customer.subscription.deleted': stripe_billing.handle_subscription_deleted,
+        'invoice.payment_failed': stripe_billing.handle_invoice_payment_failed,
+    }
+    handler = handlers.get(et)
+    if handler is None:
+        # Неизвестное событие — отвечаем 200 чтобы Stripe не retry'ил бесконечно
+        return JsonResponse({'status': 'ignored', 'type': et}, status=200)
+
+    ok = handler(data)
+    return JsonResponse({'status': 'ok' if ok else 'handled', 'type': et}, status=200)
+
+
+# ============================================================
+# AI Pipeline endpoints
+# ============================================================
+# 4 endpoint'а соответствуют 4 методам DolgAIPipeline.
+# Free доступ:  find_analogs, detect_anomalies (2 базовых)
+# Pro доступ:   + explain_scheme, recommend_next_component (4 всего)
+# Все endpoint'ы — POST с JSON-body.
+# Декоратор @enforce_daily_quota('ai_requests') считает в общую AI-квоту.
+
+AI_ACTION_FEATURES = {
+    'find_analogs': 'ai_find_analogs',
+    'detect_anomalies': 'ai_detect_anomalies',
+    'explain_scheme': 'ai_explain_scheme',
+    'recommend_next_component': 'ai_recommend_next',
+}
+
+
+def _ai_check_access(user, action: str) -> tuple[bool, str]:
+    """Backwards-compatible bool helper for tests and older callers."""
+    feature = AI_ACTION_FEATURES.get(action)
+    if not feature:
+        return True, ''
+    if has_feature(user, feature):
+        return True, ''
+    return False, f'Действие «{action}» требует тариф Pro или Enterprise.'
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('ai_requests')
+def api_ai_find_analogs(request):
+    """POST {product_id: int, top_k: int, query?: str} → list[{product, score, why}]
+
+    Phase 2 (2026-05-19): если fastembed+faiss установлены и индекс построен,
+    используем семантический поиск (ml.semantic_search). Иначе — rule-based
+    fallback через pipeline.find_analogs.
+
+    query опционален: если задан, используется как поисковая строка вместо
+    `Product.name + part_number` (по умолчанию).
+    """
+    from shop.models import Product
+
+    from .ml import pipeline
+    from .ml.semantic_search import is_semantic_available, semantic_top_k
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+    pid = data.get('product_id')
+    query = (data.get('query') or '').strip()
+    if not pid and not query:
+        return _json_error('product_id or query is required')
+    top_k = max(1, min(20, int(data.get('top_k', 5))))
+
+    source_product = None
+    if pid:
+        try:
+            source_product = Product.objects.get(pk=pid)
+        except Product.DoesNotExist:
+            return _json_error('Product not found', status=404)
+
+    # Phase 2: семантика, если доступно
+    backend = 'rule-based'
+    if is_semantic_available():
+        if not query and source_product:
+            query = f'{source_product.name} {source_product.part_number or ""}'.strip()
+        if query:
+            sem_results = semantic_top_k(query, k=top_k + 1)
+            # Исключаем сам product из аналогов, если pid задан
+            if pid:
+                sem_results = [(p, s) for p, s in sem_results if p != pid]
+            sem_results = sem_results[:top_k]
+            if sem_results:
+                backend = 'semantic'
+                products_map = {
+                    p.id: p for p in Product.objects.filter(
+                        id__in=[r[0] for r in sem_results]
+                    )
+                }
+                results = []
+                for p_id, score in sem_results:
+                    p = products_map.get(p_id)
+                    if p:
+                        results.append({
+                            'product': p,
+                            'score': round(score, 4),
+                            'why': f'Semantic similarity {score:.3f}',
+                        })
+                return _serialize_analogs(results, backend=backend)
+
+    # Fallback: rule-based feature-vectors
+    if source_product is None:
+        return _json_error('Semantic поиск недоступен (нет индекса), нужен product_id для rule-based fallback')
+    results = pipeline.find_analogs(source_product, top_k=top_k)
+    return _serialize_analogs(results, backend=backend)
+
+
+def _serialize_analogs(results, *, backend: str):
+    return JsonResponse({
+        'ok': True,
+        'action': 'find_analogs',
+        'backend': backend,
+        'results': [
+            {
+                'product_id': r['product'].id,
+                'slug': r['product'].slug,
+                'name': r['product'].name,
+                'part_number': r['product'].part_number,
+                'price': float(r['product'].price),
+                'url': f'/product/{r["product"].slug}/',
+                'score': r['score'],
+                'why': r['why'],
+            }
+            for r in results
+        ],
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('ai_requests')
+def api_ai_detect_anomalies(request):
+    """POST {scheme_data: {...}} → list[anomaly]"""
+    from .ml import pipeline
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+    scheme_data = data.get('scheme_data') or {}
+    anomalies = pipeline.detect_anomalies(scheme_data)
+    return JsonResponse({
+        'ok': True,
+        'action': 'detect_anomalies',
+        'anomalies': anomalies,
+        'total': len(anomalies),
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('ai_requests')
+def api_ai_explain_scheme(request):
+    """POST {scheme_data: {...}} → {title, summary, topology, ...}
+    Pro-only."""
+    denied = feature_denied_response(request.user, 'ai_explain_scheme')
+    if denied:
+        return denied
+    from .ml import pipeline
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+    scheme_data = data.get('scheme_data') or {}
+    result = pipeline.explain_scheme(scheme_data)
+    return JsonResponse({'ok': True, 'action': 'explain_scheme', **result})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('ai_requests')
+def api_ai_recommend_next(request):
+    """POST {scheme_data: {...}} → list[recommendation]
+    Pro-only."""
+    denied = feature_denied_response(request.user, 'ai_recommend_next')
+    if denied:
+        return denied
+    from .ml import pipeline
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+    scheme_data = data.get('scheme_data') or {}
+    recs = pipeline.recommend_next_component(scheme_data)
+    return JsonResponse({
+        'ok': True, 'action': 'recommend_next_component',
+        'recommendations': recs,
+    })
+
+
+def api_ai_pipeline_info(request):
+    """GET → {backend, model_version, capabilities}. Без auth, открыт всем
+    (метаданные о pipeline, без секретов)."""
+    from .ml import pipeline
+    return JsonResponse({'ok': True, **pipeline.info()})
+
+
+# ============================================================
+# Comments API
+# ============================================================
+# 3 endpoint'а: list / create / delete.
+# Free может оставлять plain-text до 500 симв.
+# Pro может оставлять Markdown до 5000 симв с code-highlight.
+# is_rich определяется автоматически по tier юзера на момент создания.
+
+FREE_COMMENT_MAX_LEN = 500
+PRO_COMMENT_MAX_LEN = 5000
+
+
+def _comment_to_dict(c, request_user=None):
+    from moderation.services import display_body, is_content_visible_to
+    body = display_body(c, request_user)
+    is_visible = is_content_visible_to(c, request_user)
+    return {
+        'id': c.id,
+        'user': {
+            'username': c.user.username,
+            'avatar_url': (c.user.profile.avatar.url
+                           if hasattr(c.user, 'profile') and c.user.profile.avatar
+                           else ''),
+            'is_pro': c.is_rich,   # rich-comment ≡ автор был Pro в момент написания
+        },
+        'body': body,
+        'body_html': c.render_html() if is_visible else body,
+        'is_rich': c.is_rich,
+        'moderation_status': c.moderation_status,
+        'created_at': c.created_at.isoformat(),
+        'edited_at': c.edited_at.isoformat() if c.edited_at else None,
+        'parent_id': c.parent_id,
+    }
+
+
+@require_GET
+def api_comments_list(request):
+    """GET ?project=N или ?article=N → list[comment]"""
+    from .models import Comment
+    from moderation.services import visible_queryset
+    project_id = request.GET.get('project')
+    article_id = request.GET.get('article')
+    qs = Comment.objects.select_related('user', 'user__profile').order_by('created_at')
+    if project_id:
+        _project_for_read(request.user, project_id)
+        qs = qs.filter(project_id=project_id)
+    elif article_id:
+        qs = qs.filter(article_id=article_id)
+    else:
+        return _json_error('project or article query param required')
+    qs = visible_queryset(qs, request.user)
+    return JsonResponse({'ok': True, 'comments': [_comment_to_dict(c, request.user) for c in qs[:200]]})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_comments_create(request):
+    """POST {body, project|article, parent_id?} → comment"""
+    from .models import Comment
+    from .quotas import get_user_tier
+    from moderation.services import user_is_restricted
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    if user_is_restricted(request.user, 'write'):
+        return _json_error('Ваш аккаунт временно ограничен модератором.', status=403)
+
+    body = (data.get('body') or '').strip()
+    if not body:
+        return _json_error('body is required')
+
+    tier = get_user_tier(request.user)
+    is_pro = tier in ('pro', 'unlimited')
+    max_len = PRO_COMMENT_MAX_LEN if is_pro else FREE_COMMENT_MAX_LEN
+    if len(body) > max_len:
+        return JsonResponse({
+            'ok': False, 'error': 'too_long',
+            'message': f'Превышен лимит {max_len} символов для tier «{tier}». '
+                       f'У вас {len(body)}.',
+        }, status=400)
+
+    project_id = data.get('project')
+    article_id = data.get('article')
+    parent_id = data.get('parent_id')
+    if not project_id and not article_id:
+        return _json_error('project or article required')
+
+    kwargs = {
+        'user': request.user,
+        'body': body,
+        'is_rich': is_pro,
+        'parent_id': parent_id,
+    }
+    if project_id:
+        # Проверим, что проект существует и видим юзеру (свой / shared / public)
+        project = _project_for_read(request.user, project_id)
+        if project.organization_id and user_is_restricted(request.user, 'write', organization=project.organization):
+            return _json_error('Ваш аккаунт временно ограничен модератором в этой команде.', status=403)
+        kwargs['project'] = project
+    else:
+        from knowledge.models import Article
+        try:
+            Article.objects.get(pk=article_id)
+        except Article.DoesNotExist:
+            return _json_error('Article not found', status=404)
+        kwargs['article_id'] = article_id
+
+    comment = Comment.objects.create(**kwargs)
+    if project_id:
+        _log_project_event(comment.project, request.user, 'comment_added', {
+            'comment_id': comment.id,
+            'parent_id': comment.parent_id,
+            'is_rich': comment.is_rich,
+        })
+    return JsonResponse({'ok': True, 'comment': _comment_to_dict(comment, request.user)})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_comments_delete(request, pk):
+    """POST → soft-delete (физ.удаление) собственного комментария.
+    Только автор или staff."""
+    from .models import Comment
+    comment = get_object_or_404(Comment, pk=pk)
+    if comment.user_id != request.user.id and not request.user.is_staff:
+        return _json_error('forbidden', status=403)
+    if request.user.is_superuser and request.POST.get('purge') == '1':
+        comment.delete()
+        return JsonResponse({'ok': True, 'purged': True})
+    comment.moderation_status = 'removed'
+    comment.moderation_reason = 'Удалено пользователем' if comment.user_id == request.user.id else 'Удалено модератором'
+    comment.moderated_by = request.user
+    comment.moderated_at = timezone.now()
+    comment.save(update_fields=['moderation_status', 'moderation_reason', 'moderated_by', 'moderated_at'])
+    return JsonResponse({'ok': True})
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_usage_today(request):
+    """Возвращает live-сводку лимитов для текущего юзера. UI-баннеры
+    опрашивают этот endpoint раз в минуту, чтобы показывать актуальные
+    «15/20 today» без перезагрузки страницы."""
+    return JsonResponse({'ok': True, **usage_summary(request.user)})
+
+
+def learn(request):
+    """Старый URL оставлен как совместимый вход в новый практикум."""
+    return redirect('knowledge:learning_index')
+
+
+@login_required(login_url='accounts:login')
+def pcb_view(request, project_id):
+    """Просмотр PCB-разводки проекта. Авто-расстановка из scheme_data,
+    отрисовка в SVG (для печати/сохранения), кнопка скачать Gerber+drill."""
+    from . import pcb_layout
+    project = _project_for_read(request.user, project_id)
+    layout = pcb_layout.compute_pcb_layout(project.scheme_data)
+    context = {
+        'project': project,
+        'layout': layout,
+        'page_title': f'PCB: {project.name}',
+    }
+    return render(request, 'tools/pcb.html', context)
+
+
+@login_required(login_url='accounts:login')
+def pcb_gerber_download(request, project_id):
+    """Возвращает ZIP с двумя Gerber-файлами: top-copper (.GTL) + drill (.DRL).
+    Минимальный набор для PCB-производства; реальная плата требует ещё
+    silkscreen, mask, paste и через-platы — это вне MVP."""
+    import zipfile
+    from io import BytesIO
+
+    from . import pcb_layout
+    project = _project_for_read(request.user, project_id)
+    layout = pcb_layout.compute_pcb_layout(project.scheme_data)
+
+    # Pro-юзер: добавим его custom logo в ZIP + branded README.
+    pro_logo_path = None
+    is_pro_branding = False
+    try:
+        from .quotas import get_user_tier
+        if get_user_tier(request.user) in ('pro', 'unlimited'):
+            if hasattr(request.user, 'profile') and request.user.profile.pro_logo:
+                pro_logo_path = request.user.profile.pro_logo.path
+                is_pro_branding = True
+    except Exception:
+        pass
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f'{project.id}_top_copper.GTL', pcb_layout.to_gerber_top_copper(layout))
+        zf.writestr(f'{project.id}_drill.DRL', pcb_layout.to_gerber_drill(layout))
+
+        # README: branded для Pro, generic для Free
+        if is_pro_branding:
+            readme = (
+                f'PCB Export — {request.user.username}\n'
+                f'Project: {project.name}\n\n'
+                f'Файлы:\n'
+                f'  - {project.id}_top_copper.GTL — верхний слой меди (RS-274X)\n'
+                f'  - {project.id}_drill.DRL — отверстия (Excellon NC drill)\n'
+                f'  - logo.{request.user.profile.pro_logo.name.rsplit(".", 1)[-1]} — ваш custom logo\n\n'
+                f'Перед отправкой на производство откройте в gerbview/KiCad и проведите DRC.\n'
+            )
+        else:
+            readme = (
+                'DOLG PCB export (MVP)\n\n'
+                'Файлы:\n'
+                f'  - {project.id}_top_copper.GTL — верхний слой меди (RS-274X)\n'
+                f'  - {project.id}_drill.DRL — отверстия (Excellon NC drill)\n\n'
+                'Это MVP-экспорт: нет silkscreen, mask, через-плат. Перед\n'
+                'отправкой на производство откройте в gerbview/KiCad/Altium\n'
+                'и проведите DRC.\n\n'
+                '💎 Pro-tier позволяет добавить ваш custom logo в ZIP — /billing/\n'
+            )
+        zf.writestr('README.txt', readme)
+
+        # Включаем logo-файл если Pro
+        if pro_logo_path:
+            try:
+                with open(pro_logo_path, 'rb') as f:
+                    ext = pro_logo_path.rsplit('.', 1)[-1]
+                    zf.writestr(f'logo.{ext}', f.read())
+            except Exception:
+                pass   # не валим экспорт если файл недоступен
+
+    response = HttpResponse(buf.getvalue(), content_type='application/zip')
+    response['Content-Disposition'] = f'attachment; filename="dolg_pcb_{project.id}.zip"'
+    return response
+
+
+@require_POST
+def api_pcb_autoroute(request, project_id):
+    """Block C1: A* autorouter поверх существующего pcb_layout.
+
+    POST → пересчитывает traces через A* (grid 0.5мм + штраф за поворот,
+    обход компонентов). Возвращает обновлённый layout + stats.
+    """
+    from . import pcb_layout
+    from .services.autorouter import autoroute_layout
+    project = _project_for_read(request.user, project_id)
+    base_layout = pcb_layout.compute_pcb_layout(project.scheme_data)
+    connections = (project.scheme_data or {}).get('connections', []) or []
+    new_layout = autoroute_layout(base_layout, connections)
+    return JsonResponse({
+        'ok': True,
+        'stats': new_layout.get('autoroute_stats', {}),
+        'traces': new_layout.get('traces', []),
+        'pcb_w_mm': new_layout.get('pcb_w_mm'),
+        'pcb_h_mm': new_layout.get('pcb_h_mm'),
+    })
+
+
+def shared_scheme(request, token):
+    """Read-only просмотр схемы по публичному токену /s/<token>/.
+
+    Не требует логина и квот. Открывается с любого устройства по ссылке.
+    Если токен неверен или владелец отключил шаринг — 404.
+    """
+    project = get_object_or_404(
+        SchematicProject.objects.select_related('user'),
+        share_token=token,
+    )
+    if not token or len(token) < 8:
+        # Защита от accidental пустого токена в URL.
+        from django.http import Http404
+        raise Http404('Invalid share token')
+    context = {
+        'user': request.user,
+        'is_guest_demo': not request.user.is_authenticated,
+        'is_shared_view': True,
+        'entitlements': feature_summary(request.user),
+        'shared_project': project,
+        'page_title': f'{project.name} — общий просмотр',
+        'page_description': f'Read-only схема пользователя {project.user.username}',
+    }
+    return render(request, 'tools/simulation.html', context)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_share_toggle(request, pk):
+    """Включает / выключает sharing проекта. Возвращает токен (или пустую
+    строку если выключен). Только владелец может управлять шарингом."""
+    import secrets
+    project = _project_for_write(request.user, pk)
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        data = {}
+    enable = bool(data.get('enable', True))
+    if enable and not project.share_token:
+        # Лимит активных share-link'ов tier'а (Free: 5)
+        allowed, reason = check_active_share_links(request.user)
+        if not allowed:
+            return JsonResponse({
+                'ok': False, 'error': 'quota_exceeded', 'message': reason,
+                'limit': get_limit(request.user, 'max_active_share_links'),
+            }, status=400)
+        # Генерация: 16 байт URL-safe = 22 символа base64 без padding.
+        project.share_token = secrets.token_urlsafe(16)
+    elif not enable:
+        project.share_token = ''
+    project.save(update_fields=['share_token', 'updated_at'])
+    return JsonResponse({
+        'ok': True,
+        'token': project.share_token,
+        'url': request.build_absolute_uri('/s/' + project.share_token + '/') if project.share_token else '',
+    })
+
+
+# ---------------------------------------------------------------------------
+# JSON API helpers
+# ---------------------------------------------------------------------------
+
+def _project_to_dict(p):
+    return {
+        'id': p.id,
+        'name': p.name,
+        'description': p.description,
+        'category': p.category,
+        'status': p.status,
+        'difficulty': p.difficulty,
+        'is_demo': p.is_demo,
+        'owner': p.user.username,
+        'created': p.created_at.isoformat(),
+        'modified': p.updated_at.isoformat(),
+        'has_scheme': bool(p.scheme_data),
+        'versions_count': p.versions.count() if p.pk else 0,
+        'runs_count': p.simulation_runs.count() if p.pk else 0,
+        'measurements_count': p.measurements.count() if p.pk else 0,
+        'reviews_count': p.reviews.count() if p.pk else 0,
+        'events_count': p.events.count() if p.pk else 0,
+        # Sharing — пустая строка если не share-нут. Для UI: рисуем бейдж 🔗
+        # и даём ссылку на /s/<token>/.
+        'is_shared': bool(p.share_token),
+        'share_token': p.share_token or '',
+        # Enterprise: team-context, visibility, approval-state
+        'organization': p.organization.slug if p.organization_id else None,
+        'organization_name': p.organization.name if p.organization_id else None,
+        'visibility': p.visibility,
+        'approval_state': p.approval_state,
+    }
+
+
+def _json_error(msg, status=400):
+    return JsonResponse({'ok': False, 'error': msg}, status=status)
+
+
+def _find_dwg_converter():
+    """Return (kind, executable) for optional DWG->DXF conversion.
+
+    DWG is a proprietary binary format, so DOLG delegates actual decoding to an
+    installed converter. ODA File Converter is the preferred path; LibreDWG's
+    dwg2dxf is also supported when present in PATH.
+    """
+    for name in ('ODAFileConverter', 'ODAFileConverter.exe', 'TeighaFileConverter', 'TeighaFileConverter.exe'):
+        exe = shutil.which(name)
+        if exe:
+            return 'oda', exe
+    for name in ('dwg2dxf', 'dwg2dxf.exe'):
+        exe = shutil.which(name)
+        if exe:
+            return 'libredwg', exe
+    return None, None
+
+
+def _convert_dwg_to_dxf_bytes(uploaded_file):
+    kind, exe = _find_dwg_converter()
+    if not exe:
+        raise RuntimeError(
+            'DWG — бинарный формат AutoCAD. Для автоматического импорта установите '
+            'ODA File Converter или LibreDWG/dwg2dxf на сервер, либо сохраните файл как DXF.'
+        )
+
+    with tempfile.TemporaryDirectory(prefix='dolg_dwg_') as tmp:
+        tmp_path = Path(tmp)
+        src = tmp_path / 'input.dwg'
+        with src.open('wb') as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
+
+        out_dir = tmp_path / 'out'
+        out_dir.mkdir(exist_ok=True)
+
+        if kind == 'oda':
+            cmd = [exe, str(tmp_path), str(out_dir), 'ACAD2018', 'DXF', '0', '1']
+        else:
+            dst = out_dir / 'input.dxf'
+            cmd = [exe, str(src), '-o', str(dst)]
+
+        proc = subprocess.run(cmd, cwd=str(tmp_path), capture_output=True, text=True, timeout=45)
+        if proc.returncode != 0:
+            details = (proc.stderr or proc.stdout or '').strip()[:1000]
+            raise RuntimeError(f'DWG-конвертер вернул ошибку: {details or proc.returncode}')
+
+        candidates = list(out_dir.rglob('*.dxf')) + list(tmp_path.rglob('*.dxf'))
+        if not candidates:
+            raise RuntimeError('DWG-конвертер завершился, но DXF-файл не найден')
+        return candidates[0].read_bytes()
+
+
+@require_POST
+@login_required(login_url='accounts:login')
+def api_cad_convert_dwg(request):
+    uploaded = request.FILES.get('file')
+    if not uploaded:
+        return _json_error('Файл не передан')
+    if not uploaded.name.lower().endswith('.dwg'):
+        return _json_error('Ожидается файл .dwg')
+    if uploaded.size > 25 * 1024 * 1024:
+        return _json_error('DWG слишком большой для демо-импорта (лимит 25 МБ)', status=413)
+    try:
+        dxf_bytes = _convert_dwg_to_dxf_bytes(uploaded)
+        dxf = dxf_bytes.decode('utf-8', errors='replace')
+    except RuntimeError as exc:
+        return _json_error(str(exc), status=501)
+    return JsonResponse({'ok': True, 'format': 'dxf', 'dxf': dxf})
+
+
+def _project_for_read(user, pk):
+    """Read-access: владелец / demo / public / team-member.
+
+    Расширено для Enterprise:
+    - private + не свой → 404
+    - team → доступен любому active-member организации
+    - public → доступен всем auth-юзерам
+    """
+    qs = SchematicProject.objects.select_related('user', 'organization')
+    # Базовая выборка по pk + видимость
+    candidate = get_object_or_404(qs, pk=pk)
+
+    # 1) Свой / demo / public
+    if candidate.is_demo or candidate.user_id == user.id or candidate.visibility == 'public':
+        return candidate
+    # 2) team-проект и user — member организации
+    if candidate.visibility == 'team' and candidate.organization_id:
+        if candidate.organization.has_member(user):
+            return candidate
+    # Иначе нет доступа
+    from django.http import Http404
+    raise Http404('No read access')
+
+
+def _project_for_write(user, pk):
+    """Write-access: владелец ИЛИ team-member с ролью engineer+ в org проекта.
+
+    Demo-проекты read-only для всех кроме staff.
+    """
+    qs = SchematicProject.objects.select_related('user', 'organization')
+    candidate = get_object_or_404(qs, pk=pk, is_demo=False)
+    # 1) Свой
+    if candidate.user_id == user.id:
+        return candidate
+    # 2) team-проект + user имеет project.edit_team в org
+    if candidate.organization_id:
+        from .org_permissions import user_can
+        if user_can(user, candidate.organization, 'project.edit_team'):
+            return candidate
+    from django.http import Http404
+    raise Http404('No write access')
+
+
+def _validate_scheme_data(scheme_data):
+    return validate_scheme_data(scheme_data)
+
+
+def _next_project_version(project):
+    last = project.versions.aggregate(value=Max('version_number'))['value'] or 0
+    return last + 1
+
+
+def _simulation_summary(result):
+    if not isinstance(result, dict):
+        return {}
+    points = result.get('points')
+    return {
+        'type': result.get('type', 'unknown'),
+        'points_count': len(points) if isinstance(points, list) else 0,
+        'node_count': len(result.get('nodeVoltages', {}) or {}),
+        'has_warnings': bool(result.get('warnings')),
+    }
+
+
+def _read_json_payload(request):
+    if not request.body:
+        return {}
+    try:
+        return json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return {}
+
+
+def _require_pro_feature(user, feature_key, feature_label=None):
+    return feature_denied_response(user, feature_key)
+
+
+def _measurement_to_dict(item):
+    return {
+        'id': item.id,
+        'metric': item.metric,
+        'label': item.label,
+        'value': item.value,
+        'unit': item.unit,
+        'expected_value': item.expected_value,
+        'tolerance_abs': item.tolerance_abs,
+        'tolerance_percent': item.tolerance_percent,
+        'status': item.status,
+        'source': item.source,
+        'result': item.result,
+        'created': item.created_at.isoformat(),
+    }
+
+
+def _review_to_dict(review):
+    payload = {
+        'id': review.id,
+        'project_id': review.project_id,
+        'score': review.score,
+        'status': review.status,
+        'status_label': status_label_ru(review.status),
+        'summary': review.summary,
+        'errors': review.errors,
+        'warnings': review.warnings,
+        'recommendations': review.recommendations,
+        'metrics': review.metrics,
+        'sections': review.sections,
+        'faults': review.faults,
+        'import_summary': review.import_summary,
+        'learning_suggestions': learning_suggestions_from_review(review),
+        'created': review.created_at.isoformat(),
+        'url': reverse('hello:project_review_page', args=[review.id]),
+        'pdf_url': reverse('hello:project_review_pdf', args=[review.id]),
+    }
+    localized = localize_review_report(payload)
+    sections = localized.get('sections') or {}
+    expert_section = sections.get('expert_system') if isinstance(sections, dict) else {}
+    if isinstance(expert_section, dict) and not localized.get('expert_findings'):
+        localized['expert_findings'] = expert_section.get('findings') or []
+    localized['metric_rows'] = build_metric_rows(localized.get('metrics') or {})
+    localized['measurement_rows'] = build_measurement_rows(sections)
+    try:
+        from .services.review_visualization import build_review_3d_payload
+
+        localized['review_3d_payload'] = build_review_3d_payload(localized)
+    except Exception:
+        localized['review_3d_payload'] = {'enabled': False, 'columns': [], 'risk_points': [], 'legend': []}
+    # Topology thumbnail: schemdraw SVG для типовых топологий (делитель/RC/LED).
+    # Дешевле полноценного PCB-рендера и сразу делает HTML-отчёт «иллюстрированным».
+    # PDF-вставка пока не делается (нужен SVG→PNG rasterize, M-задача в backlog).
+    try:
+        from knowledge.services.circuit_svg import thumbnail_for_topology
+
+        connectivity = sections.get('connectivity') if isinstance(sections, dict) else None
+        topology = (connectivity or {}).get('topology') if isinstance(connectivity, dict) else None
+        localized['topology_thumbnail_svg'] = thumbnail_for_topology(topology) if topology else None
+    except Exception:
+        localized['topology_thumbnail_svg'] = None
+    return localized
+
+
+def _event_to_dict(event):
+    return {
+        'id': event.id,
+        'project_id': event.project_id,
+        'event_type': event.event_type,
+        'event_label': event.get_event_type_display(),
+        'payload': event.payload or {},
+        'user': event.user.username if event.user_id else '',
+        'created': event.created_at.isoformat(),
+    }
+
+
+def _broadcast_project_event(project_id, event_payload):
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        layer = get_channel_layer()
+        if layer is not None:
+            async_to_sync(layer.group_send)(
+                f'project-{project_id}',
+                {'type': 'project.event', 'event': event_payload},
+            )
+    except Exception:
+        # WebSocket push is a UI accelerator, not the source of truth.
+        pass
+
+
+def _log_project_event(project, user, event_type, payload=None, *, broadcast=True):
+    event = ProjectEvent.log(project=project, user=user, event_type=event_type, payload=payload or {})
+    if event and broadcast:
+        _broadcast_project_event(project.id, _event_to_dict(event))
+    return event
+
+
+def _create_project_review(project, user, import_summary=None):
+    report = build_design_review(
+        project,
+        simulation_runs=list(project.simulation_runs.all()[:10]),
+        measurements=list(project.measurements.all()[:50]),
+        import_summary=import_summary,
+    )
+    review = ProjectReview.objects.create(
+        project=project,
+        user=user,
+        score=report['score'],
+        status=report['status'],
+        summary=report['summary'],
+        errors=report['errors'],
+        warnings=report['warnings'],
+        recommendations=report['recommendations'],
+        metrics=report['metrics'],
+        sections=report['sections'],
+        faults=report['faults'],
+        scheme_data=project.scheme_data,
+        import_summary=import_summary or {},
+    )
+    _log_project_event(project, user, 'review_created', {
+        'review_id': review.id,
+        'score': review.score,
+        'status': review.status,
+        'errors': len(review.errors or []),
+        'warnings': len(review.warnings or []),
+        'url': reverse('hello:project_review_page', args=[review.id]),
+    })
+    return review
+
+
+def _review_for_read(user, review_id):
+    review = get_object_or_404(
+        ProjectReview.objects.select_related('project', 'project__user', 'project__organization', 'user'),
+        pk=review_id,
+    )
+    _project_for_read(user, review.project_id)
+    return review
+
+
+# ---------------------------------------------------------------------------
+# API endpoints — все требуют авторизации, все отдают JSON
+# ---------------------------------------------------------------------------
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_projects_list(request):
+    """Возвращает: личные + demo + team-проекты org куда юзер входит.
+
+    Опциональный фильтр ?org=<slug> — только проекты конкретной org.
+    """
+    org_slug = (request.GET.get('org') or '').strip()
+    if org_slug == 'personal':
+        # Только личные (не в org)
+        qs = SchematicProject.objects.filter(user=request.user, organization__isnull=True)
+    elif org_slug:
+        # Конкретная org — проверим membership
+        from .models import Organization
+        try:
+            org = Organization.objects.get(slug=org_slug)
+        except Organization.DoesNotExist:
+            return _json_error('Organization not found', status=404)
+        if not org.has_member(request.user):
+            return _json_error('Not a member', status=403)
+        qs = SchematicProject.objects.filter(organization=org, visibility__in=['team', 'public'])
+    else:
+        # Default: личные + demo + все team-проекты org куда user входит
+        from .models import OrganizationMember
+        org_ids = list(
+            OrganizationMember.objects
+            .filter(user=request.user, deactivated_at__isnull=True)
+            .values_list('organization_id', flat=True)
+        )
+        qs = SchematicProject.objects.filter(
+            Q(user=request.user)
+            | Q(is_demo=True)
+            | Q(organization_id__in=org_ids, visibility__in=['team', 'public'])
+        ).distinct()
+
+    qs = qs.select_related('user', 'organization')
+    return JsonResponse({
+        'ok': True,
+        'projects': [_project_to_dict(p) for p in qs],
+        'quota': quota_dict(request.user),
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_project_limit
+def api_project_create(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    name = data.get('name', '').strip()
+    if not name:
+        return _json_error('Name is required')
+
+    # Org-context: если передан organization_slug, создаём team-проект.
+    # Проверяем что user — member org И имеет project.create permission.
+    organization = None
+    visibility = data.get('visibility', 'private')
+    org_slug = (data.get('organization_slug') or '').strip()
+    if org_slug:
+        from .models import Organization
+        from .org_permissions import user_can
+        try:
+            organization = Organization.objects.get(slug=org_slug)
+        except Organization.DoesNotExist:
+            return _json_error('Organization not found', status=404)
+        if not user_can(request.user, organization, 'project.create'):
+            return JsonResponse({
+                'ok': False, 'error': 'permission_denied',
+                'message': f'У вас нет прав создавать проекты в {organization.name}',
+            }, status=403)
+        # Team-проект — visibility=team по умолчанию (или public если запрошен)
+        if visibility == 'private':
+            visibility = 'team'
+
+    project = SchematicProject.objects.create(
+        user=request.user,
+        name=name,
+        description=data.get('description', ''),
+        category=data.get('category', 'other'),
+        status=data.get('status', 'draft'),
+        scheme_data=data.get('scheme_data', {}),
+        organization=organization,
+        visibility=visibility,
+    )
+    _log_project_event(project, request.user, 'project_created', {
+        'name': project.name,
+        'category': project.category,
+        'visibility': project.visibility,
+    })
+
+    # Audit log для team-проектов
+    if organization:
+        from .models import AuditLog
+        AuditLog.log(
+            actor=request.user, action='project.create',
+            organization=organization,
+            object_type='SchematicProject', object_id=project.id,
+            payload={'name': project.name, 'visibility': project.visibility},
+            request=request,
+        )
+
+    return JsonResponse({'ok': True, 'project': _project_to_dict(project)})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_update(request, pk):
+    project = _project_for_write(request.user, pk)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    for field in ('name', 'description', 'category', 'status'):
+        if field in data:
+            setattr(project, field, data[field])
+    project.save()
+    _log_project_event(project, request.user, 'project_updated', {
+        'name': project.name,
+        'status': project.status,
+        'changed_fields': [field for field in ('name', 'description', 'category', 'status') if field in data],
+    })
+    return JsonResponse({'ok': True, 'project': _project_to_dict(project)})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_delete(request, pk):
+    """Soft-delete: проект помечается deleted_at, физически живёт ещё 30 дней.
+    Восстановить — POST /projects/api/<pk>/restore/. Жёсткое удаление —
+    /projects/api/<pk>/purge/ (без возврата)."""
+    project = _project_for_write(request.user, pk)
+    project.soft_delete()
+    return JsonResponse({
+        'ok': True,
+        'soft_deleted': True,
+        'message': f'Проект «{project.name}» в корзине. Восстановить можно в течение 30 дней.',
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_restore(request, pk):
+    """Возвращает проект из корзины (deleted_at=None)."""
+    project = get_object_or_404(
+        SchematicProject.all_objects,
+        pk=pk, user=request.user, deleted_at__isnull=False,
+    )
+    project.restore()
+    return JsonResponse({
+        'ok': True,
+        'project': _project_to_dict(project),
+        'message': f'Проект «{project.name}» восстановлен.',
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_purge(request, pk):
+    """Физическое удаление soft-deleted проекта. После этого восстановить нельзя."""
+    project = get_object_or_404(
+        SchematicProject.all_objects,
+        pk=pk, user=request.user, deleted_at__isnull=False,
+    )
+    name = project.name
+    project.delete()  # реальное удаление из БД
+    return JsonResponse({'ok': True, 'message': f'Проект «{name}» удалён навсегда.'})
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_trash_list(request):
+    """Список soft-deleted проектов (для UI «Корзина»)."""
+    qs = SchematicProject.all_objects.filter(
+        user=request.user, deleted_at__isnull=False,
+    ).order_by('-deleted_at')[:50]
+    return JsonResponse({
+        'ok': True,
+        'projects': [_project_to_dict(p) for p in qs],
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_save_scheme(request, pk):
+    project = _project_for_write(request.user, pk)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    scheme_data = data.get('scheme_data', {})
+    if not isinstance(scheme_data, dict):
+        return _json_error('scheme_data must be an object')
+    if not isinstance(scheme_data.get('components', []), list):
+        return _json_error('scheme_data.components must be an array')
+    if not isinstance(scheme_data.get('connections', []), list):
+        return _json_error('scheme_data.connections must be an array')
+    drc = _validate_scheme_data(scheme_data)
+
+    # Tier-лимиты: число компонентов и листов в схеме
+    components = scheme_data.get('components', []) or []
+    sheets = scheme_data.get('sheets', []) or []
+    max_components = get_limit(request.user, 'max_components_per_scheme')
+    max_sheets = get_limit(request.user, 'max_sheets_per_project')
+    if max_components is not None and len(components) > max_components:
+        return JsonResponse({
+            'ok': False, 'error': 'quota_exceeded',
+            'message': f'Free-tier: до {max_components} компонентов на схему. '
+                       f'У вас {len(components)}. Удалите лишние или upgrade.',
+            'limit': max_components, 'current': len(components),
+        }, status=400)
+    if max_sheets is not None and len(sheets) > max_sheets:
+        return JsonResponse({
+            'ok': False, 'error': 'quota_exceeded',
+            'message': f'Free-tier: до {max_sheets} листов на проект. '
+                       f'У вас {len(sheets)}.',
+            'limit': max_sheets, 'current': len(sheets),
+        }, status=400)
+
+    project.scheme_data = scheme_data
+    project.save(update_fields=['scheme_data', 'updated_at'])
+    version = ProjectVersion.objects.create(
+        project=project,
+        version_number=_next_project_version(project),
+        scheme_data=scheme_data,
+        change_note=data.get('change_note', 'Сохранение из редактора'),
+    )
+    _log_project_event(project, request.user, 'scheme_saved', {
+        'version_number': version.version_number,
+        'components': len(components),
+        'connections': len(scheme_data.get('connections') or []),
+        'sheets': len(sheets),
+        'drc_ok': drc.get('ok', False),
+    })
+
+    # Trim истории до max_history_versions — Free: 10, Pro: 100
+    max_versions = get_limit(request.user, 'max_history_versions')
+    if max_versions is not None:
+        excess_ids = list(
+            project.versions.order_by('-version_number')
+            .values_list('id', flat=True)[max_versions:]
+        )
+        if excess_ids:
+            ProjectVersion.objects.filter(id__in=excess_ids).delete()
+
+    return JsonResponse({'ok': True, 'project': _project_to_dict(project), 'drc': drc})
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_load_scheme(request, pk):
+    project = _project_for_read(request.user, pk)
+    return JsonResponse({
+        'ok': True,
+        'scheme_data': project.scheme_data,
+        'project': _project_to_dict(project),
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_versions(request, pk):
+    project = _project_for_read(request.user, pk)
+    versions = project.versions.all()[:25]
+    return JsonResponse({
+        'ok': True,
+        'versions': [
+            {
+                'id': version.id,
+                'version_number': version.version_number,
+                'change_note': version.change_note,
+                'created': version.created_at.isoformat(),
+            }
+            for version in versions
+        ],
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_dashboard(request, pk):
+    project = _project_for_read(request.user, pk)
+    latest_review = project.reviews.select_related('project', 'user').first()
+    try:
+        from .models import Comment
+
+        comments_count = Comment.objects.filter(project=project).count()
+    except Exception:
+        comments_count = 0
+    runs = project.simulation_runs.select_related('user')[:10]
+    return JsonResponse({
+        'ok': True,
+        'project': _project_to_dict(project),
+        'scheme': {
+            'components': len((project.scheme_data or {}).get('components') or []),
+            'connections': len((project.scheme_data or {}).get('connections') or []),
+            'has_scheme': bool(project.scheme_data),
+        },
+        'versions': [
+            {
+                'id': version.id,
+                'version_number': version.version_number,
+                'change_note': version.change_note,
+                'created': version.created_at.isoformat(),
+            }
+            for version in project.versions.all()[:8]
+        ],
+        'simulation_runs': [
+            {
+                'id': run.id,
+                'analysis_type': run.analysis_type,
+                'engine': run.engine,
+                'elapsed_ms': run.elapsed_ms,
+                'status': run.status,
+                'progress_percent': run.progress_percent,
+                'message': run.message,
+                'created': run.created_at.isoformat(),
+            }
+            for run in runs
+        ],
+        'measurements': [_measurement_to_dict(item) for item in project.measurements.all()[:12]],
+        'latest_review': _review_to_dict(latest_review) if latest_review else None,
+        'bom': ((latest_review.sections or {}).get('bom') if latest_review else {}) or {},
+        'comments_count': comments_count,
+        'events': [_event_to_dict(item) for item in project.events.select_related('user')[:20]],
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_simulation_runs(request, pk):
+    project = _project_for_read(request.user, pk)
+    runs = project.simulation_runs.select_related('user')[:25]
+    return JsonResponse({
+        'ok': True,
+        'runs': [
+            {
+                'id': run.id,
+                'analysis_type': run.analysis_type,
+                'engine': run.engine,
+                'elapsed_ms': run.elapsed_ms,
+                'status': run.status,
+                'progress_percent': run.progress_percent,
+                'message': run.message,
+                'summary': run.result_summary,
+                'warnings': run.warnings,
+                'started': run.started_at.isoformat() if run.started_at else None,
+                'finished': run.finished_at.isoformat() if run.finished_at else None,
+                'created': run.created_at.isoformat(),
+            }
+            for run in runs
+        ],
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_simulation_stats(request, pk):
+    project = _project_for_read(request.user, pk)
+    runs = list(project.simulation_runs.select_related('user')[:200])
+    return JsonResponse(_simulation_analysis().simulation_run_stats(runs))
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_project_save_simulation(request, pk):
+    project = _project_for_write(request.user, pk)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    result = data.get('result', {})
+    status = data.get('status', 'success')
+    now = timezone.now()
+    run = SimulationRun.objects.create(
+        project=project,
+        user=request.user,
+        analysis_type=data.get('analysis_type') or result.get('type') or 'unknown',
+        engine=data.get('engine', ''),
+        elapsed_ms=max(0, int(data.get('elapsed_ms') or 0)),
+        status=status,
+        progress_percent=max(0, min(100, int(data.get('progress_percent') or (100 if status == 'success' else 0)))),
+        message=(data.get('message') or '')[:240],
+        started_at=now,
+        finished_at=now if status in {'success', 'error'} else None,
+        netlist=data.get('netlist', ''),
+        result_summary=data.get('result_summary') or _simulation_summary(result),
+        result_data=result,
+        warnings=data.get('warnings') or result.get('warnings') or [],
+    )
+    _log_project_event(project, request.user, 'simulation_run', {
+        'run_id': run.id,
+        'analysis_type': run.analysis_type,
+        'engine': run.engine,
+        'status': run.status,
+        'elapsed_ms': run.elapsed_ms,
+        'progress_percent': run.progress_percent,
+    })
+    return JsonResponse({
+        'ok': True,
+        'run': {
+            'id': run.id,
+            'analysis_type': run.analysis_type,
+            'engine': run.engine,
+            'elapsed_ms': run.elapsed_ms,
+            'status': run.status,
+            'progress_percent': run.progress_percent,
+            'created': run.created_at.isoformat(),
+        },
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_project_simulation_postprocess(request, pk):
+    project = _project_for_write(request.user, pk)
+    data = _read_json_payload(request)
+    run = None
+    run_id = data.get('simulation_run_id') or data.get('run_id')
+    if run_id:
+        run = project.simulation_runs.filter(id=run_id).first()
+        if not run:
+            return _json_error('simulation run not found', status=404)
+        data = {**data, 'result': data.get('result') or run.result_data}
+
+    result = _simulation_analysis().postprocess_simulation(data)
+    if not result.get('ok'):
+        return JsonResponse(result, status=400)
+
+    saved = []
+    for item in result.get('measurements') or []:
+        measurement = ProjectMeasurement.objects.create(
+            project=project,
+            user=request.user,
+            simulation_run=run,
+            metric=(item.get('metric') or 'postprocess')[:80],
+            label=(item.get('label') or item.get('metric') or 'Postprocess')[:160],
+            value=float(item.get('value') or 0),
+            unit=(item.get('unit') or '')[:24],
+            status='computed',
+            source='postprocess',
+            result={
+                'markers': result.get('markers') or [],
+                'formulas': result.get('formulas') or [],
+            },
+        )
+        saved.append(_measurement_to_dict(measurement))
+
+    _log_project_event(project, request.user, 'measurement_added', {
+        'source': 'postprocess',
+        'simulation_run_id': run.id if run else None,
+        'measurements': len(saved),
+        'metrics': list((result.get('metrics') or {}).keys()),
+    })
+    return JsonResponse({'ok': True, 'postprocess': result, 'measurements': saved})
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_simulation_export_csv(request, pk, run_id):
+    project = _project_for_read(request.user, pk)
+    run = get_object_or_404(project.simulation_runs, pk=run_id)
+    csv_text = _simulation_analysis().simulation_result_to_csv(run.result_data or {})
+    response = HttpResponse(csv_text, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="dolg_simulation_{run.id}.csv"'
+    _log_project_event(project, request.user, 'simulation_run', {
+        'run_id': run.id,
+        'action': 'csv_export',
+        'analysis_type': run.analysis_type,
+    })
+    return response
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_measurements(request, pk):
+    project = _project_for_read(request.user, pk)
+    return JsonResponse({
+        'ok': True,
+        'measurements': [_measurement_to_dict(item) for item in project.measurements.all()[:50]],
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_project_measurement_create(request, pk):
+    project = _project_for_write(request.user, pk)
+    data = _read_json_payload(request)
+    metric = (data.get('metric') or '').strip()
+    if not metric:
+        return _json_error('metric is required')
+    try:
+        value = float(data.get('value'))
+    except (TypeError, ValueError):
+        return _json_error('value must be numeric')
+
+    expected = data.get('expected_value')
+    tolerance_abs = data.get('tolerance_abs')
+    tolerance_percent = data.get('tolerance_percent')
+    expected_num = None
+    tolerance_abs_num = None
+    tolerance_percent_num = None
+    try:
+        expected_num = float(expected) if expected not in (None, '') else None
+        tolerance_abs_num = float(tolerance_abs) if tolerance_abs not in (None, '') else None
+        tolerance_percent_num = float(tolerance_percent) if tolerance_percent not in (None, '') else None
+    except (TypeError, ValueError):
+        return _json_error('expected/tolerance fields must be numeric')
+
+    result = data.get('result') if isinstance(data.get('result'), dict) else {}
+    status = 'unchecked'
+    if expected_num is not None:
+        comparison = compare_measurement(
+            metric,
+            value,
+            expected_value=expected_num,
+            tolerance_abs=tolerance_abs_num,
+            tolerance_percent=tolerance_percent_num,
+            unit=data.get('unit', ''),
+        )
+        result = {**result, **comparison}
+        status = comparison.get('status', 'unchecked')
+
+    run = None
+    run_id = data.get('simulation_run_id')
+    if run_id:
+        run = project.simulation_runs.filter(id=run_id).first()
+
+    item = ProjectMeasurement.objects.create(
+        project=project,
+        user=request.user,
+        simulation_run=run,
+        metric=metric,
+        label=(data.get('label') or metric)[:160],
+        value=value,
+        unit=(data.get('unit') or '')[:24],
+        expected_value=expected_num,
+        tolerance_abs=tolerance_abs_num,
+        tolerance_percent=tolerance_percent_num,
+        status=status,
+        source=(data.get('source') or 'manual')[:40],
+        result=result,
+    )
+    _log_project_event(project, request.user, 'measurement_added', {
+        'measurement_id': item.id,
+        'metric': item.metric,
+        'label': item.label,
+        'value': item.value,
+        'unit': item.unit,
+        'status': item.status,
+        'simulation_run_id': item.simulation_run_id,
+    })
+    return JsonResponse({'ok': True, 'measurement': _measurement_to_dict(item)})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_simulation_fft(request):
+    denied = _require_pro_feature(request.user, 'pro_fft')
+    if denied:
+        return denied
+    data = _read_json_payload(request)
+    result = _simulation_analysis().fft_spectrum(
+        data.get('samples') or data.get('values') or [],
+        data.get('sample_rate_hz') or data.get('sampleRateHz'),
+        window=data.get('window', 'hann'),
+    )
+    return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_simulation_bode(request):
+    denied = _require_pro_feature(request.user, 'pro_bode')
+    if denied:
+        return denied
+    result = _simulation_analysis().bode_plot(_read_json_payload(request))
+    return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_simulation_monte_carlo(request):
+    denied = _require_pro_feature(request.user, 'pro_monte_carlo')
+    if denied:
+        return denied
+    result = _simulation_analysis().monte_carlo_tolerance(_read_json_payload(request))
+    return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_simulation_signal_quality(request):
+    denied = _require_pro_feature(request.user, 'pro_signal_quality')
+    if denied:
+        return denied
+    data = _read_json_payload(request)
+    result = _simulation_analysis().signal_quality(
+        data.get('samples') or data.get('values') or [],
+        data.get('sample_rate_hz') or data.get('sampleRateHz'),
+        fundamental_hz=data.get('fundamental_hz') or data.get('fundamentalHz'),
+        max_harmonics=data.get('max_harmonics') or data.get('maxHarmonics') or 5,
+        window=data.get('window', 'hann'),
+    )
+    return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_simulation_parameter_sweep(request):
+    denied = _require_pro_feature(request.user, 'pro_parameter_sweep')
+    if denied:
+        return denied
+    result = _simulation_analysis().parameter_sweep(_read_json_payload(request))
+    return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_simulation_fallback_solve(request):
+    denied = _require_pro_feature(request.user, 'server_side_solver')
+    if denied:
+        return denied
+    data = _read_json_payload(request)
+    result = _simulation_analysis().server_side_dc_fallback(data.get('scheme_data') or data.get('scheme') or {})
+    return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_project_review_create(request, pk):
+    project = _project_for_write(request.user, pk)
+    review = _create_project_review(project, request.user)
+    return JsonResponse({'ok': True, 'review': _review_to_dict(review)})
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_project_review_latest(request, pk):
+    project = _project_for_read(request.user, pk)
+    review = project.reviews.select_related('project', 'user').first()
+    if not review:
+        try:
+            writable_project = _project_for_write(request.user, pk)
+        except Http404:
+            return _json_error('Review has not been created yet', status=404)
+        review = _create_project_review(writable_project, request.user)
+    return JsonResponse({'ok': True, 'review': _review_to_dict(review)})
+
+
+@login_required(login_url='accounts:login')
+def project_review_page(request, review_id):
+    review = _review_for_read(request.user, review_id)
+    return render(request, 'tools/project_review.html', {
+        'review': review,
+        'review_display': _review_to_dict(review),
+        'project': review.project,
+        'learning_suggestions': learning_suggestions_from_review(review),
+        'page_title': f'Проверка схемы: {review.project.name}',
+    })
+
+
+@login_required(login_url='accounts:login')
+def project_review_pdf(request, review_id):
+    review = _review_for_read(request.user, review_id)
+    buffer = BytesIO()
+    for pdf_font_name, pdf_font_path in (
+        ('TimesNewRoman', r'C:\Windows\Fonts\times.ttf'),
+        ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
+    ):
+        try:
+            pdfmetrics.registerFont(TTFont(pdf_font_name, pdf_font_path))
+        except Exception:
+            continue
+    registered_fonts = pdfmetrics.getRegisteredFontNames()
+    font_name = (
+        'TimesNewRoman'
+        if 'TimesNewRoman' in registered_fonts
+        else ('DejaVuSans' if 'DejaVuSans' in registered_fonts else 'Helvetica')
+    )
+    page = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y = height - 48
+    page.setFont(font_name, 14)
+    review_display = _review_to_dict(review)
+    page.drawString(40, y, f'DOLG: инженерная проверка схемы - {review.project.name}')
+    y -= 24
+    page.setFont(font_name, 10)
+    page.drawString(
+        40,
+        y,
+        f'Оценка: {review.score}/100; статус: {review_display.get("status_label")}; создано: {review.created_at:%Y-%m-%d %H:%M}',
+    )
+    y -= 24
+    page.drawString(40, y, str(review_display.get('summary') or '')[:110])
+    y -= 24
+
+    def draw_list(title, items):
+        nonlocal y
+        if y < 80:
+            page.showPage()
+            page.setFont(font_name, 10)
+            y = height - 48
+        page.setFont(font_name, 11)
+        page.drawString(40, y, title)
+        y -= 16
+        page.setFont(font_name, 9)
+        if not items:
+            page.drawString(54, y, '- none')
+            y -= 14
+            return
+        for item in items[:12]:
+            if y < 60:
+                page.showPage()
+                page.setFont(font_name, 9)
+                y = height - 48
+            page.drawString(54, y, f'- {str(item)[:120]}')
+            y -= 14
+
+    draw_list('Ошибки', review_display.get('errors') or [])
+    draw_list('Предупреждения', review_display.get('warnings') or [])
+    draw_list('Рекомендации', review_display.get('recommendations') or [])
+    draw_list(
+        'Экспертные правила',
+        [
+            f"{item.get('rule_id')} [{item.get('severity_label')}]: "
+            f"{item.get('title')} - {item.get('recommendation')}"
+            for item in review_display.get('expert_findings') or []
+        ],
+    )
+    draw_list(
+        'Источники проверки',
+        [
+            f"{item.get('rule_id')}: {source.get('title')} - {source.get('url')}"
+            for item in review_display.get('expert_findings') or []
+            for source in (item.get('source_references') or [])[:3]
+        ],
+    )
+    draw_list(
+        'Сценарии неисправностей',
+        [
+            f"{item.get('title')}: {item.get('recommendation')}"
+            for item in review_display.get('faults') or []
+        ],
+    )
+    page.save()
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="dolg_review_{review.id}.pdf"'
+    return response
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_cad_import_preview(request):
+    data = _read_json_payload(request)
+    result = import_preview(data.get('format'), data.get('source') or data.get('text') or '')
+
+    class ImportedProject:
+        scheme_data = result.get('scheme_data') or {}
+
+    review = build_design_review(ImportedProject(), simulation_runs=[], measurements=[], import_summary=result.get('summary'))
+    payload = {
+        'ok': bool(result.get('ok')),
+        'format': result.get('format'),
+        'scheme_data': result.get('scheme_data'),
+        'summary': result.get('summary'),
+        'preview': result.get('preview'),
+        'unsupported': result.get('unsupported'),
+        'review': review,
+        'learning_suggestions': learning_suggestions_from_review(review),
+    }
+
+    if result.get('ok') and data.get('save_project'):
+        project = SchematicProject.objects.create(
+            user=request.user,
+            name=(data.get('name') or f'Imported {result.get("format")}')[:200],
+            description='Imported CAD subset; run Engineering Review before production use.',
+            category='other',
+            status='draft',
+            scheme_data=result.get('scheme_data') or {},
+        )
+        saved_review = _create_project_review(project, request.user, import_summary=result.get('summary'))
+        _log_project_event(project, request.user, 'import_finished', {
+            'format': result.get('format'),
+            'components': (result.get('summary') or {}).get('components_count'),
+            'connections': (result.get('summary') or {}).get('connections_count'),
+            'unsupported': len(result.get('unsupported') or []),
+            'review_id': saved_review.id,
+        })
+        payload['project'] = _project_to_dict(project)
+        payload['saved_review'] = _review_to_dict(saved_review)
+
+    return JsonResponse(payload, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_export_scheme_pdf(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    scheme_data = data.get('scheme_data', {})
+    drc = _validate_scheme_data(scheme_data)
+    components = scheme_data.get('components', []) if isinstance(scheme_data, dict) else []
+    connections = scheme_data.get('connections', []) if isinstance(scheme_data, dict) else []
+
+    buffer = BytesIO()
+    try:
+        pdfmetrics.registerFont(TTFont('TimesNewRoman', r'C:\Windows\Fonts\times.ttf'))
+    except Exception:
+        pass
+    font_name = 'TimesNewRoman' if 'TimesNewRoman' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'
+    page = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    page.setFont(font_name, 14)
+    page.drawString(40, height - 50, 'DOLG: экспорт принципиальной схемы')
+    page.setFont(font_name, 10)
+    page.drawString(40, height - 70, f'Компонентов: {len(components)}; соединений: {len(connections)}')
+
+    y = height - 100
+    page.setFont(font_name, 9)
+    for item in components[:40]:
+        label = item.get('label') or item.get('type') or 'component'
+        catalog_ref = item.get('catalog_ref') or item.get('part_number') or ''
+        page.drawString(40, y, f"#{item.get('id')} {label} ({item.get('type')}) x={item.get('x')} y={item.get('y')} {catalog_ref}")
+        y -= 14
+        if y < 80:
+            page.showPage()
+            page.setFont(font_name, 9)
+            y = height - 50
+
+    if drc['errors'] or drc['warnings']:
+        if y < 140:
+            page.showPage()
+            page.setFont(font_name, 9)
+            y = height - 50
+        page.drawString(40, y, 'DRC:')
+        y -= 14
+        for message in (drc['errors'] + drc['warnings'])[:20]:
+            page.drawString(50, y, f'- {message}')
+            y -= 14
+
+    page.save()
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="dolg_scheme.pdf"'
+    return response
+
+
+# ---------------------------------------------------------------------------
+# AI-ассистент DOLG: чат с тремя специализированными агентами
+# ---------------------------------------------------------------------------
+
+AI_MODES = {'recommend', 'explain', 'replace'}
+AI_MAX_MESSAGE_LEN = 2000
+AI_MAX_TARGET_PN_LEN = 200  # PN компонента не бывает длиннее
+AI_FREE_HISTORY_TAIL = 6
+AI_HISTORY_TAIL = 20  # сколько предыдущих реплик держит self-hosted AI
+AI_LIVE_HISTORY_TAIL = 16  # live LLM получает меньше истории + session_summary
+
+# Минимальный интервал между вызовами Claude API одним пользователем (в секундах).
+# Защищает от случайных дабл-кликов и от спама в окно ввода. Хранится в session.
+AI_MIN_INTERVAL_SEC = 2.0
+
+
+def _ai_rate_limit(request):
+    """True если запрос отклонён по rate-limit. Состояние — в session.
+
+    Используем time.time() (wall clock), а не time.monotonic() — monotonic
+    сбрасывается при рестарте процесса, и сохранённое значение становится
+    больше «текущего», давая отрицательную дельту → ложный rate-limit.
+    """
+    now = time.time()
+    last = request.session.get('_ai_last_call_at')
+    if last is not None:
+        delta = now - last
+        if 0 <= delta < AI_MIN_INTERVAL_SEC:
+            return True
+    request.session['_ai_last_call_at'] = now
+    return False
+
+
+def _ai_history_from_payload(data, *, limit):
+    history = data.get('history') or []
+    messages = []
+    if isinstance(history, list):
+        for item in history[-limit:]:
+            if not isinstance(item, dict):
+                continue
+            role = item.get('role')
+            content = (item.get('content') or '').strip()
+            if role in ('user', 'assistant') and content:
+                messages.append({'role': role, 'content': content[:AI_MAX_MESSAGE_LEN]})
+    return messages
+
+
+def _scheme_from_ai_payload(data, mode):
+    if mode == 'explain':
+        return data.get('scheme') if isinstance(data.get('scheme'), dict) else None
+    return data.get('scheme') if isinstance(data.get('scheme'), dict) else None
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_ai_context(request):
+    denied = feature_denied_response(request.user, 'ai_scheme_context')
+    if denied:
+        return denied
+
+    try:
+        data = json.loads(request.body or '{}')
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    project = None
+    scheme = data.get('scheme') if isinstance(data.get('scheme'), dict) else None
+    project_id = data.get('project_id')
+    if project_id:
+        try:
+            project = _project_for_read(request.user, int(project_id))
+            if not scheme:
+                scheme = project.scheme_data
+        except (TypeError, ValueError):
+            project = None
+
+    context = build_ai_scheme_context(
+        project=project,
+        scheme=scheme,
+        include_deep_hint=has_feature(request.user, 'ai_deep_hint'),
+    )
+    return JsonResponse({'ok': True, 'context': context})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_monte_carlo(request):
+    """Block D2: server-side Monte Carlo DC analysis.
+
+    POST body: {scheme_data, iterations?, tolerance?, seed?}
+    Response: per-node statistics (mean/std/p05/p50/p95) + timing.
+    """
+    from .services.monte_carlo import run_monte_carlo
+    denied = _require_pro_feature(request.user, 'pro_monte_carlo')
+    if denied:
+        return denied
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+    scheme_data = data.get('scheme_data') or {}
+    if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
+        return _json_error('scheme_data with components required')
+    try:
+        result = run_monte_carlo(
+            scheme_data,
+            iterations=int(data.get('iterations') or 1000),
+            tolerance=float(data.get('tolerance') or 0.05),
+            seed=data.get('seed'),
+        )
+    except Exception as exc:
+        return _json_error(f'Monte Carlo failed: {exc}')
+    return JsonResponse({'ok': True, **result})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_export_circuit_python(request):
+    """Block B1: scheme_data → CircuitPython code.py.
+
+    POST body: {"scheme_data": {...}, "target_board": "raspberry_pi_pico"}
+    Response: text/plain с готовым code.py для скачивания.
+    """
+    from .services.circuit_python_export import generate_circuit_python
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    scheme_data = data.get('scheme_data') or {}
+    target_board = data.get('target_board') or 'raspberry_pi_pico'
+    if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
+        return _json_error('scheme_data with components required')
+
+    try:
+        code = generate_circuit_python(scheme_data, target_board=target_board)
+    except Exception as exc:
+        return _json_error(f'Generator failed: {exc}')
+
+    from django.http import HttpResponse
+    response = HttpResponse(code, content_type='text/x-python; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="code.py"'
+    return response
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_engineering_review(request):
+    """Engineering Review V2: in-memory схема → JSON-отчёт без сохранения проекта.
+
+    POST body: {"scheme_data": {...}}
+    Response: {ok, score, status, score_breakdown, errors, warnings, faults, ...}
+
+    Решает жалобу юзера «2 сообщения о фреймворках» — теперь это полноценный
+    структурированный отчёт. Frontend показывает в модале с табами.
+    """
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    scheme_data = data.get('scheme_data') or {}
+    if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
+        return _json_error('scheme_data with components required')
+
+    class InMemoryProject:
+        def __init__(self, sd):
+            self.scheme_data = sd
+
+    project = InMemoryProject(scheme_data)
+    try:
+        review = build_design_review(
+            project,
+            simulation_runs=[],
+            measurements=[],
+            import_summary=None,
+        )
+    except Exception:
+        logger.exception('In-memory engineering review failed')
+        return _json_error('Review build failed. Details were written to the server log.', status=500)
+
+    # Score breakdown — пересчёт компонентов score для drill-down UI.
+    # Если scoring изменится в build_design_review, этот блок останется
+    # consistent с реальной формулой через те же поля.
+    score = review.get('score', 0) or 0
+    breakdown = {
+        'starting': 100,
+        'errors_penalty': -len(review.get('errors') or []) * 20,
+        'warnings_penalty': -len(review.get('warnings') or []) * 6,
+        'critical_count': review.get('critical_count', 0),
+        'risk_count': review.get('risk_count', 0),
+        'final_score': score,
+    }
+
+    return JsonResponse({
+        'ok': True,
+        'score': score,
+        'status': review.get('status'),
+        'summary': review.get('summary'),
+        'score_breakdown': breakdown,
+        'errors': review.get('errors') or [],
+        'warnings': review.get('warnings') or [],
+        'recommendations': review.get('recommendations') or [],
+        'faults': review.get('faults') or [],
+        'sections': review.get('sections') or {},
+        'expert_findings': review.get('expert_findings') or [],
+        'critical_count': review.get('critical_count', 0),
+        'risk_count': review.get('risk_count', 0),
+    })
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('ai_requests')
+def api_ai_chat(request):
+    from . import ai_assistant
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return _json_error('Invalid JSON')
+
+    mode = (data.get('mode') or 'recommend').strip()
+    if mode not in AI_MODES:
+        return _json_error('Unknown mode')
+
+    effective_plan = get_effective_plan(request.user)
+    mode_feature = {
+        'recommend': 'ai_chat_basic',
+        'explain': 'ai_chat_extended',
+        'replace': 'ai_chat_extended',
+    }.get(mode, 'ai_chat_basic')
+    denied = feature_denied_response(request.user, mode_feature)
+    if denied:
+        return denied
+
+    user_message = (data.get('message') or '').strip()
+    if not user_message:
+        return _json_error('message is required')
+    if len(user_message) > AI_MAX_MESSAGE_LEN:
+        return _json_error(f'message too long (макс. {AI_MAX_MESSAGE_LEN} символов)')
+
+    if _ai_rate_limit(request):
+        return JsonResponse(
+            {'ok': False, 'error': 'Слишком часто. Подождите секунду перед следующим вопросом.'},
+            status=429,
+        )
+
+    extended_ai = has_feature(request.user, 'ai_chat_extended')
+    history_limit = AI_HISTORY_TAIL if extended_ai else AI_FREE_HISTORY_TAIL
+    live_history_limit = AI_LIVE_HISTORY_TAIL if extended_ai else AI_FREE_HISTORY_TAIL
+
+    scheme = _scheme_from_ai_payload(data, mode)
+    history = _ai_history_from_payload(data, limit=history_limit)
+    session_summary = (data.get('session_summary') or '').strip()[:1000]
+    last_intent = (data.get('last_intent') or '').strip()[:80]
+    project = None
+    project_id = data.get('project_id')
+    if project_id:
+        try:
+            project = _project_for_read(request.user, int(project_id))
+            if not scheme:
+                scheme = project.scheme_data
+        except (TypeError, ValueError):
+            project = None
+
+    if not ai_assistant.is_enabled():
+        catalog = ai_assistant.build_catalog_snapshot(limit=20)
+        result = build_rule_based_reply(
+            user_message,
+            mode=mode,
+            project=project,
+            scheme=scheme,
+            catalog=catalog,
+            history=history,
+            session_summary=session_summary,
+            last_intent=last_intent,
+            include_deep_hint=has_feature(request.user, 'ai_deep_hint'),
+        )
+        return JsonResponse({
+            'ok': True,
+            'demo': True,
+            'self_hosted': True,
+            'reply': result['reply'],
+            'mode': mode,
+            'plan': effective_plan,
+            'entitlements': feature_summary(request.user),
+            'agent': result['agent'],
+            'intent': result.get('intent'),
+            'intent_label': result.get('intent_label'),
+            'confidence': result.get('confidence'),
+            'quick_actions': result.get('quick_actions') or [],
+            'skills': result.get('skills') or [],
+            'context_sources': result.get('context_sources') or [],
+            'used_context': result.get('used_context') or {},
+            'retrieval_context': result.get('retrieval_context') or {},
+            'deep_hint': result.get('deep_hint') or {},
+            'session_summary': result.get('session_summary') or '',
+            'usage': result.get('usage') or {},
+            'token_usage': result.get('usage') or {},
+        })
+
+    if not ai_assistant.is_enabled():
+        return JsonResponse({
+            'ok': True,
+            'demo': True,
+            'reply': (
+                '🔒 AI-ассистент в demo-режиме: ANTHROPIC_API_KEY не настроен на сервере. '
+                'Задайте переменную окружения ANTHROPIC_API_KEY и перезапустите Django, '
+                'чтобы активировать live-чат с Claude.'
+            ),
+            'mode': mode,
+        })
+
+    scheme = scheme or (data.get('scheme') if mode == 'explain' else None)
+    target_pn = None
+    if mode == 'replace':
+        target_pn = (data.get('target_pn') or '').strip()[:AI_MAX_TARGET_PN_LEN]
+
+    if mode == 'replace':
+        catalog = ai_assistant.build_catalog_snapshot(
+            lifecycle_in=['active', 'nrnd'], exclude_pn=target_pn, limit=60,
+        )
+    elif mode == 'explain':
+        cats = set()
+        if isinstance(scheme, dict):
+            for comp in scheme.get('components', []) or []:
+                slug = COMPONENT_TO_CATEGORY.get((comp.get('type') or '').lower())
+                if slug:
+                    cats.add(slug)
+        catalog = ai_assistant.build_catalog_snapshot(
+            category_slugs=list(cats) or None, limit=20,
+        )
+    else:
+        catalog = ai_assistant.build_catalog_snapshot(limit=30)
+
+    messages = _ai_history_from_payload(data, limit=live_history_limit)
+    if session_summary:
+        messages.insert(0, {
+            'role': 'assistant',
+            'content': f'Краткая сводка предыдущего диалога: {session_summary}',
+        })
+    messages.append({'role': 'user', 'content': user_message})
+
+    # build_system_blocks — список блоков с cache_control на стабильном
+    # префиксе; экономит ~5× токенов между turn-ами одной сессии.
+    system_blocks = ai_assistant.build_system_blocks(
+        mode, catalog, scheme=scheme, target_pn=target_pn,
+    )
+    try:
+        result = ai_assistant.call_claude(messages, system_blocks, mode=mode)
+    except ai_assistant.AIError as exc:
+        return JsonResponse(
+            {'ok': False, 'error': exc.user_message},
+            status=exc.http_status,
+        )
+
+    return JsonResponse({
+        'ok': True,
+        'reply': result['text'],
+        'usage': result.get('usage') or {},
+        'token_usage': result.get('usage') or {},
+        'mode': mode,
+        'plan': effective_plan,
+        'entitlements': feature_summary(request.user),
+        'agent': result.get('agent'),
+        'model': result.get('model'),
+        'session_summary': session_summary,
+        'context_sources': [],
+        'quick_actions': [],
+    })

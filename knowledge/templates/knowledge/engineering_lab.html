@@ -1,0 +1,179 @@
+{% extends "shop/base.html" %}
+{% block title %}Инженерная лаборатория — ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lab-hero {
+        padding: 1.8rem 0 1.2rem;
+        border-bottom: 1px solid rgba(0, 212, 255, .25);
+        margin-bottom: 1.3rem;
+    }
+    .lab-hero h1 {
+        color: var(--accent-cyan);
+        font-size: 2rem;
+        margin: 0 0 .55rem;
+    }
+    .lab-hero p {
+        color: var(--text-light);
+        max-width: 880px;
+        line-height: 1.55;
+        margin: 0;
+    }
+    .lab-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .lab-card {
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(26, 39, 68, .62), rgba(10, 14, 39, .58));
+        padding: 1rem;
+    }
+    .lab-card h2 {
+        color: var(--accent-cyan);
+        font-size: 1.12rem;
+        margin: 0 0 .45rem;
+    }
+    .lab-desc {
+        color: var(--text-light);
+        line-height: 1.45;
+        font-size: .9rem;
+        min-height: 3.8rem;
+        margin: 0 0 .9rem;
+    }
+    .lab-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .65rem;
+    }
+    .lab-field {
+        display: flex;
+        flex-direction: column;
+        gap: .32rem;
+    }
+    .lab-field label {
+        color: var(--text-bright);
+        font-size: .82rem;
+    }
+    .lab-field input {
+        border: 1px solid rgba(0, 212, 255, .28);
+        border-radius: 8px;
+        color: var(--text-bright);
+        background: rgba(0, 0, 0, .2);
+        padding: .55rem .6rem;
+        font: inherit;
+        min-width: 0;
+    }
+    .lab-actions {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        margin-top: .9rem;
+    }
+    .lab-status {
+        border-radius: 6px;
+        padding: .25rem .5rem;
+        font-size: .78rem;
+        border: 1px solid rgba(0, 212, 255, .25);
+        color: var(--text-light);
+    }
+    .lab-status.ok { color: #72ffad; border-color: rgba(114, 255, 173, .45); }
+    .lab-status.risk,
+    .lab-status.needs_margin { color: #ffe08a; border-color: rgba(255, 224, 138, .45); }
+    .lab-status.overheat { color: #ff9a9a; border-color: rgba(255, 154, 154, .5); }
+    .lab-result {
+        margin-top: .9rem;
+        color: var(--text-light);
+        line-height: 1.45;
+        min-height: 2rem;
+    }
+    .lab-output-list {
+        display: grid;
+        gap: .35rem;
+        margin-top: .65rem;
+    }
+    .lab-output-row {
+        display: flex;
+        justify-content: space-between;
+        gap: .75rem;
+        border-bottom: 1px solid rgba(0, 212, 255, .11);
+        padding-bottom: .3rem;
+    }
+    .lab-output-row strong {
+        color: var(--text-bright);
+    }
+    @media (max-width: 560px) {
+        .lab-fields { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="lab-hero">
+    <h1>Инженерная лаборатория</h1>
+    <p>Расчеты и измерительные ориентиры для реальных узлов: транзисторный ключ, NE555, стабилизатор, RC-антидребезг и тепловой запас. Результат сразу получает инженерную оценку.</p>
+</section>
+
+<div class="lab-grid">
+    {% for tool in lab_tools %}
+    <form class="lab-card engineering-lab-form" data-kind="{{ tool.kind }}" action="{% url 'knowledge:engineering_lab_api' %}" method="post">
+        {% csrf_token %}
+        <h2>{{ tool.title }}</h2>
+        <p class="lab-desc">{{ tool.description }}</p>
+        <div class="lab-fields">
+            {% for field in tool.fields %}
+            <div class="lab-field">
+                <label for="{{ tool.kind }}-{{ field.name }}">{{ field.label }}, {{ field.unit }}</label>
+                <input id="{{ tool.kind }}-{{ field.name }}" name="{{ field.name }}" value="{{ field.default }}" autocomplete="off">
+            </div>
+            {% endfor %}
+        </div>
+        <div class="lab-actions">
+            <button class="btn-detail" type="submit">Рассчитать</button>
+            <span class="lab-status">ожидает</span>
+        </div>
+        <div class="lab-result" aria-live="polite"></div>
+    </form>
+    {% endfor %}
+</div>
+
+<script>
+document.querySelectorAll('.engineering-lab-form').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const status = form.querySelector('.lab-status');
+        const result = form.querySelector('.lab-result');
+        const inputs = {};
+        form.querySelectorAll('input[name]').forEach((input) => {
+            inputs[input.name] = input.value;
+        });
+        status.className = 'lab-status';
+        status.textContent = 'считаем';
+        result.textContent = '';
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': form.querySelector('[name="csrfmiddlewaretoken"]').value,
+                },
+                body: JSON.stringify({kind: form.dataset.kind, inputs}),
+            });
+            const data = await response.json();
+            status.className = 'lab-status ' + (data.status || 'risk');
+            status.textContent = data.status_label || 'результат';
+            const rows = Object.values(data.outputs || {}).map((item) => (
+                `<div class="lab-output-row"><span>${item.label}</span><strong>${item.display} ${item.unit || ''}</strong></div>`
+            )).join('');
+            result.innerHTML = `<div>${data.feedback || ''}</div><div class="lab-output-list">${rows}</div>`;
+        } catch (error) {
+            status.className = 'lab-status overheat';
+            status.textContent = 'ошибка';
+            result.textContent = 'Расчет не выполнился: ' + error.message;
+        }
+    });
+});
+</script>
+{% endblock %}

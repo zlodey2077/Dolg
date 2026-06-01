@@ -1,0 +1,105 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Редактировать адрес{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style="color: var(--accent-cyan);">Редактировать адрес</h1>
+
+    <div class="form-container">
+        <form method="post" class="address-form">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="title">Название адреса:</label>
+                <input type="text" id="title" name="title" value="{{ address.title }}" required class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="address">Адрес:</label>
+                <input type="text" id="address" name="address" value="{{ address.address }}" required class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="city">Город:</label>
+                <input type="text" id="city" name="city" value="{{ address.city }}" required class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="postal_code">Почтовый индекс:</label>
+                <input type="text" id="postal_code" name="postal_code" value="{{ address.postal_code }}" required class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="country">Страна:</label>
+                <input type="text" id="country" name="country" value="{{ address.country }}" required class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="is_default">
+                    <input type="checkbox" id="is_default" name="is_default" {% if address.is_default %}checked{% endif %}> Использовать по умолчанию
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success">Сохранить адрес</button>
+                <a href="{% url 'accounts:profile' %}" class="btn btn-secondary">Отменить</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-container {
+    max-width: 500px;
+    margin: 2rem auto;
+}
+
+.address-form {
+    background-color: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: rgba(0, 212, 255, 0.9);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    border-radius: 4px;
+    font-size: 1rem;
+    color: #ccc;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #00ffff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.3);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-actions button,
+.form-actions a {
+    flex: 1;
+    text-align: center;
+}
+</style>
+{% endblock %}

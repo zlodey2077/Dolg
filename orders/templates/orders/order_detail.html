@@ -1,0 +1,294 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Заказ {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <a href="{% url 'orders:order_list' %}" class="back-link">← Вернуться к заказам</a>
+
+    <div class="order-detail-container">
+        <div class="order-detail-main">
+            <h1>Заказ {{ order.order_number }}</h1>
+
+            <div class="status-section">
+                <h2>Статус заказа</h2>
+                <span class="status {% if order.status.name == 'delivered' %}status-delivered{% elif order.status.name == 'cancelled' %}status-cancelled{% elif order.status.name == 'shipped' %}status-shipped{% else %}status-pending{% endif %}">
+                    {{ order.status.get_name_display }}
+                </span>
+            </div>
+
+            <div class="info-section">
+                <h2>Информация о заказе</h2>
+                <p><strong>Номер заказа:</strong> {{ order.order_number }}</p>
+                <p><strong>Дата создания:</strong> {{ order.created_at|date:"d.m.Y H:i" }}</p>
+                <p><strong>Последнее обновление:</strong> {{ order.updated_at|date:"d.m.Y H:i" }}</p>
+            </div>
+
+            <div class="items-section">
+                <h2>Товары в заказе</h2>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Цена</th>
+                            <th>Количество</th>
+                            <th>Сумма</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>
+                                {% if item.product %}
+                                <a href="{% url 'shop:product_detail' item.product.slug %}">
+                                    {{ item.product.name }}
+                                </a>
+                                {% else %}
+                                <span style="color:#aaa;">Удалённый товар</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.price }} ₽</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.get_total_price }} ₽</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="shipping-section">
+                <h2>Адрес доставки</h2>
+                <p>{{ order.shipping_address }}</p>
+                <p>{{ order.shipping_postal_code }}, {{ order.shipping_city }}</p>
+                <p>{{ order.shipping_country }}</p>
+            </div>
+
+            {% if order.shipment %}
+            <div class="shipment-section">
+                <h2>Отправка</h2>
+                <p><strong>Номер отслеживания:</strong> {{ order.shipment.tracking_number }}</p>
+                <p><strong>Перевозчик:</strong> {{ order.shipment.carrier|default:"Не указан" }}</p>
+                <p><strong>Статус:</strong> {{ order.shipment.get_status_display }}</p>
+                {% if order.shipment.shipped_at %}
+                    <p><strong>Отправлено:</strong> {{ order.shipment.shipped_at|date:"d.m.Y H:i" }}</p>
+                {% endif %}
+                {% if order.shipment.delivered_at %}
+                    <p><strong>Доставлено:</strong> {{ order.shipment.delivered_at|date:"d.m.Y H:i" }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="notes-section">
+                <h2>Примечание</h2>
+                <p>{{ order.notes|default:"Нет примечаний" }}</p>
+            </div>
+        </div>
+
+        <div class="order-detail-sidebar">
+            <div class="payment-section">
+                <h2>Платеж</h2>
+                <p><strong>Способ:</strong> {{ order.get_payment_method_display }}</p>
+                <p><strong>Статус:</strong> 
+                    {% if order.is_paid %}
+                    <span style="color: #90ee90; font-weight: bold;">✓ Оплачено</span>
+                    {% else %}
+                    <span style="color: #ff6464; font-weight: bold;">✕ Не оплачено</span>
+                    {% endif %}
+                </p>
+                
+                {% if order.payment_transaction %}
+                <div class="payment-details" style="margin-top: 10px; font-size: 0.9em; background: rgba(20, 30, 60, 0.4); border: 1px solid rgba(0, 212, 255, 0.2); padding: 8px; border-radius: 4px;">
+                    <p><strong>ID транзакции:</strong> {{ order.payment_transaction.transaction_id }}</p>
+                    <p><strong>Статус:</strong> {{ order.payment_transaction.get_status_display }}</p>
+                    {% if order.payment_transaction.error_message %}
+                    <p style="color: #ff6464;"><strong>Ошибка:</strong> {{ order.payment_transaction.error_message }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="total-section">
+                <h2>Итого</h2>
+                <p class="total-amount">{{ order.total_amount }} ₽</p>
+            </div>
+
+            <div class="actions-section">
+                {% if not order.is_paid and order.status.name == 'pending' %}
+                <a href="{% url 'orders:create_payment' order.id %}" class="btn btn-success btn-full" style="background: #28a745; margin-bottom: 10px;">
+                    Оплатить заказ
+                </a>
+                {% endif %}
+                
+                {% if order.status.name == 'pending' or order.status.name == 'confirmed' %}
+                <form method="post" action="{% url 'orders:cancel_order' order.id %}" style="margin-bottom: 10px;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('Вы уверены, что хотите отменить заказ?')">Отменить заказ</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{% url 'orders:repeat_order' order.id %}" style="margin-bottom: 10px;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-full">Повторить заказ</button>
+                </form>
+                <a href="{% url 'shop:index' %}" class="btn btn-secondary btn-full">Продолжить покупки</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.order-detail-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.order-detail-main div {
+    background-color: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+}
+
+.order-detail-main h1 {
+    color: var(--accent-cyan);
+}
+
+.order-detail-main h2 {
+    color: var(--accent-cyan);
+}
+
+.order-detail-main p {
+    color: #ccc;
+}
+
+.status-section {
+    text-align: center;
+}
+
+.status {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.status-pending {
+    background-color: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border: 1px solid #ffc107;
+}
+
+.status-shipped {
+    background-color: rgba(0, 212, 255, 0.2);
+    color: var(--accent-cyan);
+    border: 1px solid var(--accent-cyan);
+}
+
+.status-delivered {
+    background-color: rgba(144, 238, 144, 0.2);
+    color: #90ee90;
+    border: 1px solid #90ee90;
+}
+
+.status-cancelled {
+    background-color: rgba(255, 100, 100, 0.2);
+    color: #ff6464;
+    border: 1px solid #ff6464;
+}
+
+.info-section h2,
+.items-section h2,
+.shipping-section h2,
+.shipment-section h2,
+.notes-section h2 {
+    margin-bottom: 1rem;
+}
+
+.info-section p,
+.shipping-section p {
+    margin: 0.5rem 0;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.items-table th {
+    background-color: rgba(20, 30, 60, 0.6);
+    color: var(--accent-cyan);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--accent-cyan);
+}
+
+.items-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+    color: #ccc;
+}
+
+.items-table a {
+    color: var(--accent-cyan);
+    text-decoration: none;
+}
+
+.items-table a:hover {
+    text-decoration: underline;
+}
+
+.order-detail-sidebar div {
+    background-color: rgba(10, 14, 39, 0.6);
+    border: 2px solid var(--accent-cyan);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+}
+
+.order-detail-sidebar p {
+    color: #ccc;
+}
+
+.payment-section h2,
+.total-section h2,
+.actions-section h2 {
+    margin-bottom: 1rem;
+    color: var(--accent-cyan);
+}
+
+.total-amount {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #90ee90;
+    text-align: center;
+    margin: 0;
+}
+
+.btn-full {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .order-detail-container {
+        grid-template-columns: 1fr;
+    }
+
+    .items-table {
+        font-size: 0.9rem;
+    }
+
+    .items-table th,
+    .items-table td {
+        padding: 0.5rem;
+    }
+}
+</style>
+{% endblock %}

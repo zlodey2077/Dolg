@@ -1,0 +1,458 @@
+﻿{% load static %}
+{% load tier_tags %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}🎓 Магазин - электроники{% endblock %}</title>
+    {# 2026-06-01: пустой data-URL favicon — гасит 404 в DevTools. #}
+    {# TODO: реальный favicon перед production. См. memory: project_favicon_todo #}
+    <link rel="icon" href="data:,">
+    {% comment %}
+    Cache-buster v=20260527-navfix: фикс nav dropdown (admin/org-меню ехало
+    горизонтально из-за каскадного flex). Без query-string браузер тянет
+    закэшированную версию CSS. Подбивать строку при каждом next-fix навигации.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'shop/cosmic_theme.css' %}?v=20260530-navfix4">
+    {% comment %}extra_head: link/script из дочерних шаблонов; extra_css: inline-CSS (каждый шаблон сам в <style>). Без двойной обёртки.{% endcomment %}
+    {% block extra_head %}{% endblock %}
+    {% block extra_css %}{% endblock %}
+</head>
+<body
+    data-user-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}"
+    {% if user.is_authenticated %}
+    data-profile-theme="{{ user.profile.preferred_theme|default:'dark' }}"
+    data-profile-accent="{{ user.profile.accent_color|default:'cyan' }}"
+    {% endif %}
+>
+    {% if user.is_authenticated %}
+    <style>
+        {% with accent=user.profile.accent_color %}
+        :root {
+            {% if accent == 'blue' %}
+            --accent-cyan: #4f8cff;
+            {% elif accent == 'green' %}
+            --accent-cyan: #22c55e;
+            {% elif accent == 'orange' %}
+            --accent-cyan: #f97316;
+            {% elif accent == 'violet' %}
+            --accent-cyan: #8b5cf6;
+            {% else %}
+            --accent-cyan: #00d4ff;
+            {% endif %}
+        }
+        {% endwith %}
+        body[data-profile-theme="projector"] {
+            font-size: 1.08rem;
+            letter-spacing: 0;
+        }
+        body[data-profile-theme="light"] {
+            background: #eef4f8;
+            color: #14213d;
+        }
+    </style>
+    {% endif %}
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="{% url 'shop:about' %}" class="logo">🎓 О проекте</a>
+                <form class="header-search" action="{% url 'shop:global_search' %}" method="get" role="search">
+                    <input
+                        id="header-search-input"
+                        type="search"
+                        name="q"
+                        value="{{ request.GET.q|default:'' }}"
+                        placeholder="Поиск: товар, статья, урок, схема, инструмент"
+                        aria-label="Глобальный поиск по DOLG"
+                        autocomplete="off"
+                        data-suggest-url="{% url 'shop:global_search_suggest' %}"
+                    >
+                    <button type="submit">Найти</button>
+                    <div id="header-search-suggest" class="header-search-suggest"></div>
+                </form>
+                <nav class="nav">
+                    <ul>
+                        {% comment %}
+                        🛒 Магазин — dropdown с каталогом + сравнением. Раньше
+                        Каталог и Сравнение были 2 разные flat-ссылки и съедали
+                        горизонтальное место. Логически они связаны (Сравнение
+                        работает только с товарами из каталога), объединяем.
+                        {% endcomment %}
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle">🛒 Магазин{% if compare_count %}<span class="cart-count">{{ compare_count }}</span>{% endif %}</a>
+                            <ul class="dropdown-menu">
+                                <li><a href="{% url 'shop:index' %}">🛒 Каталог товаров</a></li>
+                                <li><a href="{% url 'shop:compare' %}">⚖️ Сравнение{% if compare_count %}<span class="cart-count">{{ compare_count }}</span>{% endif %}</a></li>
+                            </ul>
+                        </li>
+                        {% comment %}
+                        Знания: Энциклопедия + Лаборатория + Обучение — все три
+                        раздела про теорию/практику. Логично в одно меню.
+                        {% endcomment %}
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle">📚 Знания</a>
+                            <ul class="dropdown-menu">
+                                <li><a href="{% url 'knowledge:index' %}">📚 Энциклопедия</a></li>
+                                <li><a href="{% url 'knowledge:engineering_lab' %}">🧮 Лаборатория</a></li>
+                                <li><a href="{% url 'knowledge:learning_index' %}">🎓 Обучение</a></li>
+                            </ul>
+                        </li>
+                        {% comment %}
+                        Инструменты — видны и guest, и auth: симулятор и CAD
+                        теперь открываются для anonymous в read-only режиме
+                        (см. Guest-сценарий). Проекты остаются только для auth
+                        — нет смысла guest'у видеть пустой список без save.
+                        {% endcomment %}
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle">🔧 Инструменты</a>
+                            <ul class="dropdown-menu">
+                                <li><a href="{% url 'hello:simulation' %}">⚙️ Симуляция</a></li>
+                                <li><a href="{% url 'hello:cad' %}">📐 2D Чертеж</a></li>
+                                {% if user.is_authenticated %}
+                                <li><a href="{% url 'hello:projects' %}">📁 Проекты</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                        {% comment %}
+                        💬 Сообщество — dropdown под чат + новости. Раньше Чат
+                        был flat-ссылкой; новости будут добавлены позже когда
+                        появится URL. Сейчас в dropdown'е заглушка-комментарий.
+                        Это даёт место под рост коммьюнити-секции (отзывы,
+                        форум, рейтинги) без новых top-level пунктов nav.
+                        {% endcomment %}
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle">💬 Сообщество</a>
+                            <ul class="dropdown-menu">
+                                <li><a href="{% url 'hello:chat_list' %}">💬 Чат</a></li>
+                                {% comment %}
+                                TODO: добавить когда появится URL `hello:news`
+                                или `knowledge:news_list`. Сейчас ведёт на главную
+                                «Знания», поскольку там публикуются статьи.
+                                {% endcomment %}
+                                <li><a href="{% url 'knowledge:index' %}">📰 Новости</a></li>
+                            </ul>
+                        </li>
+                        {% comment %}
+                        «Подписки» убрали из главного хедера — ссылка дублируется
+                        в user-dropdown (👤 → 💎 Подписка) и в pricing-баннерах
+                        на странице фич. Сравнение переехало в dropdown «🛒 Магазин».
+                        {% endcomment %}
+                        {% if user.is_authenticated %}
+                            {% with orgs=user|user_orgs %}
+                            {% if orgs %}
+                            <li class="dropdown nav-org-dropdown">
+                                <a href="#" class="dropdown-toggle">⚙ Организации</a>
+                                <ul class="dropdown-menu">
+                                    {% for m in orgs %}
+                                    <li><a href="{% url 'hello:org_dashboard' m.organization.slug %}">
+                                        {{ m.organization.name }}
+                                        <span class="org-switcher-role org-switcher-role--{{ m.role }}">{{ m.role }}</span>
+                                    </a></li>
+                                    {% endfor %}
+                                    <li class="dropdown-divider"></li>
+                                    <li><a href="{% url 'hello:org_list' %}">📋 Все организации</a></li>
+                                    <li><a href="{% url 'hello:org_create' %}">＋ Создать новую</a></li>
+                                </ul>
+                            </li>
+                            {% else %}
+                            <li><a href="{% url 'hello:org_create' %}" title="Создать организацию">⚙ Team</a></li>
+                            {% endif %}
+                            {% endwith %}
+                            {% comment %}
+                            Пользовательское меню: всё личное (профиль, корзина,
+                            заказы, биллинг, выход) собрано в один dropdown.
+                            Корзина-счётчик дублируется на toggle для видимости
+                            «есть товары» без раскрытия меню.
+                            {% endcomment %}
+                            <li class="dropdown nav-user-dropdown">
+                                <a href="#" class="dropdown-toggle">
+                                    👤 {{ user.username }}{% if user|is_pro_user %}<span class="nav-pro-badge" title="Pro-подписка активна">💎</span>{% endif %}{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a href="{% url 'accounts:profile' %}">👤 Профиль</a></li>
+                                    <li><a href="{% url 'accounts:edit_profile' %}">🎛 Настройки профиля</a></li>
+                                    <li><a href="{% url 'shop:cart' %}">🛒 Корзина{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}</a></li>
+                                    <li><a href="{% url 'orders:order_list' %}">📦 Заказы</a></li>
+                                    <li><a href="{% url 'hello:billing_plans' %}" class="nav-upgrade-link" title="Тарифы и Pro-функции">💎 Подписка</a></li>
+                                    <li><a href="{% url 'hello:two_factor_setup' %}">🔐 2FA и безопасность</a></li>
+                                    {% if user.is_staff %}
+                                    {% comment %}
+                                    Admin-only: тренировка нейронки прямо с сайта.
+                                    Запускает background thread, прогресс читается
+                                    через polling. Видна только staff/superuser.
+                                    {% endcomment %}
+                                    <li class="dropdown-divider"></li>
+                                    <li><a href="{% url 'hello:ml_training_page' %}" title="Запустить обучение Tiny Circuit AI (admin)">🧠 Тренировка нейронки</a></li>
+                                    {% endif %}
+                                    <li class="dropdown-divider"></li>
+                                    <li><a href="{% url 'accounts:logout' %}">🚪 Выход</a></li>
+                                </ul>
+                            </li>
+                        {% else %}
+                            <li><a href="{% url 'shop:cart' %}">🛒 Корзина{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}</a></li>
+                            {% comment %}
+                            Раньше «Вход» и «Регистрация» висели рядом двумя кнопками —
+                            визуально нагружало nav. Стандартный паттерн e-commerce:
+                            одна точка входа «Войти», на login-странице уже есть
+                            ссылка «📝 Регистрация →» в footer'е формы.
+                            {% endcomment %}
+                            <li><a href="{% url 'accounts:login' %}">🔑 Войти</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    {% comment %}
+    Email-verify banner: показываем сверху всех страниц для авторизованных
+    юзеров с неподтверждённым email. Скрываем через cookie 'dolg_email_banner_dismissed'
+    (не агрессивно — юзер может закрыть и работать; checkout всё равно блокирует).
+    {% endcomment %}
+    {% if user.is_authenticated and user.profile.email_verified == False %}
+    <div class="email-verify-banner" id="dolgEmailBanner">
+        ⚠️ Подтвердите email <strong>{{ user.email }}</strong> — это нужно для оформления заказов.
+        <form method="post" action="{% url 'accounts:resend_verification' %}" style="display:inline; margin-left:0.5rem;">
+            {% csrf_token %}
+            <button type="submit">Отправить ещё раз</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Информационные сообщения -->
+    {% if messages %}
+        <div class="messages-container">
+            <div class="container">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <main class="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="dolg-footer-inner">
+                <p>⚡ <strong>DOLG</strong> — платформа для проектирования электроники и магазина компонентов</p>
+                <p>📧 <a href="mailto:contact@dolg.local">contact@dolg.local</a> · 🛡 DMCA: <a href="mailto:dmca@dolg.local">dmca@dolg.local</a> · 🔒 Privacy: <a href="mailto:privacy@dolg.local">privacy@dolg.local</a></p>
+                <div class="dolg-footer-legal">
+                    <a href="{% url 'hello:terms' %}">Условия использования</a>
+                    <a href="{% url 'hello:privacy' %}">Политика конфиденциальности</a>
+                    <a href="{% url 'hello:cookies' %}">Cookies</a>
+                    <button type="button" class="dolg-footer-cookielink"
+                            onclick="if(window.DolgConsent)window.DolgConsent.openSettings()">Настройки cookies</button>
+                </div>
+                <p class="dolg-footer-disclaimer">
+                    © 2026 DOLG. All trademarks (NVIDIA, Intel, AMD, Apple, Samsung, Vishay, Murata и др.)
+                    являются собственностью их правообладателей и используются только для идентификации товаров.
+                    Симуляция и расчёты предоставляются в образовательных целях — проверяйте перед применением
+                    в safety-critical задачах.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    {% if user.is_authenticated %}
+    {# Юзер залогинился — сбрасываем guest-counters, чтобы они не мешали Pro/Free лимитам. #}
+    <script>try { localStorage.removeItem('dolg_guest_sim_count'); } catch (e) {}</script>
+    {% endif %}
+    <script>
+    // Глобальный header-search live-suggest. Дебаунс 180 мс, минимум 2 симв.
+    window.__DOLG_HDR_SUGGEST_BOOTED = true;
+    function dolgInitHeaderSuggest() {
+        const TAG = '[hdr-suggest]';
+        console.log(TAG, 'init at readyState=', document.readyState);
+        const input = document.getElementById('header-search-input');
+        const box = document.getElementById('header-search-suggest');
+        console.log(TAG, 'input=', !!input, 'box=', !!box);
+        if (!input || !box) { console.warn(TAG, 'missing element, abort'); return; }
+        if (input.__hdrSuggestBound) { console.log(TAG, 'already bound, skip'); return; }
+        input.__hdrSuggestBound = true;
+        // URL берём из data-suggest-url атрибута — так юзер может
+        // в любой момент в DevTools посмотреть какой endpoint реально использует
+        // input (раньше URL был зашит внутрь скрипта, отладка вслепую).
+        const URL_SUGGEST = input.getAttribute('data-suggest-url') || '/api/lookup/';
+        console.log(TAG, 'endpoint:', URL_SUGGEST);
+        // ВИДИМЫЙ маркер для юзера — placeholder меняется когда listeners готовы.
+        // Это позволяет проверить работу скрипта БЕЗ DevTools.
+        input.placeholder = '🔍 ' + input.placeholder;
+        // Ручной тест из консоли: dolgTestSuggest('резистор')
+        window.dolgTestSuggest = (q) => fetch(URL_SUGGEST + '?q=' + encodeURIComponent(q || 'ne555')).then(r => r.json()).then(d => { console.log(TAG, 'manual test:', d); return d; });
+        let timer = null;
+        let activeIdx = -1;
+        let items = [];
+
+        function show() {
+            box.classList.add('open');
+            // Двойная страховка — inline style на случай если CSS файл закешировался
+            // браузером и .open-класс не подхватился.
+            box.style.display = 'block';
+            console.log(TAG, 'show, items=', items.length, 'display=', getComputedStyle(box).display);
+        }
+        function hide() {
+            box.classList.remove('open');
+            box.style.display = 'none';
+            activeIdx = -1;
+        }
+        function isOpen() { return box.classList.contains('open'); }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+        function render(rs) {
+            items = rs;
+            console.log(TAG, 'render, count=', rs.length);
+            if (!rs.length) {
+                box.innerHTML = '<div class="hs-empty">Ничего не найдено</div>';
+                show();
+                return;
+            }
+            box.innerHTML = rs.map((r, i) =>
+                '<a class="hs-item" data-idx="' + i + '" href="' + esc(r.url) + '">' +
+                '<span class="hs-icon">' + esc(r.icon || '•') + '</span>' +
+                '<span class="hs-text"><span class="hs-name">' + esc(r.name) + '</span>' +
+                '<span class="hs-meta">' + esc(r.meta || '') + '</span></span>' +
+                '</a>'
+            ).join('');
+            show();
+            activeIdx = -1;
+        }
+
+        async function lookup(q) {
+            console.log(TAG, 'lookup:', q);
+            try {
+                const r = await fetch(URL_SUGGEST + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' });
+                console.log(TAG, 'fetch status:', r.status);
+                const data = await r.json();
+                console.log(TAG, 'data:', data);
+                if (data.ok) render(data.results || []);
+            } catch (e) {
+                console.error(TAG, 'fetch error:', e);
+            }
+        }
+
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            const q = input.value.trim();
+            console.log(TAG, 'input event, q=', q);
+            if (q.length < 2) { hide(); return; }
+            timer = setTimeout(() => lookup(q), 180);
+        });
+        input.addEventListener('focus', () => {
+            const q = input.value.trim();
+            if (q.length >= 2 && items.length) show();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (!isOpen()) return;
+            const els = box.querySelectorAll('.hs-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault(); activeIdx = Math.min(activeIdx + 1, els.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault(); activeIdx = Math.max(activeIdx - 1, -1);
+            } else if (e.key === 'Enter' && activeIdx >= 0) {
+                e.preventDefault(); window.location.href = items[activeIdx].url; return;
+            } else if (e.key === 'Escape') {
+                hide(); return;
+            } else { return; }
+            els.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+        });
+        document.addEventListener('click', (e) => {
+            if (!box.contains(e.target) && e.target !== input) hide();
+        });
+        console.log(TAG, 'listeners attached, ready');
+    }
+    // Запускаем сразу если DOM уже готов, иначе ждём DOMContentLoaded.
+    // Двойной bootstrap нужен на случай если скрипт оказался ВЫШЕ инпута
+    // (например, если кто-то переставит порядок блоков в base.html).
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', dolgInitHeaderSuggest);
+    } else {
+        dolgInitHeaderSuggest();
+    }
+    </script>
+    <script src="{% static 'shop/consent-ui.js' %}?v=20260524b"></script>
+    <script src="{% static 'shop/auth-modal.js' %}?v=20260525a"></script>
+    <script src="{% static 'shop/save-cta-banner.js' %}?v=20260516a"></script>
+    <script src="{% static 'shop/quota-tracker.js' %}?v=20260517a"></script>
+    <script src="{% static 'shop/comments.js' %}?v=20260517a"></script>
+    {# highlight.js для code-snippet'ов в Pro-комментариях. CDN — без зависимостей. #}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <script>document.addEventListener('DOMContentLoaded',()=>{if(window.hljs)hljs.highlightAll();});</script>
+
+    <script>
+    // 2026-05-30: viewport-aware позиционирование nav-dropdown'ов.
+    // CSS даёт top:100%, left:0 — на правом краю dropdown'ы уезжали за
+    // viewport (особенно user-меню с 7+ пунктами уходило вниз за экран).
+    // Этот скрипт на mouseenter:
+    //   1. сбрасывает inline-стили (даёт стандартное positioning)
+    //   2. меряет bounding rect — если right > viewport, флипает на right:0
+    //   3. если bottom > viewport, флипает вверх через bottom:100%
+    // Чистый Vanilla JS, никаких deps. Работает на hover (open mode) и не
+    // мешает CSS-transition'ам (правим style ДО reveal через rAF).
+    (function () {
+        'use strict';
+        function position(dropdown) {
+            var menu = dropdown.querySelector('.dropdown-menu');
+            if (!menu) return;
+            // Сбрасываем inline-сдвиги от прошлого раза
+            menu.style.left = '';
+            menu.style.right = '';
+            menu.style.top = '';
+            menu.style.bottom = '';
+            // Меряем после reflow
+            requestAnimationFrame(function () {
+                var rect = menu.getBoundingClientRect();
+                var vw = window.innerWidth || document.documentElement.clientWidth;
+                var vh = window.innerHeight || document.documentElement.clientHeight;
+                var pad = 8;
+                // Горизонталь: если правый край вылез — крепим к правому краю toggle'а
+                if (rect.right > vw - pad) {
+                    menu.style.left = 'auto';
+                    menu.style.right = '0';
+                }
+                // Вертикаль: если bottom вышел и при этом сверху ЕСТЬ место — флипаем вверх
+                var toggleRect = dropdown.getBoundingClientRect();
+                if (rect.bottom > vh - pad && toggleRect.top > rect.height + pad) {
+                    menu.style.top = 'auto';
+                    menu.style.bottom = '100%';
+                    menu.style.marginTop = '0';
+                    menu.style.marginBottom = '10px';
+                } else {
+                    menu.style.marginBottom = '';
+                }
+            });
+        }
+        function bindAll() {
+            var ddl = document.querySelectorAll('.dropdown');
+            for (var i = 0; i < ddl.length; i++) {
+                var dd = ddl[i];
+                if (dd._dolgPosBound) continue;
+                dd._dolgPosBound = true;
+                dd.addEventListener('mouseenter', (function (d) {
+                    return function () { position(d); };
+                })(dd));
+                dd.addEventListener('focusin', (function (d) {
+                    return function () { position(d); };
+                })(dd));
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bindAll);
+        } else {
+            bindAll();
+        }
+        // Re-bind на случай динамического добавления dropdown'ов
+        window.addEventListener('resize', function () {
+            var open = document.querySelectorAll('.dropdown:hover');
+            for (var i = 0; i < open.length; i++) position(open[i]);
+        });
+    })();
+    </script>
+</body>
+</html>

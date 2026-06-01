@@ -1,0 +1,37 @@
+{% extends "shop/base.html" %}
+{% load tier_tags %}
+{% block title %}Мои организации — DOLG{% endblock %}
+{% block content %}
+<div class="orgs-page">
+    <div class="orgs-header">
+        <h1>⚙ Мои организации</h1>
+        <a href="{% url 'hello:org_create' %}" class="btn btn-primary">＋ Создать новую</a>
+    </div>
+
+    {% if memberships %}
+    <div class="orgs-grid">
+        {% for m in memberships %}
+        <a class="org-card" href="{% url 'hello:org_dashboard' m.organization.slug %}">
+            {% if m.organization.custom_logo %}
+                <img class="org-card-logo" src="{{ m.organization.custom_logo.url }}" alt="">
+            {% else %}
+                <div class="org-card-logo org-card-logo--placeholder">{{ m.organization.name|slice:":1" }}</div>
+            {% endif %}
+            <div class="org-card-body">
+                <strong>{{ m.organization.name }}</strong>
+                <span class="org-card-slug">{{ m.organization.slug }}</span>
+                <span class="org-card-role">Ваша роль: <em>{{ m.get_role_display }}</em></span>
+                <span class="org-card-plan">{{ m.organization.get_plan_display }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="orgs-empty">
+        <p>Вы пока не состоите ни в одной организации.</p>
+        <p>Создайте свою или попросите admin'а другой компании прислать invite.</p>
+        <a href="{% url 'hello:org_create' %}" class="btn btn-primary">📋 Создать команду</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

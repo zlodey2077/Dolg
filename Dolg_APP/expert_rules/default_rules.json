@@ -1,0 +1,1876 @@
+{
+  "version": "2026.05-expert-v3-100rules",
+  "description": "Расширенный набор детерминированных экспертных правил DOLG (89 правил). Категории: connectivity, power, polarity, rating, topology, signal, bom, simulation, docs, layout, compliance, ai. Источники: KiCad ERC, IPC-2221A/A-610, ngspice docs, industry datasheet practices, academic papers.",
+  "rules": [
+    {
+      "id": "erc.missing_ground",
+      "title": "Нет опорного узла GND",
+      "severity": "error",
+      "when": "has_ground == false and component_count > 0",
+      "evidence_fields": [
+        "has_ground",
+        "component_count",
+        "topology"
+      ],
+      "recommendation": "Добавьте GND или опорный узел перед тем, как доверять симуляции и измерениям.",
+      "confidence": 0.98,
+      "references": {
+        "learning_track": "diagnostika-prostyh-shem",
+        "lab_tool": "engineering_review",
+        "source_ids": [
+          "all_about_circuits_textbook",
+          "ngspice_docs",
+          "kicad_docs"
+        ]
+      },
+      "category": "connectivity",
+      "enabled": true
+    },
+    {
+      "id": "erc.missing_source",
+      "title": "Нет источника питания или сигнала",
+      "severity": "warning",
+      "when": "has_source == false and component_count > 1",
+      "evidence_fields": [
+        "has_source",
+        "component_count",
+        "topology"
+      ],
+      "recommendation": "Добавьте источник напряжения/тока или явно пометьте источник после импорта.",
+      "confidence": 0.82,
+      "references": {
+        "learning_track": "diagnostika-prostyh-shem",
+        "source_ids": [
+          "ngspice_docs",
+          "kicad_docs"
+        ]
+      },
+      "category": "power",
+      "enabled": true
+    },
+    {
+      "id": "topology.floating_fragments",
+      "title": "Есть плавающие фрагменты схемы",
+      "severity": "warning",
+      "when": "floating_count > 0",
+      "evidence_fields": [
+        "floating_count",
+        "connected_components_count",
+        "topology"
+      ],
+      "recommendation": "Соедините плавающие фрагменты с основной опорной цепью или удалите неиспользуемые компоненты.",
+      "confidence": 0.9,
+      "references": {
+        "learning_track": "diagnostika-prostyh-shem",
+        "source_ids": [
+          "networkx_algorithms",
+          "kicad_docs"
+        ]
+      },
+      "category": "connectivity",
+      "enabled": true
+    },
+    {
+      "id": "topology.divider_without_output",
+      "title": "У делителя не подписан выходной узел",
+      "severity": "recommendation",
+      "when": "topology == 'voltage_divider' and has_output_node == false",
+      "evidence_fields": [
+        "topology",
+        "has_output_node"
+      ],
+      "recommendation": "Назовите среднюю точку Vout/out, чтобы лаборатория и учебные задания могли измерять её.",
+      "confidence": 0.76,
+      "references": {
+        "lab_tool": "voltage_divider",
+        "source_ids": [
+          "all_about_circuits_textbook",
+          "openstax_university_physics_2"
+        ]
+      },
+      "category": "docs",
+      "enabled": true
+    },
+    {
+      "id": "bom.missing_catalog_binding",
+      "title": "В BOM есть компоненты без связи с каталогом",
+      "severity": "warning",
+      "when": "bom_missing_count > 0",
+      "evidence_fields": [
+        "bom_missing_count",
+        "component_count"
+      ],
+      "recommendation": "Свяжите элементы схемы с товарами каталога перед экспортом BOM и оформлением заказа.",
+      "confidence": 0.78,
+      "references": {
+        "article_query": "BOM",
+        "source_ids": [
+          "kicad_docs"
+        ]
+      },
+      "category": "bom",
+      "enabled": true
+    },
+    {
+      "id": "derating.power_or_thermal_risk",
+      "title": "Риск по мощности или температурному запасу",
+      "severity": "risk",
+      "when": "derating_issue_count > 0",
+      "evidence_fields": [
+        "derating_issue_count",
+        "risk_count"
+      ],
+      "recommendation": "Увеличьте запас по мощности, напряжению или току либо выберите другой корпус перед выпуском.",
+      "confidence": 0.86,
+      "references": {
+        "lab_tool": "thermal_margin",
+        "source_ids": [
+          "all_about_circuits_textbook",
+          "pint_docs"
+        ]
+      },
+      "category": "rating",
+      "enabled": true
+    },
+    {
+      "id": "simulation.no_saved_measurements",
+      "title": "Нет сохранённых измерений симуляции",
+      "severity": "recommendation",
+      "when": "has_measurements == false and component_count > 2",
+      "evidence_fields": [
+        "has_measurements",
+        "component_count",
+        "topology"
+      ],
+      "recommendation": "Запустите DC/AC/TRAN-проверку и сохраните метрики expected vs measured.",
+      "confidence": 0.7,
+      "references": {
+        "learning_track": "prikladnye-uzly-elektroniki",
+        "source_ids": [
+          "ngspice_docs",
+          "ltspice_analog_devices"
+        ]
+      },
+      "category": "simulation",
+      "enabled": true
+    },
+    {
+      "id": "import.unsupported_items",
+      "title": "Импорт содержит неподдержанные элементы CAD/SPICE",
+      "severity": "warning",
+      "when": "unsupported_import_count > 0",
+      "evidence_fields": [
+        "unsupported_import_count"
+      ],
+      "recommendation": "Проверьте неподдержанные строки импорта перед сохранением проекта или запуском review.",
+      "confidence": 0.88,
+      "references": {
+        "article_query": "LTspice KiCad import",
+        "source_ids": [
+          "ngspice_docs",
+          "kicad_docs",
+          "lark_docs"
+        ]
+      },
+      "category": "bom",
+      "enabled": true
+    },
+    {
+      "id": "erc.led_reverse_polarity",
+      "title": "LED включён обратной полярностью",
+      "severity": "warning",
+      "when": "led_reverse_polarity_count > 0",
+      "evidence_fields": [
+        "led_reverse_polarity_count",
+        "led_reverse_polarity_refs"
+      ],
+      "recommendation": "Переверните светодиод: анод (треугольник) должен смотреть в сторону источника питания через токоограничивающий резистор, катод — к GND.",
+      "confidence": 0.85,
+      "references": {
+        "learning_track": "diagnostika-prostyh-shem",
+        "lab_tool": "led_indicator",
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      },
+      "category": "polarity",
+      "enabled": true
+    },
+    {
+      "id": "erc.parallel_voltage_sources",
+      "title": "Параллельные источники напряжения с разным номиналом",
+      "severity": "error",
+      "when": "parallel_source_conflict_count > 0",
+      "evidence_fields": [
+        "parallel_source_conflict_count",
+        "parallel_source_conflicts"
+      ],
+      "recommendation": "Уберите конфликт источников: оставьте один источник напряжения на узел или разнесите источники развязывающим элементом, иначе возникает короткое замыкание.",
+      "confidence": 0.95,
+      "references": {
+        "learning_track": "diagnostika-prostyh-shem",
+        "source_ids": [
+          "ngspice_docs",
+          "kicad_docs"
+        ]
+      },
+      "category": "power",
+      "enabled": true
+    },
+    {
+      "id": "erc.source_short_to_ground",
+      "title": "Короткое замыкание источника на GND",
+      "severity": "error",
+      "when": "source_short_count > 0",
+      "evidence_fields": [
+        "source_short_count",
+        "source_short_pairs"
+      ],
+      "recommendation": "Поставьте токоограничивающий резистор между источником и GND или измените топологию: прямой путь источник→GND без резистора создаёт КЗ.",
+      "confidence": 0.97,
+      "references": {
+        "learning_track": "diagnostika-prostyh-shem",
+        "source_ids": [
+          "all_about_circuits_textbook",
+          "ngspice_docs"
+        ]
+      },
+      "category": "power",
+      "enabled": true
+    },
+    {
+      "id": "erc.dangling_named_net",
+      "title": "Висящий именованный узел",
+      "severity": "warning",
+      "when": "dangling_named_net_count > 0",
+      "evidence_fields": [
+        "dangling_named_net_count",
+        "dangling_named_net_refs"
+      ],
+      "recommendation": "Подключите помеченный узел к схеме или удалите его метку: одиночный label без соединения вводит в заблуждение при чтении BOM/netlist.",
+      "confidence": 0.78,
+      "references": {
+        "article_query": "net label",
+        "source_ids": [
+          "kicad_docs"
+        ]
+      },
+      "category": "connectivity",
+      "enabled": true
+    },
+    {
+      "id": "topology.transistor_pinout_swap",
+      "title": "Подозрительная распиновка транзистора",
+      "severity": "warning",
+      "when": "transistor_pinout_swap_count > 0",
+      "evidence_fields": [
+        "transistor_pinout_swap_count",
+        "transistor_pinout_swap_refs"
+      ],
+      "recommendation": "Проверьте распиновку: коллектор обычно подключают к +V через нагрузку, эмиттер — к GND (для NPN). Прямое подключение коллектора к GND или эмиттера к +V почти всегда ошибка распиновки.",
+      "confidence": 0.7,
+      "references": {
+        "learning_track": "prikladnye-uzly-elektroniki",
+        "source_ids": [
+          "all_about_circuits_textbook",
+          "openstax_university_physics_2"
+        ]
+      },
+      "category": "general",
+      "enabled": false
+    },
+    {
+      "id": "conn.crossing_without_dot",
+      "title": "Пересечение проводов без junction-dot",
+      "severity": "warning",
+      "when": "crossing_count > 0 and explicit_node_count < crossing_count",
+      "evidence_fields": [
+        "crossing_count",
+        "explicit_node_count"
+      ],
+      "recommendation": "Если провода соединяются — добавьте узел (Node). Если только пересекаются — разведите их.",
+      "confidence": 0.85,
+      "category": "connectivity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "conn.parallel_close_wires",
+      "title": "Параллельные провода слишком близко (< 4 px)",
+      "severity": "recommendation",
+      "when": "min_wire_spacing_px < 4",
+      "evidence_fields": [
+        "min_wire_spacing_px"
+      ],
+      "recommendation": "Разнесите параллельные провода — на печати они визуально сольются.",
+      "confidence": 0.7,
+      "category": "connectivity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "conn.micro_segment",
+      "title": "Микро-сегмент провода (< 5 px) — мусор от плохого роутинга",
+      "severity": "recommendation",
+      "when": "min_segment_length_px < 5",
+      "evidence_fields": [
+        "min_segment_length_px"
+      ],
+      "recommendation": "Удалите короткий сегмент или объедините с соседним.",
+      "confidence": 0.8,
+      "category": "connectivity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "conn.floating_named_net",
+      "title": "Висячая именованная цепь (net label без компонентов)",
+      "severity": "warning",
+      "when": "orphan_net_label_count > 0",
+      "evidence_fields": [
+        "orphan_net_label_count"
+      ],
+      "recommendation": "Удалите неиспользуемое имя net'а или подключите компонент.",
+      "confidence": 0.9,
+      "category": "connectivity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "conn.single_connection_component",
+      "title": "Компонент подключён только одним пином — цепь разорвана",
+      "severity": "error",
+      "when": "single_port_components > 0",
+      "evidence_fields": [
+        "single_port_components"
+      ],
+      "recommendation": "Подключите оба порта компонента к схеме.",
+      "confidence": 0.97,
+      "category": "connectivity",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "conn.dangling_port",
+      "title": "Висячий порт компонента",
+      "severity": "warning",
+      "when": "dangling_port_count > 0",
+      "evidence_fields": [
+        "dangling_port_count"
+      ],
+      "recommendation": "Подключите все пины или явно пометьте «no-connect».",
+      "confidence": 0.95,
+      "category": "connectivity",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "conn.disjoint_islands",
+      "title": "Схема разбита на несвязанные «острова»",
+      "severity": "warning",
+      "when": "connected_components_count > 1",
+      "evidence_fields": [
+        "connected_components_count"
+      ],
+      "recommendation": "Соедините острова в один граф или удалите неиспользуемые куски.",
+      "confidence": 0.9,
+      "category": "connectivity",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "conn.multiple_gnd_different_nets",
+      "title": "Несколько GND-компонентов в разных net'ах",
+      "severity": "recommendation",
+      "when": "ground_net_count > 1",
+      "evidence_fields": [
+        "ground_net_count"
+      ],
+      "recommendation": "Если это намеренное разделение AGND/DGND — добавьте net-label. Иначе объедините в один net.",
+      "confidence": 0.65,
+      "category": "connectivity",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "conn.duplicate_wire",
+      "title": "Дублирующиеся провода между одними и теми же портами",
+      "severity": "recommendation",
+      "when": "duplicate_wires > 0",
+      "evidence_fields": [
+        "duplicate_wires"
+      ],
+      "recommendation": "Удалите дубликат — это «мёртвый» wire.",
+      "confidence": 0.95,
+      "category": "connectivity",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "power.source_to_gnd_short",
+      "title": "Источник напрямую к GND без резистора (КЗ через источник)",
+      "severity": "error",
+      "when": "has_source_gnd_short == true",
+      "evidence_fields": [
+        "short_circuit_path"
+      ],
+      "recommendation": "Добавьте токоограничивающий резистор между + источника и GND.",
+      "confidence": 0.95,
+      "category": "power",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "power.parallel_voltage_same_level",
+      "title": "Параллельные V-источники одного потенциала",
+      "severity": "warning",
+      "when": "parallel_voltage_sources > 0 and parallel_voltage_difference == 0",
+      "evidence_fields": [
+        "parallel_voltage_sources",
+        "parallel_voltage_difference"
+      ],
+      "recommendation": "Если намеренно — добавьте балансные резисторы. Иначе — один источник достаточен.",
+      "confidence": 0.75,
+      "category": "power",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "power.source_no_return_path",
+      "title": "Источник без обратного провода к GND",
+      "severity": "error",
+      "when": "source_without_return > 0",
+      "evidence_fields": [
+        "source_without_return"
+      ],
+      "recommendation": "Подключите минус источника к GND через нагрузку — open circuit невозможен.",
+      "confidence": 0.95,
+      "category": "power",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "power.battery_reverse_polarity",
+      "title": "Батарея подключена обратной полярностью к нагрузке",
+      "severity": "error",
+      "when": "reverse_battery_polarity > 0",
+      "evidence_fields": [
+        "reverse_battery_polarity"
+      ],
+      "recommendation": "Поменяйте местами + и − выводы батареи.",
+      "confidence": 0.85,
+      "category": "power",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "power.current_source_open_loop",
+      "title": "Источник тока без замкнутой петли",
+      "severity": "error",
+      "when": "current_source_open_loop > 0",
+      "evidence_fields": [
+        "current_source_open_loop"
+      ],
+      "recommendation": "Ток должен идти по замкнутому контуру (Кирхгофа). Добавьте обратный путь.",
+      "confidence": 0.95,
+      "category": "power",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "power.ac_without_dc_bias",
+      "title": "AC-источник без DC-bias компонента в цепи",
+      "severity": "recommendation",
+      "when": "has_ac_source == true and has_dc_bias_component == false",
+      "evidence_fields": [
+        "has_ac_source",
+        "has_dc_bias_component"
+      ],
+      "recommendation": "Для аналоговых сигналов добавьте конденсатор связи и резистор смещения.",
+      "confidence": 0.6,
+      "category": "power",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "power.opposing_sources_same_net",
+      "title": "Источники противоположной полярности на одном net'е",
+      "severity": "error",
+      "when": "opposing_sources_count > 0",
+      "evidence_fields": [
+        "opposing_sources_count"
+      ],
+      "recommendation": "Это создаёт неопределённый потенциал. Развяжите через изоляцию или диоды.",
+      "confidence": 0.9,
+      "category": "power",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "power.no_decoupling_near_ic",
+      "title": "Нет декаплинг-конденсатора около ICs/транзисторов",
+      "severity": "recommendation",
+      "when": "active_components_without_decoupling > 0",
+      "evidence_fields": [
+        "active_components_without_decoupling"
+      ],
+      "recommendation": "Добавьте 100 нФ + 10 мкФ керамический рядом с каждым активным компонентом.",
+      "confidence": 0.7,
+      "category": "power",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "polarity.electrolytic_reverse",
+      "title": "Электролитический конденсатор обратной полярности на DC",
+      "severity": "error",
+      "when": "reverse_electrolytic_count > 0",
+      "evidence_fields": [
+        "reverse_electrolytic_count"
+      ],
+      "recommendation": "Анод (+) должен быть на более высоком потенциале. В реальности это приводит к взрыву!",
+      "confidence": 0.9,
+      "category": "polarity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "polarity.diode_reverse_in_rectifier",
+      "title": "Диод обратной полярности в выпрямительной схеме",
+      "severity": "error",
+      "when": "reverse_rectifier_diode_count > 0",
+      "evidence_fields": [
+        "reverse_rectifier_diode_count"
+      ],
+      "recommendation": "Анод диода к +, катод к нагрузке. Стрелка диода = направление тока.",
+      "confidence": 0.85,
+      "category": "polarity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "polarity.led_reverse",
+      "title": "LED подключён обратной полярностью",
+      "severity": "error",
+      "when": "reverse_led_count > 0",
+      "evidence_fields": [
+        "reverse_led_count"
+      ],
+      "recommendation": "Анод (длинный вывод) — к плюсу через резистор, катод — к минусу.",
+      "confidence": 0.9,
+      "category": "polarity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "polarity.tantalum_voltage_derating",
+      "title": "Танталовый конденсатор без 50% derating",
+      "severity": "warning",
+      "when": "has_tantalum == true and tantalum_derating < 0.5",
+      "evidence_fields": [
+        "tantalum_derating"
+      ],
+      "recommendation": "Танталовые требуют V_applied ≤ 0.5 × V_rated для надёжности (взрывоопасны).",
+      "confidence": 0.8,
+      "category": "polarity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "polarity.bjt_be_swap_heuristic",
+      "title": "Транзистор BJT: эвристика перепутанных Base/Emitter",
+      "severity": "warning",
+      "when": "bjt_pinout_suspicious_count > 0",
+      "evidence_fields": [
+        "bjt_pinout_suspicious_count"
+      ],
+      "recommendation": "Проверьте: ток базы (через R) идёт в base, эмиттер обычно к GND через R или напрямую.",
+      "confidence": 0.55,
+      "category": "polarity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "polarity.zener_forward_biased",
+      "title": "Zener-диод в прямом смещении (работает как обычный диод)",
+      "severity": "recommendation",
+      "when": "zener_forward_count > 0",
+      "evidence_fields": [
+        "zener_forward_count"
+      ],
+      "recommendation": "Для стабилизации Zener должен быть включён в обратном смещении.",
+      "confidence": 0.75,
+      "category": "polarity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "rating.voltage_exceeded",
+      "title": "Превышен максимальный V компонента",
+      "severity": "error",
+      "when": "voltage_rating_violations > 0",
+      "evidence_fields": [
+        "voltage_rating_violations"
+      ],
+      "recommendation": "Замените компонент на более высоковольтный или снизьте рабочее напряжение.",
+      "confidence": 0.95,
+      "category": "rating",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "rating.current_through_resistor",
+      "title": "Ток через резистор превышает P_max",
+      "severity": "error",
+      "when": "resistor_power_violation_count > 0",
+      "evidence_fields": [
+        "resistor_power_violation_count"
+      ],
+      "recommendation": "P = I²R должно быть < rating (1/4W = 0.25Вт). Увеличьте мощность резистора.",
+      "confidence": 0.95,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "rating.capacitor_voltage_with_ac_peak",
+      "title": "V_DC + V_AC_peak конденсатора превышает rated",
+      "severity": "warning",
+      "when": "cap_v_peak_exceeded > 0",
+      "evidence_fields": [
+        "cap_v_peak_exceeded"
+      ],
+      "recommendation": "Учтите пик AC-сигнала на DC-bias'е. Возьмите конденсатор с запасом 50%.",
+      "confidence": 0.85,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "rating.transistor_vceo",
+      "title": "Транзистор: V_CE превышает V_CEO",
+      "severity": "error",
+      "when": "bjt_vceo_exceeded > 0",
+      "evidence_fields": [
+        "bjt_vceo_exceeded"
+      ],
+      "recommendation": "Замените транзистор на более высоковольтный (например 2N3904 → BC517).",
+      "confidence": 0.95,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "rating.diode_reverse_voltage",
+      "title": "Диод: обратное напряжение > V_BR",
+      "severity": "error",
+      "when": "diode_vbr_exceeded > 0",
+      "evidence_fields": [
+        "diode_vbr_exceeded"
+      ],
+      "recommendation": "Возьмите диод с большим V_BR (1N4148 → 1N4007).",
+      "confidence": 0.9,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "rating.led_current_overdrive",
+      "title": "LED-ток > 20 mA (нагрев / выгорание)",
+      "severity": "warning",
+      "when": "led_overdrive_count > 0",
+      "evidence_fields": [
+        "led_overdrive_count"
+      ],
+      "recommendation": "Стандартный LED — 20 мА. Для high-power добавьте теплоотвод или используйте LED-driver.",
+      "confidence": 0.9,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "rating.resistor_dissipation_class",
+      "title": "Резистор работает на > 50% от P_max (низкий derating)",
+      "severity": "recommendation",
+      "when": "resistor_low_derating > 0",
+      "evidence_fields": [
+        "resistor_low_derating"
+      ],
+      "recommendation": "Для надёжности возьмите резистор большей мощности (derating 50%).",
+      "confidence": 0.75,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "rating.inductor_saturation",
+      "title": "Ток через индуктор превышает I_sat",
+      "severity": "error",
+      "when": "inductor_isat_exceeded > 0",
+      "evidence_fields": [
+        "inductor_isat_exceeded"
+      ],
+      "recommendation": "Замените на индуктор с большим saturation current.",
+      "confidence": 0.9,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "coilcraft_inductor_resources"
+        ]
+      }
+    },
+    {
+      "id": "topology.opamp_no_feedback",
+      "title": "Op-amp без feedback (open-loop)",
+      "severity": "error",
+      "when": "opamp_no_feedback_count > 0",
+      "evidence_fields": [
+        "opamp_no_feedback_count"
+      ],
+      "recommendation": "Для линейной работы op-amp нужен feedback от выхода ко входу.",
+      "confidence": 0.9,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "topology.opamp_input_rail_violation",
+      "title": "Op-amp: входы за пределами питания (V_in > V_supply)",
+      "severity": "warning",
+      "when": "opamp_input_rail_violations > 0",
+      "evidence_fields": [
+        "opamp_input_rail_violations"
+      ],
+      "recommendation": "Используйте rail-to-rail op-amp или добавьте делитель.",
+      "confidence": 0.85,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "topology.digital_pin_no_pullup",
+      "title": "Цифровой вход без pull-up/pull-down резистора",
+      "severity": "warning",
+      "when": "floating_digital_inputs > 0",
+      "evidence_fields": [
+        "floating_digital_inputs"
+      ],
+      "recommendation": "Добавьте pull-up 10к к VCC или pull-down 10к к GND.",
+      "confidence": 0.85,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "topology.asymmetric_divider_for_ac",
+      "title": "Несимметричный делитель напряжения для AC (отсечение)",
+      "severity": "recommendation",
+      "when": "ac_divider_asymmetry > 0.3",
+      "evidence_fields": [
+        "ac_divider_asymmetry"
+      ],
+      "recommendation": "Для AC-сигнала bias-точка должна быть в середине рабочего диапазона.",
+      "confidence": 0.7,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "topology.rc_filter_resonance",
+      "title": "RC-фильтр в зоне резонанса (риск self-oscillation)",
+      "severity": "recommendation",
+      "when": "rc_q_factor > 1.0",
+      "evidence_fields": [
+        "rc_q_factor"
+      ],
+      "recommendation": "Проверьте Q-factor — для filter'ов Q < 1 безопасно.",
+      "confidence": 0.6,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "openstax_university_physics_2"
+        ]
+      }
+    },
+    {
+      "id": "topology.crystal_no_load_caps",
+      "title": "Кварцевый резонатор без load-конденсаторов",
+      "severity": "error",
+      "when": "crystal_without_load_caps > 0",
+      "evidence_fields": [
+        "crystal_without_load_caps"
+      ],
+      "recommendation": "Добавьте 18-22 пФ конденсаторы от каждого вывода кварца к GND.",
+      "confidence": 0.95,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "topology.reset_pin_no_pullup",
+      "title": "Reset-pin без pull-up + капа",
+      "severity": "error",
+      "when": "reset_pin_floating == true",
+      "evidence_fields": [
+        "reset_pin_floating"
+      ],
+      "recommendation": "Reset обычно: pull-up 10к + 100 нФ к GND + кнопка к GND.",
+      "confidence": 0.85,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "topology.differential_pair_unmatched",
+      "title": "Differential pair с разной длиной/импедансом",
+      "severity": "warning",
+      "when": "diff_pair_mismatch > 0.05",
+      "evidence_fields": [
+        "diff_pair_mismatch"
+      ],
+      "recommendation": "USB/HDMI/LVDS требуют length-matching < 5%.",
+      "confidence": 0.85,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "topology.signal_to_noise_ratio_low",
+      "title": "Низкий SNR: сигнал слабый относительно шума",
+      "severity": "recommendation",
+      "when": "estimated_snr_db < 30",
+      "evidence_fields": [
+        "estimated_snr_db"
+      ],
+      "recommendation": "Усильте сигнал на входе (op-amp gain stage) перед обработкой.",
+      "confidence": 0.6,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "openstax_university_physics_2"
+        ]
+      }
+    },
+    {
+      "id": "topology.feedback_loop_gain_excess",
+      "title": "Усиление feedback-контура > 80 dB (риск oscillation)",
+      "severity": "warning",
+      "when": "loop_gain_db > 80",
+      "evidence_fields": [
+        "loop_gain_db"
+      ],
+      "recommendation": "Уменьшите gain или добавьте compensation cap.",
+      "confidence": 0.7,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "openstax_university_physics_2"
+        ]
+      }
+    },
+    {
+      "id": "topology.no_input_protection",
+      "title": "Внешний вход без TVS/ESD-защиты",
+      "severity": "recommendation",
+      "when": "unprotected_external_input_count > 0",
+      "evidence_fields": [
+        "unprotected_external_input_count"
+      ],
+      "recommendation": "Добавьте TVS-диод и/или RC-фильтр на внешних портах.",
+      "confidence": 0.7,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "signal.unterminated_high_speed",
+      "title": "Высокоскоростной сигнал без согласующего резистора",
+      "severity": "warning",
+      "when": "high_speed_unterminated > 0",
+      "evidence_fields": [
+        "high_speed_unterminated"
+      ],
+      "recommendation": "Для линий > 50 МГц добавьте источник- или нагрузочное согласование (50/75/100 Ω).",
+      "confidence": 0.85,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "signal.clock_no_series_resistor",
+      "title": "Линия CLK без serial-резистора (риск ringing)",
+      "severity": "recommendation",
+      "when": "clock_no_damping > 0",
+      "evidence_fields": [
+        "clock_no_damping"
+      ],
+      "recommendation": "Добавьте 22-33 Ω в серии для damping.",
+      "confidence": 0.75,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "signal.long_unbuffered_trace",
+      "title": "Длинная (> 100 мм) непробуференная сигнальная линия",
+      "severity": "recommendation",
+      "when": "long_unbuffered_traces > 0",
+      "evidence_fields": [
+        "long_unbuffered_traces"
+      ],
+      "recommendation": "Используйте buffer (74LVC1G125) или дифпару.",
+      "confidence": 0.65,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "signal.crosstalk_risk",
+      "title": "Возможный crosstalk между параллельными high-speed линиями",
+      "severity": "recommendation",
+      "when": "parallel_high_speed_pairs > 0",
+      "evidence_fields": [
+        "parallel_high_speed_pairs"
+      ],
+      "recommendation": "Разнесите линии или добавьте GND-trace между ними.",
+      "confidence": 0.65,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "signal.ground_bounce_risk",
+      "title": "Риск ground bounce от групповой коммутации",
+      "severity": "recommendation",
+      "when": "simultaneous_switching_outputs > 8",
+      "evidence_fields": [
+        "simultaneous_switching_outputs"
+      ],
+      "recommendation": "Добавьте отдельные GND-vias около каждого MCU/FPGA пина.",
+      "confidence": 0.6,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "openstax_university_physics_2"
+        ]
+      }
+    },
+    {
+      "id": "signal.reflection_at_stub",
+      "title": "Stub-ветвление на high-speed линии",
+      "severity": "warning",
+      "when": "high_speed_stubs > 0",
+      "evidence_fields": [
+        "high_speed_stubs"
+      ],
+      "recommendation": "Избегайте Y-ветвлений на линиях > 10 МГц.",
+      "confidence": 0.8,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "bom.unbound_components",
+      "title": "Компоненты без привязки к каталогу",
+      "severity": "recommendation",
+      "when": "unbound_component_count > 0",
+      "evidence_fields": [
+        "unbound_component_count"
+      ],
+      "recommendation": "Привяжите компоненты к товарам каталога для авто-BOM и заказа.",
+      "confidence": 0.9,
+      "category": "bom",
+      "enabled": true,
+      "references": {
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "bom.lifecycle_eol",
+      "title": "Компонент в каталоге помечен EOL (End of Life)",
+      "severity": "warning",
+      "when": "eol_component_count > 0",
+      "evidence_fields": [
+        "eol_component_count"
+      ],
+      "recommendation": "Замените на актуальный аналог.",
+      "confidence": 0.95,
+      "category": "bom",
+      "enabled": false
+    },
+    {
+      "id": "bom.out_of_stock",
+      "title": "Компонент out-of-stock в каталоге",
+      "severity": "recommendation",
+      "when": "oos_component_count > 0",
+      "evidence_fields": [
+        "oos_component_count"
+      ],
+      "recommendation": "Подберите аналог или подождите поступления.",
+      "confidence": 0.95,
+      "category": "bom",
+      "enabled": false
+    },
+    {
+      "id": "bom.category_mismatch",
+      "title": "Категория компонента не соответствует типу схемы",
+      "severity": "warning",
+      "when": "bom_category_mismatch_count > 0",
+      "evidence_fields": [
+        "bom_category_mismatch_count"
+      ],
+      "recommendation": "Проверьте: возможно SMD vs THT перепутаны.",
+      "confidence": 0.75,
+      "category": "bom",
+      "enabled": false
+    },
+    {
+      "id": "bom.high_cost_warning",
+      "title": "BOM > 5000 ₽ — возможно есть дешевле аналоги",
+      "severity": "recommendation",
+      "when": "total_bom_cost > 5000",
+      "evidence_fields": [
+        "total_bom_cost"
+      ],
+      "recommendation": "Запустите AI-поиск аналогов через кнопку 🔍 Analogs.",
+      "confidence": 0.6,
+      "category": "bom",
+      "enabled": false
+    },
+    {
+      "id": "bom.no_spice_model",
+      "title": "Активный компонент без SPICE-модели",
+      "severity": "recommendation",
+      "when": "active_components_without_spice > 0",
+      "evidence_fields": [
+        "active_components_without_spice"
+      ],
+      "recommendation": "Для точной симуляции загрузите .lib или .mod от производителя.",
+      "confidence": 0.85,
+      "category": "bom",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "bom.duplicate_designators",
+      "title": "Дублирующиеся designators (R1, R1)",
+      "severity": "error",
+      "when": "duplicate_designator_count > 0",
+      "evidence_fields": [
+        "duplicate_designator_count"
+      ],
+      "recommendation": "Перенумеруйте компоненты — каждый должен иметь уникальный designator.",
+      "confidence": 0.95,
+      "category": "bom",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "simulation.no_measurements",
+      "title": "В проекте нет сохранённых измерений",
+      "severity": "recommendation",
+      "when": "measurement_count == 0 and component_count > 3",
+      "evidence_fields": [
+        "measurement_count"
+      ],
+      "recommendation": "Сохраните expected vs measured пары для регрессии.",
+      "confidence": 0.85,
+      "category": "simulation",
+      "enabled": true
+    },
+    {
+      "id": "simulation.dc_convergence_unstable",
+      "title": "DC-симуляция не сошлась — нужны .options",
+      "severity": "warning",
+      "when": "dc_no_convergence == true",
+      "evidence_fields": [
+        "dc_no_convergence"
+      ],
+      "recommendation": "Попробуйте .options gmin=1e-9, increase iteration limit.",
+      "confidence": 0.95,
+      "category": "simulation",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "simulation.tran_step_too_large",
+      "title": "TRAN: шаг > 1/100 от наименьшего постоянного времени",
+      "severity": "warning",
+      "when": "tran_step_ratio > 0.01",
+      "evidence_fields": [
+        "tran_step_ratio"
+      ],
+      "recommendation": "Уменьшите .tran step для аккуратности.",
+      "confidence": 0.8,
+      "category": "simulation",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "simulation.ac_sweep_too_narrow",
+      "title": "AC sweep охватывает < 3 декад",
+      "severity": "recommendation",
+      "when": "ac_sweep_decades < 3",
+      "evidence_fields": [
+        "ac_sweep_decades"
+      ],
+      "recommendation": "Расширьте sweep до 4-6 декад для полной АЧХ.",
+      "confidence": 0.7,
+      "category": "simulation",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "simulation.unrealistic_components",
+      "title": "Нереалистичные значения R/C/L (например R=0)",
+      "severity": "warning",
+      "when": "unrealistic_value_count > 0",
+      "evidence_fields": [
+        "unrealistic_value_count"
+      ],
+      "recommendation": "Замените 0 на 1mΩ — иначе SPICE даст бесконечный ток.",
+      "confidence": 0.95,
+      "category": "simulation",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "simulation.missing_initial_conditions",
+      "title": "TRAN без initial conditions для индукторов/конденсаторов",
+      "severity": "recommendation",
+      "when": "tran_no_ic == true and has_reactive_components == true",
+      "evidence_fields": [
+        "tran_no_ic",
+        "has_reactive_components"
+      ],
+      "recommendation": "Добавьте .ic V(node)=… для предсказуемого start.",
+      "confidence": 0.7,
+      "category": "simulation",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "docs.no_project_description",
+      "title": "У проекта нет описания",
+      "severity": "recommendation",
+      "when": "project_description_empty == true",
+      "evidence_fields": [
+        "project_description_empty"
+      ],
+      "recommendation": "Добавьте описание — что эта схема делает.",
+      "confidence": 0.95,
+      "category": "docs",
+      "enabled": true
+    },
+    {
+      "id": "docs.unlabeled_components",
+      "title": "Компоненты без подписей (label пустой)",
+      "severity": "recommendation",
+      "when": "unlabeled_component_count > 0",
+      "evidence_fields": [
+        "unlabeled_component_count"
+      ],
+      "recommendation": "Подпишите R1/C2/V1 для читаемости.",
+      "confidence": 0.9,
+      "category": "docs",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "docs.no_net_labels",
+      "title": "Схема без net-labels для важных узлов",
+      "severity": "recommendation",
+      "when": "named_net_count < 2 and component_count > 5",
+      "evidence_fields": [
+        "named_net_count"
+      ],
+      "recommendation": "Назовите VCC/GND/OUT/CLK явно — упрощает отладку.",
+      "confidence": 0.7,
+      "category": "docs",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "layout.trace_width_too_narrow",
+      "title": "Trace width слишком узкая для рассчитанного тока",
+      "severity": "warning",
+      "when": "trace_width_violations > 0",
+      "evidence_fields": [
+        "trace_width_violations"
+      ],
+      "recommendation": "IPC-2221: I = k × T^0.44 × A^0.725 (1A = 0.4 мм для 35 мкм).",
+      "confidence": 0.9,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "layout.clearance_too_small",
+      "title": "Clearance между проводниками < 0.3 мм для V > 30 В",
+      "severity": "warning",
+      "when": "clearance_violations > 0",
+      "evidence_fields": [
+        "clearance_violations"
+      ],
+      "recommendation": "IPC-2221: clearance растёт с напряжением. > 30 В = > 0.4 мм.",
+      "confidence": 0.95,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "layout.via_too_small",
+      "title": "Via < 0.3 мм — стандартный fab требует > 0.3 мм",
+      "severity": "recommendation",
+      "when": "small_via_count > 0",
+      "evidence_fields": [
+        "small_via_count"
+      ],
+      "recommendation": "Увеличьте размер via или уточните возможности производителя.",
+      "confidence": 0.85,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "jlcpcb_capabilities"
+        ]
+      }
+    },
+    {
+      "id": "layout.pad_too_small_for_smd",
+      "title": "SMD-pad меньше стандартного для footprint",
+      "severity": "recommendation",
+      "when": "small_smd_pad_count > 0",
+      "evidence_fields": [
+        "small_smd_pad_count"
+      ],
+      "recommendation": "Используйте стандартные KiCad/Eagle footprint-библиотеки.",
+      "confidence": 0.8,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "layout.silkscreen_overlap",
+      "title": "Silkscreen текст перекрывает pads",
+      "severity": "recommendation",
+      "when": "silkscreen_overlap_count > 0",
+      "evidence_fields": [
+        "silkscreen_overlap_count"
+      ],
+      "recommendation": "Перенесите подписи в свободные зоны.",
+      "confidence": 0.8,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "layout.no_ground_pour",
+      "title": "Нет ground pour (заливки GND)",
+      "severity": "recommendation",
+      "when": "has_ground_pour == false and component_count > 5",
+      "evidence_fields": [
+        "has_ground_pour"
+      ],
+      "recommendation": "Добавьте GND-pour для shielding и тепла.",
+      "confidence": 0.7,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "layout.no_mounting_holes",
+      "title": "Нет монтажных отверстий",
+      "severity": "recommendation",
+      "when": "mounting_holes_count == 0",
+      "evidence_fields": [
+        "mounting_holes_count"
+      ],
+      "recommendation": "Добавьте 2-4 отверстия M3 для крепления.",
+      "confidence": 0.85,
+      "category": "layout",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "compliance.rohs_components",
+      "title": "Компоненты без RoHS-маркировки",
+      "severity": "recommendation",
+      "when": "non_rohs_components > 0",
+      "evidence_fields": [
+        "non_rohs_components"
+      ],
+      "recommendation": "Для коммерческой схемы все компоненты должны быть RoHS-совместимы.",
+      "confidence": 0.8,
+      "category": "compliance",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "eu_rohs_directive"
+        ]
+      }
+    },
+    {
+      "id": "compliance.no_emc_filtering",
+      "title": "Нет EMC-фильтрации на питании",
+      "severity": "recommendation",
+      "when": "has_power_input == true and emc_filter_present == false",
+      "evidence_fields": [
+        "emc_filter_present"
+      ],
+      "recommendation": "Добавьте common-mode choke + Y-конденсаторы для прохождения EMC-тестов.",
+      "confidence": 0.7,
+      "category": "compliance",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "iec_webstore"
+        ]
+      }
+    },
+    {
+      "id": "compliance.high_voltage_no_creepage",
+      "title": "Высоковольтные цепи без creepage/clearance",
+      "severity": "error",
+      "when": "high_voltage_creepage_violations > 0",
+      "evidence_fields": [
+        "high_voltage_creepage_violations"
+      ],
+      "recommendation": "IEC 60664-1: > 250 В = creepage > 2.5 мм.",
+      "confidence": 0.95,
+      "category": "compliance",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "iec_webstore"
+        ]
+      }
+    },
+    {
+      "id": "ai.suggested_pattern_match",
+      "title": "AI распознал паттерн: возможны улучшения",
+      "severity": "recommendation",
+      "when": "ai_pattern_matches > 0",
+      "evidence_fields": [
+        "ai_pattern_matches"
+      ],
+      "recommendation": "См. рекомендации AI-ассистента в детальной модалке.",
+      "confidence": 0.55,
+      "category": "ai",
+      "enabled": false
+    },
+    {
+      "id": "ai.anomaly_detection",
+      "title": "AI: схема нетипична для своей категории",
+      "severity": "warning",
+      "when": "ai_anomaly_score > 0.7",
+      "evidence_fields": [
+        "ai_anomaly_score"
+      ],
+      "recommendation": "Проверьте — это намеренная инновация или ошибка.",
+      "confidence": 0.5,
+      "category": "ai",
+      "enabled": false
+    },
+    {
+      "id": "topology.no_simulation_run",
+      "title": "Симуляция ни разу не запускалась на этой схеме",
+      "severity": "recommendation",
+      "when": "sim_run_count == 0 and component_count > 0",
+      "evidence_fields": [
+        "sim_run_count"
+      ],
+      "recommendation": "Запустите ▶ Запуск — без это нельзя верифицировать схему.",
+      "confidence": 0.85,
+      "category": "simulation",
+      "enabled": true,
+      "references": {
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "connectivity.gnd_without_other_components",
+      "title": "GND без других подключённых компонентов",
+      "severity": "recommendation",
+      "when": "isolated_ground_count > 0",
+      "evidence_fields": [
+        "isolated_ground_count"
+      ],
+      "recommendation": "GND должен быть точкой возврата для тока. Подключите остальные элементы.",
+      "confidence": 0.85,
+      "category": "connectivity",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "power.battery_drains_to_zero",
+      "title": "Батарея с очень малым внутренним R может «разрядиться» в симуляции",
+      "severity": "recommendation",
+      "when": "ideal_source_count > 0",
+      "evidence_fields": [
+        "ideal_source_count"
+      ],
+      "recommendation": "Добавьте серийный резистор 1 Ω для имитации реального источника.",
+      "confidence": 0.55,
+      "category": "power",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "rating.thermal_no_heatsink",
+      "title": "Силовой компонент (P > 1 Вт) без теплоотвода",
+      "severity": "recommendation",
+      "when": "high_power_no_heatsink_count > 0",
+      "evidence_fields": [
+        "high_power_no_heatsink_count"
+      ],
+      "recommendation": "Добавьте радиатор или используйте корпус с лучшим теплоотводом.",
+      "confidence": 0.85,
+      "category": "rating",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "topology.led_chain_no_constant_current",
+      "title": "Цепочка LED без current source / constant current driver",
+      "severity": "recommendation",
+      "when": "led_series_chain_no_cc_count > 0",
+      "evidence_fields": [
+        "led_series_chain_no_cc_count"
+      ],
+      "recommendation": "Используйте LM317 в режиме CC или специализированный LED-driver.",
+      "confidence": 0.75,
+      "category": "topology",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "docs.no_revision_marks",
+      "title": "Нет ревизии / даты / автора на схеме",
+      "severity": "recommendation",
+      "when": "schematic_title_block_empty == true",
+      "evidence_fields": [
+        "schematic_title_block_empty"
+      ],
+      "recommendation": "Добавьте заголовок с REV / Date / Author для traceability.",
+      "confidence": 0.9,
+      "category": "docs",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "simulation.warnings_unresolved",
+      "title": "Последняя симуляция вернула warnings",
+      "severity": "warning",
+      "when": "last_sim_warning_count > 0",
+      "evidence_fields": [
+        "last_sim_warning_count"
+      ],
+      "recommendation": "Прочитайте подсказки от ngspice — это знак нестабильности или потенциальной проблемы.",
+      "confidence": 0.85,
+      "category": "simulation",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ngspice_docs"
+        ]
+      }
+    },
+    {
+      "id": "connectivity.multiple_outputs_on_one_net",
+      "title": "Несколько выходов IC на одном net'е (контактная конкуренция)",
+      "severity": "error",
+      "when": "multi_output_net_count > 0",
+      "evidence_fields": [
+        "multi_output_net_count"
+      ],
+      "recommendation": "Для shared bus используйте tri-state буферы или open-drain.",
+      "confidence": 0.95,
+      "category": "connectivity",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "kicad_docs"
+        ]
+      }
+    },
+    {
+      "id": "bom.cost_breakdown_unbalanced",
+      "title": "Один компонент составляет > 60% BOM cost",
+      "severity": "recommendation",
+      "when": "cost_dominant_share > 0.6",
+      "evidence_fields": [
+        "cost_dominant_share"
+      ],
+      "recommendation": "Подберите аналог дороже-доминирующего компонента — большой выигрыш.",
+      "confidence": 0.7,
+      "category": "bom",
+      "enabled": false
+    },
+    {
+      "id": "topology.dc_motor_no_freewheeling_diode",
+      "title": "DC-motor / реле без обратного диода (freewheeling)",
+      "severity": "error",
+      "when": "inductive_load_no_diode_count > 0",
+      "evidence_fields": [
+        "inductive_load_no_diode_count"
+      ],
+      "recommendation": "Параллельно индуктивной нагрузке поставьте диод (1N4148/1N4007) для защиты транзистора от EMF spike.",
+      "confidence": 0.95,
+      "category": "topology",
+      "enabled": true,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ],
+        "implementation": "2026-05-31 expert_detectors v3"
+      }
+    },
+    {
+      "id": "topology.opto_isolator_no_pulldown",
+      "title": "Опто-изолятор: выходной транзистор без pulldown",
+      "severity": "warning",
+      "when": "opto_no_pulldown_count > 0",
+      "evidence_fields": [
+        "opto_no_pulldown_count"
+      ],
+      "recommendation": "Добавьте 10к между collector и GND (collector — open).",
+      "confidence": 0.85,
+      "category": "topology",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "signal.long_unbroken_clock_line",
+      "title": "CLK > 300 мм без буфера",
+      "severity": "recommendation",
+      "when": "long_clock_line_count > 0",
+      "evidence_fields": [
+        "long_clock_line_count"
+      ],
+      "recommendation": "На длинных CLK-линиях добавьте buffer (74LVC1G125) каждые 200-300 мм.",
+      "confidence": 0.75,
+      "category": "signal",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "all_about_circuits_textbook"
+        ]
+      }
+    },
+    {
+      "id": "connectivity.no_test_points",
+      "title": "Нет тест-точек на ключевых net'ах",
+      "severity": "recommendation",
+      "when": "test_point_count == 0 and component_count > 10",
+      "evidence_fields": [
+        "test_point_count"
+      ],
+      "recommendation": "Для debug добавьте test-points на VCC, GND, CLK, OUT.",
+      "confidence": 0.75,
+      "category": "docs",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "ipc_standards_store"
+        ]
+      }
+    },
+    {
+      "id": "compliance.ce_marking_components",
+      "title": "Внешние разъёмы без CE-protection (ESD/EMI)",
+      "severity": "recommendation",
+      "when": "external_connector_count > 0 and ce_protection_count == 0",
+      "evidence_fields": [
+        "external_connector_count",
+        "ce_protection_count"
+      ],
+      "recommendation": "Для прохождения CE добавьте TVS на входах USB/Ethernet/Power.",
+      "confidence": 0.7,
+      "category": "compliance",
+      "enabled": false,
+      "references": {
+        "source_ids": [
+          "eu_ce_marking"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,762 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}🧠 Тренировка нейронки · DOLG{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .mlt-wrap {
+        max-width: 920px; margin: 24px auto; padding: 0 20px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #e8eef9;
+    }
+    .mlt-card {
+        background: linear-gradient(180deg, #1a1f2e 0%, #161b29 100%);
+        border: 1px solid rgba(0,212,255,.22);
+        border-radius: 12px;
+        padding: 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 6px 16px rgba(0,0,0,.28);
+    }
+    .mlt-card h2 {
+        margin: 0 0 14px 0; color: #72ffad;
+        font-size: 17px; letter-spacing: .02em;
+    }
+    .mlt-card h2 small {
+        font-size: 12px; color: #94a3b8; margin-left: 8px; font-weight: 400;
+    }
+    .mlt-row { display: flex; align-items: center; gap: 18px; margin: 8px 0; }
+    .mlt-row label { color: #cfe; font-size: 13px; min-width: 130px; }
+    .mlt-row input[type=number] {
+        background: rgba(255,255,255,.08); border: 1px solid rgba(0,212,255,.30);
+        color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 14px; width: 110px;
+    }
+    .mlt-btn {
+        background: linear-gradient(135deg, #6e44ff, #2c7be5);
+        color: #fff; border: none; padding: 10px 22px;
+        border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
+        transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .mlt-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(110,68,255,.35); }
+    .mlt-btn:disabled {
+        opacity: .55; cursor: not-allowed; transform: none; box-shadow: none;
+    }
+    .mlt-btn.secondary {
+        background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
+    }
+    .mlt-btn.danger {
+        background: rgba(255,80,80,.18); color: #ff8a8a;
+        border: 1px solid rgba(255,80,80,.42);
+    }
+    .mlt-meta { color: #94a3b8; font-size: 12px; }
+    .mlt-progress {
+        margin: 12px 0;
+        background: rgba(255,255,255,.06);
+        border-radius: 8px; overflow: hidden;
+        height: 26px; position: relative;
+    }
+    .mlt-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #72ffad, #7fdbff);
+        width: 0%;
+        transition: width .25s ease;
+    }
+    .mlt-progress-label {
+        position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px; color: #0e1421; font-weight: 700; mix-blend-mode: lighten;
+    }
+    .mlt-status {
+        font-family: ui-monospace, Menlo, monospace;
+        color: #7fdbff; font-size: 13px; margin: 8px 0;
+    }
+    .mlt-stats {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+        gap: 10px; margin: 12px 0;
+    }
+    .mlt-stat {
+        background: rgba(0,212,255,.06);
+        border: 1px solid rgba(0,212,255,.18);
+        border-radius: 8px; padding: 8px 12px;
+    }
+    .mlt-stat-label { font-size: 11px; color: #94a3b8; }
+    .mlt-stat-value {
+        font-size: 18px; color: #fff; font-weight: 600;
+        font-family: ui-monospace, Menlo, monospace;
+    }
+    .mlt-result {
+        background: rgba(114,255,173,.08); border: 1px solid rgba(114,255,173,.30);
+        border-radius: 8px; padding: 12px 14px; margin-top: 10px;
+        font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+        white-space: pre-wrap; max-height: 220px; overflow-y: auto;
+    }
+    .mlt-error {
+        background: rgba(255,80,80,.12); border: 1px solid rgba(255,80,80,.40);
+        color: #ff8a8a; padding: 10px 14px; border-radius: 8px; margin-top: 10px;
+    }
+    .mlt-features {
+        font-size: 12px; color: #cfe; line-height: 1.6;
+    }
+    .mlt-features li { margin: 2px 0; }
+
+    /* Список датасетов (radio-выбор) */
+    .mlt-datasets {
+        display: flex; flex-direction: column; gap: 6px;
+        max-height: 260px; overflow-y: auto;
+        background: rgba(0,0,0,.18); border-radius: 8px; padding: 8px;
+        border: 1px solid rgba(0,212,255,.10);
+    }
+    .mlt-ds-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 6px 8px; border-radius: 6px;
+        background: rgba(255,255,255,.03);
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: background .15s ease, border-color .15s ease;
+    }
+    .mlt-ds-item:hover { background: rgba(0,212,255,.08); }
+    .mlt-ds-item.selected {
+        background: rgba(110,68,255,.18);
+        border-color: rgba(110,68,255,.45);
+    }
+    .mlt-ds-name {
+        flex: 1; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+        color: #fff; word-break: break-all;
+    }
+    .mlt-ds-meta {
+        font-size: 11px; color: #94a3b8;
+        font-family: ui-monospace, Menlo, monospace;
+        white-space: nowrap;
+    }
+    .mlt-ds-badge {
+        font-size: 9px; padding: 2px 6px; border-radius: 4px;
+        text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+    }
+    .mlt-ds-badge.curated { background: rgba(114,255,173,.20); color: #72ffad; }
+    .mlt-ds-badge.external { background: rgba(255,196,80,.20); color: #ffc450; }
+
+    /* Импорт-блок */
+    .mlt-import-row {
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        margin-top: 8px;
+    }
+    .mlt-import-row input[type=number],
+    .mlt-import-row select {
+        background: rgba(255,255,255,.08); border: 1px solid rgba(0,212,255,.30);
+        color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 14px;
+    }
+    .mlt-import-row input[type=number] { width: 90px; }
+    .mlt-checkbox {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 12px; color: #cfe; cursor: pointer;
+    }
+    .mlt-kind-table {
+        display: grid; grid-template-columns: 1fr auto; gap: 4px 16px;
+        font-size: 12px; color: #cfe;
+        font-family: ui-monospace, Menlo, monospace;
+        margin-top: 6px;
+    }
+    .mlt-kind-table .k { color: #94a3b8; }
+    .mlt-kind-table .v { color: #72ffad; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mlt-wrap">
+    <div class="mlt-card">
+        <h2>🧠 Тренировка нейронки DOLG <small>tiny PyTorch · только для staff</small></h2>
+        <p class="mlt-meta">
+            Запускает <code>train_tiny_model</code> в фоне.
+            Прогресс обновляется каждые 1.5 сек через polling.
+            Можно закрыть вкладку — тренировка продолжится.
+        </p>
+        <div class="mlt-row">
+            <label for="mlt-epochs">Эпохи:</label>
+            <input type="number" id="mlt-epochs" value="200" min="10" max="1000" step="10">
+            <span class="mlt-meta">10–1000. По умолчанию 200.</span>
+        </div>
+        <div class="mlt-row">
+            <label for="mlt-size">Synthetic size:</label>
+            <input type="number" id="mlt-size" value="240" min="50" max="1000" step="10">
+            <span class="mlt-meta">Размер синтетической части датасета.</span>
+        </div>
+        <div class="mlt-row" style="align-items: flex-start;">
+            <label style="margin-top: 6px;">Датасет (extra):</label>
+            <div style="flex: 1; min-width: 0;">
+                {% if datasets %}
+                <div class="mlt-datasets" id="mlt-datasets">
+                    {% for ds in datasets %}
+                    <label class="mlt-ds-item {% if ds.path == dataset_path %}selected{% endif %}">
+                        <input type="radio" name="dataset" value="{{ ds.path }}"
+                               {% if ds.path == dataset_path %}checked{% endif %}>
+                        <span class="mlt-ds-name">{{ ds.rel }}</span>
+                        <span class="mlt-ds-badge {{ ds.source }}">{{ ds.source }}</span>
+                        <span class="mlt-ds-meta">{{ ds.scheme_count }} схем · {{ ds.size_kb }} КБ</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="mlt-meta" style="margin-top: 6px;">
+                    Всего на диске: <b>{{ datasets|length }}</b> файл(а),
+                    <b>{{ datasets_total_schemes }}</b> схем суммарно.
+                    Выбран будет добавлен к synthetic'у.
+                </div>
+                {% else %}
+                <div class="mlt-meta">
+                    ⚠ В <code>Dolg_APP/ml/dataset/</code> нет JSON-датасетов.
+                    Сгенерируйте seed через <code>python scripts/seed_ml_dataset.py</code>
+                    или импортируйте HF ниже.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mlt-row">
+            <label>Из БД:</label>
+            <label class="mlt-checkbox">
+                <input type="checkbox" id="mlt-include-db">
+                Добавить AITrainingExample из БД ({{ db_stats.total }} записей)
+            </label>
+        </div>
+        <div class="mlt-row" style="margin-top: 14px;">
+            <button id="mlt-start" class="mlt-btn">▶️ Запустить тренировку</button>
+            <button id="mlt-reset" class="mlt-btn secondary">🔄 Сбросить state</button>
+        </div>
+    </div>
+
+    {% comment %}
+    Прогресс тренировки — раньше был В САМОМ НИЗУ страницы (после import и DB-stats).
+    Сейчас сразу под кнопкой «Запустить» — логично читать сверху вниз.
+    {% endcomment %}
+    <div class="mlt-card" id="mlt-progress-card" style="display: none;">
+        <h2>⏳ Прогресс тренировки <small id="mlt-status-text">—</small></h2>
+        <div class="mlt-progress">
+            <div class="mlt-progress-bar" id="mlt-progress-bar"></div>
+            <div class="mlt-progress-label" id="mlt-progress-label">0%</div>
+        </div>
+        <div class="mlt-stats">
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Эпоха</div>
+                <div class="mlt-stat-value" id="mlt-epoch">0 / 0</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Train loss</div>
+                <div class="mlt-stat-value" id="mlt-train-loss">—</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Val loss</div>
+                <div class="mlt-stat-value" id="mlt-val-loss">—</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Прошло</div>
+                <div class="mlt-stat-value" id="mlt-elapsed">0с</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">ETA</div>
+                <div class="mlt-stat-value" id="mlt-eta">—</div>
+            </div>
+        </div>
+        <div class="mlt-result" id="mlt-result" style="display: none;"></div>
+        <div class="mlt-error" id="mlt-error" style="display: none;"></div>
+    </div>
+
+    {% comment %}
+    БД-статы — компактная плашка о состоянии AITrainingExample. Прижата
+    к блоку тренировки, чтобы было видно: «вот столько примеров, на чём тренируешь».
+    {% endcomment %}
+    <div class="mlt-card">
+        <h2>💾 База данных AITrainingExample <small>что уже в admin'е</small></h2>
+        <div class="mlt-meta">
+            Всего записей: <b style="color: #72ffad;">{{ db_stats.total }}</b>
+        </div>
+        {% if db_stats.by_kind %}
+        <div class="mlt-kind-table">
+            {% for kind, count in db_stats.by_kind.items %}
+            <span class="k">{{ kind }}</span>
+            <span class="v">{{ count }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <p class="mlt-meta" style="margin-top: 10px;">
+            Управление записями — в <a href="/admin/Dolg_APP/aitrainingexample/" style="color: #7fdbff;">Django admin</a>.
+            Там можно фильтровать по <code>evidence_kind</code> и удалять/редактировать.
+        </p>
+    </div>
+
+    <div class="mlt-card">
+        <h2>📥 Импорт открытых датасетов <small>HuggingFace · в фоне</small></h2>
+        <p class="mlt-meta">
+            Скачивает CC-BY-4.0 KiCad-схемы с HuggingFace
+            (<code>bshada/open-schematics</code>, 84&nbsp;470 схем).
+            Результат сохраняется в <code>Dolg_APP/ml/dataset/external/&lt;source&gt;_&lt;timestamp&gt;.json</code>;
+            при <b>persist</b> ещё и в <code>AITrainingExample</code> БД.
+        </p>
+        {% if not has_hf_token %}
+        <div style="background: rgba(255,196,80,.10); border: 1px solid rgba(255,196,80,.35);
+                    color: #ffc450; padding: 10px 14px; border-radius: 8px; margin: 8px 0;
+                    font-size: 12.5px;">
+            ⚠ <b>HF_TOKEN не задан</b> — анонимная загрузка часто зависает на 90+ МБ
+            (rate-limit Cloudflare). Получите бесплатный токен на
+            <a href="https://huggingface.co/settings/tokens" target="_blank"
+               style="color: #ffd970; text-decoration: underline;">huggingface.co/settings/tokens</a>
+            и добавьте в <code>.env</code>:<br>
+            <code style="background: rgba(0,0,0,.3); padding: 2px 6px; border-radius: 3px;
+                         display: inline-block; margin-top: 4px;">HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxx</code>
+            (после правки .env — рестарт сервера).
+        </div>
+        {% else %}
+        <div style="font-size: 12px; color: #72ffad; margin: 4px 0 8px;">
+            ✓ HF_TOKEN задан · authenticated загрузка (×10 rate-limit)
+        </div>
+        {% endif %}
+        <div class="mlt-import-row">
+            <select id="mlt-imp-source">
+                <option value="open_schematics" selected>open_schematics (HuggingFace, CC-BY-4.0)</option>
+            </select>
+            <label class="mlt-meta">
+                Limit:
+                <input type="number" id="mlt-imp-limit" value="500" min="1" max="5000" step="50">
+            </label>
+            <label class="mlt-checkbox">
+                <input type="checkbox" id="mlt-imp-persist" checked>
+                persist (писать в БД)
+            </label>
+            <label class="mlt-checkbox">
+                <input type="checkbox" id="mlt-imp-local-only">
+                local cache only
+            </label>
+            <label class="mlt-checkbox">
+                <input type="checkbox" id="mlt-imp-as-projects">
+                demo projects
+            </label>
+            <label class="mlt-meta">
+                Quality:
+                <input type="number" id="mlt-imp-project-quality" value="60" min="0" max="100" step="5">
+            </label>
+            <button id="mlt-imp-start" class="mlt-btn"
+                    {% if is_importing %}disabled{% endif %}>
+                {% if is_importing %}⏳ Импорт идёт…{% else %}⬇️ Запустить импорт{% endif %}
+            </button>
+        </div>
+        <div class="mlt-progress" id="mlt-imp-progress" style="display: none; margin-top: 12px;">
+            <div class="mlt-progress-bar" id="mlt-imp-progress-bar"></div>
+            <div class="mlt-progress-label" id="mlt-imp-progress-label">0%</div>
+        </div>
+        <div class="mlt-stats" id="mlt-imp-stats" style="display: none;">
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Обработано</div>
+                <div class="mlt-stat-value" id="mlt-imp-processed">0 / 0</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Импортировано</div>
+                <div class="mlt-stat-value" id="mlt-imp-imported">0</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">Прошло</div>
+                <div class="mlt-stat-value" id="mlt-imp-elapsed">0с</div>
+            </div>
+            <div class="mlt-stat">
+                <div class="mlt-stat-label">ETA</div>
+                <div class="mlt-stat-value" id="mlt-imp-eta">—</div>
+            </div>
+        </div>
+        <div id="mlt-imp-status" class="mlt-status" style="margin-top: 10px;">
+            {% if import_progress.state == 'running' %}
+                {{ import_progress.message }}
+            {% elif import_progress.state == 'done' %}
+                ✓ {{ import_progress.message }} ({{ import_progress.elapsed|default:0 }}с)
+            {% elif import_progress.state == 'error' %}
+                ⚠ Ошибка: {{ import_progress.error }}
+            {% endif %}
+        </div>
+        <pre id="mlt-imp-output" class="mlt-result" style="display: none;"></pre>
+    </div>
+
+    <div class="mlt-card">
+        <h2>ℹ️ Пассивные функции <small>применяются автоматически</small></h2>
+        <ul class="mlt-features">
+            <li>📊 <b>Validation split 15%</b> — held-out set, не идёт в backprop, выявляет переобучение</li>
+            <li>🛑 <b>Early stopping</b> patience=25 epochs — остановка если val_loss не улучшается</li>
+            <li>🎯 <b>Best-model checkpoint</b> — сохраняется самая лучшая по val_loss модель, не последняя</li>
+            <li>📉 <b>CosineAnnealing LR scheduler</b> — плавное снижение learning rate с 0.015 → ~0.0</li>
+            <li>🎲 <b>Data augmentation</b> — jitter feature-vector ±5% на каждой epoch для разнообразия</li>
+            <li>⚖️ <b>Weight decay</b> 1e-4 — L2 регуляризация в Adam-оптимизаторе</li>
+            <li>✂️ <b>Gradient clipping</b> max_norm=5.0 — стабильность при больших градиентах</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+(function () {
+    const epochsInput = document.getElementById('mlt-epochs');
+    const sizeInput = document.getElementById('mlt-size');
+    const startBtn = document.getElementById('mlt-start');
+    const resetBtn = document.getElementById('mlt-reset');
+    const progressCard = document.getElementById('mlt-progress-card');
+    const progressBar = document.getElementById('mlt-progress-bar');
+    const progressLabel = document.getElementById('mlt-progress-label');
+    const statusText = document.getElementById('mlt-status-text');
+    const epochEl = document.getElementById('mlt-epoch');
+    const trainLossEl = document.getElementById('mlt-train-loss');
+    const valLossEl = document.getElementById('mlt-val-loss');
+    const elapsedEl = document.getElementById('mlt-elapsed');
+    const resultEl = document.getElementById('mlt-result');
+    const errorEl = document.getElementById('mlt-error');
+
+    const etaEl = document.getElementById('mlt-eta');
+    const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    let pollTimer = null;
+    let liveTimer = null;
+
+    // Last-known progress + server-client clock offset для живого таймера
+    // (тикает каждую секунду без серверных запросов).
+    let lastProgress = null;
+    let clockOffset = 0;  // server_time - client_time, чтобы elapsed был точным
+
+    function fmt(v) {
+        if (v === null || v === undefined) return '—';
+        if (typeof v === 'number') return v.toFixed(4);
+        return String(v);
+    }
+
+    function fmtTime(seconds) {
+        if (seconds == null || !isFinite(seconds) || seconds < 0) return '—';
+        const s = Math.round(seconds);
+        if (s < 60) return s + 'с';
+        const m = Math.floor(s / 60);
+        const rest = s - m * 60;
+        if (m < 60) return `${m}м ${rest}с`;
+        const h = Math.floor(m / 60);
+        return `${h}ч ${m - h * 60}м`;
+    }
+
+    function liveElapsed(startedAt) {
+        if (!startedAt) return 0;
+        return (Date.now() / 1000 + clockOffset) - startedAt;
+    }
+
+    function updateProgress(p) {
+        if (!p || p.state === 'idle') {
+            progressCard.style.display = 'none';
+            stopLiveTimer();
+            return;
+        }
+        lastProgress = p;
+        progressCard.style.display = '';
+        const epoch = p.epoch || 0;
+        const total = p.total_epochs || 1;
+        const pct = Math.round((epoch / total) * 100);
+        progressBar.style.width = pct + '%';
+        progressLabel.textContent = pct + '%';
+        epochEl.textContent = `${epoch} / ${total}`;
+        trainLossEl.textContent = fmt(p.train_loss);
+        valLossEl.textContent = fmt(p.val_loss);
+        statusText.textContent = p.message || p.state;
+        renderLiveTimes();
+
+        if (p.state === 'done') {
+            elapsedEl.textContent = fmtTime(p.elapsed);
+            etaEl.textContent = '✓ готово';
+            resultEl.style.display = '';
+            resultEl.textContent = JSON.stringify(p.result, null, 2);
+            startBtn.disabled = false;
+            startBtn.textContent = '▶️ Запустить ещё раз';
+            stopPolling();
+            stopLiveTimer();
+        } else if (p.state === 'error') {
+            elapsedEl.textContent = fmtTime(p.elapsed);
+            etaEl.textContent = '⚠ ошибка';
+            errorEl.style.display = '';
+            errorEl.textContent = (p.error || 'Неизвестная ошибка') + (p.traceback ? '\n\n' + p.traceback : '');
+            startBtn.disabled = false;
+            stopPolling();
+            stopLiveTimer();
+        } else if (p.state === 'running') {
+            startLiveTimer();
+        }
+    }
+
+    function renderLiveTimes() {
+        if (!lastProgress || lastProgress.state !== 'running') return;
+        const elapsed = liveElapsed(lastProgress.started_at);
+        elapsedEl.textContent = fmtTime(elapsed);
+        // ETA: считаем по эпохам (если есть прогресс)
+        const epoch = lastProgress.epoch || 0;
+        const total = lastProgress.total_epochs || 1;
+        if (epoch > 0 && total > epoch) {
+            const perEpoch = elapsed / epoch;
+            const remaining = perEpoch * (total - epoch);
+            etaEl.textContent = '~' + fmtTime(remaining);
+        } else {
+            etaEl.textContent = '…';
+        }
+    }
+
+    function startLiveTimer() {
+        if (liveTimer) return;
+        liveTimer = setInterval(renderLiveTimes, 1000);
+    }
+    function stopLiveTimer() {
+        if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    }
+
+    function startPolling() {
+        stopPolling();
+        const tick = async () => {
+            try {
+                const res = await fetch('{% url "hello:ml_training_status" %}', { credentials: 'same-origin' });
+                const data = await res.json();
+                if (typeof data.server_time === 'number') {
+                    clockOffset = data.server_time - (Date.now() / 1000);
+                }
+                updateProgress(data.progress);
+                if (data.is_running) pollTimer = setTimeout(tick, 1500);
+            } catch (e) {
+                console.error('[MLT] polling error:', e);
+            }
+        };
+        tick();
+    }
+
+    function stopPolling() {
+        if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    }
+
+    // Подсветка выбранного датасета (radio с визуальным feedback'ом)
+    const dsContainer = document.getElementById('mlt-datasets');
+    if (dsContainer) {
+        dsContainer.addEventListener('change', (e) => {
+            if (e.target.name !== 'dataset') return;
+            dsContainer.querySelectorAll('.mlt-ds-item').forEach(item => {
+                item.classList.toggle('selected', item.contains(e.target));
+            });
+        });
+    }
+    function getSelectedDataset() {
+        const r = document.querySelector('input[name="dataset"]:checked');
+        return r ? r.value : '';
+    }
+    const includeDbEl = document.getElementById('mlt-include-db');
+
+    startBtn.addEventListener('click', async () => {
+        startBtn.disabled = true;
+        startBtn.textContent = '⏳ Запускаю…';
+        errorEl.style.display = 'none';
+        resultEl.style.display = 'none';
+        try {
+            const fd = new FormData();
+            fd.append('epochs', epochsInput.value);
+            fd.append('size', sizeInput.value);
+            const selectedDs = getSelectedDataset();
+            if (selectedDs) fd.append('dataset_path', selectedDs);
+            if (includeDbEl && includeDbEl.checked) fd.append('include_db', '1');
+            const res = await fetch('{% url "hello:ml_training_start" %}', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-CSRFToken': CSRF }, body: fd,
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Ошибка запуска');
+            startBtn.textContent = '⏳ Тренировка идёт…';
+            startPolling();
+        } catch (e) {
+            errorEl.style.display = '';
+            errorEl.textContent = e.message;
+            startBtn.disabled = false;
+            startBtn.textContent = '▶️ Запустить тренировку';
+        }
+    });
+
+    // ─── Импорт HF dataset ─────────────────────────────────────────────
+    const impBtn = document.getElementById('mlt-imp-start');
+    const impSrc = document.getElementById('mlt-imp-source');
+    const impLim = document.getElementById('mlt-imp-limit');
+    const impPersist = document.getElementById('mlt-imp-persist');
+    const impLocalOnly = document.getElementById('mlt-imp-local-only');
+    const impAsProjects = document.getElementById('mlt-imp-as-projects');
+    const impProjectQuality = document.getElementById('mlt-imp-project-quality');
+    const impStatus = document.getElementById('mlt-imp-status');
+    const impOutput = document.getElementById('mlt-imp-output');
+    let impPollTimer = null;
+
+    const impProgressBlock = document.getElementById('mlt-imp-progress');
+    const impProgressBar = document.getElementById('mlt-imp-progress-bar');
+    const impProgressLabel = document.getElementById('mlt-imp-progress-label');
+    const impStatsBlock = document.getElementById('mlt-imp-stats');
+    const impProcessedEl = document.getElementById('mlt-imp-processed');
+    const impImportedEl = document.getElementById('mlt-imp-imported');
+    const impElapsedEl = document.getElementById('mlt-imp-elapsed');
+    const impEtaEl = document.getElementById('mlt-imp-eta');
+
+    let lastImpProgress = null;
+    let impLiveTimer = null;
+
+    function renderImpLive() {
+        if (!lastImpProgress) return;
+        const p = lastImpProgress;
+        const elapsed = liveElapsed(p.started_at);
+
+        // Показываем блоки прогресса при первом running
+        if (p.state === 'running' || p.state === 'done' || p.state === 'error') {
+            impProgressBlock.style.display = '';
+            impStatsBlock.style.display = '';
+        }
+
+        const processed = p.processed || 0;
+        const limit = p.limit || 1;
+        // Процент: до начала первой итерации показываем 0%; до завершения — capped на 99%,
+        // чтобы 100% появлялись только когда state=done.
+        let pct = 0;
+        if (processed > 0 && limit > 0) {
+            pct = Math.min(99, Math.round((processed / limit) * 100));
+        }
+        if (p.state === 'done') pct = 100;
+        impProgressBar.style.width = pct + '%';
+        impProgressLabel.textContent = pct + '%';
+        impProcessedEl.textContent = `${processed} / ${limit}`;
+        impImportedEl.textContent = `${p.imported || 0}` + (p.skipped ? ` (пропущено ${p.skipped})` : '');
+        impElapsedEl.textContent = fmtTime(elapsed);
+
+        // ETA по обработанным строкам (не по импортированным — те могут отсеяться)
+        if (processed > 0 && limit > processed && p.state === 'running') {
+            const perItem = elapsed / processed;
+            const remaining = perItem * (limit - processed);
+            impEtaEl.textContent = '~' + fmtTime(remaining);
+            if (p.stale) {
+                impStatus.textContent += ` · no new heartbeat ${fmtTime(p.stale_seconds || 0)}`;
+            }
+        } else if (p.state === 'done') {
+            impEtaEl.textContent = '✓ готово';
+        } else if (p.state === 'error') {
+            impEtaEl.textContent = '⚠ ошибка';
+        } else {
+            impEtaEl.textContent = '…';
+        }
+
+        // Status-line
+        if (p.state === 'running') {
+            impStatus.textContent = `${p.message || 'Импорт…'}`;
+        } else if (p.state === 'done') {
+            impStatus.textContent = `✓ ${p.message} · общее время ${fmtTime(p.elapsed)} — обновите страницу, чтобы увидеть новый датасет.`;
+        } else if (p.state === 'error') {
+            impStatus.textContent = `⚠ Ошибка: ${p.error || 'unknown'} · через ${fmtTime(p.elapsed)}`;
+        }
+    }
+
+    function startImpLiveTimer() {
+        if (impLiveTimer) return;
+        impLiveTimer = setInterval(renderImpLive, 1000);
+    }
+    function stopImpLiveTimer() {
+        if (impLiveTimer) { clearInterval(impLiveTimer); impLiveTimer = null; }
+    }
+
+    function setImpStatus(p) {
+        if (!p || p.state === 'idle') {
+            impStatus.textContent = '';
+            impProgressBlock.style.display = 'none';
+            impStatsBlock.style.display = 'none';
+            stopImpLiveTimer();
+            return;
+        }
+        lastImpProgress = p;
+        renderImpLive();
+        if (p.state === 'running') {
+            startImpLiveTimer();
+        } else if (p.state === 'done') {
+            stopImpLiveTimer();
+            if (p.output_tail) {
+                impOutput.style.display = '';
+                impOutput.textContent = p.output_tail;
+            }
+            impBtn.disabled = false;
+            impBtn.textContent = '⬇️ Запустить импорт';
+            stopImpPolling();
+        } else if (p.state === 'error') {
+            stopImpLiveTimer();
+            if (p.output_tail) {
+                impOutput.style.display = '';
+                impOutput.textContent = p.output_tail;
+            }
+            impBtn.disabled = false;
+            impBtn.textContent = '⬇️ Запустить импорт';
+            stopImpPolling();
+        }
+    }
+    function startImpPolling() {
+        stopImpPolling();
+        const tick = async () => {
+            try {
+                const res = await fetch('{% url "hello:ml_dataset_import_status" %}', { credentials: 'same-origin' });
+                const data = await res.json();
+                if (typeof data.server_time === 'number') {
+                    clockOffset = data.server_time - (Date.now() / 1000);
+                }
+                setImpStatus(data.progress);
+                if (data.is_importing) impPollTimer = setTimeout(tick, 2000);
+            } catch (e) {
+                console.error('[MLT-import] polling error:', e);
+            }
+        };
+        tick();
+    }
+    function stopImpPolling() {
+        if (impPollTimer) { clearTimeout(impPollTimer); impPollTimer = null; }
+    }
+    if (impBtn) {
+        impBtn.addEventListener('click', async () => {
+            impBtn.disabled = true;
+            impBtn.textContent = '⏳ Запускаю…';
+            impOutput.style.display = 'none';
+            try {
+                const fd = new FormData();
+                fd.append('source', impSrc.value);
+                fd.append('limit', impLim.value);
+                if (impPersist.checked) fd.append('persist', '1');
+                if (impLocalOnly && impLocalOnly.checked) fd.append('local_only', '1');
+                if (impAsProjects && impAsProjects.checked) fd.append('as_projects', '1');
+                if (impProjectQuality) fd.append('project_min_quality', impProjectQuality.value || '60');
+                const res = await fetch('{% url "hello:ml_dataset_import" %}', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'X-CSRFToken': CSRF }, body: fd,
+                });
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'Ошибка запуска');
+                impBtn.textContent = '⏳ Импорт идёт…';
+                startImpPolling();
+            } catch (e) {
+                impStatus.textContent = '⚠ ' + e.message;
+                impBtn.disabled = false;
+                impBtn.textContent = '⬇️ Запустить импорт';
+            }
+        });
+    }
+    {% if is_importing %}
+    startImpPolling();
+    {% endif %}
+
+    resetBtn.addEventListener('click', async () => {
+        if (!confirm('Сбросить state? (если зависла тренировка)')) return;
+        try {
+            const res = await fetch('{% url "hello:ml_training_reset" %}', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-CSRFToken': CSRF },
+            });
+            const data = await res.json();
+            if (data.ok) {
+                progressCard.style.display = 'none';
+                startBtn.disabled = false;
+                startBtn.textContent = '▶️ Запустить тренировку';
+                stopPolling();
+            }
+        } catch (e) { console.error(e); }
+    });
+
+    // На загрузке: если уже что-то выполняется — начать polling сразу.
+    {% if is_running %}
+        startBtn.disabled = true;
+        startBtn.textContent = '⏳ Тренировка идёт…';
+        startPolling();
+    {% elif progress.state == 'done' or progress.state == 'error' %}
+        updateProgress({{ progress|safe|default:"null" }});
+    {% endif %}
+})();
+</script>
+{% endblock %}

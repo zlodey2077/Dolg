@@ -1,0 +1,21 @@
+{
+  "name": "dolg-frontend",
+  "version": "0.1.0",
+  "description": "TypeScript + Vite-сборка модулей DOLG. Постепенно мигрируем shop/static/simulation/*.js → src/*.ts; финальный bundle копируется в shop/static/lib/dolg.bundle.js, шаблоны подключают его одним <script>.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/three": "^0.160.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vitest": "^1.5.0"
+  }
+}

@@ -1,0 +1,52 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+{% if ai_dataset_dashboard %}
+<div class="module" style="margin-bottom:16px;">
+  <h2>Сводка AI dataset</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:12px;">
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_dashboard.total }}</strong><span>примеров всего</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_dashboard.validated }}</strong><span>подтверждено</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_dashboard.unvalidated }}</strong><span>ожидают проверки</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_dashboard.with_scheme_data }}</strong><span>со scheme_data</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_dashboard.with_source_ids }}</strong><span>с источниками</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_dashboard.with_teacher_rules }}</strong><span>с teacher rules</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_validation.errors_count }}</strong><span>ошибок валидации</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ ai_dataset_validation.warnings_count }}</strong><span>предупреждений</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 12px 12px;">
+    <div>
+      <h3 style="margin:0 0 6px;">Evidence kind</h3>
+      <ul style="margin:0 0 0 1rem;">
+        {% for key, value in ai_dataset_dashboard.by_evidence_kind.items %}
+        <li><strong>{{ key }}</strong>: {{ value }}</li>
+        {% empty %}
+        <li>нет данных</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin:0 0 6px;">Topology</h3>
+      <ul style="margin:0 0 0 1rem;">
+        {% for key, value in ai_dataset_dashboard.by_topology.items %}
+        <li><strong>{{ key }}</strong>: {{ value }}</li>
+        {% empty %}
+        <li>нет схемных примеров</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin:0 0 6px;">Source</h3>
+      <ul style="margin:0 0 0 1rem;">
+        {% for key, value in ai_dataset_dashboard.by_source.items %}
+        <li><strong>{{ key }}</strong>: {{ value }}</li>
+        {% empty %}
+        <li>нет данных</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

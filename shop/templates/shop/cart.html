@@ -1,0 +1,234 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Корзина{% endblock %}
+
+{% block extra_css %}
+<style>
+.project-cart-panel {
+    margin: 0 0 1.25rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(0,212,255,.28);
+    border-radius: 8px;
+    background: rgba(0,212,255,.06);
+    box-shadow: 0 0 22px rgba(0,212,255,.10);
+}
+.project-cart-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: .85rem;
+}
+.project-cart-kicker {
+    color: var(--accent-cyan);
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+.project-cart-title {
+    color: var(--text-bright);
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-top: .15rem;
+}
+.project-cart-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    color: rgba(224,224,224,.72);
+    font-size: .84rem;
+}
+.project-cart-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    justify-content: flex-end;
+}
+.project-cart-link,
+.project-cart-reset {
+    min-height: 34px;
+    border: 1px solid rgba(0,212,255,.30);
+    border-radius: 6px;
+    background: rgba(10,16,32,.45);
+    color: var(--accent-cyan);
+    padding: .42rem .7rem;
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.project-cart-link:hover,
+.project-cart-reset:hover { border-color: var(--accent-cyan); }
+.project-cart-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .55rem;
+    margin-top: .8rem;
+}
+.project-cart-item {
+    padding: .55rem .65rem;
+    border: 1px solid rgba(0,212,255,.16);
+    border-radius: 6px;
+    background: rgba(10,16,32,.38);
+    color: var(--text-light);
+    font-size: .82rem;
+    line-height: 1.35;
+}
+.project-cart-item strong { color: var(--text-bright); }
+.project-cart-warnings {
+    margin-top: .85rem;
+    display: grid;
+    gap: .4rem;
+}
+.project-cart-warning {
+    color: #ffd27d;
+    font-size: .82rem;
+}
+@media (max-width: 720px) {
+    .project-cart-head { flex-direction: column; }
+    .project-cart-actions { justify-content: flex-start; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Корзина товаров</h1>
+
+    {% if project_cart_context %}
+    <section class="project-cart-panel">
+        <div class="project-cart-head">
+            <div>
+                <div class="project-cart-kicker">Проектная корзина</div>
+                <div class="project-cart-title">{{ project_cart_context.project_name }}</div>
+                <div class="project-cart-meta">
+                    <span>Источник: {{ project_cart_context.source }}</span>
+                    <span>Позиций: {{ project_cart_context.total_positions }}</span>
+                    <span>Количество: {{ project_cart_context.total_quantity }}</span>
+                    <span>BOM: {{ project_cart_context.grand_total }} ₽</span>
+                </div>
+            </div>
+            <div class="project-cart-actions">
+                {% if project_cart_context.project_url %}
+                <a class="project-cart-link" href="{{ project_cart_context.project_url }}">Открыть проект</a>
+                {% endif %}
+                <form method="post" action="{% url 'shop:clear_project_cart_context' %}">
+                    {% csrf_token %}
+                    <button class="project-cart-reset" type="submit">Сбросить привязку</button>
+                </form>
+            </div>
+        </div>
+        {% if project_cart_context.items %}
+        <div class="project-cart-items">
+            {% for item in project_cart_context.items %}
+            <div class="project-cart-item">
+                <strong>{{ item.part_number|default:item.name }}</strong><br>
+                {{ item.quantity }} шт. x {{ item.unit_price }} ₽ = {{ item.line_total }} ₽
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if project_cart_context.warnings %}
+        <div class="project-cart-warnings">
+            {% for warning in project_cart_context.warnings %}
+            <div class="project-cart-warning">Внимание: {{ warning }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if cart_items %}
+        <div class="cart-content">
+            <div class="cart-items">
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Цена</th>
+                            <th>Количество</th>
+                            <th>Сумма</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in cart_items %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'shop:product_detail' item.product.slug %}">
+                                    {{ item.product.name }}
+                                </a>
+                            </td>
+                            <td>{{ item.product.price }} ₽</td>
+                            <td>
+                                <form method="post" action="{% url 'shop:update_cart_item' item.id %}" class="quantity-form">
+                                    {% csrf_token %}
+                                    <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.product.stock }}" class="quantity-input">
+                                    <button type="submit" class="btn-update">Обновить</button>
+                                </form>
+                            </td>
+                            <td>{{ item.get_total_price }} ₽</td>
+                            <td>
+                                <form method="post" action="{% url 'shop:remove_from_cart' item.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-remove">Удалить</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="cart-summary">
+                <h3>Итого</h3>
+                <p class="total-price">Общая стоимость: <strong>{{ total_price }} ₽</strong></p>
+                <a href="{% url 'shop:index' %}" class="btn btn-secondary">Продолжить покупки</a>
+                {% if user.is_authenticated %}
+                    <form method="post" action="{% url 'orders:checkout' %}" class="checkout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success">✓ Оформить заказ</button>
+                    </form>
+                {% else %}
+                    {% comment %}
+                    Guest-чек-аут: гость может оформить заказ без регистрации, указав
+                    email/имя/телефон. Заказ привязывается к session_id + guest_token
+                    (UUID-ссылка для отслеживания приходит на email).
+                    Зарегистрированный пользователь получает историю заказов в личном
+                    кабинете — оставляем как опцию.
+                    {% endcomment %}
+                    <a href="{% url 'orders:checkout' %}"
+                       class="btn btn-success">⚡ Оформить как гость</a>
+                    <p class="cart-guest-notice" style="margin-top:0.6rem; font-size: 0.85rem;">
+                        Без регистрации — нужны только email и контакты. Ссылка на заказ придёт на почту.
+                    </p>
+                    <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgba(0,212,255,0.25);">
+                        {% comment %}
+                        Раньше тут было две кнопки «Регистрация» + «Вход». Принцип
+                        «одна точка входа»: оставляем только Войти, на login-странице
+                        есть ссылка на регистрацию.
+                        {% endcomment %}
+                        <p style="font-size: 0.82rem; color: rgba(200,200,200,0.7); margin-bottom: 0.4rem;">
+                            💎 Уже есть аккаунт? История заказов в одном месте:
+                        </p>
+                        <a href="{% url 'accounts:login' %}?next={% url 'orders:checkout' %}"
+                           class="btn btn-secondary" style="display:inline-block;">🔑 Войти</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="empty-cart">
+            <p class="empty-message">🛒 Корзина пуста</p>
+            <p style="color:var(--text-color); margin-bottom: var(--space-lg, 24px);">
+                Добавьте сюда компоненты из <a href="{% url 'shop:index' %}" style="color: var(--accent-cyan);">каталога</a>,
+                либо сгенерируйте перечень из готовой схемы в <a href="{% url 'hello:projects' %}" style="color: var(--accent-cyan);">симуляторе</a>
+                — нажмите «Добавить BOM в корзину».
+            </p>
+            <a href="{% url 'shop:index' %}" class="btn btn-primary">→ К каталогу товаров</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

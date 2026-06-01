@@ -1,0 +1,322 @@
+{% extends "shop/base.html" %}
+{% load shop_extras %}
+
+{% block title %}{% if query %}Поиск: {{ query }}{% else %}Глобальный поиск{% endif %} — DOLG{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-page {
+        margin: 1.5rem 0 3rem;
+    }
+    .search-hero {
+        padding: 1.4rem 1.5rem;
+        border: 1px solid rgba(0,212,255,.28);
+        border-radius: 10px;
+        background: rgba(26,39,68,.55);
+        margin-bottom: 1.5rem;
+    }
+    .search-hero h1 {
+        margin: 0 0 .35rem;
+        color: var(--accent-cyan);
+        font-size: 1.7rem;
+    }
+    .search-hero p {
+        margin: 0;
+        color: var(--text-light);
+    }
+    .search-section {
+        margin: 2rem 0;
+    }
+    .search-section-title {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid rgba(0,212,255,.18);
+        padding-bottom: .55rem;
+        margin-bottom: 1rem;
+    }
+    .search-section-title h2 {
+        margin: 0;
+        color: var(--accent-cyan);
+        font-size: 1.1rem;
+    }
+    .search-count {
+        color: rgba(224,224,224,.65);
+        font-size: .85rem;
+    }
+    .search-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: .9rem;
+    }
+    .search-card {
+        display: block;
+        padding: .95rem 1rem;
+        border: 1px solid rgba(0,212,255,.24);
+        border-radius: 8px;
+        background: rgba(10,14,39,.45);
+        color: inherit;
+        text-decoration: none;
+        transition: all .2s ease;
+    }
+    .search-card:hover {
+        border-color: var(--accent-cyan);
+        transform: translateY(-2px);
+        box-shadow: 0 0 18px rgba(0,212,255,.18);
+    }
+    .search-card-kicker {
+        color: rgba(0,255,255,.72);
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-bottom: .25rem;
+    }
+    .search-card-title {
+        color: var(--text-bright);
+        font-weight: 700;
+        margin-bottom: .3rem;
+        line-height: 1.25;
+    }
+    .search-card-desc {
+        color: var(--text-light);
+        font-size: .86rem;
+        line-height: 1.45;
+    }
+    .search-empty {
+        padding: 1.5rem;
+        border: 1px dashed rgba(0,212,255,.32);
+        border-radius: 8px;
+        color: var(--text-light);
+        background: rgba(10,14,39,.3);
+    }
+    .products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+    .product-card {
+        background: linear-gradient(135deg, rgba(26,39,68,0.85), rgba(10,14,39,0.7));
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 0 10px rgba(0,212,255,0.12);
+    }
+    .product-card-topbar,
+    .product-meta-row,
+    .product-signals {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        align-items: center;
+    }
+    .product-card-topbar {
+        justify-content: space-between;
+        padding: .55rem .65rem 0;
+    }
+    .product-category-chip,
+    .product-signal {
+        border-radius: 4px;
+        border: 1px solid rgba(0,212,255,.22);
+        padding: .12rem .42rem;
+        color: var(--accent-cyan);
+        font-size: .68rem;
+    }
+    /* .param-chip и .product-params, .product-footer стилизуются из
+       cosmic_theme.css (общая правда для каталога и поиска). */
+    .badge-lifecycle {
+        font-size: .65rem;
+        font-weight: 700;
+        padding: .18rem .45rem;
+        border-radius: 4px;
+        text-transform: uppercase;
+    }
+    .badge-active { color: #00c864; border: 1px solid rgba(0,200,100,.35); background: rgba(0,200,100,.14); }
+    .badge-nrnd { color: #ffa000; border: 1px solid rgba(255,160,0,.35); background: rgba(255,160,0,.14); }
+    .badge-eol,
+    .badge-obsolete { color: #ff7777; border: 1px solid rgba(255,70,70,.35); background: rgba(255,70,70,.14); }
+    .product-image {
+        width: calc(100% - 1rem);
+        height: 138px;
+        margin: 0.4rem 0.5rem 0.8rem;
+        padding: 6px 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;            /* убрали тёмную плашку — синхронизация с каталогом */
+        overflow: visible;
+        box-sizing: border-box;
+    }
+    /* Стиль самой картинки (border-radius, neon-glow) приходит из
+       cosmic_theme.css → ".product-image .product-photo". Здесь только
+       sizing-обёртка. */
+    .product-photo-missing { color: rgba(224,224,224,.65); font-size: .78rem; text-align: center; padding: .75rem; }
+    .product-body { padding: .85rem; display: flex; flex-direction: column; flex: 1; gap: .35rem; }
+    .product-name { color: var(--text-bright); font-size: .9rem; font-weight: 700; line-height: 1.3; }
+    .product-pn { color: var(--accent-cyan); font-family: monospace; font-size: .75rem; }
+    .product-meta-row { color: rgba(224,224,224,.76); font-size: .72rem; }
+    .product-price { color: var(--text-bright); font-size: 1rem; font-weight: 700; margin: 0; }
+    .badge-stock-ok { color: #00c864; font-size: .7rem; }
+    .badge-stock-out { color: #ff7777; font-size: .7rem; }
+    /* .btn-detail приходит из cosmic_theme.css (анимированный градиент,
+       движущаяся стрелка, hover-glow). */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-page">
+    <section class="search-hero">
+        <h1>{% if query %}Поиск по DOLG: «{{ query }}»{% else %}Глобальный поиск DOLG{% endif %}</h1>
+        <p>
+            {% if query %}
+                Найдено результатов: {{ total_results }}. Поиск смотрит товары, категории, статьи, уроки, демо-схемы и инструменты.
+            {% else %}
+                Введите запрос сверху или выберите один из готовых разделов ниже.
+            {% endif %}
+        </p>
+    </section>
+
+    {% if not query %}
+    <div class="search-empty">
+        Примеры запросов: <strong>NE555</strong>, <strong>резистор</strong>, <strong>делитель</strong>, <strong>CAD</strong>, <strong>BOM</strong>, <strong>A3</strong>.
+    </div>
+    {% endif %}
+
+    {% if tools %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Инструменты и сценарии</h2>
+            <span class="search-count">{{ tools|length }}</span>
+        </div>
+        <div class="search-list">
+            {% for item in tools %}
+            <a class="search-card" href="{{ item.url }}">
+                <div class="search-card-kicker">Инструмент</div>
+                <div class="search-card-title">{{ item.title }}</div>
+                <div class="search-card-desc">{{ item.description }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if products %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Товары</h2>
+            <span class="search-count">{{ products|length }}</span>
+        </div>
+        <div class="products-grid">
+            {% for product in products %}
+            {% include "shop/includes/product_card.html" %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if categories_found %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Категории</h2>
+            <span class="search-count">{{ categories_found|length }}</span>
+        </div>
+        <div class="search-list">
+            {% for category in categories_found %}
+            <a class="search-card" href="{% url 'shop:category' category.slug %}">
+                <div class="search-card-kicker">Категория</div>
+                <div class="search-card-title">{% category_icon category.slug %} {{ category.name }}</div>
+                <div class="search-card-desc">{{ category.description|default:"Раздел каталога DOLG." }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if articles %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Энциклопедия</h2>
+            <span class="search-count">{{ articles|length }}</span>
+        </div>
+        <div class="search-list">
+            {% for article in articles %}
+            <a class="search-card" href="{% url 'knowledge:article' article.slug %}">
+                <div class="search-card-kicker">{{ article.category.name }} · {{ article.reading_minutes }} мин</div>
+                <div class="search-card-title">{{ article.title }}</div>
+                <div class="search-card-desc">{{ article.summary|truncatewords:22 }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if source_results %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Источники и документация</h2>
+            <span class="search-count">{{ source_results|length }}</span>
+        </div>
+        <div class="search-list">
+            {% for source in source_results %}
+            <a class="search-card" href="{{ source.article_url }}">
+                <div class="search-card-kicker">{{ source.kicker }}</div>
+                <div class="search-card-title">{{ source.title }}</div>
+                <div class="search-card-desc">{{ source.description|truncatewords:24 }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if learning_lessons %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Обучение</h2>
+            <span class="search-count">{{ learning_lessons|length }}</span>
+        </div>
+        <div class="search-list">
+            {% for lesson in learning_lessons %}
+            <a class="search-card" href="{% url 'knowledge:learning_lesson' lesson.slug %}">
+                <div class="search-card-kicker">{{ lesson.track.title }} · {{ lesson.estimated_minutes }} мин</div>
+                <div class="search-card-title">{{ lesson.title }}</div>
+                <div class="search-card-desc">{{ lesson.summary|truncatewords:22 }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if projects %}
+    <section class="search-section">
+        <div class="search-section-title">
+            <h2>Схемы и проекты</h2>
+            <span class="search-count">{{ projects|length }}</span>
+        </div>
+        <div class="search-list">
+            {% for project in projects %}
+            <a class="search-card" href="{% url 'hello:projects' %}">
+                <div class="search-card-kicker">{% if project.is_demo %}Демо-схема{% else %}Проект{% endif %}</div>
+                <div class="search-card-title">{{ project.name }}</div>
+                <div class="search-card-desc">{{ project.description|default:"Схема DOLG"|truncatewords:24 }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if query and not total_results %}
+    <div class="search-empty">
+        <p style="font-size: 1.1rem; margin-bottom: var(--space-sm, 8px);"><b>По запросу «{{ query }}» ничего не нашлось.</b></p>
+        <p>Что можно попробовать:</p>
+        <ul style="text-align: left; display: inline-block; margin-top: var(--space-sm, 8px);">
+            <li>Сократить запрос до 1–2 ключевых слов («резистор» вместо «резистор 10 кОм 1%»)</li>
+            <li>Искать по part number («2N3904», «BC547») — точно как на корпусе</li>
+            <li>Использовать категории из меню сверху, если не уверены в названии</li>
+            <li>Задачей: «фильтр», «стабилизатор», «делитель»</li>
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

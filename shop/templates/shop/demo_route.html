@@ -1,0 +1,189 @@
+{% extends "shop/base.html" %}
+{% load shop_extras %}
+
+{% block title %}Демонстрационный маршрут — DOLG{% endblock %}
+
+{% block extra_css %}
+<style>
+    .demo-hero {
+        margin: 1.5rem 0 2rem;
+        padding: 1.7rem;
+        border: 1px solid rgba(0,212,255,.3);
+        border-radius: 10px;
+        background: linear-gradient(135deg, rgba(0,102,255,.14), rgba(10,14,39,.55));
+    }
+    .demo-hero h1 {
+        margin: 0 0 .45rem;
+        color: var(--accent-cyan);
+        font-size: 1.9rem;
+    }
+    .demo-hero p {
+        margin: 0;
+        max-width: 860px;
+        color: var(--text-light);
+        line-height: 1.55;
+    }
+    .demo-flow {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: .9rem;
+        margin: 1.5rem 0 2rem;
+    }
+    .demo-step {
+        display: flex;
+        flex-direction: column;
+        gap: .45rem;
+        padding: 1rem;
+        border: 1px solid rgba(0,212,255,.24);
+        border-radius: 8px;
+        background: rgba(26,39,68,.52);
+        text-decoration: none;
+        color: inherit;
+        min-height: 180px;
+        transition: all .2s ease;
+    }
+    .demo-step:hover {
+        border-color: var(--accent-cyan);
+        transform: translateY(-3px);
+        box-shadow: 0 0 18px rgba(0,212,255,.2);
+    }
+    .demo-step-index {
+        width: 2rem;
+        height: 2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(0,212,255,.12);
+        border: 1px solid rgba(0,212,255,.35);
+        color: var(--accent-cyan);
+        font-weight: 800;
+    }
+    .demo-step-label {
+        color: rgba(0,255,255,.72);
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+    .demo-step-title {
+        color: var(--text-bright);
+        font-weight: 800;
+        font-size: 1rem;
+    }
+    .demo-step-desc {
+        color: var(--text-light);
+        font-size: .86rem;
+        line-height: 1.45;
+        flex: 1;
+    }
+    .demo-step-action {
+        color: var(--accent-cyan);
+        font-weight: 700;
+        font-size: .86rem;
+    }
+    .demo-panels {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+        margin: 2rem 0;
+    }
+    .demo-panel {
+        padding: 1rem 1.1rem;
+        border: 1px solid rgba(0,212,255,.22);
+        border-radius: 8px;
+        background: rgba(10,14,39,.45);
+    }
+    .demo-panel h2 {
+        margin: 0 0 .55rem;
+        color: var(--accent-cyan);
+        font-size: 1.05rem;
+    }
+    .demo-panel p,
+    .demo-panel li {
+        color: var(--text-light);
+        font-size: .9rem;
+        line-height: 1.5;
+    }
+    .demo-panel ul {
+        margin: .4rem 0 0 1.2rem;
+        padding: 0;
+    }
+    .demo-link {
+        color: var(--accent-cyan);
+        text-decoration: none;
+        font-weight: 700;
+    }
+    .demo-link:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="demo-hero">
+    <h1>Демонстрационный маршрут DOLG</h1>
+    <p>
+        Это короткий сценарий для защиты и проверки проекта: от реального компонента в каталоге до статьи,
+        CAD-чертежа, симуляции, спецификации BOM и заказа. Он показывает DOLG как цельную инженерную среду,
+        а не набор отдельных страниц.
+    </p>
+</section>
+
+<section class="demo-flow" aria-label="Маршрут демонстрации">
+    {% for step in steps %}
+    <a class="demo-step" href="{{ step.url }}">
+        <span class="demo-step-index">{{ forloop.counter }}</span>
+        <span class="demo-step-label">{{ step.label }}</span>
+        <span class="demo-step-title">{{ step.title }}</span>
+        <span class="demo-step-desc">{{ step.description }}</span>
+        <span class="demo-step-action">Открыть →</span>
+    </a>
+    {% endfor %}
+</section>
+
+<section class="demo-panels">
+    <div class="demo-panel">
+        <h2>Быстрый старт</h2>
+        {% if featured_product %}
+        <p>
+            Начните с товара:
+            <a class="demo-link" href="{% url 'shop:product_detail' featured_product.slug %}">
+                {{ featured_product.name }}
+            </a>
+            {% if featured_product.part_number %}({{ featured_product.part_number }}){% endif %}.
+        </p>
+        {% else %}
+        <p>Каталог пока пуст: заполните его командами из README, затем маршрут автоматически подхватит товар.</p>
+        {% endif %}
+        {% if featured_article %}
+        <p>
+            Затем откройте статью:
+            <a class="demo-link" href="{% url 'knowledge:article' featured_article.slug %}">
+                {{ featured_article.title }}
+            </a>.
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="demo-panel">
+        <h2>Инженерная часть</h2>
+        <ul>
+            <li>В CAD используйте реальные товары из каталога, net labels, GND и DRC.</li>
+            <li>Через CAD → SIM перенесите схему в симулятор без ручного пересоздания.</li>
+            <li>В симуляторе сформируйте BOM и добавьте подходящие позиции в корзину.</li>
+        </ul>
+    </div>
+
+    <div class="demo-panel">
+        <h2>Запасной сценарий</h2>
+        {% if demo_project %}
+        <p>
+            Если нужно показать готовую сложную схему, откройте
+            <a class="demo-link" href="{% url 'hello:simulation' %}?project={{ demo_project.id }}">{{ demo_project.name }}</a>
+            в разделе проектов.
+        </p>
+        {% else %}
+        <p>Демо-схемы еще не созданы. Запустите <code>python manage.py populate_demo_projects</code>.</p>
+        {% endif %}
+        <p>Для проверки готовности используйте <code>python manage.py check_demo_ready</code>.</p>
+    </div>
+</section>
+{% endblock %}

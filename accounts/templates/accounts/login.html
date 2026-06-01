@@ -1,0 +1,111 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% load socialaccount %}
+
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="auth-form-container">
+        <h1>Вход</h1>
+        
+        {% if messages %}
+            <div class="messages" role="status" aria-live="polite">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" class="auth-form" aria-label="Форма входа">
+            {% csrf_token %}
+            {% comment %}
+            Сохраняем ?next= если пришли с защищённой страницы — после успешного
+            логина вернёмся туда, а не на главную.
+            {% endcomment %}
+            {% if request.GET.next %}
+            <input type="hidden" name="next" value="{{ request.GET.next }}">
+            {% endif %}
+
+            <div class="form-group">
+                <label for="username">Имя пользователя:</label>
+                <input type="text" id="username" name="username" required
+                       class="form-control"
+                       autocomplete="username"
+                       aria-required="true"
+                       autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <div class="password-field">
+                    <input type="password" id="password" name="password" required
+                           class="form-control"
+                           autocomplete="current-password"
+                           aria-required="true">
+                    <button type="button" class="password-toggle" data-target="password"
+                            aria-label="Показать пароль" title="Показать/скрыть пароль">👁</button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success" style="width:100%;">Войти</button>
+
+            {% comment %}
+            Компактный footer формы: «Забыли пароль» слева, «Регистрация» справа.
+            Раньше Регистрация была в отдельном <p class="auth-link"> вне формы —
+            из-за этого ссылка съезжала в нижний-левый угол и выглядела как лишний
+            элемент. Теперь обе ссылки на одной строке, центрированы под кнопкой.
+            {% endcomment %}
+            <div class="auth-form-footer"
+                 style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;font-size:0.9rem;flex-wrap:wrap;gap:0.5rem;">
+                <a href="{% url 'accounts:password_reset' %}">🔑 Забыли пароль?</a>
+                <a href="{% url 'accounts:register' %}">📝 Регистрация →</a>
+            </div>
+        </form>
+
+        <script>
+        // Show-password toggle: иконка глаза переключает type=password/text.
+        // Применяется ко всем .password-toggle на странице (login + register).
+        document.querySelectorAll('.password-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = document.getElementById(btn.dataset.target);
+                if (!target) return;
+                const showing = target.type === 'text';
+                target.type = showing ? 'password' : 'text';
+                btn.textContent = showing ? '👁' : '🙈';
+                btn.setAttribute('aria-label', showing ? 'Показать пароль' : 'Скрыть пароль');
+                btn.title = showing ? 'Показать пароль' : 'Скрыть пароль';
+            });
+        });
+        </script>
+
+        {% comment %}
+        SSO кнопки — показываются ТОЛЬКО когда admin создал хотя бы один
+        SocialApp в /admin/socialaccount/socialapp/. Без него тег
+        provider_login_url бросает 500 (DoesNotExist).
+        view передаёт has_sso в context — см. accounts/views.py:login_view.
+        {% endcomment %}
+        {% if has_sso %}
+        <div class="sso-divider" style="display:flex;align-items:center;gap:0.7rem;margin:1.2rem 0;">
+            <hr style="flex:1;border:none;border-top:1px solid rgba(255,255,255,.15);">
+            <span style="color:var(--text-light,#a4b3d0);font-size:.85rem;">или войти через</span>
+            <hr style="flex:1;border:none;border-top:1px solid rgba(255,255,255,.15);">
+        </div>
+        <div class="sso-buttons" style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;">
+            <a href="{% provider_login_url 'google' %}" class="sso-btn"
+               style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;background:#fff;color:#333;border-radius:6px;text-decoration:none;font-size:.9rem;border:1px solid #ddd;">
+                🟦 Google
+            </a>
+            <a href="{% provider_login_url 'microsoft' %}" class="sso-btn"
+               style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;background:#0078d4;color:#fff;border-radius:6px;text-decoration:none;font-size:.9rem;">
+                🪟 Microsoft
+            </a>
+            <a href="{% provider_login_url 'github' %}" class="sso-btn"
+               style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;background:#24292e;color:#fff;border-radius:6px;text-decoration:none;font-size:.9rem;">
+                🐙 GitHub
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

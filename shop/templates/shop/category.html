@@ -1,0 +1,997 @@
+{% extends "shop/base.html" %}
+{% load static %}
+{% load shop_extras %}
+
+{% block title %}{{ current_category.name }} — ДОЛГ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        margin: 1.5rem 0 2rem 0;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, rgba(0,102,255,0.1), rgba(93,0,102,0.08));
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .page-header-icon { font-size: 2.5rem; }
+    .page-header h1 { margin: 0; font-size: 1.8rem; color: var(--text-bright); }
+    .page-header p  { margin: 0.3rem 0 0 0; font-size: 0.9rem; color: var(--text-light); }
+
+    /* Search bar */
+    .search-bar {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    .search-bar input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        background: rgba(26,39,68,0.85);
+        border: 2px solid var(--cosmic-light-blue);
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 0.9rem;
+    }
+    .search-bar input::placeholder { color: rgba(224,224,224,0.4); }
+    .search-bar input:focus { outline: none; border-color: var(--accent-cyan); }
+    .search-bar button {
+        padding: 0.75rem 1.25rem;
+        background: linear-gradient(135deg, var(--cosmic-blue), var(--accent-cyan));
+        color: var(--cosmic-black);
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    .search-bar button:hover { box-shadow: 0 0 18px rgba(0,212,255,0.6); }
+
+    /* Плавающий сайдбар, fixed к краю окна */
+    .catalog-layout {
+        margin-left: 70px;       /* было 58 — теперь явный зазор от sidebar */
+        padding-left: 1.5rem;    /* плюс внутренний отступ */
+        padding-right: 0.5rem;
+        transition: margin-left .24s ease, max-width .24s ease;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: auto;
+        max-height: 80vh;
+        background: rgba(26,39,68,0.85);
+        border: 1px solid var(--cosmic-light-blue);
+        border-left: none;
+        border-top-right-radius: 12px;
+        border-bottom-right-radius: 12px;
+        overflow: hidden;
+        transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(6px);
+    }
+    .sidebar:hover,
+    .sidebar:focus-within,
+    .sidebar.pinned {
+        width: 300px;
+        max-height: 90vh;
+        box-shadow: 0 0 40px rgba(0, 212, 255, 0.45), 0 4px 20px rgba(0, 0, 0, 0.6);
+    }
+    .sidebar:hover + .catalog-layout,
+    .sidebar:focus-within + .catalog-layout,
+    .sidebar.pinned + .catalog-layout {
+        margin-left: 320px;
+        max-width: calc(100% - 320px);
+    }
+
+    .sidebar-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 0;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        color: var(--accent-cyan);
+        font-size: 0.8rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        user-select: none;
+        width: 44px;
+        height: 100%;
+        min-height: 260px;
+        position: absolute;
+        top: 0; left: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+    .sidebar-rail .rail-icon {
+        writing-mode: horizontal-tb;
+        transform: rotate(180deg);
+        font-size: 1.3rem;
+    }
+    .sidebar:hover .sidebar-rail,
+    .sidebar:focus-within .sidebar-rail,
+    .sidebar.pinned .sidebar-rail { opacity: 0; }
+
+    .sidebar-inner {
+        opacity: 0;
+        transition: opacity 0.15s ease 0.1s;
+        padding: 1.25rem;
+        max-height: calc(100vh - 3rem);
+        overflow-y: auto;
+    }
+    .sidebar:hover .sidebar-inner,
+    .sidebar:focus-within .sidebar-inner,
+    .sidebar.pinned .sidebar-inner { opacity: 1; }
+
+    .sidebar-pin {
+        position: absolute; top: 8px; right: 8px;
+        background: transparent;
+        border: 1px solid rgba(0,212,255,0.3);
+        color: var(--accent-cyan);
+        border-radius: 4px;
+        width: 26px; height: 26px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s ease, background 0.2s ease;
+        z-index: 40;
+    }
+    .sidebar:hover .sidebar-pin,
+    .sidebar:focus-within .sidebar-pin,
+    .sidebar.pinned .sidebar-pin { opacity: 1; }
+    .sidebar-pin:hover { background: rgba(0,212,255,0.15); }
+    .sidebar.pinned .sidebar-pin { background: rgba(0,212,255,0.25); }
+
+    .sidebar h3 {
+        color: var(--accent-cyan);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin: 0 0 0.75rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(0,212,255,0.2);
+    }
+    .sidebar-section { margin-bottom: 1.5rem; }
+
+    .filter-group label {
+        display: block;
+        font-size: 0.78rem;
+        color: var(--text-light);
+        margin-bottom: 0.3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .filter-group select,
+    .filter-group input[type="text"] {
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        background: rgba(10,14,39,0.8);
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 6px;
+        color: var(--text-light);
+        font-size: 0.82rem;
+        margin-bottom: 0.75rem;
+        box-sizing: border-box;
+    }
+    .filter-group select:focus,
+    .filter-group input:focus { outline: none; border-color: var(--accent-cyan); }
+    .filter-group select option { background: #0a0e27; }
+    .filter-check {
+        display: flex !important;
+        align-items: center;
+        gap: .45rem;
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+        margin: .1rem 0 .8rem;
+    }
+    .filter-check input {
+        width: auto;
+        margin: 0;
+        accent-color: var(--accent-cyan);
+    }
+
+    .btn-filter {
+        width: 100%;
+        padding: 0.55rem;
+        background: linear-gradient(135deg, var(--cosmic-blue), var(--accent-cyan));
+        color: var(--cosmic-black);
+        border: none;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 0.5rem;
+    }
+    .btn-filter:hover { box-shadow: 0 0 15px rgba(0,212,255,0.5); }
+
+    .btn-reset {
+        width: 100%;
+        padding: 0.45rem;
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 6px;
+        font-size: 0.78rem;
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        display: block;
+        transition: all 0.2s ease;
+    }
+    .btn-reset:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+    .sidebar-cat-link {
+        display: block;
+        padding: 0.3rem 0.4rem;
+        border-radius: 5px;
+        color: var(--text-light);
+        text-decoration: none;
+        font-size: 0.8rem;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sidebar-cat-link:hover { background: rgba(0,212,255,0.1); color: var(--accent-cyan); }
+    .sidebar-cat-link.active {
+        background: rgba(0,212,255,0.15);
+        color: var(--accent-cyan);
+        font-weight: 600;
+        border-left: 2px solid var(--accent-cyan);
+        padding-left: 0.6rem;
+    }
+    .cat-divider {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(0,212,255,0.4);
+        margin: 0.7rem 0 0.3rem 0;
+    }
+
+    /* Products grid */
+    .section-header {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        margin: 1.5rem 0 1.5rem 0;       /* было margin-bottom 1.25 — сейчас отступ есть и сверху */
+        padding-top: 0.5rem;
+    }
+    .section-header h2 { font-size: 1.4rem; color: var(--accent-cyan); margin: 0; }
+    .section-header .count { font-size: 0.82rem; color: var(--text-light); opacity: 0.8; }
+
+    .products-grid {
+        display: grid;
+        /* Min 240px (было 210) — на узких карточках чипы сжимались и казались
+           «пустыми». Search-результаты используют 260px, чтобы они выглядели
+           одинаково — приближаем к этому значению. */
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .product-card {
+        background: linear-gradient(135deg, rgba(26,39,68,0.85), rgba(10,14,39,0.7));
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 10px rgba(0,212,255,0.1);
+    }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0 22px rgba(0,212,255,0.4);
+        border-color: var(--accent-cyan);
+    }
+    .product-card-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.45rem;
+        min-height: 30px;
+        padding: 0.7rem 0.8rem 0.9rem;
+        /* topbar — на затемнённом фоне (а не на цвете карточки), визуально
+           «полочка», от которой картинка точно отделена. */
+        background: rgba(5, 8, 20, 0.4);
+        border-bottom: 1px solid rgba(0, 212, 255, 0.25);
+    }
+    .product-category-chip {
+        max-width: 68%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        border: 1px solid rgba(0,212,255,0.22);
+        border-radius: 999px;
+        padding: 0.14rem 0.45rem;
+        background: rgba(0,212,255,0.07);
+        color: var(--text-light);
+        font-size: 0.68rem;
+    }
+
+    /* Геометрию backdrop'а и .product-photo задаёт cosmic_theme.css
+       (см. правило ".product-image" / ".product-image .product-photo" там).
+       Раньше здесь была дополнительная «рамка» — светлая плашка + cyan-border
+       + outline. Убрали по требованию пользователя: рамки слишком сильно
+       вылезали за поля карточки и спорили с общим неон-стилем.
+       Сейчас «обводка» полностью выражена через свечение лампы
+       (per-category --card-accent), и дублировать это бордером не нужно. */
+    .product-card > .product-image .product-photo-missing {
+        /* Если фото нет вовсе — мягкая полосатая текстура поверх тёмного
+           backdrop'а: чтобы пустая зона не выглядела «дырой». */
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.06), rgba(10, 14, 39, 0.22)),
+                    repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+    }
+    .icon-placeholder { font-size: 3.2rem; }
+
+    /* Стандартизация карточек: каждая зона имеет фиксированную высоту,
+       чтобы при разной длине title/desc/params все карточки выглядели
+       одинаково. Раньше при 1-строчном vs 2-строчном названии «Other»,
+       чипы и кнопка «прыгали» по разным y-позициям. */
+    .product-body {
+        padding: 0.85rem 0.85rem 1rem;   /* симметричнее: верх/бока 0.85rem, низ чуть больше */
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        gap: 0.4rem;
+    }
+    .product-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--text-bright);
+        line-height: 1.3;
+        /* Резервируем место под 2 строки названия; короткие имена тоже
+           займут эту высоту → последующие блоки выровнены по карточкам. */
+        min-height: calc(0.88rem * 1.3 * 2);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .product-pn   {
+        font-size: 0.72rem;
+        font-family: monospace;
+        color: var(--accent-cyan);
+        opacity: 0.85;
+        min-height: 1em;
+        /* Длинные part numbers вроде "BZX55C5V1-TR" / "MCP6002-I/SN" уезжали
+           за правый край карточки. Сейчас обрезаем многоточием, полное
+           значение — на detail-странице. */
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .product-mfr  { font-size: 0.72rem; color: var(--text-light); opacity: 0.65; }
+    .product-meta-row,
+    .product-signals {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .product-meta-row {
+        min-height: 20px;
+        color: var(--text-light);
+        font-size: 0.72rem;
+        opacity: 0.78;
+    }
+    /* Раньше тут был border-right между span'ами — нужно было для
+       старой плоской мета-строки <span>Vishay</span><span>SMD</span>.
+       Сейчас в meta-row живут brand-badge и pkg-tag-mini, которые сами
+       себе визуально-разделённые элементы. Старый разделитель добавлял
+       лишнюю вертикальную чёрточку на pkg-tag-mini и портил вид. */
+    .product-signals {
+        min-height: 20px;
+    }
+    /* .product-signal* стилизуются из cosmic_theme.css (общая правда
+       для каталога и detail-page). Раньше тут были page-specific
+       переопределения с меньшим padding/font — каталог и detail
+       визуально разъезжались. */
+
+    /* .product-params / .param-chip — стили в cosmic_theme.css (grid 2-кол).
+       Раньше тут был дубль с inline-flex layout и flex-wrap — он перебивал
+       глобальный grid, и чипы ехали в один столбец вместо 2×N сетки.
+       Цвета групп (electrical/package/performance/...) тоже в cosmic_theme.css. */
+
+    .product-desc {
+        font-size: 0.76rem;
+        color: var(--text-light);
+        line-height: 1.4;
+        flex: 1;
+    }
+    /* Variant: добавочное описание под небольшим набором чипов (см.
+       product_card.html, «preview|length < 3»). Меньше и приглушённее
+       основного fallback'а — это «дополнение», а не главный контент. */
+    .product-desc--complement {
+        font-size: 0.7rem;
+        opacity: 0.75;
+        line-height: 1.35;
+        margin-top: 0.4rem;
+        flex: 0 0 auto;
+        font-style: italic;
+    }
+
+    /* Brand-badge: цветная пилюля с буквой бренда + полным именем.
+       На hover расширяется (буква-только → полное имя), реальные brand-color
+       сразу узнаваемы. Кликабельна — переход в категорию с фильтром. */
+    .brand-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.18rem 0.5rem 0.18rem 0.22rem;
+        border-radius: 999px;
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-decoration: none;
+        line-height: 1.1;
+        max-width: 100%;
+        overflow: hidden;
+        transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+    .brand-badge:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.15);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.18);
+    }
+    .brand-badge .brand-letter {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.05rem;
+        height: 1.05rem;
+        padding: 0 0.2rem;
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        font-size: 0.62rem;
+        font-weight: 800;
+        letter-spacing: 0;
+    }
+    .brand-badge .brand-name {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pkg-tag-mini {
+        font-size: 0.68rem;
+        padding: 0.12rem 0.4rem;
+        border-radius: 4px;
+        background: rgba(0, 212, 255, 0.08);
+        border: 1px solid rgba(0, 212, 255, 0.22);
+        color: var(--accent-cyan);
+    }
+
+    /* Footer — вертикальный стек: price → stock-badge → delivery-hint.
+       Раньше был flex-row + space-between → при flex-wrap «✓ 50 шт.»
+       уезжала отдельной центровкой к правому краю, разъединяясь с ценой.
+       Сейчас всё выровнено по левому краю столбиком. */
+    .product-footer {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+        margin-top: auto;
+        padding-top: 0.7rem;
+        border-top: 1px solid rgba(0, 212, 255, 0.15);
+        min-height: 3.4rem;
+    }
+    .product-price { font-size: 1.05rem; font-weight: 700; color: var(--text-bright); margin: 0; }
+    .product-price small { font-size: 0.72rem; font-weight: 400; color: var(--text-light); }
+
+    /* Delivery-hint: короткая «сигнальная» строка под ценой/стоком.
+       4 уровня (fast/ok/low/out) — цвета совпадают с light-сигнализацией
+       (зелёный→cyan→оранжевый→серый). */
+    .delivery-hint {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.2rem;
+        padding: 0.22rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        line-height: 1.2;
+        box-sizing: border-box;
+        align-self: stretch;
+        justify-content: flex-start;
+    }
+    .delivery-hint .delivery-icon {
+        font-size: 0.9rem;
+        line-height: 1;
+        flex-shrink: 0;
+        /* для emoji в неоднородных шрифтах: явный фолбэк */
+        font-family: "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji",sans-serif;
+    }
+    .delivery--fast { background: rgba(0, 200, 100, 0.12); color: #4ad991; border: 1px solid rgba(0, 200, 100, 0.28); }
+    .delivery--ok   { background: rgba(0, 212, 255, 0.10); color: #6dd4ff; border: 1px solid rgba(0, 212, 255, 0.28); }
+    .delivery--low  { background: rgba(255, 160, 0, 0.12);  color: #ffb84d; border: 1px solid rgba(255, 160, 0, 0.32); }
+    .delivery--out  { background: rgba(150, 150, 150, 0.12); color: #aaa;    border: 1px solid rgba(150, 150, 150, 0.28); }
+
+    .badge-lifecycle {
+        font-size: 0.62rem;
+        font-weight: 700;
+        padding: 0.18rem 0.45rem;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0;
+        white-space: nowrap;
+    }
+    .badge-active   { background: rgba(0,200,100,0.18); color: #00c864; border: 1px solid rgba(0,200,100,0.35); }
+    .badge-nrnd     { background: rgba(255,160,0,0.18);  color: #ffa000; border: 1px solid rgba(255,160,0,0.35); }
+    .badge-eol      { background: rgba(255,70,70,0.18);  color: #ff4646; border: 1px solid rgba(255,70,70,0.35); }
+    .badge-obsolete { background: rgba(150,150,150,0.18);color: #999999; border: 1px solid rgba(150,150,150,0.35); }
+
+    .stock-ok  { font-size: 0.68rem; color: #00c864; }
+    .stock-out { font-size: 0.68rem; color: #ff4646; }
+    .badge-stock-ok { font-size: 0.68rem; color: #00c864; }
+    .badge-stock-out { font-size: 0.68rem; color: #ff4646; }
+
+    /* Кнопка «Подробнее» — интерактивная: gradient-shift на hover,
+       стрелка едет вправо, при клике лёгкая «вдавленность» (active).
+       Псевдо-ripple через background-position на :hover. */
+    .btn-detail {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        width: 100%;
+        margin-top: 0.6rem;
+        padding: 0.55rem;
+        text-align: center;
+        background: linear-gradient(135deg, var(--cosmic-blue) 0%, var(--accent-cyan) 50%, var(--cosmic-blue) 100%);
+        background-size: 200% 100%;
+        background-position: 0% 50%;
+        color: var(--cosmic-black);
+        border: none;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-decoration: none;
+        cursor: pointer;
+        overflow: hidden;
+        transition: background-position 0.4s ease, box-shadow 0.25s ease,
+                    transform 0.15s ease, letter-spacing 0.25s ease;
+    }
+    .btn-detail:hover {
+        background-position: 100% 50%;
+        box-shadow: 0 0 16px rgba(0, 212, 255, 0.55),
+                    0 4px 14px rgba(0, 0, 0, 0.35);
+        transform: translateY(-1px);
+        letter-spacing: 0.04em;
+    }
+    .btn-detail:active {
+        transform: translateY(0);
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    .btn-detail .btn-detail-arrow {
+        display: inline-block;
+        font-weight: 800;
+        transition: transform 0.25s ease;
+    }
+    .btn-detail:hover .btn-detail-arrow {
+        transform: translateX(5px);
+    }
+
+    .no-products {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 2.5rem;
+        background: rgba(26,39,68,0.5);
+        border: 1px solid var(--cosmic-light-blue);
+        border-radius: 12px;
+        color: var(--text-light);
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: .5rem;
+        flex-wrap: wrap;
+        margin: 1.5rem 0 0;
+    }
+    .page-link,
+    .page-current {
+        border: 1px solid rgba(0,212,255,.26);
+        border-radius: 6px;
+        padding: .45rem .7rem;
+        color: var(--accent-cyan);
+        text-decoration: none;
+        font-size: .84rem;
+        background: rgba(10,14,39,.45);
+    }
+    .page-current {
+        color: var(--text-bright);
+        border-color: rgba(255,255,255,.18);
+    }
+    .page-link:hover {
+        border-color: var(--accent-cyan);
+        box-shadow: 0 0 12px rgba(0,212,255,.24);
+    }
+
+    /* Active filters summary */
+    .active-filters {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+    .filter-tag {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.25rem 0.6rem;
+        background: rgba(0,212,255,0.12);
+        border: 1px solid rgba(0,212,255,0.3);
+        border-radius: 20px;
+        font-size: 0.75rem;
+        color: var(--accent-cyan);
+    }
+
+    .back-link {
+        display: inline-block;
+        color: var(--text-light);
+        text-decoration: none;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+        transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--accent-cyan); }
+
+    @media (max-width: 900px) {
+        .sidebar {
+            position: static;
+            width: 100%;
+            max-height: none;
+            transform: none;
+            margin-bottom: 1.5rem;
+            border-radius: 12px;
+            border-left: 1px solid var(--cosmic-light-blue);
+        }
+        .sidebar:hover,
+        .sidebar:focus-within,
+        .sidebar.pinned {
+            width: 100%;
+            max-height: none;
+        }
+        .catalog-layout,
+        .sidebar:hover + .catalog-layout,
+        .sidebar:focus-within + .catalog-layout,
+        .sidebar.pinned + .catalog-layout {
+            margin-left: 0;
+            max-width: none;
+        }
+        .sidebar-rail { display: none; }
+        .sidebar-inner { opacity: 1; }
+        .sidebar-pin { display: none; }
+    }
+    @media (max-width: 600px) {
+        .products-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'shop:index' %}" class="back-link">← На главную</a>
+
+<!-- Page header -->
+<div class="page-header">
+    <div class="page-header-icon">{% category_icon current_category.slug %}</div>
+    <div>
+        <h1>{{ current_category.name }}</h1>
+        {% if current_category.description %}<p>{{ current_category.description }}</p>{% endif %}
+    </div>
+</div>
+
+<!-- Search bar -->
+<form method="get" action="">
+    <div class="search-bar">
+        <input type="text" name="q" value="{{ query|default:'' }}"
+               placeholder="Поиск{% if is_reb %} по названию или part number{% else %} по товарам категории{% endif %}...">
+        {% for input in hidden_filter_inputs %}
+        <input type="hidden" name="{{ input.name }}" value="{{ input.value }}">
+        {% endfor %}
+        <button type="submit">Найти</button>
+    </div>
+</form>
+
+<!-- Sidebar — плавающая панель, прилеплённая к левому краю окна -->
+<aside class="sidebar" id="sidebar-drawer">
+    <div class="sidebar-rail">
+        <span class="rail-icon">⚙️</span>
+        <span>Фильтры</span>
+    </div>
+    <button type="button" class="sidebar-pin" title="Закрепить открытым" onclick="togglePin(this)">📌</button>
+
+    <div class="sidebar-inner">
+            <form method="get" action="">
+                {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+
+                <div class="sidebar-section">
+                    <h3>Фильтры</h3>
+                    <details class="filter-accordion" open>
+                        <summary>🏷 Базовые</summary>
+                        <div class="filter-group">
+                        {% if manufacturers %}
+                        <label>Производитель</label>
+                        <select name="manufacturer">
+                            <option value="">Все</option>
+                            {% for key in manufacturers %}
+                            {% catalog_facet_count facets 'manufacturer' key as manufacturer_count %}
+                            <option value="{{ key }}" {% if active_manufacturer == key %}selected{% endif %}>
+                                {{ key|manufacturer_label:manufacturer_choices }}{% if manufacturer_count %} ({{ manufacturer_count }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        {% if is_reb %}
+                        <label>Lifecycle</label>
+                        <select name="lifecycle">
+                            <option value="">Любой</option>
+                            {% for key, label in lifecycle_choices.items %}
+                            {% catalog_facet_count facets 'lifecycle' key as lifecycle_count %}
+                            <option value="{{ key }}" {% if active_lifecycle == key %}selected{% endif %}>{{ label }}{% if lifecycle_count %} ({{ lifecycle_count }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        {% if packages %}
+                        <label>Корпус</label>
+                        <select name="package">
+                            <option value="">Все</option>
+                            {% for pkg in packages %}
+                            {% catalog_facet_count facets 'package' pkg as package_count %}
+                            <option value="{{ pkg }}" {% if active_package == pkg %}selected{% endif %}>{{ pkg }}{% if package_count %} ({{ package_count }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        <label>Part number</label>
+                        <input type="text" name="part_number" value="{{ active_part_number }}"
+                               placeholder="напр. RC0402FR-07, NE555"
+                               title="Поиск по part_number — подстрока, регистр игнорируется">
+
+                        <label>Цена, ₽</label>
+                        <div class="filter-range-row">
+                            <input type="text" name="price_min" value="{{ active_price_min }}" placeholder="от">
+                            <input type="text" name="price_max" value="{{ active_price_max }}" placeholder="до">
+                        </div>
+
+                        <label class="filter-check">
+                            <input type="checkbox" name="hide_eol" value="1" {% if active_hide_eol %}checked{% endif %}>
+                            Скрыть EOL/Obsolete
+                        </label>
+                    </div>
+                    </details>
+
+                    <details class="filter-accordion" open>
+                        <summary>⚙ Технические параметры</summary>
+                        <div class="filter-group">
+                            <label>Номинал</label>
+                            <input type="text" name="nominal" list="nominal-options" value="{{ active_nominal }}" placeholder="1k, 10u, 100 nF">
+                            <datalist id="nominal-options">
+                                {% for value in param_filter_options.nominal %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Мощность</label>
+                            <input type="text" name="power" list="power-options" value="{{ active_power }}" placeholder="0.25 W, 65 W">
+                            <datalist id="power-options">
+                                {% for value in param_filter_options.power %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Напряжение</label>
+                            <input type="text" name="voltage" list="voltage-options" value="{{ active_voltage }}" placeholder="5 V, 50 V">
+                            <datalist id="voltage-options">
+                                {% for value in param_filter_options.voltage %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Допуск</label>
+                            <input type="text" name="tolerance" list="tolerance-options" value="{{ active_tolerance }}" placeholder="1%, 5%">
+                            <datalist id="tolerance-options">
+                                {% for value in param_filter_options.tolerance %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Монтаж</label>
+                            <input type="text" name="mounting" list="mounting-options" value="{{ active_mounting }}" placeholder="SMD, THT">
+                            <datalist id="mounting-options">
+                                {% for value in param_filter_options.mounting %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Интерфейс</label>
+                            <input type="text" name="interface" list="interface-options" value="{{ active_interface }}" placeholder="PCIe, USB-C, I2C">
+                            <datalist id="interface-options">
+                                {% for value in param_filter_options.interface %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Форм-фактор</label>
+                            <input type="text" name="form_factor" list="form-factor-options" value="{{ active_form_factor }}" placeholder="M.2, 0603, SOIC">
+                            <datalist id="form-factor-options">
+                                {% for value in param_filter_options.form_factor %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+
+                            <label>Диэлектрик</label>
+                            <input type="text" name="dielectric" list="dielectric-options" value="{{ active_dielectric }}" placeholder="X7R, C0G">
+                            <datalist id="dielectric-options">
+                                {% for value in param_filter_options.dielectric %}<option value="{{ value }}"></option>{% endfor %}
+                            </datalist>
+                        </div>
+                    </details>
+
+                    <details class="filter-accordion" open>
+                        <summary>📦 Доступность и ресурсы</summary>
+                        <div class="filter-group">
+                            <label class="filter-check">
+                                <input type="checkbox" name="in_stock" value="1" {% if active_in_stock %}checked{% endif %}>
+                                Только в наличии
+                            </label>
+                            <label class="filter-check">
+                                <input type="checkbox" name="has_datasheet" value="1" {% if active_has_datasheet %}checked{% endif %}>
+                                Есть datasheet
+                            </label>
+                            <label class="filter-check">
+                                <input type="checkbox" name="has_spice_model" value="1" {% if active_has_spice_model %}checked{% endif %}>
+                                Есть SPICE
+                            </label>
+                            <label class="filter-check">
+                                <input type="checkbox" name="has_cad_model" value="1" {% if active_has_cad_model %}checked{% endif %}>
+                                Есть CAD/3D
+                            </label>
+                        </div>
+                    </details>
+
+                    <button type="submit" class="btn-filter">Применить</button>
+                    <a href="{% url 'shop:category' current_category.slug %}" class="btn-reset">Сбросить</a>
+                </div>
+            </form>
+
+            <!-- Other categories in same group -->
+            <div class="sidebar-section">
+                {% if is_reb %}
+                <h3>РЭБ-компоненты</h3>
+                {% for cat in reb_categories %}
+                <a href="{% url 'shop:category' cat.slug %}"
+                   class="sidebar-cat-link {% if cat.slug == current_category.slug %}active{% endif %}">
+                    {{ cat.name }}
+                </a>
+                {% endfor %}
+                <div class="cat-divider">Электроника</div>
+                {% for cat in consumer_categories %}
+                <a href="{% url 'shop:category' cat.slug %}" class="sidebar-cat-link">{{ cat.name }}</a>
+                {% endfor %}
+                {% else %}
+                <h3>Электроника</h3>
+                {% for cat in consumer_categories %}
+                <a href="{% url 'shop:category' cat.slug %}"
+                   class="sidebar-cat-link {% if cat.slug == current_category.slug %}active{% endif %}">
+                    {{ cat.name }}
+                </a>
+                {% endfor %}
+                <div class="cat-divider">РЭБ-компоненты</div>
+                {% for cat in reb_categories %}
+                <a href="{% url 'shop:category' cat.slug %}" class="sidebar-cat-link">{{ cat.name }}</a>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+</aside>
+
+<!-- Products -->
+<div class="catalog-layout">
+    <!-- Active filters tags -->
+        {% if active_filters %}
+        <div class="active-filters">
+            {% for tag in active_filters %}
+            <a class="filter-tag" href="{{ tag.remove_url }}" title="Снять фильтр {{ tag.label }}">
+                <span>{{ tag.label }}: {{ tag.display }}</span>
+                <span class="filter-tag-x">×</span>
+            </a>
+            {% endfor %}
+            <a class="filter-tag filter-tag-reset" href="{% url 'shop:category' current_category.slug %}">Сбросить все</a>
+        </div>
+        {% endif %}
+
+        <div class="section-header">
+            <h2>{{ current_category.name }}</h2>
+            <span class="count">
+                {% if page_obj.paginator.count %}
+                    показано {{ page_obj.start_index }}–{{ page_obj.end_index }} из {{ page_obj.paginator.count }}
+                {% else %}
+                    0 позиций
+                {% endif %}
+            </span>
+            <form method="get" action="{% url 'shop:category' current_category.slug %}" class="sort-form">
+                {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+                {% for f in hidden_filter_inputs %}<input type="hidden" name="{{ f.name }}" value="{{ f.value }}">{% endfor %}
+                <label for="sort-select">Сортировка:</label>
+                <select id="sort-select" name="sort" onchange="this.form.submit()">
+                    {% for value, label in sort_options %}
+                    <option value="{{ value }}" {% if active_sort == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+
+        <div class="products-grid">
+            {% for product in products %}
+            {% include "shop/includes/product_card.html" %}
+            {% empty %}
+            <div class="no-products">
+                <p style="font-size: 1.05rem;"><b>Под выбранные фильтры товаров нет.</b></p>
+                <p style="margin-top:0.5rem; color: var(--text-color);">
+                    Попробуйте расширить диапазон цены, снять дополнительные параметры или
+                    переключиться на другую категорию в меню сверху.
+                </p>
+                <a href="{% url 'shop:category' current_category.slug %}" class="btn btn-primary" style="margin-top:1rem;">↺ Сбросить фильтры</a>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <nav class="pagination" aria-label="Пагинация категории">
+            {% if page_obj.has_previous %}
+            <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}">← Назад</a>
+            {% endif %}
+            <span class="page-current">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}">Дальше →</a>
+            {% endif %}
+            <span class="pagination-meta">
+                {{ page_obj.start_index }}–{{ page_obj.end_index }} из {{ page_obj.paginator.count }} товаров
+            </span>
+        </nav>
+        {% endif %}
+</div>
+
+<button type="button" class="scroll-top-btn" id="scroll-top-btn" aria-label="Наверх" title="К началу категории">↑</button>
+
+<script>
+function togglePin(btn) {
+    const drawer = document.getElementById('sidebar-drawer');
+    drawer.classList.toggle('pinned');
+    btn.title = drawer.classList.contains('pinned') ? 'Открепить' : 'Закрепить открытым';
+    try {
+        localStorage.setItem('sidebarPinned', drawer.classList.contains('pinned') ? '1' : '0');
+    } catch (e) { /* приватный режим */ }
+}
+(function() {
+    try {
+        if (localStorage.getItem('sidebarPinned') === '1') {
+            document.getElementById('sidebar-drawer')?.classList.add('pinned');
+        }
+    } catch (e) {}
+})();
+(function() {
+    const btn = document.getElementById('scroll-top-btn');
+    if (!btn) return;
+    const toggle = () => btn.classList.toggle('visible', window.scrollY > 600);
+    window.addEventListener('scroll', toggle, {passive: true});
+    btn.addEventListener('click', () => window.scrollTo({top: 0, behavior: 'smooth'}));
+    toggle();
+})();
+
+(function() {
+    if (window.matchMedia('(max-width: 900px)').matches) {
+        document.querySelectorAll('.filter-accordion').forEach(d => {
+            const hasActive = d.querySelector('select option[selected]:not([value=""]), input[type="text"][value]:not([value=""]), input[type="checkbox"]:checked');
+            if (!hasActive) d.open = false;
+        });
+    }
+})();
+</script>
+{% endblock %}

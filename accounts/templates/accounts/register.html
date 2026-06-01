@@ -1,0 +1,123 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}Регистрация{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="auth-form-container">
+        <h1>Регистрация</h1>
+        
+        {% if messages %}
+            <div class="messages" role="status" aria-live="polite">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" class="auth-form" aria-label="Форма регистрации">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="username">Имя пользователя:</label>
+                <input type="text" id="username" name="username" required
+                       class="form-control"
+                       autocomplete="username"
+                       aria-required="true"
+                       maxlength="150"
+                       autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required
+                       class="form-control"
+                       autocomplete="email"
+                       aria-required="true"
+                       aria-describedby="email-hint">
+                <small id="email-hint" class="form-hint" style="display:none;"></small>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <div class="password-field">
+                    <input type="password" id="password" name="password" required
+                           class="form-control"
+                           autocomplete="new-password"
+                           aria-required="true"
+                           aria-describedby="password-hint"
+                           minlength="8">
+                    <button type="button" class="password-toggle" data-target="password"
+                            aria-label="Показать пароль" title="Показать/скрыть пароль">👁</button>
+                </div>
+                <small id="password-hint" style="color:#888;">
+                    Минимум 8 символов, не только цифры, не похож на имя/email.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="password_confirm">Подтверждение пароля:</label>
+                <div class="password-field">
+                    <input type="password" id="password_confirm" name="password_confirm" required
+                           class="form-control"
+                           autocomplete="new-password"
+                           aria-required="true">
+                    <button type="button" class="password-toggle" data-target="password_confirm"
+                            aria-label="Показать пароль" title="Показать/скрыть пароль">👁</button>
+                </div>
+                <small id="password-match-hint" class="form-hint" style="display:none;"></small>
+            </div>
+
+            <button type="submit" class="btn btn-success">Зарегистрироваться</button>
+        </form>
+
+        <p class="auth-link">
+            Уже есть аккаунт? <a href="{% url 'accounts:login' %}">Войти</a>
+        </p>
+    </div>
+</div>
+
+<script>
+// Show-password toggle для обоих полей.
+document.querySelectorAll('.password-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.target);
+        if (!target) return;
+        const showing = target.type === 'text';
+        target.type = showing ? 'password' : 'text';
+        btn.textContent = showing ? '👁' : '🙈';
+        btn.setAttribute('aria-label', showing ? 'Показать пароль' : 'Скрыть пароль');
+    });
+});
+
+// Email-валидация по мере ввода: показываем подсказку под полем.
+// Раньше неверный email замечался только при submit — пользователь успевал
+// ввести пароль и нажать «Зарегистрироваться», получая ошибку с нуля.
+const emailInput = document.getElementById('email');
+const emailHint  = document.getElementById('email-hint');
+const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+emailInput.addEventListener('input', () => {
+    const v = emailInput.value.trim();
+    if (!v) { emailHint.style.display = 'none'; return; }
+    const ok = EMAIL_RE.test(v);
+    emailHint.style.display = '';
+    emailHint.textContent = ok ? '✓ Корректный email' : '⚠ Похоже на не email — должен быть вида user@example.com';
+    emailHint.style.color = ok ? '#90ee90' : '#ffa940';
+});
+
+// Проверка совпадения паролей по мере ввода.
+const pw  = document.getElementById('password');
+const pw2 = document.getElementById('password_confirm');
+const pwHint = document.getElementById('password-match-hint');
+function checkPwMatch() {
+    if (!pw2.value) { pwHint.style.display = 'none'; return; }
+    const ok = pw.value === pw2.value;
+    pwHint.style.display = '';
+    pwHint.textContent = ok ? '✓ Пароли совпадают' : '⚠ Пароли не совпадают';
+    pwHint.style.color = ok ? '#90ee90' : '#ffa940';
+}
+pw.addEventListener('input', checkPwMatch);
+pw2.addEventListener('input', checkPwMatch);
+</script>
+{% endblock %}

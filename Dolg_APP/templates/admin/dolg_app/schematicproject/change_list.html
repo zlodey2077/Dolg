@@ -1,0 +1,21 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+{% if project_dashboard %}
+<div class="module" style="margin-bottom:16px;">
+  <h2>Сводка проектных сеансов</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:12px;">
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.total }}</strong><span>проектов всего</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.active }}</strong><span>активных</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.demo }}</strong><span>демо</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.public }}</strong><span>публичных</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.team }}</strong><span>командных</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.pending_review }}</strong><span>на review</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.reviews }}</strong><span>review snapshots</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.simulation_runs }}</strong><span>симуляций</span></div>
+    <div><strong style="display:block;font-size:20px;">{{ project_dashboard.measurements }}</strong><span>измерений</span></div>
+  </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "shop/base.html" %}
+{% block title %}Создать команду — DOLG{% endblock %}
+{% block content %}
+<div class="org-create-page">
+    <h1>📋 Создать команду</h1>
+    <p class="org-create-subtitle">
+        Self-serve Team-plan: до 10 seats, мгновенно. От 1490 ₽/seat/мес (mock).
+    </p>
+
+    <form method="post" class="org-create-form">
+        {% csrf_token %}
+
+        <div class="form-step">
+            <label>
+                Название компании
+                <input type="text" name="name" required maxlength="200" placeholder="ACME Robotics">
+            </label>
+        </div>
+
+        <div class="form-step">
+            <label>
+                URL-slug (можно изменить)
+                <span class="form-hint">dolg.app/orgs/<strong id="slugPreview">acme-robotics</strong>/</span>
+                <input type="text" name="slug" pattern="[a-z0-9-]+" placeholder="acme-robotics"
+                       oninput="document.getElementById('slugPreview').textContent=this.value||'…';">
+            </label>
+        </div>
+
+        <div class="form-step">
+            <label>
+                Биллинг-email
+                <input type="email" name="billing_email" value="{{ user.email }}" required>
+            </label>
+        </div>
+
+        <div class="form-step">
+            <label>
+                Размер команды
+                <select name="expected_size">
+                    <option value="1-5">1-5 человек (Team)</option>
+                    <option value="6-20">6-20 (Team)</option>
+                    <option value="21-50">21-50 (Business)</option>
+                    <option value="50+">50+ (Enterprise)</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="form-step form-step-legal">
+            <h3>Согласие с документами</h3>
+            <label class="checkbox-row">
+                <input type="checkbox" name="agree_msa" required>
+                Я представляю компанию и принимаю <a href="{% url 'hello:terms' %}" target="_blank">MSA</a>
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="agree_dpa" required>
+                Принимаю <a href="{% url 'hello:privacy' %}" target="_blank">DPA</a> (152-ФЗ / GDPR Art. 28)
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="agree_aup" required>
+                Принимаю Acceptable Use Policy
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="agree_privacy" required>
+                Согласен с <a href="{% url 'hello:cookies' %}" target="_blank">Cookie Policy</a>
+            </label>
+        </div>
+
+        <div class="form-step form-step-cta">
+            <p class="org-create-disclaimer">
+                ⚠ Mock-режим: реальной оплаты нет, активируется бесплатно (для дипломного проекта).
+            </p>
+            <button type="submit" class="btn btn-primary btn-large">
+                🎁 Создать команду + 30 дней trial
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
