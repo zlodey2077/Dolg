@@ -51,6 +51,47 @@
 - Проверить запуск двойным кликом через `run_dolg.bat` на чистой машине.
 - Учитывать новый слой обучения, scientific stack, lightweight stack, expert stack, neural stack и media quality: `check_demo_ready --json` теперь проверяет опубликованные learning tracks/lessons/tasks, версии NumPy/SciPy/Matplotlib/Pandas/python-engineering, service-smoke FFT/Bode/Monte Carlo/Signal quality/Parameter sweep/DC fallback, `graph_stack/formula_stack/circuit_svg_stack`, `expert_stack`, `neural_stack` и `media_quality`.
 
+## P0: каталог V3 по эталону карточки
+
+Аудит 2026-06-01 после первичного наполнения показал: технически карточки стабильны, но по качеству данных до эталона "диодов" еще не хватает локализации, единых обязательных схем параметров и более строгой политики тегов.
+
+- Закрыто 2026-06-02:
+  - расходники, инструменты и модули очищены от сырых `Consumable/Tool/Module` и seed-названий;
+  - `enrich_product_parameters` нормализует витринные названия, `package_type` и русские значения параметров для consumables/tools/modules;
+  - все preview-чипы карточек кликабельны, а `material`, `size`, `wire`, `configuration`, `temperature_range`, `compatibility`, `mode`, `safety` получили прямые backend-фильтры;
+  - длинные значения вроде `ABS + фосфористая бронза` выводятся широким чипом, а не режут сетку;
+  - allowlist официальных/дистрибьюторских фото расширен для макетных плат, макетных PCB и части расходников; Wikimedia/Commons не используется.
+- Текущее состояние после правки: 364 товара, сырых package-type `0`, non-clickable preview chips `0`, verified images `79`, generated fallback `285`.
+- Оставшийся хвост: постепенно расширять official/supplier photo allowlist для модулей, инструментов и потребительской электроники; для РЭБ fallback заменить на чистые UGO-style изображения без текста, неона и декоративных дуг.
+
+- Эталон карточки: категория, чистое изображение, название, рейтинг, part number, производитель, корпус/форм-фактор, ресурсные чипы, 5-7 инженерных параметров, цена, склад, доставка, CTA.
+- Найденные хвосты:
+  - `modules/tools/consumables`: базовая локализация и фильтры закрыты; следующий шаг - реальные verified photos и schema-аудит полноты по подтипам.
+  - `resistors`: 78 товаров, в основном 4 параметра; добавить технологию, max voltage, temp coefficient/series или noise class, чтобы карточки не выглядели беднее диодов.
+  - `ics`: 34 товара, у большинства 3-4 параметра; добавить назначение, pins/package, частоту/GBW/channels/interface для логики, ОУ, стабилизаторов и MCU.
+  - `transistors`: 21 товар, многим нужны hFE/Vce(sat) для BJT, Vgs/Rds/Qg для MOSFET, pinout/package и heat/rating aliases.
+  - `diodes`: довести сам эталон: русифицировать `max_current`, разделить рабочий ток и предельный ток, добавить surge/reverse leakage там, где уместно.
+  - `connectors`: добить недостающие 5-й параметр: orientation/gender/contact material/voltage для headers, Dupont, DC jack.
+- Data-layer:
+  - завести `shop/services/catalog_schema.py` с required/recommended fields per category/type;
+  - добавить команду `audit_catalog_schema --json`, которая выводит coverage, missing fields, english values, weak image source, non-clickable chips;
+  - расширить `enrich_product_parameters` не отдельными патчами, а через словари `CATEGORY_TYPE_SCHEMAS`, `SLUG_PARAMETER_OVERRIDES`, `VALUE_TRANSLATIONS`.
+- UI-layer:
+  - разделить чипы на три класса: ресурсы (`PDF`, `SPICE`, `CAD`, `Параметры`), мета (`бренд`, `корпус`) и параметры;
+  - убрать странные/слишком короткие resource labels вроде `Данные`, заменить на понятное `Параметры` или `Из datasheet`;
+  - расширять backend-фильтры дальше по мере появления новых полей (`protocol`, `series`, `pinout`, `thermal`, `noise_class`), чтобы новые чипы не становились декоративными;
+  - для active chips показывать понятное состояние и "снять фильтр".
+- Media-layer:
+  - для РЭБ в карточках использовать либо реальное официальное/дистрибьюторское фото, либо чистый UGO-style PNG без текста, неона, полукругов и декоративной сетки;
+  - для инструментов/модулей/расходников предпочитать реальные фото; если фото не проверено, показывать аккуратную объясняющую заглушку "фото уточняется у производителя";
+  - добавить image audit по категориям: real/official/generated/placeholder coverage.
+- Acceptance:
+  - в каждой категории `avg_preview >= 5`, кроме случаев, где физически достаточно 4 параметров и это явно разрешено схемой;
+  - 0 английских type/application/sensor/tool значений в пользовательском UI;
+  - 0 служебных ключей в HTML;
+  - 0 горизонтального overflow desktop/mobile;
+  - `check_data_integrity --json`, `check_demo_ready --json`, targeted catalog tests и browser smoke проходят.
+
 ## P1: инженерная связность CAD/SIM
 
 - Сохранять demo-схемы через `populate_demo_projects`: seed назначает позиционные обозначения и ортогональные маршруты, чтобы БД не расходилась с кодом.

@@ -333,7 +333,10 @@ main {
     height: 138px;
     margin: 0.6rem 0.8rem 0.7rem;           /* снизу 0.7rem — было 1.1rem, лишний gap до имени */
     padding: 6px 8px;                       /* минимальный зазор — фото просто центрируется */
-    background: transparent;                /* убрали тёмную плашку: визуально она «заходила» на карточку */
+    background:
+        radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.08), transparent 62%),
+        linear-gradient(135deg, rgba(8, 16, 38, 0.38), rgba(5, 10, 28, 0.62));
+    border: 1px solid color-mix(in srgb, var(--card-accent, #00d4ff) 42%, transparent);
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -341,6 +344,9 @@ main {
     overflow: visible;                      /* свечение не клипуется — лампа «дышит» */
     position: relative;
     box-sizing: border-box;
+    box-shadow:
+        0 0 18px color-mix(in srgb, var(--card-accent, #00d4ff) 22%, transparent),
+        inset 0 0 18px rgba(0, 0, 0, 0.22);
 }
 /* Гасим shine-overlay из исторической версии .product-image. */
 .product-image::before { content: none !important; }
@@ -356,34 +362,53 @@ main {
     border: none;
     border-radius: 6px;
     padding: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.24),
+        0 0 14px color-mix(in srgb, var(--card-accent, #00d4ff) 28%, transparent);
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--card-accent, #00d4ff) 22%, transparent));
     box-sizing: border-box;
-    transition: filter 0.25s ease, transform 0.25s ease;
+    transition: filter 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.product-card:hover .product-image {
+    border-color: color-mix(in srgb, var(--card-accent, #00d4ff) 62%, transparent);
+    box-shadow:
+        0 0 24px color-mix(in srgb, var(--card-accent, #00d4ff) 34%, transparent),
+        inset 0 0 20px rgba(0, 0, 0, 0.24);
 }
 .product-card:hover .product-image .product-photo {
-    filter: brightness(1.04) contrast(1.03);
+    filter:
+        brightness(1.04)
+        contrast(1.03)
+        drop-shadow(0 0 9px color-mix(in srgb, var(--card-accent, #00d4ff) 32%, transparent));
 }
 
 /* Per-category цвет неона — задаётся через data-category на .product-card.
    Цвета подобраны так, чтобы НЕ сливаться с фоном (тёмный backdrop) и
    не быть одинаковыми между категориями. */
-.product-card[data-category="led"]            .product-photo { --card-accent: #ff6b6b; }  /* красный */
-.product-card[data-category="power"]          .product-photo { --card-accent: #ffd700; }  /* жёлтый */
-.product-card[data-category="audio"]          .product-photo { --card-accent: #ff8c42; }  /* оранжевый */
-.product-card[data-category="sensor"]         .product-photo { --card-accent: #50fa7b; }  /* зелёный */
-.product-card[data-category="arduino"]        .product-photo { --card-accent: #00d4ff; }  /* cyan */
-.product-card[data-category="transistors"]    .product-photo { --card-accent: #bd93f9; }  /* фиолетовый */
-.product-card[data-category="microcontrollers"].product-photo { --card-accent: #00d4ff; }
-.product-card[data-category="resistors"]      .product-photo { --card-accent: #ffb86c; }  /* персик */
-.product-card[data-category="capacitors"]     .product-photo { --card-accent: #8be9fd; }  /* light cyan */
-.product-card[data-category="inductors"]      .product-photo { --card-accent: #f1fa8c; }  /* пшеничный */
-.product-card[data-category="diodes"]         .product-photo { --card-accent: #ff79c6; }  /* розовый */
-.product-card[data-category="coolers"]        .product-photo { --card-accent: #6272a4; }  /* стальной синий */
-.product-card[data-category="ssd"]            .product-photo { --card-accent: #44475a; }  /* графит */
-.product-card[data-category="accessories"]    .product-photo { --card-accent: #a4a4ff; }  /* лавандовый */
-.product-card[data-category="tablets"]        .product-photo { --card-accent: #8be9fd; }
-.product-card[data-category="cpu"]            .product-photo { --card-accent: #00d4ff; }
-.product-card[data-category="consumables"]    .product-photo { --card-accent: #50fa7b; }
+.product-card[data-category="led"],
+.product-card[data-category="diodes"]         { --card-accent: #ff79c6; }
+.product-card[data-category="power"],
+.product-card[data-category="psu"]            { --card-accent: #ffd700; }
+.product-card[data-category="audio"]          { --card-accent: #ff8c42; }
+.product-card[data-category="sensor"],
+.product-card[data-category="modules"],
+.product-card[data-category="consumables"]    { --card-accent: #50fa7b; }
+.product-card[data-category="arduino"],
+.product-card[data-category="microcontrollers"],
+.product-card[data-category="cpu"],
+.product-card[data-category="ics"]            { --card-accent: #00d4ff; }
+.product-card[data-category="transistors"]    { --card-accent: #bd93f9; }
+.product-card[data-category="resistors"],
+.product-card[data-category="connectors"]     { --card-accent: #ffb86c; }
+.product-card[data-category="capacitors"],
+.product-card[data-category="tablets"]        { --card-accent: #8be9fd; }
+.product-card[data-category="inductors"]      { --card-accent: #f1fa8c; }
+.product-card[data-category="coolers"]        { --card-accent: #6272a4; }
+.product-card[data-category="ssd"]            { --card-accent: #7aa2ff; }
+.product-card[data-category="accessories"]    { --card-accent: #a4a4ff; }
+.product-card[data-category="tools"]          { --card-accent: #ffb86c; }
+.product-card[data-category="relays"]         { --card-accent: #ff8c42; }
+.product-card[data-category="gpu"]            { --card-accent: #bd93f9; }
 /* Дефолт — cyan (см. .product-photo выше) */
 
 .product-image .product-photo-missing {
@@ -1135,7 +1160,7 @@ tr:hover {
 }
 .product-card .product-params { min-height: 4.4rem; }   /* стабильная высота в гриде каталога */
 .product-card .product-params:has(.param-chip--wide) {
-    min-height: 5.1rem;
+    min-height: 5.8rem;
 }
 
 .param-chip {
@@ -1236,6 +1261,7 @@ span.param-chip { cursor: default; opacity: 0.85; }
     border: 1px solid transparent;
 }
 .product-signal-doc   { background: rgba(0, 212, 255, 0.12); color: var(--accent-cyan); border-color: rgba(0, 212, 255, 0.32); }
+.product-signal-cad   { background: rgba(189, 147, 249, 0.12); color: #bd93f9;          border-color: rgba(189, 147, 249, 0.34); }
 .product-signal-spice { background: rgba(164, 255, 92, 0.12); color: #a4ff5c;          border-color: rgba(164, 255, 92, 0.32); }
 .product-signal-mount { background: rgba(255, 255, 255, 0.08); color: var(--text-light); border-color: rgba(255, 255, 255, 0.15); }
 .product-signal-stock { background: rgba(0, 200, 100, 0.12); color: #4ad991;           border-color: rgba(0, 200, 100, 0.28); }

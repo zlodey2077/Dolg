@@ -91,7 +91,8 @@
         {% endcomment %}
         <div class="product-signals">
             {% if product.datasheet_url %}<a class="product-signal product-signal-doc" href="{{ product.datasheet_url }}" target="_blank" rel="noopener" title="Открыть datasheet PDF">PDF</a>{% endif %}
-            {% if product.parameters.datasheet_extracted %}<a class="product-signal product-signal-doc" href="{% url 'shop:product_detail' product.slug %}#datasheet-intel" title="Поля извлечены из datasheet и карточки">Данные</a>{% endif %}
+            {% if product.parameters.datasheet_extracted %}<a class="product-signal product-signal-doc" href="{% url 'shop:product_detail' product.slug %}#datasheet-intel" title="Поля извлечены из datasheet и карточки">Параметры</a>{% endif %}
+            {% if product.parameters.cad_model or product.parameters.cad_model_url %}<a class="product-signal product-signal-cad" href="{% url 'shop:category' product.category.slug %}?has_cad_model=1" title="Показать товары с CAD/3D-моделью">CAD</a>{% endif %}
             {% if product.parameters.spice_model %}<a class="product-signal product-signal-spice" href="{% url 'shop:category' product.category.slug %}?has_spice_model=1" title="Показать товары со SPICE-моделью">SPICE</a>{% endif %}
         </div>
 

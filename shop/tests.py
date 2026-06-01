@@ -133,6 +133,27 @@ class EnrichProductParametersTests(TestCase):
         self.assertEqual(product.parameters['interface'], 'USB 3.2 Gen 2 (USB-C)')
         self.assertEqual(product.parameters['image_source'], 'generated')
 
+    def test_command_repairs_consumable_seed_text_and_package(self):
+        category = Category.objects.create(name='Consumables', slug='consumables')
+        product = Product.objects.create(
+            name='BREADBOARD 2x830',
+            slug='breadboard-2x830',
+            category=category,
+            description='Seed breadboard item.',
+            price=780,
+            stock=500,
+            manufacturer='other',
+            package_type='Consumable',
+            parameters={'type': 'breadboard'},
+        )
+
+        call_command('enrich_product_parameters', stdout=StringIO())
+        product.refresh_from_db()
+
+        self.assertEqual(product.name, 'Набор макетных плат 2×830')
+        self.assertEqual(product.package_type, 'Макетирование')
+        self.assertEqual(product.parameters['type'], 'Набор макетных плат')
+
 
 class DatasheetIntelligenceTests(TestCase):
     def setUp(self):
@@ -399,6 +420,13 @@ class CatalogFilterTests(TestCase):
         self.assertEqual(chip_filter_name('current'), 'current')
         self.assertEqual(chip_filter_name('screen_size'), 'display')
         self.assertEqual(chip_filter_name('package'), 'package')
+        self.assertEqual(chip_filter_name('material'), 'material')
+        self.assertEqual(chip_filter_name('contact_material'), 'material')
+        self.assertEqual(chip_filter_name('temperature_range'), 'temperature_range')
+        self.assertEqual(chip_filter_name('length'), 'size')
+        self.assertEqual(chip_filter_name('power_rails'), 'size')
+        self.assertEqual(chip_filter_name('gauge'), 'wire')
+        self.assertEqual(chip_filter_name('configuration'), 'configuration')
         self.assertEqual(chip_filter_name('latency'), 'q')
         self.assertTrue(chip_value_valid({}, 'latency', 'CL34'))
         self.assertFalse(set(CARD_PARAM_FILTER_MAP.values()) - set(CATALOG_FILTERS))

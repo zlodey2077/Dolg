@@ -259,6 +259,22 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                         <input type="checkbox" id="sticky-add-checkbox">
                         <span>🔁 Серия (множ. установка)</span>
                     </label>
+                    {% comment %}
+                    2026-06-02 Lithium ECAD killer: Functional Blocks.
+                    Внутри того же drawer'a — отдельная секция с переиспользуемыми subcircuits.
+                    Заполняется JS из API /api/blocks/. Drag-n-drop на канвас.
+                    {% endcomment %}
+                    <div class="functional-blocks-section">
+                        <div class="fb-section-head">
+                            <span>📦 Мои функциональные блоки</span>
+                            <button type="button" class="fb-refresh" title="Обновить список"
+                                    onclick="window._refreshBlocksDrawer && window._refreshBlocksDrawer()">⟳</button>
+                        </div>
+                        <div class="functional-blocks-list" id="functionalBlocksList">
+                            <span class="fb-empty">Загрузка…</span>
+                        </div>
+                        <small class="fb-hint">Сохрани выделение через ПКМ → 💾 Сохранить как блок…</small>
+                    </div>
                 </div>
             </div>
 
@@ -836,6 +852,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="mirrorSelectedComponent('h'); hideContextMenu();">↔ Зеркало гориз.</button>
             <button onclick="mirrorSelectedComponent('v'); hideContextMenu();">↕ Зеркало верт.</button>
             <button onclick="duplicateSelectedComponent(); hideContextMenu();">📑 Дублировать <small style="opacity:0.6;">Ctrl+D</small></button>
+            {# 2026-06-02 Lithium-killer: сохранить выделение как переиспользуемый блок #}
+            <button onclick="saveAsFunctionalBlock(); hideContextMenu();">💾 Сохранить как блок…</button>
             <button onclick="deleteSelected()">🗑️ Удалить <small style="opacity:0.6;">Del</small></button>
         </div>
         <!-- ПКМ по проводу -->
@@ -1690,6 +1708,93 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
     margin-bottom: 8px;
+}
+/* 2026-06-02 Lithium-killer: Functional Blocks секция в drawer'е */
+.functional-blocks-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 212, 255, 0.18);
+}
+.fb-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    color: var(--accent-cyan, #00d4ff);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.fb-refresh {
+    background: transparent;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    color: var(--accent-cyan, #00d4ff);
+    border-radius: 4px;
+    padding: 1px 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.fb-refresh:hover { background: rgba(0, 212, 255, 0.15); }
+.functional-blocks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.fb-empty {
+    color: #6c7388;
+    font-style: italic;
+    font-size: 0.78rem;
+    padding: 4px 8px;
+}
+.fb-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: rgba(0, 212, 255, 0.06);
+    border: 1px solid rgba(0, 212, 255, 0.22);
+    border-radius: 5px;
+    cursor: grab;
+    transition: background 0.12s, transform 0.12s, border-color 0.12s;
+}
+.fb-card:hover {
+    background: rgba(0, 212, 255, 0.15);
+    border-color: rgba(0, 212, 255, 0.55);
+    transform: translateX(2px);
+}
+.fb-card:active { cursor: grabbing; }
+.fb-card-emoji { font-size: 1.1rem; flex-shrink: 0; }
+.fb-card-body { flex: 1; min-width: 0; }
+.fb-card-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e6e9ef;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fb-card-meta {
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+.fb-card-delete {
+    background: transparent;
+    border: none;
+    color: #ff9090;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0 4px;
+    visibility: hidden;
+}
+.fb-card:hover .fb-card-delete { visibility: visible; }
+.fb-card-delete:hover { color: #ff5555; }
+.fb-hint {
+    display: block;
+    margin-top: 6px;
+    color: #6c7388;
+    font-size: 0.72rem;
+    line-height: 1.3;
 }
 /* В drawer'е компоненты возвращаются к двухстрочному виду (название + R/C/...)
    — текст «Резистор» виден, не скрыт как в icon-only toolbar mode. */
@@ -10564,6 +10669,218 @@ function copySelectedToClipboard() {
     if (typeof showNotification === 'function') showNotification(`📋 Скопировано: ${comps.length} комп. + ${conns.length} соед.`, 'success');
 }
 window.copySelectedToClipboard = copySelectedToClipboard;
+
+// 2026-06-02 Lithium ECAD killer: сохранить выделенную группу как Functional Block.
+// Аналог Lithium ECAD «Functional blocks» — переиспользуемые subcircuits.
+async function saveAsFunctionalBlock() {
+    const ids = new Set(selectedComponentIds);
+    if (selectedComponent && !ids.has(selectedComponent.id)) ids.add(selectedComponent.id);
+    if (!ids.size) {
+        if (typeof showNotification === 'function') {
+            showNotification('Сначала выдели компоненты (Ctrl+A или drag-select) — потом сохраняй блок', 'warning');
+        }
+        return;
+    }
+    const comps = components.filter(c => ids.has(c.id));
+    const conns = (connections || []).filter(co => ids.has(co.from.compId) && ids.has(co.to.compId));
+    if (!comps.length) {
+        if (typeof showNotification === 'function') showNotification('Нет компонентов для сохранения', 'warning');
+        return;
+    }
+    // Нормализуем координаты: смещаем чтобы min_x = min_y = 0 (блок начинается с (0,0))
+    const minX = Math.min(...comps.map(c => c.x));
+    const minY = Math.min(...comps.map(c => c.y));
+    const blockComps = comps.map(c => ({ ...JSON.parse(JSON.stringify(c)), x: c.x - minX, y: c.y - minY }));
+    const blockConns = conns.map(co => {
+        const c = JSON.parse(JSON.stringify(co));
+        if (c.waypoints) c.waypoints = c.waypoints.map(wp => ({ x: wp.x - minX, y: wp.y - minY }));
+        return c;
+    });
+
+    // Простейший UI-диалог через prompt (TODO: красивая модалка)
+    const name = window.prompt(`Имя функционального блока:\n(${comps.length} компонентов, ${conns.length} соединений)`, '');
+    if (!name || !name.trim()) return;
+    const description = window.prompt('Описание (необязательно):', '') || '';
+    const categories = ['power', 'analog', 'digital', 'rf', 'filter', 'sensor', 'other'];
+    const catChoice = window.prompt(
+        'Категория (введи число):\n1 — Питание\n2 — Аналог\n3 — Цифра\n4 — РЧ\n5 — Фильтры\n6 — Датчики\n7 — Прочее',
+        '7',
+    );
+    const category = categories[(parseInt(catChoice) || 7) - 1] || 'other';
+
+    try {
+        if (typeof showNotification === 'function') showNotification('💾 Сохраняю блок…', 'info');
+        const data = await simApiFetch('/api/blocks/create/', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name.trim(),
+                description: description.trim(),
+                category,
+                schema_json: { components: blockComps, connections: blockConns },
+            }),
+        });
+        if (data && data.ok) {
+            if (typeof showNotification === 'function') {
+                showNotification(`✓ Блок «${name}» сохранён (${comps.length} компонентов)`, 'success');
+            }
+            // Обновляем drawer блоков если открыт
+            if (typeof _refreshBlocksDrawer === 'function') _refreshBlocksDrawer();
+        } else {
+            throw new Error((data && data.error) || 'не удалось сохранить');
+        }
+    } catch (e) {
+        if (typeof showNotification === 'function') {
+            showNotification('❌ ' + (e.message || e), 'error');
+        }
+    }
+}
+window.saveAsFunctionalBlock = saveAsFunctionalBlock;
+
+// Drag-n-drop блока в схему: fetch detail → applySchemeData с offset = курсор.
+async function insertFunctionalBlock(blockId, atX, atY) {
+    try {
+        const data = await simApiFetch('/api/blocks/' + blockId + '/');
+        if (!data || !data.ok || !data.block) throw new Error('Блок не найден');
+        const schema = data.block.schema_json || {};
+        const blockComps = schema.components || [];
+        const blockConns = schema.connections || [];
+        if (!blockComps.length) {
+            if (typeof showNotification === 'function') showNotification('Блок пустой', 'warning');
+            return;
+        }
+        // Сдвиг к позиции курсора (atX, atY) — атаки координаты приходят в "world".
+        const cx = (typeof atX === 'number') ? atX : 100;
+        const cy = (typeof atY === 'number') ? atY : 100;
+        // Генерируем новые ID и map старые → новые
+        const idMap = {};
+        const newComps = blockComps.map(bc => {
+            const newId = (typeof nextComponentId === 'function') ? nextComponentId() : (Date.now() + Math.random());
+            idMap[bc.id] = newId;
+            return {
+                ...bc,
+                id: newId,
+                x: cx + (bc.x || 0),
+                y: cy + (bc.y || 0),
+                sheet_index: currentSheet,
+            };
+        });
+        const newConns = blockConns.map(bc => {
+            const c = JSON.parse(JSON.stringify(bc));
+            c.from.compId = idMap[c.from.compId];
+            c.to.compId = idMap[c.to.compId];
+            return c;
+        });
+
+        components.push(...newComps);
+        connections.push(...newConns);
+        if (typeof updateProperties === 'function') updateProperties();
+        if (typeof updateStats === 'function') updateStats();
+        if (typeof snapshotScheme === 'function') snapshotScheme();
+        if (typeof drawCanvas === 'function') drawCanvas();
+
+        // Инкремент use_count на сервере (не блокирующий)
+        try { simApiFetch('/api/blocks/' + blockId + '/use/', { method: 'POST' }); } catch (_e) {}
+
+        if (typeof showNotification === 'function') {
+            showNotification(`✓ Блок «${data.block.name}» вставлен (${newComps.length} компонентов)`, 'success');
+        }
+    } catch (e) {
+        if (typeof showNotification === 'function') {
+            showNotification('❌ Не удалось вставить блок: ' + (e.message || e), 'error');
+        }
+    }
+}
+window.insertFunctionalBlock = insertFunctionalBlock;
+
+// Загружает список блоков и рендерит в drawer
+async function _refreshBlocksDrawer() {
+    const list = document.getElementById('functionalBlocksList');
+    if (!list) return;
+    list.innerHTML = '<span class="fb-empty">Загрузка…</span>';
+    try {
+        const data = await simApiFetch('/api/blocks/');
+        if (!data || !data.ok) throw new Error('Не удалось загрузить');
+        const blocks = data.blocks || [];
+        if (!blocks.length) {
+            list.innerHTML = '<span class="fb-empty">Блоков пока нет.<br>ПКМ → 💾 Сохранить как блок…</span>';
+            return;
+        }
+        const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const html = blocks.map(b => {
+            const emoji = (b.category_label || '📦').charAt(0);
+            const title = escapeHtml(b.name + (b.description ? ' — ' + b.description : ''));
+            const delBtn = b.is_mine
+                ? `<button class="fb-card-delete" title="Удалить блок" onclick="event.stopPropagation(); _deleteBlock(${b.id})">✕</button>`
+                : '';
+            return `<div class="fb-card" draggable="true" data-block-id="${b.id}" title="${title}"
+                         onclick="_quickInsertBlock(${b.id})">
+                <span class="fb-card-emoji">${emoji}</span>
+                <div class="fb-card-body">
+                    <div class="fb-card-name">${escapeHtml(b.name)}</div>
+                    <div class="fb-card-meta">${b.component_count} комп. · ${b.connection_count} соед.${b.use_count ? ' · ' + b.use_count + '×' : ''}</div>
+                </div>
+                ${delBtn}
+            </div>`;
+        }).join('');
+        list.innerHTML = html;
+
+        // Drag-n-drop handlers
+        list.querySelectorAll('.fb-card').forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/dolg-block-id', card.dataset.blockId);
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+        });
+    } catch (e) {
+        list.innerHTML = '<span class="fb-empty">Ошибка: ' + (e.message || e) + '</span>';
+    }
+}
+window._refreshBlocksDrawer = _refreshBlocksDrawer;
+
+// Клик по блоку = вставка в центр канваса
+function _quickInsertBlock(blockId) {
+    if (!canvas) return;
+    // Центр текущего viewport в world-coords
+    const cx = (canvas.width / 2 - panX) / zoom;
+    const cy = (canvas.height / 2 - panY) / zoom;
+    insertFunctionalBlock(blockId, cx, cy);
+}
+window._quickInsertBlock = _quickInsertBlock;
+
+async function _deleteBlock(blockId) {
+    if (!window.confirm('Удалить этот блок?')) return;
+    try {
+        await simApiFetch('/api/blocks/' + blockId + '/delete/', { method: 'DELETE' });
+        if (typeof showNotification === 'function') showNotification('🗑 Блок удалён', 'success');
+        _refreshBlocksDrawer();
+    } catch (e) {
+        if (typeof showNotification === 'function') showNotification('❌ ' + (e.message || e), 'error');
+    }
+}
+window._deleteBlock = _deleteBlock;
+
+// Drag-n-drop в канвас: при drop на канвас вставляем блок в координаты курсора
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(_refreshBlocksDrawer, 600);
+    const cv = document.getElementById('schematicCanvas');
+    if (cv) {
+        cv.addEventListener('dragover', (e) => {
+            if (e.dataTransfer.types.includes('text/dolg-block-id')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            }
+        });
+        cv.addEventListener('drop', (e) => {
+            const blockId = e.dataTransfer.getData('text/dolg-block-id');
+            if (!blockId) return;
+            e.preventDefault();
+            const rect = cv.getBoundingClientRect();
+            const wx = (e.clientX - rect.left - panX) / zoom;
+            const wy = (e.clientY - rect.top - panY) / zoom;
+            insertFunctionalBlock(parseInt(blockId), wx, wy);
+        });
+    }
+});
 
 function pasteFromClipboard() {
     if (!_multiClipboard || !_multiClipboard.components.length) {

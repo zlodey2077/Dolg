@@ -118,6 +118,7 @@ PARAM_LABELS = {
     'ic':             'Ток коллектора (Ic)',
     'hfe':            'Коэфф. β (hFE)',
     'ft':             'Частота среза',
+    'dropout':        'Падение стабилизатора',
     'vf':             'Падение напряжения (Vf)',
     'if':             'Прямой ток (If)',
     'vr':             'Обратное напряжение (Vr)',
@@ -165,6 +166,9 @@ PARAM_LABELS = {
     'points':         'Контактные точки',
     'power_rails':    'Шины питания',
     'contact_count':  'Количество контактов',
+    'orientation':    'Ориентация',
+    'gender':         'Тип контакта',
+    'contact_material':'Материал контактов',
     'melting_point':  'Температура плавления',
     'diameter':       'Диаметр',
     'volume':         'Объём',
@@ -374,9 +378,9 @@ CARD_PARAM_ORDER = [
     'voltage', 'max_voltage', 'current', 'max_current', 'power', 'tolerance',
     'type', 'package', 'mounting', 'dielectric', 'temp_coef', 'max_temp', 'temp_max',
     # === РЭБ: активные (транзисторы/диоды/IC) ===
-    'supply_voltage', 'vceo', 'vds', 'ic', 'id', 'rds_on',
+    'supply_voltage', 'vceo', 'vds', 'ic', 'id', 'hfe', 'ft', 'rds_on',
     'vf', 'if', 'vrrm', 'vz', 'trr', 'wavelength',
-    'output_current', 'family', 'channels', 'flash', 'gbw', 'slew_rate', 'interface',
+    'output_current', 'dropout', 'family', 'channels', 'flash', 'gbw', 'slew_rate', 'interface',
     'coil_voltage', 'contact_rating', 'configuration', 'pins', 'pitch', 'dcr', 'srf',
     # === Модули / датчики / учебные платы ===
     'mcu', 'logic_level', 'clock', 'gpio', 'wireless',
@@ -388,7 +392,8 @@ CARD_PARAM_ORDER = [
     'magnification', 'light', 'board_size', 'points', 'power_rails',
     'contact_count', 'melting_point', 'diameter', 'volume', 'purity',
     'shrink_ratio', 'gauge', 'color', 'section', 'width', 'hole_count',
-    'flux_core', 'size', 'connector', 'rotation', 'mode', 'signal', 'touch', 'delay', 'application',
+    'flux_core', 'size', 'connector', 'orientation', 'gender', 'contact_material',
+    'rotation', 'mode', 'signal', 'touch', 'delay', 'application',
     # === CPU ===
     'cores', 'threads', 'boost_clock', 'base_clock', 'cache_l3', 'socket',
     'tdp', 'process',
@@ -441,6 +446,9 @@ CARD_PARAM_LABELS = {
     'ic': 'Ic',
     'id': 'Id',
     'rds_on': 'Rds',
+    'hfe': 'hFE',
+    'ft': 'fT',
+    'dropout': 'Drop',
     'vf': 'Vf',
     'if': 'If',
     'vrrm': 'Vr',
@@ -478,6 +486,9 @@ CARD_PARAM_LABELS = {
     'points': 'Точек',
     'power_rails': 'Шины',
     'contact_count': 'Кол-во',
+    'orientation': 'Ориент.',
+    'gender': 'Контакт',
+    'contact_material': 'Мат.',
     'melting_point': 'Плавл.',
     'diameter': 'Ø',
     'volume': 'Объём',
@@ -572,7 +583,7 @@ CARD_PARAM_FILTER_MAP = {
     'current': 'current', 'max_current': 'current', 'output_current': 'current',
     'ic': 'current', 'id': 'current', 'if': 'current',
     'type': 'type',
-    'pins': 'pins', 'pin_count': 'pins',
+    'pins': 'pins', 'pin_count': 'pins', 'contact_count': 'pins',
     'pitch': 'pitch',
     # Допуск
     'tolerance': 'tolerance',
@@ -591,7 +602,8 @@ CARD_PARAM_FILTER_MAP = {
     'inputs': 'connectivity', 'power_conn': 'connectivity', 'm2_slots': 'connectivity',
     'pcie': 'connectivity', 'ram_slots': 'connectivity', 'charging': 'connectivity',
     'os': 'connectivity', 'codec': 'connectivity', 'wireless': 'connectivity',
-    'connector': 'connectivity', 'compatibility': 'connectivity',
+    'connector': 'connectivity',
+    'compatibility': 'compatibility',
     # Product.package_type
     'package': 'package',
     # Расширенные (дублируют ENGINEERING_FILTERS в views.py) — каждый
@@ -600,6 +612,17 @@ CARD_PARAM_FILTER_MAP = {
     'interface': 'interface',
     'dielectric': 'dielectric',
     'mounting': 'mounting',
+    'material': 'material', 'contact_material': 'material', 'flux_core': 'material',
+    'application': 'application',
+    'length': 'size', 'width': 'size', 'diameter': 'size', 'size': 'size',
+    'board_size': 'size', 'hole_count': 'size', 'points': 'size', 'power_rails': 'size',
+    'gauge': 'wire', 'section': 'wire', 'color': 'wire',
+    'configuration': 'configuration', 'orientation': 'configuration', 'gender': 'configuration',
+    'temperature_range': 'temperature_range', 'operating_temp': 'temperature_range',
+    'max_temp': 'temperature_range', 'temp_max': 'temperature_range',
+    'min_temp': 'temperature_range', 'melting_point': 'temperature_range',
+    'mode': 'mode', 'signal': 'mode',
+    'safety': 'safety',
 }
 
 
@@ -608,7 +631,13 @@ def chip_filter_name(key):
     не поддерживает фильтрацию (тогда шаблон отрендерит чип без ссылки)."""
     if key in CARD_PARAM_FILTER_MAP:
         return CARD_PARAM_FILTER_MAP[key]
-    if key in CARD_PARAM_ORDER and key not in CARD_PARAM_EXCLUDE:
+    if (
+        key
+        and key not in CARD_PARAM_EXCLUDE
+        and not (isinstance(key, str) and key.startswith('_'))
+    ):
+        # Любой видимый параметр должен быть действием. Если для поля еще нет
+        # отдельного backend-фильтра, используем общий инженерный поиск.
         return 'q'
     return ''
 
@@ -622,17 +651,27 @@ def chip_value_valid(param_filter_options, key, value):
     Цель — отсечь чипы, ведущие на пустую страницу (filter применится,
     но 0 товаров найдут, юзер расстроится).
     """
+    if value in (None, ''):
+        return False
+    # UX-решение каталога V3: все видимые chips кликабельны. Для строгих
+    # facet-фильтров значение обычно есть в param_filter_options, а для редких
+    # инженерных полей chip_filter_name() дает fallback в `q`.
     if not param_filter_options:
         return True
     filter_name = CARD_PARAM_FILTER_MAP.get(key)
     if not filter_name:
-        return key in CARD_PARAM_ORDER and key not in CARD_PARAM_EXCLUDE
+        return key not in CARD_PARAM_EXCLUDE
     if filter_name in {'q', 'package'}:
         return True
     available = param_filter_options.get(filter_name) or []
     if not available:
-        return False
-    return str(value) in available
+        return True
+    if str(value) in available:
+        return True
+    # Фильтр может быть шире, чем список facet-значений на текущей странице
+    # (например, значение скрыто предыдущим фильтром). Оставляем chip
+    # кликабельным, чтобы пользователь мог перейти к поиску/сужению.
+    return True
 
 
 # Группы параметров для color-coding лейблов в карточке. Группа = одна
@@ -795,6 +834,11 @@ WIDE_CARD_VALUE_KEYS = frozenset({
     'compatibility',
     'sensor_type',
     'temperature_range',
+    'material',
+    'contact_material',
+    'flux_core',
+    'connector',
+    'safety',
     'signal',
     'mode',
     'application',

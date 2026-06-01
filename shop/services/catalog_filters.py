@@ -21,7 +21,7 @@ ENGINEERING_FILTERS = {
     'current': ('current', 'ic', 'id', 'if'),
     'tolerance': ('tolerance',),
     'type': ('type',),
-    'pins': ('pins', 'pin_count'),
+    'pins': ('pins', 'pin_count', 'contact_count'),
     'pitch': ('pitch',),
     'frequency': ('frequency', 'base_clock', 'boost_clock', 'refresh_rate', 'bandwidth'),
     'capacity': ('capacity', 'ram', 'storage', 'vram', 'battery', 'battery_earbuds', 'battery_case', 'cache_l3'),
@@ -32,6 +32,15 @@ ENGINEERING_FILTERS = {
     'interface': ('interface',),
     'dielectric': ('dielectric',),
     'mounting': ('mounting',),
+    'material': ('material', 'contact_material', 'flux_core'),
+    'application': ('application',),
+    'size': ('length', 'width', 'diameter', 'size', 'board_size', 'hole_count', 'points', 'power_rails'),
+    'wire': ('gauge', 'section', 'color'),
+    'configuration': ('configuration', 'orientation', 'gender'),
+    'temperature_range': ('temperature_range', 'operating_temp', 'max_temp', 'temp_max', 'min_temp', 'melting_point'),
+    'compatibility': ('compatibility',),
+    'mode': ('mode', 'signal'),
+    'safety': ('safety',),
 }
 
 STANDARD_FILTERS = (
@@ -79,6 +88,15 @@ FILTER_LABELS = {
     'interface': 'Interface',
     'form_factor': 'Form factor',
     'dielectric': 'Dielectric',
+    'material': 'Material',
+    'application': 'Application',
+    'size': 'Size',
+    'wire': 'Wire',
+    'configuration': 'Configuration',
+    'temperature_range': 'Temperature',
+    'compatibility': 'Compatibility',
+    'mode': 'Mode',
+    'safety': 'Safety',
 }
 
 RANGE_PREFIXES = {

@@ -2,6 +2,12 @@
 
 ## 2026-06-01: catalog card hotfix and official photo allowlist
 
+- 2026-06-02: Catalog V3 расширен на расходники, инструменты и модули:
+  - `enrich_product_parameters` нормализует витринные названия и `package_type` для consumables/tools/modules;
+  - добавлены прямые фильтры `material`, `size`, `wire`, `configuration`, `temperature_range`, `compatibility`, `mode`, `safety`;
+  - все preview-чипы карточек остаются кликабельными (`nonclickable preview chips = 0`);
+  - allowlist official/supplier photos расширен для `breadboard-400`, `breadboard-830`, `breadboard-2x830`, `pcb-protoboard-7x9`, `pcb-protoboard-9x15`, `jumper-mm-65pcs`.
+  - фактические метрики после применения команд: 364 товара, raw package types `0`, verified images `79`, generated fallback `285`.
 - Скрыты служебные `Product.parameters` из карточек и деталки: `catalog_quality`, `image_source*`, `image_verified_from` больше не попадают в chips и таблицу характеристик.
 - Добавлены широкие chips для длинных значений (`type`, `resolution`, `chip`, `connectivity`), чтобы названия не вылезали и не резались в узкой колонке.
 - Добавлена allowlist-команда `import_official_product_photos`; обновлены реальные фото для `solder-paste-138`, `solder-lead-free-100g`, `solder-60-40-100g`, `ao3400`, `irlz44n`, `irf9540n` без Wikimedia/Commons.

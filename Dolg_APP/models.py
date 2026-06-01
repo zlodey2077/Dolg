@@ -1222,3 +1222,61 @@ class Announcement(models.Model):
         if self.expires_at and self.expires_at < timezone.now():
             return False
         return True
+
+
+# ─── 2026-06-02 Lithium ECAD killer-фича: Functional Blocks ─────────────────
+# Юзер выделяет группу компонентов на схеме (Ctrl+A или drag-select), сохраняет
+# как «функциональный блок» — JSON со списком компонентов и соединений + preview.
+# Потом drag-n-drop из палитры «📦 Мои блоки» → подсхема разворачивается на канвасе
+# со смещением до позиции курсора. Аналог Lithium ECAD «Functional blocks».
+class FunctionalBlock(models.Model):
+    CATEGORY_CHOICES = [
+        ('power',    '⚡ Питание'),
+        ('analog',   '🔊 Аналог'),
+        ('digital',  '💾 Цифра'),
+        ('rf',       '📡 РЧ'),
+        ('filter',   '🌊 Фильтры'),
+        ('sensor',   '🌡 Датчики'),
+        ('other',    '📦 Прочее'),
+    ]
+    name = models.CharField(max_length=80, help_text='Название блока (напр. "DC-DC 5В→3.3В")')
+    description = models.CharField(max_length=200, blank=True,
+                                   help_text='Краткое описание для тултипа')
+    category = models.CharField(max_length=16, choices=CATEGORY_CHOICES, default='other')
+    schema_json = models.JSONField(
+        help_text='{"components":[...],"connections":[...]} формата applySchemeData')
+    preview_svg = models.TextField(blank=True,
+                                   help_text='Опциональная мини-SVG-отрисовка')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name='functional_blocks',
+                             help_text='Владелец блока')
+    is_public = models.BooleanField(default=False, db_index=True,
+                                    help_text='Виден ли другим юзерам')
+    use_count = models.PositiveIntegerField(default=0,
+                                            help_text='Счётчик использований (drag в схему)')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['user', '-updated_at']),
+            models.Index(fields=['is_public', 'category']),
+        ]
+
+    def __str__(self):
+        return f'{self.name} ({self.user.username})'
+
+    @property
+    def component_count(self):
+        try:
+            return len((self.schema_json or {}).get('components', []))
+        except (TypeError, AttributeError):
+            return 0
+
+    @property
+    def connection_count(self):
+        try:
+            return len((self.schema_json or {}).get('connections', []))
+        except (TypeError, AttributeError):
+            return 0

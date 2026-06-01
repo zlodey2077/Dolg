@@ -327,6 +327,8 @@ def _infer_category_parameters(product, pn: str, params: dict[str, Any], result:
 
     if category == 'diodes':
         _infer_diode_params(token, params, result)
+    elif category == 'resistors':
+        _infer_resistor_params(product, token, params, result)
     elif category == 'transistors':
         _infer_transistor_params(token, params, result)
     elif category == 'ics':
@@ -344,71 +346,105 @@ def _infer_category_parameters(product, pn: str, params: dict[str, Any], result:
 
 def _infer_diode_params(pn: str, params: dict[str, Any], result: NormalizationResult) -> None:
     table = {
-        '1N4001': {'type': 'rectifier diode', 'max_voltage': '50 В', 'current': '1 А', 'vf': '1.1 В @ 1 А'},
-        '1N4007': {'type': 'rectifier diode', 'max_voltage': '1000 В', 'current': '1 А', 'vf': '1.1 В @ 1 А'},
-        '1N4148': {'type': 'small-signal diode', 'max_voltage': '100 В', 'current': '200 мА', 'trr': '4 нс'},
-        '1N5817': {'type': 'Schottky diode', 'max_voltage': '20 В', 'current': '1 А'},
-        '1N5819': {'type': 'Schottky diode', 'max_voltage': '40 В', 'current': '1 А'},
-        '1N5822': {'type': 'Schottky diode', 'max_voltage': '40 В', 'current': '3 А'},
-        'BAT54': {'type': 'Schottky diode', 'max_voltage': '30 В', 'current': '200 мА', 'vf': '0.8 В max'},
-        'SS14': {'type': 'Schottky diode', 'max_voltage': '40 В', 'current': '1 А'},
+        '1N4001': {'type': 'rectifier diode', 'max_voltage': '50 В', 'current': '1 А', 'max_current': '30 А имп.', 'vf': '1.1 В @ 1 А'},
+        '1N4007': {'type': 'rectifier diode', 'max_voltage': '1000 В', 'current': '1 А', 'max_current': '30 А имп.', 'vf': '1.1 В @ 1 А'},
+        '1N4148': {'type': 'small-signal diode', 'max_voltage': '100 В', 'current': '200 мА', 'max_current': '450 мА имп.', 'trr': '4 нс'},
+        '1N5817': {'type': 'Schottky diode', 'max_voltage': '20 В', 'current': '1 А', 'max_current': '25 А имп.', 'vf': '0.45 В тип.'},
+        '1N5819': {'type': 'Schottky diode', 'max_voltage': '40 В', 'current': '1 А', 'max_current': '25 А имп.', 'vf': '0.6 В тип.'},
+        '1N5822': {'type': 'Schottky diode', 'max_voltage': '40 В', 'current': '3 А', 'max_current': '80 А имп.', 'vf': '0.55 В тип.'},
+        'BAT54': {'type': 'Schottky diode', 'max_voltage': '30 В', 'current': '200 мА', 'max_current': '600 мА имп.', 'vf': '0.8 В макс.'},
+        'SS14': {'type': 'Schottky diode', 'max_voltage': '40 В', 'current': '1 А', 'max_current': '30 А имп.', 'vf': '0.5 В тип.'},
     }
     values = table.get(pn)
     if pn.startswith('BZX55'):
-        values = {'type': 'Zener diode', 'voltage': ZENER_VOLTAGES.get(pn, '5.1 В'), 'power': '0.5 Вт'}
+        zener_current = {'BZX55C-3V3': '150 мА расч.', 'BZX55C-5V1': '98 мА расч.', 'BZX55C-12V': '42 мА расч.'}
+        values = {
+            'type': 'Zener diode',
+            'voltage': ZENER_VOLTAGES.get(pn, '5.1 В'),
+            'power': '0.5 Вт',
+            'max_current': zener_current.get(pn, 'по P/Vz'),
+        }
     if pn.startswith('LED-'):
         vf = '3.2 В' if 'BLUE' in pn else ('3.0 В' if 'WHITE' in pn else ('2.1 В' if 'GREEN' in pn else '2.0 В'))
         values = {'type': 'LED', 'vf': vf, 'current': '20 мА', 'max_current': '30 мА'}
     _merge_params(params, result, values or {})
 
 
+def _infer_resistor_params(product, pn: str, params: dict[str, Any], result: NormalizationResult) -> None:
+    package = str(getattr(product, 'package_type', '') or '').upper()
+    token = ' '.join([pn, package, str(getattr(product, 'slug', '') or '')]).upper()
+
+    if '0603' in token:
+        defaults = {'type': 'thick-film resistor', 'material': 'thick film', 'max_voltage': '75 В', 'temp_coef': '100 ppm/°C'}
+    elif '0805' in token:
+        defaults = {'type': 'thick-film resistor', 'material': 'thick film', 'max_voltage': '150 В', 'temp_coef': '100 ppm/°C'}
+    elif '1206' in token:
+        defaults = {'type': 'thick-film resistor', 'material': 'thick film', 'max_voltage': '200 В', 'temp_coef': '100 ppm/°C'}
+    elif pn.startswith('MF') or 'METAL' in token:
+        defaults = {'type': 'metal-film resistor', 'material': 'metal film', 'max_voltage': '250 В', 'temp_coef': '50 ppm/°C'}
+    else:
+        defaults = {'type': 'thick-film resistor', 'material': 'thick film', 'temp_coef': '100 ppm/°C'}
+
+    if 'power' not in params and 'rated_power_w' not in params:
+        if '0603' in token:
+            defaults['power'] = '0.1 Вт'
+        elif '0805' in token:
+            defaults['power'] = '0.125 Вт'
+        elif '1206' in token:
+            defaults['power'] = '0.25 Вт'
+        else:
+            defaults['power'] = '0.25 Вт'
+
+    _merge_params(params, result, defaults)
+
+
 def _infer_transistor_params(pn: str, params: dict[str, Any], result: NormalizationResult) -> None:
     table = {
-        'BC547B': {'type': 'NPN', 'max_voltage': '45 В', 'current': '100 мА'},
-        'BC557B': {'type': 'PNP', 'max_voltage': '45 В', 'current': '100 мА'},
-        '2N2222A': {'type': 'NPN', 'max_voltage': '40 В', 'current': '800 мА'},
-        '2N2907A': {'type': 'PNP', 'max_voltage': '40 В', 'current': '600 мА'},
-        '2N3904': {'type': 'NPN', 'max_voltage': '40 В', 'current': '200 мА'},
-        '2N3906': {'type': 'PNP', 'max_voltage': '40 В', 'current': '200 мА'},
-        'BC817-25': {'type': 'NPN', 'max_voltage': '45 В', 'current': '500 мА'},
-        'BC857B': {'type': 'PNP', 'max_voltage': '45 В', 'current': '100 мА'},
-        'IRF540N': {'type': 'N-MOSFET', 'max_voltage': '100 В', 'current': '33 А'},
-        'IRF9540N': {'type': 'P-MOSFET', 'max_voltage': '100 В', 'current': '23 А'},
-        'IRLZ44N': {'type': 'Logic N-MOSFET', 'max_voltage': '55 В', 'current': '47 А'},
-        'AO3400': {'type': 'N-MOSFET', 'max_voltage': '30 В', 'current': '5.7 А'},
-        'AO3401': {'type': 'P-MOSFET', 'max_voltage': '30 В', 'current': '4 А'},
-        'BSS138': {'type': 'N-MOSFET', 'max_voltage': '50 В', 'current': '200 мА'},
-        'TIP120': {'type': 'NPN Darlington', 'max_voltage': '60 В', 'current': '5 А'},
+        'BC547B': {'type': 'NPN', 'max_voltage': '45 В', 'current': '100 мА', 'hfe': '200...450', 'ft': '300 МГц', 'pins': '3'},
+        'BC557B': {'type': 'PNP', 'max_voltage': '45 В', 'current': '100 мА', 'hfe': '220...800', 'ft': '100 МГц', 'pins': '3'},
+        '2N2222A': {'type': 'NPN', 'max_voltage': '40 В', 'current': '800 мА', 'hfe': '100...300', 'ft': '250 МГц', 'pins': '3'},
+        '2N2907A': {'type': 'PNP', 'max_voltage': '40 В', 'current': '600 мА', 'hfe': '100...300', 'ft': '200 МГц', 'pins': '3'},
+        '2N3904': {'type': 'NPN', 'max_voltage': '40 В', 'current': '200 мА', 'hfe': '100...300', 'ft': '300 МГц', 'pins': '3'},
+        '2N3906': {'type': 'PNP', 'max_voltage': '40 В', 'current': '200 мА', 'hfe': '100...300', 'ft': '250 МГц', 'pins': '3'},
+        'BC817-25': {'type': 'NPN', 'max_voltage': '45 В', 'current': '500 мА', 'hfe': '160...400', 'ft': '100 МГц', 'pins': '3'},
+        'BC857B': {'type': 'PNP', 'max_voltage': '45 В', 'current': '100 мА', 'hfe': '220...475', 'ft': '100 МГц', 'pins': '3'},
+        'IRF540N': {'type': 'N-MOSFET', 'max_voltage': '100 В', 'current': '33 А', 'rds_on': '44 мОм тип.', 'power': '130 Вт', 'pins': '3'},
+        'IRF9540N': {'type': 'P-MOSFET', 'max_voltage': '100 В', 'current': '23 А', 'rds_on': '117 мОм тип.', 'power': '140 Вт', 'pins': '3'},
+        'IRLZ44N': {'type': 'Logic N-MOSFET', 'max_voltage': '55 В', 'current': '47 А', 'rds_on': '22 мОм тип.', 'power': '110 Вт', 'pins': '3'},
+        'AO3400': {'type': 'N-MOSFET', 'max_voltage': '30 В', 'current': '5.7 А', 'rds_on': '52 мОм тип.', 'power': '1.4 Вт', 'pins': '3'},
+        'AO3401': {'type': 'P-MOSFET', 'max_voltage': '30 В', 'current': '4 А', 'rds_on': '85 мОм тип.', 'power': '1.4 Вт', 'pins': '3'},
+        'BSS138': {'type': 'N-MOSFET', 'max_voltage': '50 В', 'current': '200 мА', 'rds_on': '3.5 Ом макс.', 'power': '360 мВт', 'pins': '3'},
+        'TIP120': {'type': 'NPN Darlington', 'max_voltage': '60 В', 'current': '5 А', 'hfe': '1000 тип.', 'power': '65 Вт', 'pins': '3'},
     }
     _merge_params(params, result, table.get(pn) or {})
 
 
 def _infer_ic_params(pn: str, params: dict[str, Any], result: NormalizationResult) -> None:
     table = {
-        'NE555': {'type': 'Timer', 'supply_voltage': '4.5...16 В', 'output_current': '200 мА'},
-        'LM358': {'type': 'dual op-amp', 'supply_voltage': '3...30 В', 'channels': '2'},
-        'LM324': {'type': 'quad op-amp', 'supply_voltage': '3...30 В', 'channels': '4'},
-        'LM741': {'type': 'op-amp', 'supply_voltage': '±10...±18 В', 'channels': '1', 'gbw': '1 МГц', 'slew_rate': '0.5 В/мкс'},
-        'TL072': {'type': 'dual JFET op-amp', 'supply_voltage': '±3.5...±18 В', 'channels': '2'},
-        'LM386': {'type': 'audio amplifier', 'supply_voltage': '4...12 В', 'power': '0.7 Вт'},
-        'LM7805': {'type': 'linear regulator', 'voltage': '5 В', 'current': '1 А'},
-        'LM7812': {'type': 'linear regulator', 'voltage': '12 В', 'current': '1 А'},
-        'LM7905': {'type': 'negative linear regulator', 'voltage': '-5 В', 'current': '1 А'},
-        'LM7912': {'type': 'negative linear regulator', 'voltage': '-12 В', 'current': '1 А'},
-        'LM317T': {'type': 'adjustable linear regulator', 'voltage': '1.2...37 В', 'current': '1.5 А'},
-        'AMS1117-3.3': {'type': 'LDO regulator', 'voltage': '3.3 В', 'current': '1 А'},
-        'AMS1117-5.0': {'type': 'LDO regulator', 'voltage': '5 В', 'current': '1 А'},
-        'LM2596': {'type': 'buck regulator', 'voltage': '4.5...40 В', 'current': '3 А'},
-        'XL6009': {'type': 'boost regulator', 'voltage': '5...32 В', 'current': '4 А'},
-        'ATMEGA328P-PU': {'type': 'AVR MCU', 'supply_voltage': '1.8...5.5 В', 'flash': '32 КБ'},
-        'ATTINY85': {'type': 'AVR MCU', 'supply_voltage': '1.8...5.5 В', 'flash': '8 КБ'},
-        'MCP23017': {'type': 'I2C GPIO expander', 'supply_voltage': '1.8...5.5 В', 'interface': 'I2C'},
-        'DS1307': {'type': 'RTC', 'supply_voltage': '4.5...5.5 В', 'interface': 'I2C'},
-        'DS18B20': {'type': 'temperature sensor', 'supply_voltage': '3...5.5 В', 'interface': '1-Wire'},
-        'AT24C32': {'type': 'I2C EEPROM', 'supply_voltage': '1.7...5.5 В', 'interface': 'I2C'},
+        'NE555': {'type': 'Timer', 'supply_voltage': '4.5...16 В', 'output_current': '200 мА', 'pins': '8', 'frequency': 'до 500 кГц'},
+        'LM358': {'type': 'dual op-amp', 'supply_voltage': '3...30 В', 'channels': '2', 'pins': '8', 'gbw': '1 МГц'},
+        'LM324': {'type': 'quad op-amp', 'supply_voltage': '3...30 В', 'channels': '4', 'pins': '14', 'gbw': '1 МГц'},
+        'LM741': {'type': 'op-amp', 'supply_voltage': '±10...±18 В', 'channels': '1', 'pins': '8', 'gbw': '1 МГц', 'slew_rate': '0.5 В/мкс'},
+        'TL072': {'type': 'dual JFET op-amp', 'supply_voltage': '±3.5...±18 В', 'channels': '2', 'pins': '8', 'gbw': '3 МГц', 'slew_rate': '13 В/мкс'},
+        'LM386': {'type': 'audio amplifier', 'supply_voltage': '4...12 В', 'power': '0.7 Вт', 'pins': '8', 'gain': '20...200'},
+        'LM7805': {'type': 'linear regulator', 'voltage': '5 В', 'current': '1 А', 'pins': '3', 'dropout': 'около 2 В'},
+        'LM7812': {'type': 'linear regulator', 'voltage': '12 В', 'current': '1 А', 'pins': '3', 'dropout': 'около 2 В'},
+        'LM7905': {'type': 'negative linear regulator', 'voltage': '-5 В', 'current': '1 А', 'pins': '3', 'dropout': 'около 2 В'},
+        'LM7912': {'type': 'negative linear regulator', 'voltage': '-12 В', 'current': '1 А', 'pins': '3', 'dropout': 'около 2 В'},
+        'LM317T': {'type': 'adjustable linear regulator', 'voltage': '1.2...37 В', 'current': '1.5 А', 'pins': '3', 'dropout': 'около 3 В'},
+        'AMS1117-3.3': {'type': 'LDO regulator', 'voltage': '3.3 В', 'current': '1 А', 'pins': '3', 'dropout': '1.1 В тип.'},
+        'AMS1117-5.0': {'type': 'LDO regulator', 'voltage': '5 В', 'current': '1 А', 'pins': '3', 'dropout': '1.1 В тип.'},
+        'LM2596': {'type': 'buck regulator', 'voltage': '4.5...40 В', 'current': '3 А', 'pins': '5', 'frequency': '150 кГц'},
+        'XL6009': {'type': 'boost regulator', 'voltage': '5...32 В', 'current': '4 А', 'pins': '5', 'frequency': '400 кГц'},
+        'ATMEGA328P-PU': {'type': 'AVR MCU', 'supply_voltage': '1.8...5.5 В', 'flash': '32 КБ', 'pins': '28', 'clock': '20 МГц'},
+        'ATTINY85': {'type': 'AVR MCU', 'supply_voltage': '1.8...5.5 В', 'flash': '8 КБ', 'pins': '8', 'clock': '20 МГц'},
+        'MCP23017': {'type': 'I2C GPIO expander', 'supply_voltage': '1.8...5.5 В', 'interface': 'I2C', 'pins': '28', 'gpio': '16'},
+        'DS1307': {'type': 'RTC', 'supply_voltage': '4.5...5.5 В', 'interface': 'I2C', 'pins': '8'},
+        'DS18B20': {'type': 'temperature sensor', 'supply_voltage': '3...5.5 В', 'interface': '1-Wire', 'pins': '3', 'temperature_range': '-55...+125 °C'},
+        'AT24C32': {'type': 'I2C EEPROM', 'supply_voltage': '1.7...5.5 В', 'interface': 'I2C', 'pins': '8', 'memory': '32 кбит'},
     }
     if pn.startswith('74HC'):
-        table[pn] = {'type': '74HC CMOS logic', 'supply_voltage': '2...6 В', 'family': 'HC CMOS'}
+        table[pn] = {'type': '74HC CMOS logic', 'supply_voltage': '2...6 В', 'family': 'HC CMOS', 'pins': '14'}
     _merge_params(params, result, table.get(pn) or {})
 
 
@@ -429,25 +465,25 @@ def _infer_inductor_params(pn: str, params: dict[str, Any], result: Normalizatio
 
 def _infer_connector_params(pn: str, params: dict[str, Any], result: NormalizationResult) -> None:
     if 'USB-C' in pn:
-        _merge_params(params, result, {'type': 'USB-C receptacle', 'pins': '16', 'current': '5 А', 'voltage': '20 В PD'})
+        _merge_params(params, result, {'type': 'USB-C receptacle', 'pins': '16', 'current': '5 А', 'voltage': '20 В PD', 'gender': 'гнездо', 'orientation': 'горизонтальный', 'contact_material': 'медь / золочение'})
     elif 'USB-MICRO' in pn:
-        _merge_params(params, result, {'type': 'USB Micro-B receptacle', 'pins': '5', 'current': '1.8 А', 'voltage': '5 В'})
+        _merge_params(params, result, {'type': 'USB Micro-B receptacle', 'pins': '5', 'current': '1.8 А', 'voltage': '5 В', 'gender': 'гнездо', 'orientation': 'горизонтальный', 'contact_material': 'медь / золочение'})
     elif 'USB-A' in pn:
-        _merge_params(params, result, {'type': 'USB-A receptacle', 'pins': '4', 'current': '1.5 А', 'voltage': '5 В'})
+        _merge_params(params, result, {'type': 'USB-A receptacle', 'pins': '4', 'current': '1.5 А', 'voltage': '5 В', 'gender': 'гнездо', 'orientation': 'горизонтальный', 'contact_material': 'медь / золочение'})
     elif pn.startswith('JST-XH'):
         pins = _first_number(pn) or '2'
-        _merge_params(params, result, {'type': 'JST XH connector', 'pins': pins, 'pitch': '2.5 мм', 'current': '3 А'})
+        _merge_params(params, result, {'type': 'JST XH connector', 'pins': pins, 'pitch': '2.5 мм', 'current': '3 А', 'gender': 'гнездо/штекер', 'orientation': 'вертикальный', 'contact_material': 'луженая медь'})
     elif pn.startswith('HEADER') or pn.startswith('DUPONT'):
-        _merge_params(params, result, {'type': 'pin header', 'pitch': '2.54 мм', 'current': '1 А'})
+        _merge_params(params, result, {'type': 'pin header', 'pitch': '2.54 мм', 'current': '1 А', 'gender': 'штыревой', 'orientation': 'прямой', 'contact_material': 'латунь / золочение'})
     elif pn.startswith('SCREW'):
         pins = _first_number(pn) or '2'
-        _merge_params(params, result, {'type': 'screw terminal block', 'pins': pins, 'pitch': '5.08 мм', 'current': '10 А', 'voltage': '250 В'})
+        _merge_params(params, result, {'type': 'screw terminal block', 'pins': pins, 'pitch': '5.08 мм', 'current': '10 А', 'voltage': '250 В', 'orientation': 'вертикальный', 'contact_material': 'луженая медь'})
     elif pn.startswith('DB9'):
-        _merge_params(params, result, {'type': 'D-Sub connector', 'pins': '9', 'current': '5 А', 'voltage': '250 В'})
+        _merge_params(params, result, {'type': 'D-Sub connector', 'pins': '9', 'current': '5 А', 'voltage': '250 В', 'gender': 'гнездо', 'orientation': 'угловой', 'contact_material': 'медь / золочение'})
     elif pn.startswith('RJ45'):
-        _merge_params(params, result, {'type': 'RJ45 connector', 'pins': '8P8C', 'current': '1.5 А', 'voltage': '150 В'})
+        _merge_params(params, result, {'type': 'RJ45 connector', 'pins': '8P8C', 'current': '1.5 А', 'voltage': '150 В', 'gender': 'гнездо', 'orientation': 'угловой', 'contact_material': 'фосфористая бронза'})
     elif pn.startswith('DC-JACK'):
-        _merge_params(params, result, {'type': 'DC barrel jack', 'current': '2 А', 'voltage': '24 В'})
+        _merge_params(params, result, {'type': 'DC barrel jack', 'pins': '3', 'current': '2 А', 'voltage': '24 В', 'gender': 'гнездо', 'orientation': 'горизонтальный'})
 
 
 def _infer_relay_params(pn: str, params: dict[str, Any], result: NormalizationResult) -> None:

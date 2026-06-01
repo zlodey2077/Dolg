@@ -28,6 +28,36 @@ class OfficialPhoto:
 OFFICIAL_PHOTOS = {
     item.slug: item for item in [
         OfficialPhoto(
+            slug='breadboard-400',
+            url='https://cdn-shop.adafruit.com/970x728/64-06.jpg',
+            source_title='Adafruit product photo',
+        ),
+        OfficialPhoto(
+            slug='breadboard-830',
+            url='https://cdn-shop.adafruit.com/970x728/239-03.jpg',
+            source_title='Adafruit product photo',
+        ),
+        OfficialPhoto(
+            slug='breadboard-2x830',
+            url='https://cdn-shop.adafruit.com/970x728/239-05.jpg',
+            source_title='Adafruit product photo',
+        ),
+        OfficialPhoto(
+            slug='pcb-protoboard-7x9',
+            url='https://cdn-shop.adafruit.com/970x728/1606-06.jpg',
+            source_title='Adafruit product photo',
+        ),
+        OfficialPhoto(
+            slug='pcb-protoboard-9x15',
+            url='https://cdn-shop.adafruit.com/970x728/1606-06.jpg',
+            source_title='Adafruit product photo',
+        ),
+        OfficialPhoto(
+            slug='jumper-mm-65pcs',
+            url='https://cdn-shop.adafruit.com/970x728/759-03.jpg',
+            source_title='Adafruit product photo',
+        ),
+        OfficialPhoto(
             slug='solder-paste-138',
             url='https://vxb.com/cdn/shop/files/61XnUsid7fL.jpg?v=1778102724&width=1280',
             source_title='VXB product photo',

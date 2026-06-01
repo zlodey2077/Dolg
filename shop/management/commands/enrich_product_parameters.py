@@ -426,6 +426,400 @@ TEXT_FIXUPS = {
         'description': 'Внешний SSD USB-C для переноса проектов, резервных копий и инженерных архивов.',
         'manufacturer': 'samsung',
     },
+    # Расходники: приводим seed-товары к нормальной витрине, без BREADBOARD/Consumable
+    # в карточках. Сами характеристики остаются в Product.parameters.
+    'pcb-protoboard-7x9': {
+        'name': 'Макетная PCB 7×9 см',
+        'package_type': 'Макетирование',
+    },
+    'pcb-protoboard-9x15': {
+        'name': 'Макетная PCB 9×15 см',
+        'package_type': 'Макетирование',
+    },
+    'breadboard-2x830': {
+        'name': 'Набор макетных плат 2×830',
+        'package_type': 'Макетирование',
+    },
+    'breadboard-400': {
+        'name': 'Макетная плата 400 точек',
+        'package_type': 'Макетирование',
+    },
+    'breadboard-830': {
+        'name': 'Макетная плата 830 точек',
+        'package_type': 'Макетирование',
+    },
+    'jumper-mm-65pcs': {
+        'name': 'Перемычки Dupont M-M, 65 шт.',
+        'package_type': 'Проводники',
+    },
+    'jumper-mf-65pcs': {
+        'name': 'Перемычки Dupont M-F, 65 шт.',
+        'package_type': 'Проводники',
+    },
+    'jumper-ff-65pcs': {
+        'name': 'Перемычки Dupont F-F, 65 шт.',
+        'package_type': 'Проводники',
+    },
+    'solder-paste-138': {
+        'name': 'Паяльная паста Sn42Bi58, 138 °C',
+        'package_type': 'Пайка',
+    },
+    'solder-lead-free-100g': {
+        'name': 'Бессвинцовый припой SnAgCu, 100 г',
+        'package_type': 'Пайка',
+    },
+    'solder-60-40-100g': {
+        'name': 'Припой Sn60Pb40, 100 г',
+        'package_type': 'Пайка',
+    },
+    'flux-no-clean': {
+        'name': 'Безотмывочный флюс 10 мл',
+        'package_type': 'Пайка',
+    },
+    'flux-rma-50ml': {
+        'name': 'Флюс RMA 50 мл',
+        'package_type': 'Пайка',
+    },
+    'flux-rosin-30g': {
+        'name': 'Канифольный флюс 30 г',
+        'package_type': 'Пайка',
+    },
+    'solder-tip-cleaner': {
+        'name': 'Очиститель жала паяльника',
+        'package_type': 'Пайка',
+    },
+    'alcohol-ipa-100ml': {
+        'name': 'Изопропиловый спирт 99%, 100 мл',
+        'package_type': 'Чистка',
+    },
+    'pcb-cleaner-200ml': {
+        'name': 'Очиститель плат 200 мл',
+        'package_type': 'Чистка',
+    },
+    'heat-shrink-2mm-1m': {
+        'name': 'Термоусадка 2 мм, 1 м',
+        'package_type': 'Изоляция',
+    },
+    'heat-shrink-kit': {
+        'name': 'Набор термоусадки 1–10 мм',
+        'package_type': 'Изоляция',
+    },
+    'electrical-tape-blk': {
+        'name': 'Изолента черная 19 мм',
+        'package_type': 'Изоляция',
+    },
+    'electrical-tape-color': {
+        'name': 'Набор цветной изоленты',
+        'package_type': 'Изоляция',
+    },
+    'wire-cu-22awg-red-5m': {
+        'name': 'Провод монтажный 22 AWG, красный 5 м',
+        'package_type': 'Провод',
+    },
+    'wire-cu-22awg-black-5m': {
+        'name': 'Провод монтажный 22 AWG, черный 5 м',
+        'package_type': 'Провод',
+    },
+    'wire-silicon-18awg-1m': {
+        'name': 'Силиконовый провод 18 AWG, 1 м',
+        'package_type': 'Провод',
+    },
+    'wire-pair-2x05mm': {
+        'name': 'Двухжильный провод 2×0.5 мм²',
+        'package_type': 'Провод',
+    },
+    'solder-wick-2mm': {
+        'name': 'Оплетка для выпайки 2 мм',
+        'package_type': 'Выпайка',
+    },
+    'solder-wick-3mm': {
+        'name': 'Оплетка для выпайки 3 мм',
+        'package_type': 'Выпайка',
+    },
+    'desolder-pump': {
+        'name': 'Вакуумный оловоотсос',
+        'package_type': 'Выпайка',
+    },
+    'esd-mat-30x60': {
+        'name': 'Антистатический коврик 30×60 см',
+        'package_type': 'ESD',
+    },
+    'esd-wrist-strap': {
+        'name': 'Антистатический браслет',
+        'package_type': 'ESD',
+    },
+}
+
+GENERIC_PACKAGE_TYPE_FIXUPS = {
+    'Consumable': 'Расходник',
+    'Tool': 'Инструмент',
+    'Module': 'Модуль',
+}
+
+REPLACEABLE_SEED_VALUES = {
+    'type': {
+        'breadboard',
+        'consumable',
+        'dev board',
+        'module',
+        'sensor',
+        'tool',
+    },
+}
+
+TEXT_FIXUPS.update({
+    # Инструменты: бейдж показывает не сырой Tool, а роль в лаборатории.
+    'cutter-flush': {'name': 'Бокорезы заподлицо', 'package_type': 'Ручной инструмент'},
+    'stripper-wire': {'name': 'Стриппер для проводов', 'package_type': 'Ручной инструмент'},
+    'tweezers-esd': {'name': 'ESD-пинцет прямой', 'package_type': 'Ручной инструмент'},
+    'tweezers-esd-curved': {'name': 'ESD-пинцет изогнутый', 'package_type': 'Ручной инструмент'},
+    'helping-hands': {'name': 'Держатель "третья рука"', 'package_type': 'Оснастка'},
+    'pcb-vice': {'name': 'Тиски для печатных плат', 'package_type': 'Оснастка'},
+    'loupe-30x': {'name': 'Инспекционная лупа 30×', 'package_type': 'Оснастка'},
+    'microscope-usb': {'name': 'USB-микроскоп', 'package_type': 'Оснастка'},
+    'iron-60w-t12': {'name': 'Паяльник T12, 60 Вт', 'package_type': 'Пайка'},
+    'iron-908s': {'name': 'Паяльник 908S', 'package_type': 'Пайка'},
+    'station-936': {'name': 'Паяльная станция 936', 'package_type': 'Пайка'},
+    'station-t12-oled': {'name': 'Паяльная станция T12 OLED', 'package_type': 'Пайка'},
+    'hotair-858d': {'name': 'Термофен 858D', 'package_type': 'Пайка'},
+    'rework-2in1': {'name': 'Ремонтная станция 2-в-1', 'package_type': 'Пайка'},
+    'lab-psu-30v-5a': {'name': 'Лабораторный БП 30 В 5 А', 'package_type': 'Питание'},
+    'lab-psu-60v-3a': {'name': 'Лабораторный БП 60 В 3 А', 'package_type': 'Питание'},
+    'generator-fy6800': {'name': 'Генератор сигналов FY6800', 'package_type': 'Измерение'},
+    'logic-analyzer-8ch': {'name': 'Логический анализатор 8 каналов', 'package_type': 'Измерение'},
+    'multimeter-dt830b': {'name': 'Мультиметр DT830B', 'package_type': 'Измерение'},
+    'multimeter-fluke-87v': {'name': 'Мультиметр Fluke 87V', 'package_type': 'Измерение'},
+    'multimeter-ut61e': {'name': 'Мультиметр UNI-T UT61E', 'package_type': 'Измерение'},
+    'osc-rigol-ds1054z': {'name': 'Осциллограф Rigol DS1054Z', 'package_type': 'Измерение'},
+    'osc-usb-ds213': {'name': 'Портативный осциллограф DS213', 'package_type': 'Измерение'},
+    'st-link-v2': {'name': 'Отладчик ST-Link V2', 'package_type': 'Отладка'},
+    'usbasp': {'name': 'AVR-программатор USBasp', 'package_type': 'Отладка'},
+
+    # Модули: название сразу объясняет назначение, а не только part number.
+    'arduino-uno-r3': {'name': 'Отладочная плата Arduino Uno R3', 'package_type': 'Отладочная плата'},
+    'arduino-nano': {'name': 'Отладочная плата Arduino Nano', 'package_type': 'Отладочная плата'},
+    'arduino-mega-2560': {'name': 'Отладочная плата Arduino Mega 2560', 'package_type': 'Отладочная плата'},
+    'arduino-leonardo': {'name': 'Отладочная плата Arduino Leonardo', 'package_type': 'Отладочная плата'},
+    'arduino-micro': {'name': 'Отладочная плата Arduino Micro', 'package_type': 'Отладочная плата'},
+    'esp32-devkit': {'name': 'Отладочная плата ESP32 DevKit', 'package_type': 'Отладочная плата'},
+    'esp32-s3': {'name': 'Отладочная плата ESP32-S3', 'package_type': 'Отладочная плата'},
+    'esp32-cam': {'name': 'Камера-модуль ESP32-CAM', 'package_type': 'Отладочная плата'},
+    'esp8266-nodemcu': {'name': 'Wi-Fi плата NodeMCU ESP8266', 'package_type': 'Отладочная плата'},
+    'esp8266-d1-mini': {'name': 'Wi-Fi плата ESP8266 D1 Mini', 'package_type': 'Отладочная плата'},
+    'stm32-bluepill': {'name': 'Отладочная плата STM32 Blue Pill', 'package_type': 'Отладочная плата'},
+    'rpi-pico': {'name': 'Микроконтроллерная плата Raspberry Pi Pico', 'package_type': 'Отладочная плата'},
+    'rpi-pico-w': {'name': 'Микроконтроллерная плата Raspberry Pi Pico W', 'package_type': 'Отладочная плата'},
+    'rpi-4b-4gb': {'name': 'Одноплатный компьютер Raspberry Pi 4B 4GB', 'package_type': 'SBC'},
+    'rpi-4b-8gb': {'name': 'Одноплатный компьютер Raspberry Pi 4B 8GB', 'package_type': 'SBC'},
+    'rpi-zero-2w': {'name': 'Одноплатный компьютер Raspberry Pi Zero 2 W', 'package_type': 'SBC'},
+    'bme280': {'name': 'Датчик BME280: температура, влажность, давление', 'package_type': 'Датчик'},
+    'bmp280': {'name': 'Датчик BMP280: температура и давление', 'package_type': 'Датчик'},
+    'dht11': {'name': 'Датчик температуры и влажности DHT11', 'package_type': 'Датчик'},
+    'dht22': {'name': 'Датчик температуры и влажности DHT22', 'package_type': 'Датчик'},
+    'hc-sr04': {'name': 'Ультразвуковой дальномер HC-SR04', 'package_type': 'Датчик'},
+    'hc-sr501': {'name': 'PIR-датчик движения HC-SR501', 'package_type': 'Датчик'},
+    'ldr-photores': {'name': 'Модуль фоторезистора LDR', 'package_type': 'Датчик'},
+    'max30102': {'name': 'Датчик пульса MAX30102', 'package_type': 'Датчик'},
+    'mpu6050': {'name': 'IMU MPU6050, 6 осей', 'package_type': 'Датчик'},
+    'mpu9250': {'name': 'IMU MPU9250, 9 осей', 'package_type': 'Датчик'},
+    'mq-2': {'name': 'Газовый датчик MQ-2', 'package_type': 'Датчик'},
+    'mq-135': {'name': 'Датчик качества воздуха MQ-135', 'package_type': 'Датчик'},
+    'tcs3200': {'name': 'Датчик цвета TCS3200', 'package_type': 'Датчик'},
+    'lcd1602-i2c': {'name': 'LCD-дисплей 1602 I2C', 'package_type': 'Дисплей'},
+    'lcd2004-i2c': {'name': 'LCD-дисплей 2004 I2C', 'package_type': 'Дисплей'},
+    'oled-096-i2c': {'name': 'OLED-дисплей 0.96" I2C', 'package_type': 'Дисплей'},
+    'oled-13-i2c': {'name': 'OLED-дисплей 1.3" I2C', 'package_type': 'Дисплей'},
+    'tft-144-spi': {'name': 'TFT-дисплей 1.44" SPI', 'package_type': 'Дисплей'},
+    'tft-24-touch': {'name': 'Сенсорный TFT-дисплей 2.4"', 'package_type': 'Дисплей'},
+})
+
+
+# Exact-value локализация для уже известных инженерных параметров. Команда
+# применяет ее и к новым спекам, и к старым значениям в базе без --force.
+VALUE_TRANSLATIONS = {
+    # Modules
+    'Dev board': 'Отладочная плата',
+    'MCU board': 'Плата микроконтроллера',
+    'Wi-Fi MCU board': 'Wi-Fi плата микроконтроллера',
+    'Camera MCU board': 'Плата ESP32 с камерой',
+    'SBC': 'Одноплатный компьютер',
+    'module': 'Модуль',
+    'sensor': 'Датчик',
+    'gas sensor': 'Газовый датчик',
+    'ultrasonic sensor': 'Ультразвуковой дальномер',
+    'PIR sensor': 'PIR-датчик движения',
+    'light sensor': 'Датчик освещенности',
+    'color sensor': 'Датчик цвета',
+    'temperature / humidity / pressure': 'температура / влажность / давление',
+    'temperature / pressure': 'температура / давление',
+    'temperature / humidity': 'температура / влажность',
+    '6-axis accel/gyro': '6-осевой акселерометр/гироскоп',
+    '9-axis accel/gyro/mag': '9-осевой IMU',
+    'pulse oximeter / heart rate': 'пульсоксиметр / пульс',
+    'LPG / smoke / methane': 'газ / дым / метан',
+    'air quality / NH3 / NOx / CO2 proxy': 'качество воздуха / NH3 / NOx / CO2',
+    'RGB reflected light': 'отраженный RGB-свет',
+    'analog / digital': 'аналоговый / цифровой',
+    'trigger/echo digital': 'trigger/echo, цифровой',
+    '1-Wire-like digital': 'цифровой 1-Wire-like',
+    'frequency output': 'частотный выход',
+    'analog divider': 'аналоговый делитель',
+    'digital output': 'цифровой выход',
+    'SPI / parallel': 'SPI / параллельный',
+    'около 150 мА heater': 'около 150 мА нагреватель',
+    'LCD module': 'LCD-дисплей',
+    'OLED module': 'OLED-дисплей',
+    'TFT display': 'TFT-дисплей',
+    'TFT touch display': 'TFT-дисплей с сенсором',
+
+    # Tools
+    'digital multimeter': 'Цифровой мультиметр',
+    'industrial multimeter': 'Промышленный мультиметр',
+    'digital oscilloscope': 'Цифровой осциллограф',
+    'portable oscilloscope': 'Портативный осциллограф',
+    'function generator': 'Генератор сигналов',
+    'logic analyzer': 'Логический анализатор',
+    'bench power supply': 'Лабораторный блок питания',
+    'soldering iron': 'Паяльник',
+    'soldering station': 'Паяльная станция',
+    'hot air station': 'Термовоздушная станция',
+    '2-in-1 rework station': 'Ремонтная станция 2-в-1',
+    'programmer/debugger': 'Программатор/отладчик',
+    'AVR programmer': 'AVR-программатор',
+    'USB microscope': 'USB-микроскоп',
+    'inspection loupe': 'Инспекционная лупа',
+    'PCB holder': 'Держатель плат',
+    'PCB vise': 'Тиски для плат',
+    'wire stripper': 'Стриппер для проводов',
+    'flush cutter': 'Бокорезы',
+    'ESD tweezers': 'ESD-пинцет',
+    'button cell': 'таблеточная батарейка',
+    'straight': 'прямой',
+    'curved': 'изогнутый',
+    'flush cut': 'плоский срез',
+
+    # Consumables
+    'tip cleaner': 'Очиститель жала',
+    'PCB cleaner': 'Очиститель плат',
+    'cleaner': 'Очиститель',
+    'solderless breadboard set': 'Набор макетных плат',
+    'solderless breadboard': 'Макетная плата',
+    'jumper wires': 'Перемычки Dupont',
+    'prototype PCB': 'Макетная PCB',
+    'solder paste': 'Паяльная паста',
+    'solder wire': 'Припой в проволоке',
+    'flux': 'Флюс',
+    'rosin flux': 'Канифольный флюс',
+    'heat-shrink tube': 'Термоусадочная трубка',
+    'heat-shrink kit': 'Набор термоусадки',
+    'hook-up wire': 'Монтажный провод',
+    'silicone wire': 'Силиконовый провод',
+    'paired wire': 'Двухжильный провод',
+    'desoldering braid': 'Оплетка для выпайки',
+    'desoldering pump': 'Вакуумный оловоотсос',
+    'insulating tape': 'Изолента',
+    'insulating tape set': 'Набор изоленты',
+    'ESD mat': 'Антистатический коврик',
+    'ESD wrist strap': 'Антистатический браслет',
+    'aluminum / plastic': 'алюминий / пластик',
+    'copper braid + flux': 'медная оплетка + флюс',
+    'brass wool': 'латунная стружка',
+    'polyolefin': 'полиолефин',
+    'red': 'красный',
+    'black': 'черный',
+    'red/black': 'красный / черный',
+    'multi': 'цветной набор',
+    'RMA': 'RMA-флюс',
+    'no-clean': 'безотмывочный',
+    'PTFE nozzle': 'PTFE-носик',
+    'T12 / 900M / Hakko-style tips': 'жала T12 / 900M / Hakko-совместимые',
+    'жала T12 / 900M / Hakko-style': 'жала T12 / 900M / Hakko-совместимые',
+    'banana / crocodile': 'банан / крокодил',
+    'banana / крокодил': 'банан / крокодил',
+    'dissipative rubber': 'рассеивающая резина',
+    'copper PVC': 'медь + PVC',
+    'tinned copper + silicone': 'луженая медь + силикон',
+    'ABS + phosphor bronze': 'ABS + фосфористая бронза',
+    'PCB / flux residues': 'PCB / остатки флюса',
+    '1 МОм safety resistor': '1 МОм защитный резистор',
+    '700 Вт hot air + 60 Вт iron': '700 Вт фен + 60 Вт паяльник',
+    'sine/square/triangle/pulse': 'синус / меандр / треугольник / импульс',
+    'basic ±0.05% DCV': 'базовая ±0.05% DCV',
+    'basic ±0.1% DCV': 'базовая ±0.1% DCV',
+    'basic ±0.5% DCV': 'базовая ±0.5% DCV',
+    'DC/AC V, DC A, R, diode': 'DC/AC V, DC A, R, диод',
+    'ABS / glass': 'ABS / стекло',
+
+    # REB
+    'rectifier diode': 'Выпрямительный диод',
+    'small-signal diode': 'Сигнальный диод',
+    'Schottky diode': 'Диод Шоттки',
+    'Zener diode': 'Стабилитрон',
+    'LED': 'Светодиод',
+    'op-amp': 'Операционный усилитель',
+    'dual op-amp': 'Двойной ОУ',
+    'quad op-amp': 'Счетверенный ОУ',
+    'dual JFET op-amp': 'Двойной JFET ОУ',
+    'audio amplifier': 'Аудиоусилитель',
+    'Timer': 'Таймер',
+    'linear regulator': 'Линейный стабилизатор',
+    'negative linear regulator': 'Отрицательный линейный стабилизатор',
+    'adjustable linear regulator': 'Регулируемый линейный стабилизатор',
+    'LDO regulator': 'LDO-стабилизатор',
+    'buck regulator': 'Понижающий DC-DC',
+    'boost regulator': 'Повышающий DC-DC',
+    'AVR MCU': 'AVR-микроконтроллер',
+    'I2C GPIO expander': 'I2C расширитель GPIO',
+    'RTC': 'Часы реального времени',
+    'temperature sensor': 'Датчик температуры',
+    'I2C EEPROM': 'I2C EEPROM',
+    '74HC CMOS logic': 'Логика 74HC CMOS',
+    'SMD power inductor': 'SMD силовой дроссель',
+    'axial inductor': 'Осевой дроссель',
+    'toroidal inductor': 'Тороидальный дроссель',
+    'power choke': 'силовой дроссель',
+    'USB-C receptacle': 'Разъем USB-C',
+    'USB Micro-B receptacle': 'Разъем USB Micro-B',
+    'USB-A receptacle': 'Разъем USB-A',
+    'JST XH connector': 'Разъем JST XH',
+    'pin header': 'Штыревой разъем',
+    'screw terminal block': 'Винтовая клемма',
+    'D-Sub connector': 'Разъем D-Sub',
+    'RJ45 connector': 'Разъем RJ45',
+    'DC barrel jack': 'Разъем питания DC',
+    'solid state relay': 'Твердотельное реле',
+    'power relay': 'Силовое реле',
+    'signal relay': 'Сигнальное реле',
+    'Logic N-MOSFET': 'Логический N-MOSFET',
+    'N-MOSFET': 'N-канальный MOSFET',
+    'P-MOSFET': 'P-канальный MOSFET',
+    'NPN Darlington': 'NPN Дарлингтон',
+    'thick-film resistor': 'Толстопленочный резистор',
+    'metal-film resistor': 'Металлопленочный резистор',
+    'thick film': 'толстая пленка',
+    'metal film': 'металлопленка',
+    '30 А surge': '30 А имп.',
+    '25 А surge': '25 А имп.',
+    '80 А surge': '80 А имп.',
+    '450 мА pulse': '450 мА имп.',
+    '600 мА pulse': '600 мА имп.',
+    '0.45 В typ': '0.45 В тип.',
+    '0.5 В typ': '0.5 В тип.',
+    '0.55 В typ': '0.55 В тип.',
+    '0.6 В typ': '0.6 В тип.',
+    '0.8 В max': '0.8 В макс.',
+    '44 мОм typ': '44 мОм тип.',
+    '117 мОм typ': '117 мОм тип.',
+    '22 мОм typ': '22 мОм тип.',
+    '52 мОм typ': '52 мОм тип.',
+    '85 мОм typ': '85 мОм тип.',
+    '3.5 Ом max': '3.5 Ом макс.',
+    '1000 typ': '1000 тип.',
+    '1.1 В typ': '1.1 В тип.',
+
+    # Seed artifact cleanup
+    'portable SSD': 'Внешний SSD',
+    'external portable': 'внешний портативный',
 }
 
 
@@ -551,10 +945,10 @@ SLUG_PARAMETER_OVERRIDES = {
     'station-936': {'type': 'soldering station', 'power': '60 Вт', 'temperature_range': '200...480 °C', 'tip_type': '900M', 'supply_voltage': '220 В'},
     'station-t12-oled': {'type': 'soldering station', 'power': '72 Вт', 'temperature_range': '180...480 °C', 'tip_type': 'T12', 'display': 'OLED'},
     'hotair-858d': {'type': 'hot air station', 'power': '700 Вт', 'temperature_range': '100...500 °C', 'airflow': 'до 120 л/мин', 'supply_voltage': '220 В'},
-    'rework-2in1': {'type': '2-in-1 rework station', 'power': '700 Вт hot air + 60 Вт iron', 'temperature_range': '100...500 °C / 200...480 °C', 'airflow': 'регулируемый'},
-    'st-link-v2': {'type': 'programmer/debugger', 'interface': 'SWD / SWIM / USB', 'logic_level': '3.3 В', 'compatibility': 'STM8 / STM32'},
-    'usbasp': {'type': 'AVR programmer', 'interface': 'USB / ISP', 'logic_level': '5 В / 3.3 В', 'compatibility': 'AVR ATmega / ATtiny'},
-    'microscope-usb': {'type': 'USB microscope', 'magnification': '50...1000×', 'resolution': 'до 1080p', 'interface': 'USB'},
+    'rework-2in1': {'type': '2-in-1 rework station', 'power': '700 Вт hot air + 60 Вт iron', 'temperature_range': '100...500 °C / 200...480 °C', 'airflow': 'регулируемый', 'tip_type': 'фен + паяльник'},
+    'st-link-v2': {'type': 'programmer/debugger', 'interface': 'SWD / SWIM / USB', 'logic_level': '3.3 В', 'compatibility': 'STM8 / STM32', 'mode': 'отладка / прошивка'},
+    'usbasp': {'type': 'AVR programmer', 'interface': 'USB / ISP', 'logic_level': '5 В / 3.3 В', 'compatibility': 'AVR ATmega / ATtiny', 'mode': 'прошивка ISP'},
+    'microscope-usb': {'type': 'USB microscope', 'magnification': '50...1000×', 'resolution': 'до 1080p', 'interface': 'USB', 'light': 'LED-подсветка'},
     'loupe-30x': {'type': 'inspection loupe', 'magnification': '30×', 'light': 'LED', 'material': 'ABS / glass', 'battery': 'button cell'},
     'helping-hands': {'type': 'PCB holder', 'material': 'металл', 'configuration': 'крокодилы + лупа', 'magnification': '2×', 'board_size': 'малые платы'},
     'pcb-vice': {'type': 'PCB vise', 'material': 'алюминий / пластик', 'board_size': 'до 200 мм', 'configuration': 'регулируемый зажим', 'rotation': '360°'},
@@ -575,25 +969,25 @@ SLUG_PARAMETER_OVERRIDES = {
     'solder-paste-138': {'type': 'solder paste', 'material': 'Sn42Bi58', 'melting_point': '138 °C', 'weight': '30 г', 'package': 'шприц'},
     'solder-lead-free-100g': {'type': 'solder wire', 'material': 'SnAgCu', 'diameter': '0.8 мм', 'weight': '100 г', 'flux_core': 'есть'},
     'solder-60-40-100g': {'type': 'solder wire', 'material': 'Sn60Pb40', 'diameter': '1.0 мм', 'weight': '100 г', 'flux_core': 'есть'},
-    'flux-no-clean': {'type': 'flux', 'material': 'no-clean', 'volume': '10 мл', 'application': 'SMD/THT пайка'},
-    'flux-rma-50ml': {'type': 'flux', 'material': 'RMA', 'volume': '50 мл', 'application': 'ремонт / ручная пайка'},
-    'flux-rosin-30g': {'type': 'rosin flux', 'material': 'канифоль', 'weight': '30 г', 'application': 'лужение / пайка проводов'},
+    'flux-no-clean': {'type': 'flux', 'material': 'no-clean', 'volume': '10 мл', 'application': 'SMD/THT пайка', 'compatibility': 'микросхемы / SMD'},
+    'flux-rma-50ml': {'type': 'flux', 'material': 'RMA', 'volume': '50 мл', 'application': 'ремонт / ручная пайка', 'compatibility': 'PCB / провода'},
+    'flux-rosin-30g': {'type': 'rosin flux', 'material': 'канифоль', 'weight': '30 г', 'application': 'лужение / пайка проводов', 'compatibility': 'THT / провода'},
     'alcohol-ipa-100ml': {'type': 'cleaner', 'material': 'изопропиловый спирт', 'volume': '100 мл', 'purity': '99%', 'application': 'очистка плат'},
     'pcb-cleaner-200ml': {'type': 'PCB cleaner', 'volume': '200 мл', 'material': 'очиститель для электроники', 'compatibility': 'PCB / flux residues', 'application': 'удаление флюса / очистка плат'},
     'heat-shrink-2mm-1m': {'type': 'heat-shrink tube', 'material': 'polyolefin', 'diameter': '2 мм', 'length': '1 м', 'shrink_ratio': '2:1'},
-    'heat-shrink-kit': {'type': 'heat-shrink kit', 'material': 'polyolefin', 'diameter': '1...10 мм', 'shrink_ratio': '2:1'},
+    'heat-shrink-kit': {'type': 'heat-shrink kit', 'material': 'polyolefin', 'diameter': '1...10 мм', 'shrink_ratio': '2:1', 'color': 'multi'},
     'wire-cu-22awg-red-5m': {'type': 'hook-up wire', 'material': 'copper PVC', 'gauge': '22 AWG', 'length': '5 м', 'color': 'red'},
     'wire-cu-22awg-black-5m': {'type': 'hook-up wire', 'material': 'copper PVC', 'gauge': '22 AWG', 'length': '5 м', 'color': 'black'},
-    'wire-silicon-18awg-1m': {'type': 'silicone wire', 'material': 'tinned copper + silicone', 'gauge': '18 AWG', 'length': '1 м'},
-    'wire-pair-2x05mm': {'type': 'paired wire', 'material': 'copper PVC', 'section': '2×0.5 мм²', 'length': '1 м'},
-    'solder-wick-2mm': {'type': 'desoldering braid', 'material': 'copper braid + flux', 'width': '2 мм', 'length': '1.5 м'},
-    'solder-wick-3mm': {'type': 'desoldering braid', 'material': 'copper braid + flux', 'width': '3 мм', 'length': '1.5 м'},
+    'wire-silicon-18awg-1m': {'type': 'silicone wire', 'material': 'tinned copper + silicone', 'gauge': '18 AWG', 'length': '1 м', 'temperature_range': '-60...+200 °C'},
+    'wire-pair-2x05mm': {'type': 'paired wire', 'material': 'copper PVC', 'section': '2×0.5 мм²', 'length': '1 м', 'color': 'red/black'},
+    'solder-wick-2mm': {'type': 'desoldering braid', 'material': 'copper braid + flux', 'width': '2 мм', 'length': '1.5 м', 'flux_core': 'есть'},
+    'solder-wick-3mm': {'type': 'desoldering braid', 'material': 'copper braid + flux', 'width': '3 мм', 'length': '1.5 м', 'flux_core': 'есть'},
     'desolder-pump': {'type': 'desoldering pump', 'material': 'aluminum / plastic', 'length': '190 мм', 'tip_type': 'PTFE nozzle', 'application': 'удаление припоя'},
     'solder-tip-cleaner': {'type': 'tip cleaner', 'material': 'brass wool', 'size': '65 мм', 'compatibility': 'T12 / 900M / Hakko-style tips', 'application': 'очистка жала'},
     'electrical-tape-blk': {'type': 'insulating tape', 'material': 'PVC', 'width': '19 мм', 'length': '10 м', 'color': 'black'},
     'electrical-tape-color': {'type': 'insulating tape set', 'material': 'PVC', 'width': '19 мм', 'length': '5×10 м', 'color': 'multi'},
-    'esd-mat-30x60': {'type': 'ESD mat', 'material': 'dissipative rubber', 'size': '30×60 см', 'resistance': '10^6...10^9 Ом'},
-    'esd-wrist-strap': {'type': 'ESD wrist strap', 'resistance': '1 МОм safety resistor', 'length': '1.8 м', 'connector': 'banana / crocodile'},
+    'esd-mat-30x60': {'type': 'ESD mat', 'material': 'dissipative rubber', 'size': '30×60 см', 'resistance': '10^6...10^9 Ом', 'safety': 'ESD'},
+    'esd-wrist-strap': {'type': 'ESD wrist strap', 'resistance': '1 МОм safety resistor', 'length': '1.8 м', 'connector': 'banana / crocodile', 'safety': 'ESD / 1 МОм'},
     't1-ok': {
         'type': 'portable SSD',
         'capacity': '1 ТБ',
@@ -606,6 +1000,16 @@ SLUG_PARAMETER_OVERRIDES = {
         'weight': '58 г',
     },
 }
+
+
+def localize_parameter_value(value):
+    if isinstance(value, str):
+        return VALUE_TRANSLATIONS.get(value, value)
+    return value
+
+
+def localize_specs(specs: dict) -> dict:
+    return {key: localize_parameter_value(value) for key, value in specs.items()}
 
 
 def build_product_specs(product) -> dict:
@@ -622,15 +1026,27 @@ def build_product_specs(product) -> dict:
             break
 
     specs.update(SLUG_PARAMETER_OVERRIDES.get(product.slug, {}))
-    return specs
+    return localize_specs(specs)
+
+
+def should_replace_seed_value(key: str, current, new_value) -> bool:
+    """Allow slug-specific specs to replace old generic seed placeholders."""
+    if new_value in (None, ''):
+        return False
+    seed_values = REPLACEABLE_SEED_VALUES.get(key, set())
+    return str(current or '').strip().lower() in seed_values
 
 
 def apply_text_fixups(product) -> list[str]:
     fix = TEXT_FIXUPS.get(product.slug)
     changed_fields = []
-    if not fix:
+    fix_items = dict(fix or {})
+    package_fix = GENERIC_PACKAGE_TYPE_FIXUPS.get(product.package_type)
+    if package_fix and 'package_type' not in fix_items:
+        fix_items['package_type'] = package_fix
+    if not fix_items:
         return changed_fields
-    for field, value in fix.items():
+    for field, value in fix_items.items():
         if getattr(product, field) != value:
             setattr(product, field, value)
             changed_fields.append(field)
@@ -658,14 +1074,21 @@ class Command(BaseCommand):
 
         for p in Product.objects.select_related('category').all():
             text_fields = apply_text_fixups(p)
-            current = dict(p.parameters or {})
+            original = dict(p.parameters or {})
+            current = localize_specs(original)
             had_app = bool(current.get('applications'))
             specs = build_product_specs(p)
             if not specs:
-                if text_fields:
-                    p.save(update_fields=text_fields)
+                update_fields = list(text_fields)
+                if current != original:
+                    p.parameters = current
+                    update_fields.append('parameters')
+                if update_fields:
+                    p.save(update_fields=update_fields)
                     updated += 1
-                    self._write(f'  {p.name[:50]:<50} -> fixed text fields: {", ".join(text_fields)}')
+                    self._write(
+                        f'  {p.name[:50]:<50} -> fixed: {", ".join(update_fields)}'
+                    )
                 else:
                     skipped += 1
                 continue
@@ -674,11 +1097,11 @@ class Command(BaseCommand):
             for key, value in specs.items():
                 if value in (None, ''):
                     continue
-                if force or merged.get(key) in (None, ''):
+                if force or merged.get(key) in (None, '') or should_replace_seed_value(key, merged.get(key), value):
                     merged[key] = value
 
             update_fields = list(text_fields)
-            if merged != current:
+            if merged != original:
                 p.parameters = merged
                 update_fields.append('parameters')
 

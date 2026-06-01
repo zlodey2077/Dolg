@@ -1,6 +1,14 @@
 from django.urls import path
 
-from . import chat_views, ml_admin_views, org_views, sso_views, two_factor_views, views
+from . import (
+    chat_views,
+    ml_admin_views,
+    org_views,
+    sso_views,
+    two_factor_views,
+    views,
+    views_blocks,
+)
 
 app_name = "hello"
 
@@ -28,6 +36,13 @@ urlpatterns = [
 
     # Projects JSON API
     path("projects/api/list/", views.api_projects_list, name="api_projects_list"),
+
+    # 2026-06-02 Lithium ECAD killer: Functional Blocks API
+    path("api/blocks/",                 views_blocks.api_blocks_list,   name="api_blocks_list"),
+    path("api/blocks/create/",          views_blocks.api_blocks_create, name="api_blocks_create"),
+    path("api/blocks/<int:block_id>/",  views_blocks.api_blocks_detail, name="api_blocks_detail"),
+    path("api/blocks/<int:block_id>/use/", views_blocks.api_blocks_use, name="api_blocks_use"),
+    path("api/blocks/<int:block_id>/delete/", views_blocks.api_blocks_delete, name="api_blocks_delete"),
     path("projects/api/create/", views.api_project_create, name="api_project_create"),
     path("projects/api/<int:pk>/update/", views.api_project_update, name="api_project_update"),
     path("projects/api/<int:pk>/delete/", views.api_project_delete, name="api_project_delete"),
