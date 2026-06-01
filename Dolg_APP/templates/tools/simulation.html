@@ -8390,11 +8390,17 @@ function escapeHtml(s) {
 // Экспорт схемы в PNG. Рендерит текущее содержимое canvas с белым фоном
 // и bounding box'ом всех компонентов, не завися от pan/zoom.
 // =============================================================
-function exportSchemePng() {
+function exportSchemePng(options) {
     if (components.length === 0) {
         showNotification('⚠️ Схема пуста', 'warning');
         return;
     }
+    options = options || {};
+    // 2026-06-02 Lithium-killer: ЕСКД-рамка (опционально)
+    const withEskd = options.eskd !== false && options.eskd !== undefined ? options.eskd
+                   : window.confirm('Добавить ЕСКД-рамку (ГОСТ 2.104) с основной надписью?\n\nНУжно для дипломной работы / КД.');
+    const paperSize = options.paper || 'A4';
+
     // Bounding box всех компонентов в мировых координатах
     const PAD = 50;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -8404,8 +8410,15 @@ function exportSchemePng() {
         maxX = Math.max(maxX, c.x + COMPONENT_WIDTH * 1.5);
         maxY = Math.max(maxY, c.y + COMPONENT_HEIGHT * 1.5);
     });
-    const w = Math.ceil(maxX - minX + PAD * 2);
-    const h = Math.ceil(maxY - minY + PAD * 2);
+    const schemeW = Math.ceil(maxX - minX + PAD * 2);
+    const schemeH = Math.ceil(maxY - minY + PAD * 2);
+    let w = schemeW, h = schemeH;
+    let frameOffsetX = 0, frameOffsetY = 0;
+    if (withEskd) {
+        const mm = ESKD_PAPER_MM[paperSize] || ESKD_PAPER_MM.A4;
+        w = mm.w * ESKD_MM_TO_PX;
+        h = mm.h * ESKD_MM_TO_PX;
+    }
 
     // Внеэкранный canvas
     const off = document.createElement('canvas');
@@ -8413,7 +8426,23 @@ function exportSchemePng() {
     const offCtx = off.getContext('2d');
     offCtx.fillStyle = '#ffffff';
     offCtx.fillRect(0, 0, w, h);
-    offCtx.translate(PAD - minX, PAD - minY);
+
+    // Сначала рисуем рамку (она устанавливает свой transform до translate scheme)
+    if (withEskd) {
+        const meta = _getEskdMeta();
+        const eskdInfo = _drawEskdFrame(offCtx, paperSize, meta);
+        // Вписываем схему в content-area с пропорциональным масштабом
+        const ca = eskdInfo.contentArea;
+        const scale = Math.min(ca.w / schemeW, ca.h / schemeH) * 0.95;
+        frameOffsetX = ca.x + (ca.w - schemeW * scale) / 2;
+        frameOffsetY = ca.y + (ca.h - schemeH * scale) / 2;
+        offCtx.save();
+        offCtx.translate(frameOffsetX, frameOffsetY);
+        offCtx.scale(scale, scale);
+        offCtx.translate(PAD - minX, PAD - minY);
+    } else {
+        offCtx.translate(PAD - minX, PAD - minY);
+    }
 
     // Сохраняем текущий ctx/zoom, подменяем на offCtx
     const savedCtx = ctx, savedZoom = zoom, savedPan = { x: panX, y: panY };
@@ -8436,6 +8465,10 @@ function exportSchemePng() {
         components.forEach(comp => drawComponent(comp, false));
     } finally {
         ctx = savedCtx; zoom = savedZoom; panX = savedPan.x; panY = savedPan.y;
+        // Закрываем save() из eskd-блока если был
+        if (withEskd) {
+            try { offCtx.restore(); } catch (_e) {}
+        }
         drawCanvas();
     }
 
@@ -8453,6 +8486,97 @@ function exportSchemePng() {
         showNotification('✓ Схема сохранена в PNG', 'success');
     }, 'image/png');
 }
+
+// 2026-06-02 Lithium-killer: рамка по ГОСТ 2.104-2006 для экспорта схемы.
+// Рисует внешнюю рамку 20мм слева + 5мм с остальных сторон, основную надпись
+// в правом нижнем углу (форма 1, 185×55мм).
+// ctx: уже спозиционированный для бумаги (origin = 0,0 paper, расширения в px).
+// paperSize: 'A4' | 'A3' | 'A2' | 'A1'
+// meta: { name, designer, reviewer, date, doc_number }
+// На 1мм = 4 пикселя (логично для 200-300 DPI экспорта).
+const ESKD_PAPER_MM = {
+    A4: { w: 297, h: 210 },  // landscape default
+    A3: { w: 420, h: 297 },
+    A2: { w: 594, h: 420 },
+    A1: { w: 841, h: 594 },
+};
+const ESKD_MM_TO_PX = 4;
+
+function _drawEskdFrame(ctx, paperSize, meta) {
+    const mm = ESKD_PAPER_MM[paperSize] || ESKD_PAPER_MM.A4;
+    const K = ESKD_MM_TO_PX;
+    const W = mm.w * K, H = mm.h * K;
+    meta = meta || {};
+
+    // Внешняя рамка (5мм с трёх сторон, 20мм слева)
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    const L = 20 * K, M = 5 * K;
+    ctx.strokeRect(L, M, W - L - M, H - 2 * M);
+
+    // Основная надпись справа-внизу (форма 1 ГОСТ 2.104-2006: 185×55мм)
+    const TBL_W = 185 * K, TBL_H = 55 * K;
+    const tx = W - M - TBL_W, ty = H - M - TBL_H;
+    ctx.strokeRect(tx, ty, TBL_W, TBL_H);
+
+    // Делим на ячейки. Упрощённая версия (не все клетки формы 1).
+    ctx.font = `${4 * K}px Arial`;
+    ctx.fillStyle = '#000';
+
+    // Верхняя полоса — название документа
+    const rowH = TBL_H / 5;
+    for (let i = 1; i < 5; i++) {
+        ctx.beginPath();
+        ctx.moveTo(tx, ty + rowH * i);
+        ctx.lineTo(tx + TBL_W, ty + rowH * i);
+        ctx.stroke();
+    }
+    // Левый столбец 70мм (метки) + правый 115мм (значения)
+    const colSplit = tx + 70 * K;
+    ctx.beginPath();
+    ctx.moveTo(colSplit, ty);
+    ctx.lineTo(colSplit, ty + TBL_H);
+    ctx.stroke();
+
+    // Заполнение
+    const labels = ['Изм.', 'Лист', 'Дата', 'Разраб.', 'Пров.'];
+    const values = [
+        meta.doc_number || 'DOLG-' + new Date().getFullYear(),
+        '1',
+        meta.date || new Date().toISOString().slice(0, 10),
+        meta.designer || '—',
+        meta.reviewer || '—',
+    ];
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    for (let i = 0; i < 5; i++) {
+        ctx.fillText(labels[i], tx + 2 * K, ty + rowH * i + rowH / 2);
+        ctx.fillText(values[i], colSplit + 2 * K, ty + rowH * i + rowH / 2);
+    }
+    // Заголовок документа (по центру правого столбца верхней строки)
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${5 * K}px Arial`;
+    ctx.fillText(meta.name || 'Принципиальная схема', colSplit + (TBL_W - 70 * K) / 2, ty + rowH / 2 - rowH * 0.3);
+    ctx.font = `${3.5 * K}px Arial`;
+    ctx.fillText('Схема электрическая принципиальная', colSplit + (TBL_W - 70 * K) / 2, ty + rowH / 2 + rowH * 0.3);
+
+    return { W, H, contentArea: { x: L, y: M, w: W - L - M, h: H - 2 * M - TBL_H } };
+}
+window._drawEskdFrame = _drawEskdFrame;
+
+function _getEskdMeta() {
+    // Берём из currentProject.eskd_meta если есть, иначе defaults
+    const proj = window.currentProject || {};
+    const eskd = (proj && proj.eskd_meta) || {};
+    return {
+        name: eskd.name || proj.name || 'Принципиальная схема',
+        designer: eskd.designer || (proj.author && proj.author.username) || '',
+        reviewer: eskd.reviewer || '',
+        date: eskd.date || new Date().toISOString().slice(0, 10),
+        doc_number: eskd.doc_number || ('DOLG-' + Date.now().toString().slice(-6)),
+    };
+}
+window._getEskdMeta = _getEskdMeta;
 
 function componentBounds() {
     const PAD = 50;
