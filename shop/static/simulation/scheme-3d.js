@@ -703,6 +703,12 @@
     // Cross-probing: id выбранного в 2D-схеме компонента и его overlay-mesh.
     let _highlightedId = null;
     let _highlightMesh = null;
+    // 2026-06-02 Lithium-killer: переменные для pulse-анимации highlight'а и
+    // плавного перемещения камеры controls.target к выбранному компоненту.
+    let _highlightPulseStart = 0;
+    let _highlightFocusFrom = null;
+    let _highlightFocusTo = null;
+    let _highlightFocusStart = 0;
     let _layoutReport = null;
     let _hoverables = [];
     let _raycaster = null;
@@ -1137,6 +1143,28 @@
 
     function tick() {
         if (!_renderer || !_scene || !_camera) return;
+        // 2026-06-02 Lithium-killer: pulse + focus анимация для highlight.
+        if (_highlightMesh && _highlightMesh.material && _highlightPulseStart) {
+            const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+            const phase = ((now - _highlightPulseStart) % 1200) / 1200;  // 0..1 за 1.2с
+            // cosine-волна opacity 0.45 → 1.0 → 0.45
+            const op = 0.45 + 0.55 * (0.5 + 0.5 * Math.cos(phase * Math.PI * 2));
+            _highlightMesh.material.opacity = op;
+            // Scale-волна: ±5% размера для пульса
+            const sc = 1 + 0.05 * Math.sin(phase * Math.PI * 2);
+            _highlightMesh.scale.set(sc, sc, sc);
+        }
+        // Плавный focus camera target → центр выбранного компонента (300мс ease)
+        if (_highlightFocusTo && _controls && _controls.target) {
+            const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+            const t = Math.min(1, (now - _highlightFocusStart) / 300);
+            const eased = 1 - (1 - t) * (1 - t);  // easeOutQuad
+            _controls.target.lerpVectors(_highlightFocusFrom, _highlightFocusTo, eased);
+            if (t >= 1) {
+                _highlightFocusFrom = null;
+                _highlightFocusTo = null;
+            }
+        }
         if (_controls) _controls.update();
         _renderer.render(_scene, _camera);
     }
@@ -1349,6 +1377,15 @@
         _root.add(wire);
         _highlightMesh = wire;
         _highlightedId = componentId;
+        // 2026-06-02 Lithium-killer: pulse-animation для wow-эффекта на защите.
+        // Opacity cycling 0.4 → 1.0 каждые 600мс через tick() → cosine wave.
+        _highlightPulseStart = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+        // Camera focus на компонент — плавное смещение controls.target.
+        if (_controls && _controls.target) {
+            _highlightFocusFrom = _controls.target.clone();
+            _highlightFocusTo = center.clone();
+            _highlightFocusStart = _highlightPulseStart;
+        }
         return true;
     }
 
@@ -1360,6 +1397,10 @@
             _highlightMesh = null;
         }
         _highlightedId = null;
+        // 2026-06-02 Lithium-killer: сбрасываем pulse/focus state
+        _highlightPulseStart = 0;
+        _highlightFocusFrom = null;
+        _highlightFocusTo = null;
     }
 
     function getHighlightedComponentId() {
