@@ -322,6 +322,22 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                             <div class="hm-section-title">⚙ Вид и настройки</div>
                             <div class="hm-section-body" id="hm-section-view"></div>
                         </div>
+                        {# 2026-06-02 Lithium-killer: фильтр видимости уровней цепей #}
+                        <div class="hm-section">
+                            <div class="hm-section-title">🎚 Уровни цепей</div>
+                            <div class="hm-section-body">
+                                <div id="netLevelsFilterBox" class="net-levels-filter-box"></div>
+                                <div style="display:flex; gap:6px; margin-top:6px;">
+                                    <button type="button" class="tdm-item tdm-item--compact" onclick="showAllNetLevels()">
+                                        Показать все
+                                    </button>
+                                </div>
+                                <small style="color:#94a3b8; display:block; margin-top:4px; line-height:1.35;">
+                                    Скрой GND/Power чтобы видеть только signal flow.<br>
+                                    ПКМ на провод → 🎚 Уровень цепи 1-10.
+                                </small>
+                            </div>
+                        </div>
                         <div class="hm-section">
                             <div class="hm-section-title">📁 Файл</div>
                             <div class="hm-section-body" id="hm-section-file"></div>
@@ -862,6 +878,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="editWaypoints()">📐 Редактировать путь</button>
             <button onclick="setWireNetLabel(); hideContextMenu();">🏷 Имя net'а (VCC, OUT, …)</button>
             <button onclick="probeThisWire(); hideContextMenu();">📍 Probe этот net (вольтметр)</button>
+            {# 2026-06-02 Lithium-killer: уровень цепи 1-10 #}
+            <button onclick="window._openNetLevelDialog && window._openNetLevelDialog(); hideContextMenu();">🎚 Уровень цепи…</button>
         </div>
     </div>
 
@@ -1795,6 +1813,34 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     color: #6c7388;
     font-size: 0.72rem;
     line-height: 1.3;
+}
+/* 2026-06-02 Lithium-killer: фильтр уровней цепей в hamburger menu */
+.net-levels-filter-box {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    padding: 4px 0;
+}
+.net-level-chip {
+    background: rgba(20, 25, 40, 0.7);
+    border: 1px solid rgba(0, 212, 255, 0.18);
+    color: #6c7388;
+    border-radius: 4px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: all 0.15s;
+}
+.net-level-chip:hover {
+    border-color: rgba(0, 212, 255, 0.45);
+    color: #94a3b8;
+}
+.net-level-chip.active {
+    background: rgba(0, 212, 255, 0.18);
+    border-color: rgba(0, 212, 255, 0.6);
+    color: var(--accent-cyan, #00d4ff);
+    box-shadow: 0 0 6px rgba(0, 212, 255, 0.3);
 }
 /* В drawer'е компоненты возвращаются к двухстрочному виду (название + R/C/...)
    — текст «Резистор» виден, не скрыт как в icon-only toolbar mode. */
@@ -6686,6 +6732,10 @@ function drawCanvas() {
         const toComp = compById.get(conn.to.compId);
         if (!fromComp || !toComp) return;
         if (!_isOnCurrentSheet(fromComp) || !_isOnCurrentSheet(toComp)) return;
+        // 2026-06-02 Lithium-killer: фильтр по уровню цепи (1-10).
+        // window._visibleNetLevels — Set уровней которые видны (default = all).
+        const level = conn.level || 1;
+        if (window._visibleNetLevels && !window._visibleNetLevels.has(level)) return;
         const fromPos = getPortWorldPosition(fromComp, conn.from.portId);
         const toPos = getPortWorldPosition(toComp, conn.to.portId);
         if (fromPos && toPos) {
@@ -10792,6 +10842,86 @@ async function insertFunctionalBlock(blockId, atX, atY) {
 }
 window.insertFunctionalBlock = insertFunctionalBlock;
 
+// ──────────── 2026-06-02 Lithium-killer: Уровни цепей (level 1-10) ────────────
+// Каждое соединение имеет conn.level (default 1). UI-фильтр в floating-toolbar.
+// Скрытые уровни не рисуются на канвасе (см. filter в connections.forEach).
+window._visibleNetLevels = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+try {
+    const saved = localStorage.getItem('dolg.visibleNetLevels');
+    if (saved) {
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr)) window._visibleNetLevels = new Set(arr.map(Number));
+    }
+} catch (_e) {}
+
+function _openNetLevelDialog() {
+    if (!selectedConnection) {
+        if (typeof showNotification === 'function') showNotification('Сначала выдели провод', 'warning');
+        return;
+    }
+    const current = selectedConnection.level || 1;
+    const lvl = window.prompt(
+        'Уровень цепи (1-10):\n\n' +
+        '1 — питание (Power)\n' +
+        '2 — сигнал основной\n' +
+        '3 — GND\n' +
+        '4-9 — пользовательские\n' +
+        '10 — отладочные\n\n' +
+        'Можно фильтровать видимость через ☰ → 🎚 Фильтр уровней.',
+        String(current)
+    );
+    if (lvl === null) return;
+    const n = parseInt(lvl);
+    if (!Number.isInteger(n) || n < 1 || n > 10) {
+        if (typeof showNotification === 'function') showNotification('Уровень должен быть от 1 до 10', 'error');
+        return;
+    }
+    selectedConnection.level = n;
+    if (typeof snapshotScheme === 'function') snapshotScheme();
+    if (typeof drawCanvas === 'function') drawCanvas();
+    if (typeof showNotification === 'function') showNotification(`🎚 Уровень цепи: ${n}`, 'success');
+}
+window._openNetLevelDialog = _openNetLevelDialog;
+
+function toggleNetLevelVisibility(level) {
+    if (window._visibleNetLevels.has(level)) {
+        window._visibleNetLevels.delete(level);
+    } else {
+        window._visibleNetLevels.add(level);
+    }
+    try {
+        localStorage.setItem('dolg.visibleNetLevels', JSON.stringify(Array.from(window._visibleNetLevels)));
+    } catch (_e) {}
+    if (typeof drawCanvas === 'function') drawCanvas();
+    _refreshNetLevelsUI();
+}
+window.toggleNetLevelVisibility = toggleNetLevelVisibility;
+
+function _refreshNetLevelsUI() {
+    const box = document.getElementById('netLevelsFilterBox');
+    if (!box) return;
+    box.innerHTML = '';
+    for (let i = 1; i <= 10; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'net-level-chip' + (window._visibleNetLevels.has(i) ? ' active' : '');
+        btn.textContent = i;
+        const labels = {1:'Power',2:'Signal',3:'GND',10:'Debug'};
+        if (labels[i]) btn.title = `${i} — ${labels[i]}`;
+        btn.onclick = () => toggleNetLevelVisibility(i);
+        box.appendChild(btn);
+    }
+}
+window._refreshNetLevelsUI = _refreshNetLevelsUI;
+
+function showAllNetLevels() {
+    window._visibleNetLevels = new Set([1,2,3,4,5,6,7,8,9,10]);
+    try { localStorage.removeItem('dolg.visibleNetLevels'); } catch (_e) {}
+    if (typeof drawCanvas === 'function') drawCanvas();
+    _refreshNetLevelsUI();
+}
+window.showAllNetLevels = showAllNetLevels;
+
 // Загружает список блоков и рендерит в drawer
 async function _refreshBlocksDrawer() {
     const list = document.getElementById('functionalBlocksList');
@@ -10862,6 +10992,8 @@ window._deleteBlock = _deleteBlock;
 // Drag-n-drop в канвас: при drop на канвас вставляем блок в координаты курсора
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(_refreshBlocksDrawer, 600);
+    // 2026-06-02 Lithium-killer: render фильтра уровней цепей
+    setTimeout(() => { if (window._refreshNetLevelsUI) window._refreshNetLevelsUI(); }, 400);
     const cv = document.getElementById('schematicCanvas');
     if (cv) {
         cv.addEventListener('dragover', (e) => {
