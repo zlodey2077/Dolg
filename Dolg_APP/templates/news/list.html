@@ -1,0 +1,70 @@
+{% extends "shop/base.html" %}
+{% load static %}
+
+{% block title %}📰 Новости DOLG{% endblock %}
+
+{% block content %}
+<div class="container my-lg">
+    <header style="margin-bottom: 1.5rem;">
+        <h1 style="color: var(--accent-cyan); margin: 0 0 .3rem 0;">📰 Новости DOLG</h1>
+        <p style="color: #94a3b8; margin: 0; font-size: 0.92rem;">
+            Релизы, плановые работы, объявления.
+        </p>
+    </header>
+
+    {% if announcements %}
+    <div class="news-list" style="display: flex; flex-direction: column; gap: 14px;">
+        {% for ann in announcements %}
+        <article class="news-item news-level-{{ ann.level }}{% if ann.is_pinned %} news-pinned{% endif %}"
+                 style="background: linear-gradient(135deg, rgba(10, 14, 39, 0.85), rgba(20, 30, 60, 0.85));
+                        border: 1px solid rgba(0, 212, 255, 0.25);
+                        border-radius: 10px;
+                        padding: 18px 22px;
+                        {% if ann.is_pinned %}border-color: rgba(255, 198, 100, 0.55);{% endif %}
+                        {% if ann.level == 'warning' %}border-left: 4px solid #ffd595;{% endif %}
+                        {% if ann.level == 'critical' %}border-left: 4px solid #ff9090;{% endif %}">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                {% if ann.is_pinned %}<span style="color: #ffd595; font-size: 0.85rem;">📌 закреплено</span>{% endif %}
+                <span style="color: #94a3b8; font-size: 0.78rem;">
+                    {{ ann.created_at|date:"d M Y, H:i" }}
+                </span>
+                {% if ann.author %}
+                    <span style="color: #94a3b8; font-size: 0.78rem;">· {{ ann.author.username }}</span>
+                {% endif %}
+                {% if ann.level == 'warning' %}<span style="color: #ffd595; font-size: 0.78rem;">⚠ Предупреждение</span>{% endif %}
+                {% if ann.level == 'critical' %}<span style="color: #ff9090; font-size: 0.78rem;">🔴 Критично</span>{% endif %}
+            </div>
+            <h2 style="margin: 0 0 8px 0; color: #e6e9ef; font-size: 1.15rem;">{{ ann.title }}</h2>
+            <div style="color: #cfd6e0; line-height: 1.55; font-size: 0.95rem; white-space: pre-wrap;">{{ ann.body|linebreaksbr }}</div>
+        </article>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav style="margin-top: 24px; display: flex; gap: 8px; justify-content: center;">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}"
+               style="color: var(--accent-cyan); padding: 6px 12px; border: 1px solid rgba(0,212,255,0.3); border-radius: 6px;">← Предыдущая</a>
+        {% endif %}
+        <span style="color: #94a3b8; padding: 6px 12px;">
+            Страница {{ page_obj.number }} из {{ paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}"
+               style="color: var(--accent-cyan); padding: 6px 12px; border: 1px solid rgba(0,212,255,0.3); border-radius: 6px;">Следующая →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div style="text-align: center; padding: 60px 20px; color: #6c7388;">
+        <div style="font-size: 4rem; margin-bottom: 16px;">📭</div>
+        <h2 style="color: #94a3b8; margin-bottom: 8px;">Пока нет новостей</h2>
+        <p>Новости появятся когда администраторы их опубликуют.</p>
+        <p style="margin-top: 16px;">
+            <a href="{% url 'knowledge:index' %}" style="color: var(--accent-cyan);">📚 К Энциклопедии →</a>
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

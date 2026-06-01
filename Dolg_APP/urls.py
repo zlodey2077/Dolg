@@ -15,6 +15,8 @@ app_name = "hello"
 urlpatterns = [
     # Tools for authorized users
     path("simulation/", views.simulation, name="simulation"),
+    # 2026-06-02 фикс бага: «Новости» в nav вели на Энциклопедию (заглушка).
+    path("news/", views.news, name="news"),
     path("simulation/ar/", views.ar_viewer, name="ar_viewer"),
     # Admin-only: тренировка нейронки прямо с сайта (background thread + polling).
     # ВАЖНО: префикс staff/, а НЕ admin/ — последний перехвачен django.contrib.admin

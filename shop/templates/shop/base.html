@@ -125,12 +125,8 @@
                             <a href="#" class="dropdown-toggle">💬 Сообщество</a>
                             <ul class="dropdown-menu">
                                 <li><a href="{% url 'hello:chat_list' %}">💬 Чат</a></li>
-                                {% comment %}
-                                TODO: добавить когда появится URL `hello:news`
-                                или `knowledge:news_list`. Сейчас ведёт на главную
-                                «Знания», поскольку там публикуются статьи.
-                                {% endcomment %}
-                                <li><a href="{% url 'knowledge:index' %}">📰 Новости</a></li>
+                                {# 2026-06-02 фикс: реальный раздел /news/ вместо редиректа на Энциклопедию #}
+                                <li><a href="{% url 'hello:news' %}">📰 Новости</a></li>
                             </ul>
                         </li>
                         {% comment %}

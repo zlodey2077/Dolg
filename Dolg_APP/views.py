@@ -24,7 +24,7 @@ from reportlab.pdfgen import canvas
 
 from shop.models import Product
 
-from .models import ProjectEvent, ProjectMeasurement, ProjectReview, ProjectVersion, SchematicProject, SimulationRun
+from .models import Announcement, ProjectEvent, ProjectMeasurement, ProjectReview, ProjectVersion, SchematicProject, SimulationRun
 from .quotas import (
     check_active_share_links,
     enforce_daily_quota,
@@ -59,6 +59,28 @@ def _simulation_analysis():
 # ---------------------------------------------------------------------------
 # Page views
 # ---------------------------------------------------------------------------
+
+def news(request):
+    """2026-06-02 фикс: реальный раздел Новостей вместо редиректа на Энциклопедию.
+
+    Показывает все опубликованные Announcement, сначала закреплённые, затем по дате.
+    Истёкшие (expires_at < now) скрываются. Pagination 20/страница.
+    """
+    from django.core.paginator import Paginator
+    now = timezone.now()
+    qs = Announcement.objects.filter(is_published=True).filter(
+        Q(expires_at__isnull=True) | Q(expires_at__gte=now)
+    ).select_related('author')
+    paginator = Paginator(qs, 20)
+    page_num = request.GET.get('page') or 1
+    page = paginator.get_page(page_num)
+    return render(request, 'news/list.html', {
+        'announcements': page,
+        'paginator': paginator,
+        'page_obj': page,
+        'page_title': 'Новости DOLG',
+    })
+
 
 @never_cache
 @ensure_csrf_cookie
