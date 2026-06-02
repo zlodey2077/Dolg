@@ -11720,6 +11720,15 @@ function runQuickDRC(opts) {
         }
     }
 
+    // 2026-06-02 Lithium-inspired: Pin-Pin ERC (43 правила matrix)
+    if (typeof runPinPinErc === 'function') {
+        try {
+            const ercResult = runPinPinErc();
+            errors.push(...ercResult.errors);
+            warnings.push(...ercResult.warnings);
+        } catch (_e) {}
+    }
+
     drawCanvas();
     if (typeof updateStatusDrc === 'function') updateStatusDrc(errors.length, warnings.length);
     const total = errors.length + warnings.length;
@@ -11735,6 +11744,187 @@ function runQuickDRC(opts) {
     return { errors, warnings, markers: _dolgDrcMarkers };
 }
 window.runQuickDRC = runQuickDRC;
+
+// ──────────── 2026-06-02 Lithium-inspired: 43 ERC pin-pin compatibility ────────────
+// Каждый порт компонента имеет тип (Input/Output/Bidir/Power/...). При соединении
+// двух портов matrix говорит: 0 = ok, 1 = warning, 2 = error.
+// Это industry-стандартная ERC из KiCad/Altium/Eagle/Lithium.
+window.ERC_PIN_TYPES = {
+    I: 'Input',          // Только потребляет сигнал
+    O: 'Output',         // Только источник сигнала
+    B: 'Bidirectional',  // Может быть и in, и out (например GPIO микроконтроллера)
+    H: 'HighZ',          // Tri-state (отключенный выход)
+    P: 'Power',          // Питание (VCC, GND)
+    N: 'NoConnect',      // Должен быть НЕ подключен
+    W: 'Wired-OR',       // Open-collector / open-drain
+    C: 'OpenCollector',  // Похоже на W но более строго
+    U: 'Undefined',      // Тип не определён
+};
+
+// Матрица 43 правил совместимости (значения 0/1/2 = ok/warn/error).
+// Симметрична (XY == YX). Ключ — 2 буквы по алфавиту (BB, BI, IO, OO...).
+window.ERC_MATRIX = {
+    // Power: подключение к питанию
+    PP: 0,   // Power-Power: одинаковые цепи питания — ok
+    BP: 0,   // Bidir-Power: pull-up/pull-down — ok
+    IP: 0,   // Input-Power: использование напряжения — ok
+    OP: 2,   // Output-Power: выход на питание — короткое замыкание! ERROR
+    HP: 0,   // HighZ-Power: ok
+    WP: 1,   // Wired-OR-Power: возможен конфликт — warning
+    CP: 1,   // OpenCollector-Power: возможен конфликт — warning
+    NP: 2,   // NoConnect-Power: NC не должен быть на питании — ERROR
+    UP: 1,   // Undefined-Power: warning
+
+    // Input compatibility
+    II: 0,   // Input-Input: два входа на одну цепь — ok
+    BI: 0,   // Bidir-Input: ok (вход слушает)
+    HI: 0,   // HighZ-Input: ok
+    OI: 0,   // Output-Input: классическое — ok!
+    WI: 0,   // Wired-OR-Input: ok
+    CI: 0,   // OpenCollector-Input: ok
+    NI: 2,   // NoConnect-Input: NC подключен — ERROR
+    UI: 1,   // Undefined-Input: warning
+
+    // Output compatibility
+    OO: 2,   // Output-Output: два источника — короткое замыкание! ERROR
+    BO: 1,   // Bidir-Output: возможен конфликт — warning
+    HO: 0,   // HighZ-Output: ok (HighZ позволяет)
+    WO: 1,   // Wired-OR-Output: возможен — warning
+    CO: 1,   // OpenCollector-Output: возможен — warning
+    NO: 2,   // NoConnect-Output: ERROR
+    UO: 1,   // Undefined-Output: warning
+
+    // Bidirectional
+    BB: 0,   // Bidir-Bidir: ok (шина данных)
+    BH: 0,   // Bidir-HighZ: ok
+    BW: 0,   // Bidir-Wired-OR: ok
+    BC: 0,   // Bidir-OpenCollector: ok
+    BN: 2,   // Bidir-NoConnect: ERROR
+    BU: 1,   // Bidir-Undefined: warning
+
+    // HighZ
+    HH: 0,   // HighZ-HighZ: ok
+    HW: 0,   // HighZ-WiredOR: ok
+    HC: 0,   // HighZ-OpenCollector: ok
+    HN: 2,   // HighZ-NoConnect: ERROR (HighZ не должен быть NC)
+    HU: 1,   // HighZ-Undefined: warning
+
+    // Wired-OR / OpenCollector
+    WW: 0,   // WiredOR-WiredOR: типичная open-drain шина — ok
+    WC: 0,   // WiredOR-OpenCollector: ok
+    WN: 2,   // ERROR
+    WU: 1,   // warning
+    CC: 0,   // OpenCollector-OpenCollector: ok
+    CN: 2,   // ERROR
+    CU: 1,   // warning
+
+    // NoConnect (NC pin не должен быть подключен)
+    NN: 2,   // NC-NC: два NC соединены — ERROR
+    NU: 2,   // NC-Undefined: ERROR
+
+    // Undefined
+    UU: 1,   // Undefined-Undefined: warning
+};
+
+// Default pin types для встроенных компонентов DOLG.
+// Каждый component.type → {portId → pinType}.
+window.ERC_DEFAULT_PIN_TYPES = {
+    resistor:  { A: 'B', B: 'B' },            // Пассивные элементы — B (bidir)
+    capacitor: { A: 'B', B: 'B' },
+    inductor:  { A: 'B', B: 'B' },
+    led:       { A: 'I', B: 'O' },            // анод вход, катод выход тока
+    diode:     { A: 'I', B: 'O' },
+    switch:    { A: 'B', B: 'B' },
+    battery:   { '+': 'P', '-': 'P' },        // Питание
+    ground:    { gnd: 'P' },
+    current_source: { '+': 'P', '-': 'P' },
+    npn:       { B: 'I', C: 'O', E: 'O' },    // База вход, коллектор/эмиттер выход
+    pnp:       { B: 'I', C: 'O', E: 'O' },
+    node:      { '*': 'B' },                  // Узел — passive
+};
+
+function _getPinType(comp, portId) {
+    if (!comp) return 'U';
+    // Сначала custom pinTypes на компоненте (если юзер задал)
+    if (comp.pin_types && comp.pin_types[portId]) return comp.pin_types[portId];
+    // Иначе defaults по типу компонента
+    const defaults = window.ERC_DEFAULT_PIN_TYPES[(comp.type || '').toLowerCase()];
+    if (defaults) {
+        if (defaults[portId]) return defaults[portId];
+        if (defaults['*']) return defaults['*'];
+    }
+    return 'U'; // Undefined
+}
+window._getPinType = _getPinType;
+
+// Проверка ERC pin-pin для всех соединений. Возвращает {errors, warnings}.
+function runPinPinErc() {
+    const errors = [];
+    const warnings = [];
+    if (!components || !components.length || !connections || !connections.length) {
+        return { errors, warnings };
+    }
+
+    // Группируем порты по net'ам — те, что соединены проводами (включая транзитивно).
+    // Простой union-find через connections.
+    const portKey = (compId, portId) => compId + ':' + portId;
+    const parent = new Map();
+    const find = (k) => {
+        if (!parent.has(k)) parent.set(k, k);
+        while (parent.get(k) !== k) {
+            const p = parent.get(k);
+            parent.set(k, parent.get(p));
+            k = parent.get(k);
+        }
+        return k;
+    };
+    const union = (a, b) => {
+        const ra = find(a), rb = find(b);
+        if (ra !== rb) parent.set(ra, rb);
+    };
+    connections.forEach(c => {
+        const a = portKey(c.from.compId, c.from.portId);
+        const b = portKey(c.to.compId, c.to.portId);
+        union(a, b);
+    });
+
+    // Собираем net → список pin info
+    const nets = new Map();
+    connections.forEach(c => {
+        [c.from, c.to].forEach(p => {
+            const root = find(portKey(p.compId, p.portId));
+            if (!nets.has(root)) nets.set(root, new Map());
+            const k = p.compId + ':' + p.portId;
+            if (!nets.get(root).has(k)) {
+                const comp = components.find(cc => cc.id === p.compId);
+                nets.get(root).set(k, {
+                    comp,
+                    portId: p.portId,
+                    pinType: _getPinType(comp, p.portId),
+                    label: (comp && (comp.label || comp.type)) + (comp ? comp.id : '') + '.' + p.portId,
+                });
+            }
+        });
+    });
+
+    // Для каждой net попарно проверяем pinType matrix
+    nets.forEach((portsMap) => {
+        const ports = Array.from(portsMap.values());
+        for (let i = 0; i < ports.length; i++) {
+            for (let j = i + 1; j < ports.length; j++) {
+                const t1 = ports[i].pinType, t2 = ports[j].pinType;
+                const key = (t1 + t2).split('').sort().join('');
+                const level = window.ERC_MATRIX[key];
+                if (level === undefined || level === 0) continue;
+                const msg = `Pin-Pin ERC: ${ports[i].label} (${window.ERC_PIN_TYPES[t1] || t1}) ↔ ${ports[j].label} (${window.ERC_PIN_TYPES[t2] || t2})`;
+                if (level === 2) errors.push(msg);
+                else if (level === 1) warnings.push(msg);
+            }
+        }
+    });
+    return { errors, warnings };
+}
+window.runPinPinErc = runPinPinErc;
 
 // v19: Liang-Barsky line-AABB intersection. Возвращает true если отрезок
 // (x1,y1)→(x2,y2) пересекает box {x,y,x2,y2}. Использует параметризацию t∈[0,1].
