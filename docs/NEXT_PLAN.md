@@ -161,3 +161,11 @@
 - Формат: legal-first black-box research: публичная документация, установка в песочнице, проверка поведения UI, сохранений, импорта/экспорта, логов и открытых конфигов.
 - Ограничения: без обхода защит, патчинга бинарников, извлечения закрытых алгоритмов и действий, нарушающих лицензию.
 - Потенциальный выход для DOLG: режим синхронизации CAD/SIM, подсветка review поверх схемы, улучшенный import/export compatibility pack, новые сценарии обучения и AI-разбора схем.
+
+## 2026-06-02: синтез сторонних ресурсов
+
+- Добавлен документ [EXTERNAL_RESOURCES_INSPIRATION_20260602.md](EXTERNAL_RESOURCES_INSPIRATION_20260602.md): единый банк идей из Lithium ECAD, инженерных архивов, legal source map, Qucs/Web-CAD подходов, KiCad/Altium/EasyEDA/CircuitLab/Flux и ML-ориентиров.
+- Добавлен рабочий фронт [WORKFRONT_20260602_RESOURCE_DRIVEN.md](WORKFRONT_20260602_RESOURCE_DRIVEN.md): анализ фактического состояния БД/кода и приоритеты `ProjectSession`, `PinERCMatrix`, `NetInspector`, `External Import Preview V2`, `Measurement Core`, `ManufacturingReadiness`, `AI dataset cleanup`.
+- Главный вывод: DOLG развивать как web-ориентированную среду инженерного сеанса, а не как копию промышленного PCB CAD.
+- Ближайший пакет после анализа ресурсов: `PinERCMatrix`, `NetInspector` с уровнями/operator filter, `Lithium XML import preview`, `ManufacturingReadiness`, `RequirementsTrace`.
+- Ограничения закреплены явно: не скачивать пиратские книги, не копировать UI/код Lithium, не декомпилировать бинарники, не обучать нейронку на сырых внешних документах без нормализации и разрешения.
