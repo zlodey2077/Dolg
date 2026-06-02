@@ -877,7 +877,6 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="addComponentFromContext('pnp')">📐 PNP транзистор</button>
             <button onclick="addComponentFromContext('node')">⚪ Узел (Node)</button>
             <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
-            {# 2026-06-02 Lithium R.11: multi-section ИС (LM358 / LM324 / 74HC00) #}
             <div style="padding:5px 14px;color:rgba(0,212,255,0.6);font-size:0.75rem;font-weight:600;letter-spacing:0.05em;">МИКРОСХЕМЫ (СЕКЦИЙ &gt; 1)</div>
             <button onclick="window.insertMultisectionChip('LM358'); hideContextMenu();">🧩 LM358 — Dual op-amp</button>
             <button onclick="window.insertMultisectionChip('LM324'); hideContextMenu();">🧩 LM324 — Quad op-amp</button>
@@ -901,7 +900,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="duplicateSelectedComponent(); hideContextMenu();">📑 Дублировать <small style="opacity:0.6;">Ctrl+D</small></button>
             {# 2026-06-02 Lithium-killer: сохранить выделение как переиспользуемый блок #}
             <button onclick="saveAsFunctionalBlock(); hideContextMenu();">💾 Сохранить как блок…</button>
-            {# 2026-06-02 Lithium R.11: только для multi-section (показывается из showContextMenu) #}
+            {# Multi-section: видимо только когда выбран chip с несколькими секциями #}
             <button id="ctxAddNextSection" style="display:none;" onclick="window.addNextSectionForSelected(); hideContextMenu();">➕ Следующая секция</button>
             <button id="ctxUnplacedSections" style="display:none;" onclick="window.openUnplacedSectionsDialog(); hideContextMenu();">📋 Неустановленные секции…</button>
             <button onclick="deleteSelected()">🗑️ Удалить <small style="opacity:0.6;">Del</small></button>
@@ -7289,8 +7288,6 @@ function drawComponent(comp, isSelected) {
             }
             break;
         case 'multisection': {
-            // IC-секция: прямоугольный корпус + section_name по центру.
-            // Badge "U1@2" рисуется отдельно (без поворота), как обычный label.
             ctx.beginPath();
             ctx.rect(-w + 2, -h + 4, (w - 2) * 2, (h - 4) * 2);
             ctx.stroke();
@@ -7449,7 +7446,6 @@ let _displayLabelCache = new WeakMap();
 function getComponentDisplayLabel(comp) {
     const cached = _displayLabelCache.get(comp);
     if (cached && cached._for === components.length && cached._raw === comp.label && cached._type === comp.type) return cached.label;
-    // Multi-section IC: показываем "U1@1 OpAmp_A" — badge с refdes и номером секции.
     if (comp.type === 'multisection' && comp.refdes) {
         const lbl = `${comp.refdes}@${comp.section || 1}`;
         _displayLabelCache.set(comp, { label: lbl, _for: components.length, _raw: comp.label, _type: comp.type });
@@ -11953,9 +11949,8 @@ function runPinPinErc() {
         }
     });
 
-    // 2026-06-02 Lithium R.11: multi-section — все секции должны быть размещены.
-    // На PCB они дадут один корпус — если секция не размещена на схеме, останется
-    // подключённый/висящий pin корпуса, что критично для трассировки.
+    // Multi-section: если секция объявлена, но не размещена на схеме, на PCB
+    // останется неподключённый pin корпуса — критично для трассировки.
     if (typeof window.findUnplacedSections === 'function') {
         const unplaced = window.findUnplacedSections();
         unplaced.forEach(u => {
@@ -11966,16 +11961,10 @@ function runPinPinErc() {
 }
 window.runPinPinErc = runPinPinErc;
 
-// ──────────── 2026-06-02 Lithium R.11: Multi-section components ────────────
-// Один корпус = несколько символов на схеме (LM358 = 2 op-amp + power).
-// Каждый компонент получает refdes (U1) + section (1/2/3) + section_name (OpAmp_A).
-// На PCB все секции одного refdes → один footprint.
-// Lithium docs: Help/projects/unplaced-parts.html, Help/projects/sections.html.
-
-// Шаблоны multi-section компонентов (расширяемо).
+// Multi-section компоненты: один корпус (U1) = несколько символов на схеме.
+// Например LM358 = OpAmp_A + OpAmp_B + Power. На PCB все секции одного
+// refdes сводятся к одному footprint'у.
 // Координаты портов рассчитаны под COMPONENT_WIDTH=60, COMPONENT_HEIGHT=40.
-// Op-amp / NAND: 2 порта слева (вверху-внизу), 1 справа (центр).
-// Power: V+ слева, V- справа (по середине).
 const _OPAMP_PORTS = [
     { id:'+',   label:'IN+', x:-30, y:-12 },
     { id:'-',   label:'IN-', x:-30, y: 12 },
@@ -13300,7 +13289,6 @@ function showContextMenu(x, y, target) {
         emptyMenu.style.display = 'block';
     } else if (target === 'component') {
         componentMenu.style.display = 'block';
-        // 2026-06-02 Lithium R.11: multi-section пункты — только для multi-section компонента
         const isMultisection = !!(selectedComponent && selectedComponent.multisection_template);
         const nextBtn = document.getElementById('ctxAddNextSection');
         const unplacedBtn = document.getElementById('ctxUnplacedSections');
