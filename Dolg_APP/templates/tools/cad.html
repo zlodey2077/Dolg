@@ -355,6 +355,44 @@
         white-space: nowrap;
         line-height: 1.2;
     }
+    /* 2026-06-02 Quick-fix #2: вертикальные дивайдеры между группами тулбара */
+    .cad-toolbar-divider {
+        display: inline-block;
+        width: 1px;
+        height: 22px;
+        background: rgba(0, 212, 255, 0.3);
+        margin: 0 4px;
+        vertical-align: middle;
+    }
+    /* 2026-06-02 Quick-fix #3: collapsible <details> панели в правой колонке.
+       По умолчанию свёрнуто. Юзер сам решает когда нужны параметры рисования. */
+    .panel-section--collapsible {
+        cursor: pointer;
+    }
+    .panel-section--collapsible > summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        padding-right: 20px;
+        position: relative;
+    }
+    .panel-section--collapsible > summary::-webkit-details-marker { display: none; }
+    .panel-section--collapsible > summary::after {
+        content: '▸';
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(0, 212, 255, 0.65);
+        transition: transform 0.15s;
+    }
+    .panel-section--collapsible[open] > summary::after {
+        transform: translateY(-50%) rotate(90deg);
+    }
+    .panel-section--collapsible > .panel-section-content {
+        cursor: default;
+        padding-top: 8px;
+    }
 
     .btn-small:hover {
         background: rgba(0, 212, 255, 0.32);
@@ -744,25 +782,29 @@
         </div>
 
         <div class="control-group" style="margin-left: auto;">
-            <button id="runDrcBtn" class="btn-small primary" title="Проверить электрические узлы, GND и неподключенные выводы">Проверка</button>
-            <button id="bomBtn" class="btn-small" title="Собрать спецификацию по компонентам">Спецификация</button>
-            <button id="cadToSimBtn" class="btn-small" title="Передать семантическую схему в симулятор">В симулятор</button>
-            <button id="insertSpecBtn" class="btn-small" title="Вставить спецификацию на лист">Спецификация</button>
-            <button id="exportA3Btn" class="btn-small" title="Печать/сохранение PDF на листе A3">PDF A3</button>
-            {% comment %}
-            Guest: save/load/import отключены — нужны проекты в БД (требует auth).
-            Tooltip объясняет почему, клик открывает login-модал через JS.
-            {% endcomment %}
+            {# 2026-06-02 fix: группы кнопок с дивайдерами + переименование дубля #}
+            {# Группа 1: Анализ #}
+            <button id="runDrcBtn" class="btn-small primary" title="Проверить электрические узлы, GND и неподключенные выводы">🔍 Проверка</button>
+            <button id="bomBtn" class="btn-small" title="Собрать спецификацию по компонентам (BOM)">📋 BOM</button>
+            <button id="cadToSimBtn" class="btn-small" title="Передать семантическую схему в симулятор">⚡ В симулятор</button>
+            <button id="insertSpecBtn" class="btn-small" title="Вставить таблицу спецификации прямо на лист чертежа">📊 Таблица</button>
+            <span class="cad-toolbar-divider"></span>
+            {# Группа 2: Файл #}
+            <button id="exportA3Btn" class="btn-small" title="Печать/сохранение PDF на листе A3">📄 PDF A3</button>
             <button id="saveBtn" class="btn-small primary"
                     {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы сохранять проекты"{% endif %}>💾 Сохранить</button>
             <button id="loadBtn" class="btn-small"
                     {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы открывать свои проекты"{% endif %}>📂 Загрузить</button>
             <button id="importCadBtn" class="btn-small" title="{% if is_guest %}Войдите, чтобы импортировать в свои проекты{% else %}Импорт DOLG JSON, SVG, DXF, SPICE .cir/.net{% endif %}"
-                    {% if is_guest %}data-guest-locked="1"{% endif %}>Импорт</button>
+                    {% if is_guest %}data-guest-locked="1"{% endif %}>📥 Импорт</button>
+            <span class="cad-toolbar-divider"></span>
+            {# Группа 3: Экспорт #}
             <button id="exportCadJsonBtn" class="btn-small" title="Сохранить редактируемый CAD JSON">JSON</button>
             <button id="exportPngBtn" class="btn-small" title="Экспорт видимых слоёв в PNG">PNG</button>
             <button id="exportSvgBtn" class="btn-small" title="Экспорт видимых слоёв в SVG">SVG</button>
             <button id="exportPnPBtn" class="btn-small" title="Pick-and-Place CSV: Ref / X / Y / Rotation / Footprint / Layer — стандартный формат для PCBA-сборки">P&amp;P</button>
+            <span class="cad-toolbar-divider"></span>
+            {# Группа 4: Визуализация и навигация #}
             <button id="cad3DBtn" class="btn-small" title="3D-предпросмотр CAD-чертежа (Three.js). Электрические компоненты схемы поднимаются на 3D-плату.">🎬 3D</button>
             <a href="{% url 'shop:index' %}" class="btn-small" style="color: #ff9900; border-color: #ff9900; text-decoration: none; display: inline-flex; align-items: center;">🏠 Магазин</a>
         </div>
@@ -807,9 +849,13 @@
 
         <!-- Правая панель со свойствами и слоями -->
         <div class="right-panel">
-            <!-- Свойства объекта -->
-            <div class="panel-section">
-                <div class="panel-section-title">⚙️ Свойства</div>
+            {% comment %}
+            2026-06-02 Quick-fix #3: «Свойства» — collapsible через <details>.
+            Это параметры рисования (цвет/ширина/заливка/текст), нужны только
+            когда юзер реально рисует линию/прямоугольник. По умолчанию свёрнуто.
+            {% endcomment %}
+            <details class="panel-section panel-section--collapsible">
+                <summary class="panel-section-title">⚙️ Свойства рисования <small style="opacity:.6;font-weight:normal;">(линия/фигура)</small></summary>
                 <div class="panel-section-content">
                     <div class="properties-group">
                         <label class="property-label">Цвет:</label>
@@ -841,7 +887,7 @@
                         <textarea id="textInput" class="property-input" rows="3" placeholder="Введите текст..."></textarea>
                     </div>
                 </div>
-            </div>
+            </details>
 
             <!-- Свойства выбранного объекта (показываем только при selection) -->
             <div class="panel-section" id="selectedObjPanel" style="display:none;">

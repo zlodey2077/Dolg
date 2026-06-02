@@ -60,6 +60,44 @@ def _simulation_analysis():
 # Page views
 # ---------------------------------------------------------------------------
 
+def pcb_editor(request, project_id=None):
+    """2026-06-02 Phase 2.1: 2D PCB editor (top/bottom view).
+
+    URL вариант:
+    - /pcb-editor/ — без параметра, юзер выбирает проект из dropdown'а
+    - /pcb-editor/<id>/ — открывает конкретный проект сразу
+
+    Минимальный MVP: canvas с top/bottom view, layer toggle, рендер компонентов
+    из schema как footprints, рендер traces из connections. Manual routing,
+    polygon pours — следующие итерации.
+    """
+    project = None
+    scheme_data = None
+    if project_id and request.user.is_authenticated:
+        try:
+            project = SchematicProject.objects.get(pk=project_id, user=request.user)
+            scheme_data = project.scheme_json or {}
+        except SchematicProject.DoesNotExist:
+            pass
+
+    user_projects = []
+    if request.user.is_authenticated:
+        user_projects = list(
+            SchematicProject.objects
+            .filter(user=request.user)
+            .order_by('-updated_at')
+            .values('id', 'name', 'updated_at')[:30]
+        )
+
+    return render(request, 'tools/pcb_editor.html', {
+        'project': project,
+        'scheme_data_json': json.dumps(scheme_data) if scheme_data else 'null',
+        'user_projects': user_projects,
+        'page_title': 'PCB Editor — 2D',
+        'page_description': 'Двумерный редактор печатной платы (top/bottom view, layer toggle).',
+    })
+
+
 def news(request):
     """2026-06-02 фикс: реальный раздел Новостей вместо редиректа на Энциклопедию.
 
