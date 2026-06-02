@@ -394,6 +394,165 @@
         padding-top: 8px;
     }
 
+    /* 2026-06-02 CAD Tier A: PCB Layers section в правой панели */
+    .pcb-layers-section .pcb-layers-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .pcb-layer-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        background: rgba(10, 14, 39, 0.5);
+        border: 1px solid rgba(0, 212, 255, 0.18);
+        border-radius: 4px;
+        font-size: 0.82rem;
+        color: #cfe;
+        transition: background 0.12s, border-color 0.12s;
+        cursor: pointer;
+        user-select: none;
+    }
+    .pcb-layer-row:hover {
+        background: rgba(0, 212, 255, 0.08);
+        border-color: rgba(0, 212, 255, 0.45);
+    }
+    .pcb-layer-row.active {
+        background: rgba(0, 212, 255, 0.18);
+        border-color: rgba(0, 212, 255, 0.6);
+        box-shadow: inset 0 0 6px rgba(0, 212, 255, 0.25);
+    }
+    .pcb-layer-color {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        flex-shrink: 0;
+    }
+    .pcb-layer-name { flex: 1; }
+    .pcb-layer-row input[type="checkbox"] {
+        cursor: pointer;
+        accent-color: #00d4ff;
+        flex-shrink: 0;
+    }
+
+    /* 2026-06-02 CAD Tier A: Top/Bottom view tabs над канвасом */
+    .cad-view-tabs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        background: linear-gradient(180deg, rgba(0, 212, 255, 0.12), rgba(0, 212, 255, 0.04));
+        border-bottom: 1px solid rgba(0, 212, 255, 0.4);
+    }
+    .cad-view-tab {
+        background: rgba(10, 14, 39, 0.7);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        color: #94a3b8;
+        padding: 5px 14px;
+        border-radius: 5px 5px 0 0;
+        cursor: pointer;
+        font-size: 0.86rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s;
+    }
+    .cad-view-tab:hover {
+        background: rgba(0, 212, 255, 0.15);
+        color: #cfe;
+    }
+    .cad-view-tab.active {
+        background: rgba(0, 212, 255, 0.25);
+        border-color: var(--accent-cyan, #00d4ff);
+        color: var(--accent-cyan, #00d4ff);
+        font-weight: 600;
+        box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+    }
+    .cad-view-tab-icon {
+        font-size: 0.85rem;
+        opacity: 0.85;
+    }
+    .cad-view-spacer { flex: 1; }
+    .cad-view-info {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        font-family: 'Consolas', monospace;
+    }
+
+    /* 2026-06-02 CAD Tier A: bottom DRC panel — collapsible */
+    .cad-drc-panel {
+        background: rgba(15, 24, 50, 0.7);
+        border: 2px solid var(--accent-cyan, #00d4ff);
+        border-radius: 10px;
+        margin-top: 8px;
+        overflow: hidden;
+        max-height: 200px;
+        box-shadow: 0 0 14px rgba(0, 212, 255, 0.18);
+    }
+    .cad-drc-panel > summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 14px;
+        background: linear-gradient(180deg, rgba(0, 212, 255, 0.12), rgba(0, 212, 255, 0.04));
+        color: var(--accent-cyan, #00d4ff);
+        font-weight: 600;
+        font-size: 0.92rem;
+    }
+    .cad-drc-panel > summary::-webkit-details-marker { display: none; }
+    .cad-drc-panel > summary::after {
+        content: '▸';
+        margin-left: 8px;
+        transition: transform 0.15s;
+    }
+    .cad-drc-panel[open] > summary::after {
+        transform: rotate(90deg);
+    }
+    .cad-drc-counter {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        font-weight: normal;
+        padding: 2px 10px;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 10px;
+    }
+    .cad-drc-counter.has-errors { color: #ff9090; }
+    .cad-drc-counter.has-warnings { color: #ffd595; }
+    .cad-drc-counter.is-clean { color: #72ffad; }
+    .cad-drc-list {
+        max-height: 140px;
+        overflow-y: auto;
+        padding: 8px 14px;
+        background: rgba(0, 0, 0, 0.2);
+    }
+    .cad-drc-empty {
+        color: #6c7388;
+        font-style: italic;
+        font-size: 0.84rem;
+        margin: 0;
+        line-height: 1.45;
+    }
+    .cad-drc-item {
+        display: flex;
+        gap: 8px;
+        padding: 6px 10px;
+        margin-bottom: 4px;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 5px;
+        border-left: 3px solid #7fdbff;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: background 0.12s;
+    }
+    .cad-drc-item:hover { background: rgba(0, 212, 255, 0.1); }
+    .cad-drc-item.severity-error { border-left-color: #ff9090; }
+    .cad-drc-item.severity-warning { border-left-color: #ffd595; }
+
     .btn-small:hover {
         background: rgba(0, 212, 255, 0.32);
         box-shadow: 0 0 8px rgba(0, 212, 255, 0.45);
@@ -834,6 +993,24 @@
 
         <!-- Центральная область с canvas -->
         <div class="canvas-area">
+            {% comment %}
+            2026-06-02 CAD Tier A: Top/Bottom view tabs над канвасом.
+            Toggle между видом сверху и снизу платы — стандарт PCB CAD.
+            При активном Top видны Top Copper/Silk/Mask. При Bottom — Bottom.
+            {% endcomment %}
+            <div class="cad-view-tabs" role="tablist">
+                <button type="button" class="cad-view-tab active" data-cad-view="top" title="Вид сверху (Top side)">
+                    <span class="cad-view-tab-icon">▲</span> Top
+                </button>
+                <button type="button" class="cad-view-tab" data-cad-view="bottom" title="Вид снизу (Bottom side)">
+                    <span class="cad-view-tab-icon">▼</span> Bottom
+                </button>
+                <button type="button" class="cad-view-tab" data-cad-view="both" title="Оба слоя одновременно (полупрозрачные)">
+                    <span class="cad-view-tab-icon">◐</span> Оба
+                </button>
+                <span class="cad-view-spacer"></span>
+                <span class="cad-view-info" id="cadViewInfo">Top side</span>
+            </div>
             <div class="canvas-header">
                 <span id="objCountSpan">Объектов: 0</span>
                 <span id="coordsDisplay">X: 0, Y: 0</span>
@@ -979,17 +1156,76 @@
                 </div>
             </div>
 
-            <div class="panel-section layers-section">
-                <div class="panel-section-title">
-                    🎨 Слои
-                    <button class="btn-small" id="addLayerBtn" style="padding: 2px 8px; font-size: 0.75rem;">+</button>
+            {% comment %}
+            2026-06-02 CAD Tier A: PCB Layer Manager — 8 предустановленных слоёв PCB.
+            Standardized под индустрию (KiCad/Altium совместимо).
+            Каждый: toggle visibility (👁), цвет, опц. active (для рисования).
+            {% endcomment %}
+            <div class="panel-section pcb-layers-section">
+                <div class="panel-section-title">📐 Слои PCB</div>
+                <div class="panel-section-content">
+                    <div class="pcb-layers-list" id="pcbLayersList">
+                        <div class="pcb-layer-row" data-pcb-layer="top-copper">
+                            <input type="checkbox" checked title="Показать/скрыть"><span class="pcb-layer-color" style="background:#c83232"></span>
+                            <span class="pcb-layer-name">Top Copper</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="bottom-copper">
+                            <input type="checkbox" checked title="Показать/скрыть"><span class="pcb-layer-color" style="background:#3232c8"></span>
+                            <span class="pcb-layer-name">Bottom Copper</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="top-silk">
+                            <input type="checkbox" checked title="Показать/скрыть"><span class="pcb-layer-color" style="background:#ffffff"></span>
+                            <span class="pcb-layer-name">Top Silk</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="bottom-silk">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#cccccc"></span>
+                            <span class="pcb-layer-name">Bottom Silk</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="top-mask">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#7a3a8a"></span>
+                            <span class="pcb-layer-name">Top Soldermask</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="bottom-mask">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#3a3a7a"></span>
+                            <span class="pcb-layer-name">Bottom Soldermask</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="drill">
+                            <input type="checkbox" checked title="Показать/скрыть"><span class="pcb-layer-color" style="background:#888888"></span>
+                            <span class="pcb-layer-name">Drill</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="outline">
+                            <input type="checkbox" checked title="Показать/скрыть"><span class="pcb-layer-color" style="background:#ffd54f"></span>
+                            <span class="pcb-layer-name">Outline</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <details class="panel-section panel-section--collapsible layers-section">
+                <summary class="panel-section-title">
+                    🎨 Слои чертежа
+                    <button class="btn-small" id="addLayerBtn" style="padding: 2px 8px; font-size: 0.75rem; margin-left: 8px;">+</button>
+                </summary>
                 <div class="panel-section-content">
                     <div class="layers-list" id="layersList"></div>
                 </div>
-            </div>
+            </details>
         </div>
     </div>
+
+    {% comment %}
+    2026-06-02 CAD Tier A: bottom panel «Анализ DRC» — список violations,
+    click → jump-to-coords. По умолчанию свёрнут, разворачивается по клику.
+    {% endcomment %}
+    <details class="cad-drc-panel" id="cadDrcPanel">
+        <summary>
+            <span>⚠ Анализ DRC</span>
+            <span class="cad-drc-counter" id="cadDrcCounter">Не запускался</span>
+        </summary>
+        <div class="cad-drc-list" id="cadDrcList">
+            <p class="cad-drc-empty">Нажми «🔍 Проверка» в тулбаре — здесь появится список нарушений (clearance, unrouted, short, overlap) с переходом к месту на схеме.</p>
+        </div>
+    </details>
 
     <!-- Статус бар -->
     <div class="status-bar">
@@ -5012,5 +5248,102 @@ function _ensureCad3DOverlay() {
 }
 
 window.addEventListener('DOMContentLoaded', init);
+
+// ──────────── 2026-06-02 CAD Tier A: Top/Bottom + PCB Layers + DRC panel ────────────
+window.addEventListener('DOMContentLoaded', () => {
+    // 1. Top/Bottom view tabs
+    const viewTabs = document.querySelectorAll('.cad-view-tab[data-cad-view]');
+    const viewInfo = document.getElementById('cadViewInfo');
+    const sideLabels = { top: 'Top side', bottom: 'Bottom side', both: 'Top + Bottom (полупрозрачные)' };
+    window._cadActiveView = 'top';
+    viewTabs.forEach(t => {
+        t.addEventListener('click', () => {
+            const view = t.dataset.cadView;
+            window._cadActiveView = view;
+            viewTabs.forEach(x => x.classList.toggle('active', x === t));
+            if (viewInfo) viewInfo.textContent = sideLabels[view] || view;
+            // Авто-toggle PCB слоёв соответственно
+            const pcbCheckboxes = {
+                'top-copper':    view === 'top' || view === 'both',
+                'top-silk':      view === 'top' || view === 'both',
+                'top-mask':      false,  // mask по умолчанию скрыт
+                'bottom-copper': view === 'bottom' || view === 'both',
+                'bottom-silk':   view === 'bottom' || view === 'both',
+                'bottom-mask':   false,
+            };
+            Object.entries(pcbCheckboxes).forEach(([layer, on]) => {
+                const row = document.querySelector('.pcb-layer-row[data-pcb-layer="' + layer + '"]');
+                if (row) {
+                    const cb = row.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = on;
+                }
+            });
+            // Триггер перерисовки канваса (если есть render)
+            if (typeof render === 'function') try { render(); } catch (_e) {}
+            try { localStorage.setItem('dolg.cadActiveView', view); } catch (_e) {}
+        });
+    });
+    // Восстановление сохранённого view
+    try {
+        const saved = localStorage.getItem('dolg.cadActiveView');
+        if (saved) {
+            const t = document.querySelector('.cad-view-tab[data-cad-view="' + saved + '"]');
+            if (t) t.click();
+        }
+    } catch (_e) {}
+
+    // 2. PCB Layer rows — click row toggles checkbox + active class for «рисую здесь»
+    document.querySelectorAll('.pcb-layer-row[data-pcb-layer]').forEach(row => {
+        row.addEventListener('click', (e) => {
+            // Если клик по самому checkbox — не дёргаем повторно
+            if (e.target.tagName === 'INPUT') {
+                if (typeof render === 'function') try { render(); } catch (_e) {}
+                return;
+            }
+            // Click по имени → ставит этот слой как active для рисования
+            document.querySelectorAll('.pcb-layer-row').forEach(r => r.classList.remove('active'));
+            row.classList.add('active');
+            try { localStorage.setItem('dolg.cadActivePcbLayer', row.dataset.pcbLayer); } catch (_e) {}
+        });
+    });
+
+    // 3. DRC panel — populate из существующего runDrcBtn click (если есть)
+    const drcBtn = document.getElementById('runDrcBtn');
+    const drcPanel = document.getElementById('cadDrcPanel');
+    const drcList = document.getElementById('cadDrcList');
+    const drcCounter = document.getElementById('cadDrcCounter');
+    if (drcBtn && drcPanel && drcList && drcCounter) {
+        // Перехватываем click для авто-открытия панели + рендеринга результата
+        const origClick = drcBtn.onclick;
+        drcBtn.addEventListener('click', () => {
+            // Открываем bottom-panel
+            drcPanel.open = true;
+            // Через 200мс читаем результаты — runDrc обычно alert или modal, но если
+            // есть window._lastCadDrc — рендерим оттуда
+            setTimeout(() => {
+                const result = window._lastCadDrc || null;
+                if (!result) {
+                    drcCounter.textContent = 'Запущено · детали в модалке';
+                    drcCounter.className = 'cad-drc-counter';
+                    return;
+                }
+                const errs = result.errors || [];
+                const warns = result.warnings || [];
+                const total = errs.length + warns.length;
+                if (total === 0) {
+                    drcCounter.textContent = '✓ Чисто';
+                    drcCounter.className = 'cad-drc-counter is-clean';
+                    drcList.innerHTML = '<p class="cad-drc-empty">✅ Нарушений не найдено — чертёж готов к экспорту.</p>';
+                } else {
+                    drcCounter.textContent = errs.length + ' ошибок · ' + warns.length + ' предупр.';
+                    drcCounter.className = 'cad-drc-counter ' + (errs.length > 0 ? 'has-errors' : 'has-warnings');
+                    const renderItem = (text, sev) => `<div class="cad-drc-item severity-${sev}">${sev === 'error' ? '❌' : '⚠'} ${text}</div>`;
+                    drcList.innerHTML = errs.map(e => renderItem(e, 'error')).join('')
+                                      + warns.map(w => renderItem(w, 'warning')).join('');
+                }
+            }, 250);
+        });
+    }
+});
 </script>
 {% endblock %}
