@@ -118,7 +118,7 @@
 - После каждого изменения данных обновлять README, `docs/TESTS_AND_REPORTS.md`, `docs/DEMO_SCENARIO.md` и финальные материалы диплома.
 - Держать временные логи, `__pycache__` и `.ruff_cache` вне релизного архива.
 - Перед упаковкой выполнять `check`, `check_demo_ready --json`, `check_data_integrity --json` и, если есть время, полный `test`.
-- Сверить актуальный текст диплома и презентации с фактическими цифрами: 43 РЭБ-товара, 67 verified real photos, 13 SVG fallback, 9 generated PNG без прямых Wikimedia/Commons путей, 12 demo-схем, 21 статья, 50 материалов, 4 learning tracks, 13 уроков, 29 заданий.
+- Сверить актуальный текст диплома и презентации с фактическими цифрами: 364 товара, 227 РЭБ-компонентов, 79 verified real photos, 285 generated fallback без прямых Wikimedia/Commons путей, 12 demo-схем, 22 статьи, 99 материалов, 5 learning tracks, 16 уроков, 38 заданий.
 
 ## P2: продуктовый слой
 

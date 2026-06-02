@@ -45,9 +45,9 @@
 
 ### 2. **Уровни цепей (10 levels)** ⭐⭐
 
-Каждой цепи присваивается level (1-10). UI имеет фильтр «показать только level 1». Юзер фокусируется на одном узле при трассировке.
+Каждой цепи присваивается level. По уточненному inspection-отчету Lithium использует диапазон **0-9** и оператор сравнения в фильтре видимости, например «показать level >= 3». Пользователь фокусируется на одном узле или группе цепей при трассировке.
 
-Пример: power-цепи level 1, signal цепи level 2, GND level 3. При работе с DC-DC показываешь только level 1.
+Пример для адаптации в DOLG: power-цепи level 1, signal цепи level 2, GND level 3. При работе с DC-DC можно показать только power-цепи или скрыть все служебные уровни.
 
 ### 3. **Functional blocks** ⭐⭐⭐
 
@@ -80,7 +80,7 @@
 | **Sync schema↔PCB realtime** | ✓ | ❌ | **L** |
 | **Cross-highlight** | ✓ | ❌ | **M** |
 | **Back-annotation PCB→schema** | ✓ | ❌ | M |
-| **Уровни цепей** | ✓ (10 levels) | ❌ | S |
+| **Уровни цепей** | ✓ (0-9 + operator filter) | ❌ | S |
 | Net labels | ✓ | ✓ (KiCad-style v17) | 0 |
 | **Functional blocks** | ✓ | ❌ | L |
 | **Multi-channel copy** | ✓ | ❌ | M |
@@ -140,12 +140,12 @@ DOLG **уже впереди по AI/ML/симуляции**. Lithium впере
 
 #### B. Уровни цепей (level 1-10) (1 день) ⭐⭐
 
-**Идея:** каждый wire получает поле `level` (default 1). В сайдбаре «фильтр уровней» — toggle какие levels видны.
+**Идея:** каждый wire получает поле `level` (default 1). В сайдбаре «фильтр уровней» — toggle уровней и оператор сравнения (`=`, `>=`, `<=`) по аналогии с Lithium, но в web-first интерфейсе DOLG.
 
 **Реализация:**
 - В connection model добавить `level: 1`
 - ПКМ на провод → «Уровень цепи» → 1-10
-- В header analysis-panel или в hamburger ☰ menu — toggle visibility levels
+- В header analysis-panel или в hamburger ☰ menu — toggle visibility levels и operator filter
 - В `drawConnectionPath` — пропускать если level не в видимом set
 
 **Что юзер увидит:** на сложной схеме скрывает GND/Power линии, видит только signal flow.

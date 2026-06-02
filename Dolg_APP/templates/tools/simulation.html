@@ -338,6 +338,17 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                                 </small>
                             </div>
                         </div>
+                        {# 2026-06-02 Lithium-inspired: Net Classes легенда #}
+                        <div class="hm-section">
+                            <div class="hm-section-title">🎨 Классы цепей</div>
+                            <div class="hm-section-body">
+                                <div id="netClassesLegend" class="net-classes-legend"></div>
+                                <small style="color:#94a3b8; display:block; margin-top:4px; line-height:1.35;">
+                                    ПКМ на провод → 🎨 Класс цепи (Power/GND/Signal/DiffPair).<br>
+                                    Влияет на цвет, мин. ширину и зазор DRC.
+                                </small>
+                            </div>
+                        </div>
                         <div class="hm-section">
                             <div class="hm-section-title">📁 Файл</div>
                             <div class="hm-section-body" id="hm-section-file"></div>
@@ -880,6 +891,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="probeThisWire(); hideContextMenu();">📍 Probe этот net (вольтметр)</button>
             {# 2026-06-02 Lithium-killer: уровень цепи 1-10 #}
             <button onclick="window._openNetLevelDialog && window._openNetLevelDialog(); hideContextMenu();">🎚 Уровень цепи…</button>
+            {# 2026-06-02 Lithium-inspired: Net Class (Power/Signal/GND/DiffPair/Default) #}
+            <button onclick="window._openNetClassDialog && window._openNetClassDialog(); hideContextMenu();">🎨 Класс цепи…</button>
         </div>
     </div>
 
@@ -1814,6 +1827,41 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     font-size: 0.72rem;
     line-height: 1.3;
 }
+/* 2026-06-02 Lithium-inspired: Net Classes legend */
+.net-classes-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+}
+.net-class-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: rgba(20, 25, 40, 0.6);
+    border: 1px solid rgba(0, 212, 255, 0.18);
+    border-radius: 4px;
+    font-size: 0.78rem;
+}
+.net-class-chip-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+}
+.net-class-chip-name {
+    font-weight: 600;
+    color: #cfe;
+    flex-shrink: 0;
+}
+.net-class-chip-meta {
+    color: #94a3b8;
+    font-family: 'Consolas', monospace;
+    font-size: 0.7rem;
+}
+
 /* 2026-06-02 Lithium-killer: фильтр уровней цепей в hamburger menu */
 .net-levels-filter-box {
     display: grid;
@@ -5989,7 +6037,16 @@ function drawConnectionPath(fromPos, toPos, waypoints, isSelected, fromComp, fro
         strokePolyline();
     }
 
-    ctx.strokeStyle = isSelected ? palette.selected : palette.wire;
+    // 2026-06-02 Lithium-inspired: цвет из net_class (Power=red, GND=grey, Signal=cyan, …)
+    let wireColor = isSelected ? palette.selected : palette.wire;
+    if (!isSelected) {
+        const connForColor = connections[connIdx];
+        if (connForColor && typeof _getNetClassColor === 'function') {
+            const ncColor = _getNetClassColor(connForColor);
+            if (ncColor) wireColor = ncColor;
+        }
+    }
+    ctx.strokeStyle = wireColor;
     ctx.lineWidth = (isSelected ? simLineWidth + 1 : simLineWidth) / zoom;
     strokePolyline();
 
@@ -11046,6 +11103,59 @@ function showAllNetLevels() {
 }
 window.showAllNetLevels = showAllNetLevels;
 
+// ──────────── 2026-06-02 Lithium-inspired: Net Classes ────────────
+// Аналог Lithium ECAD «Net classes»: каждая цепь принадлежит классу с min
+// width / clearance / via size. Применяется в DRC и при рисовании.
+// 5 предопределённых классов (MVP без БД, JS-only).
+window.NET_CLASSES = {
+    'Default':  { color: '#7fdbff', default_width: 0.25, min_width: 0.15, min_clearance: 0.2,  min_via: 0.6, desc: 'Стандартная цепь' },
+    'Power':    { color: '#ff9090', default_width: 0.6,  min_width: 0.4,  min_clearance: 0.25, min_via: 0.8, desc: 'Питание (+5V, +12V, VDD…)' },
+    'GND':      { color: '#a0a0a0', default_width: 0.5,  min_width: 0.3,  min_clearance: 0.2,  min_via: 0.6, desc: 'Земля / общий провод' },
+    'Signal':   { color: '#22d3ee', default_width: 0.2,  min_width: 0.15, min_clearance: 0.15, min_via: 0.5, desc: 'Цифровой сигнал' },
+    'DiffPair': { color: '#a78bfa', default_width: 0.18, min_width: 0.15, min_clearance: 0.12, min_via: 0.4, desc: 'Дифференциальная пара (USB/LVDS)' },
+};
+
+function _openNetClassDialog() {
+    if (!selectedConnection) {
+        if (typeof showNotification === 'function') showNotification('Сначала выдели провод', 'warning');
+        return;
+    }
+    const current = selectedConnection.net_class || 'Default';
+    const names = Object.keys(window.NET_CLASSES);
+    const lines = names.map((n, i) => {
+        const c = window.NET_CLASSES[n];
+        const mark = n === current ? '● ' : '   ';
+        return `${i + 1}. ${mark}${n} — ${c.desc} (w=${c.default_width}мм)`;
+    });
+    const choice = window.prompt(
+        'Класс цепи (введи номер 1-' + names.length + '):\n\n' + lines.join('\n') + '\n\n' +
+        'Влияет на цвет провода, минимальную ширину и зазор в DRC.',
+        String(names.indexOf(current) + 1) || '1'
+    );
+    if (choice === null) return;
+    const idx = parseInt(choice);
+    if (!Number.isInteger(idx) || idx < 1 || idx > names.length) {
+        if (typeof showNotification === 'function') showNotification('Номер должен быть от 1 до ' + names.length, 'error');
+        return;
+    }
+    const className = names[idx - 1];
+    selectedConnection.net_class = className;
+    if (typeof snapshotScheme === 'function') snapshotScheme();
+    if (typeof drawCanvas === 'function') drawCanvas();
+    if (typeof showNotification === 'function') {
+        showNotification(`🎨 Класс цепи: ${className} (цвет — ${window.NET_CLASSES[className].color})`, 'success');
+    }
+}
+window._openNetClassDialog = _openNetClassDialog;
+
+// Helper: цвет провода из net_class (используется в drawConnectionPath)
+function _getNetClassColor(conn) {
+    const className = (conn && conn.net_class) || 'Default';
+    const cls = window.NET_CLASSES[className];
+    return cls ? cls.color : null;
+}
+window._getNetClassColor = _getNetClassColor;
+
 // Загружает список блоков и рендерит в drawer
 async function _refreshBlocksDrawer() {
     const list = document.getElementById('functionalBlocksList');
@@ -11118,6 +11228,18 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(_refreshBlocksDrawer, 600);
     // 2026-06-02 Lithium-killer: render фильтра уровней цепей
     setTimeout(() => { if (window._refreshNetLevelsUI) window._refreshNetLevelsUI(); }, 400);
+    // 2026-06-02 Lithium-inspired: render Net Classes legend
+    setTimeout(() => {
+        const box = document.getElementById('netClassesLegend');
+        if (!box || !window.NET_CLASSES) return;
+        box.innerHTML = Object.entries(window.NET_CLASSES).map(([name, cls]) => `
+            <div class="net-class-chip" title="${cls.desc}">
+                <span class="net-class-chip-color" style="background:${cls.color}"></span>
+                <span class="net-class-chip-name">${name}</span>
+                <span class="net-class-chip-meta">w=${cls.default_width}мм · gap=${cls.min_clearance}мм</span>
+            </div>
+        `).join('');
+    }, 400);
     const cv = document.getElementById('schematicCanvas');
     if (cv) {
         cv.addEventListener('dragover', (e) => {

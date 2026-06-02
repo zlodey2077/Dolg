@@ -68,11 +68,11 @@
 
 ## Текущая база
 
-- РЭБ-каталог: 43 товара.
-- Активные изображения каталога: 67 проверенных реальных фото в `products/verified/`, 13 точных SVG fallback и 9 generated PNG; legacy Commons-команда отключена, прямые `commons/curated` пути не используются.
+- РЭБ-каталог: 227 товаров.
+- Активные изображения каталога: 79 проверенных реальных фото в `products/verified/`, 285 аккуратных generated fallback; legacy Commons-команда отключена, прямые `commons/curated` пути не используются.
 - `check_data_integrity --json`: 0 ошибок; no-Wikimedia policy и Media Quality Gate включены в аудит.
 - `check_demo_ready --json`: OK; URL smoke, media-policy, scientific stack, lightweight graph/formula/SVG smoke и expert stack проходят.
-- Демо-данные: 12 demo-схем, 21 статья энциклопедии, 50 материалов, 4 learning tracks, 13 уроков, 29 заданий.
+- Демо-данные: 12 demo-схем, 22 статьи энциклопедии, 99 материалов, 5 learning tracks, 16 уроков, 38 заданий.
 - `python manage.py check`: 0 ошибок.
 - `python manage.py test Dolg_APP.tests knowledge.tests shop.tests --keepdb -v 1`: 123 тестов OK.
 - `python manage.py test --keepdb -v 1`: полный discovery-прогон в текущем окружении уперся в 15-минутный таймаут; gate на итерацию разбит по приложениям.
@@ -142,7 +142,7 @@
 ## P2: дипломные материалы
 
 1. Синхронизировать текст диплома с фактическими цифрами:
-   43 РЭБ-товара, 67 verified real photos, 13 SVG fallback, 9 generated PNG без прямых Wikimedia/Commons путей, 12 demo-схем, 21 статья, 50 материалов, 4 learning tracks, 13 уроков, 29 заданий.
+   364 товара, 227 РЭБ-компонентов, 79 verified real photos, 285 generated fallback без прямых Wikimedia/Commons путей, 12 demo-схем, 22 статьи, 99 материалов, 5 learning tracks, 16 уроков, 38 заданий.
 
 2. Проверить презентацию:
    убрать устаревшие числа и заменить скриншоты после P0.
