@@ -349,6 +349,19 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                                 </small>
                             </div>
                         </div>
+                        {# 2026-06-02 Lithium-inspired: Physical PCB Stack-up #}
+                        <div class="hm-section">
+                            <div class="hm-section-title">📚 Стек слоёв PCB</div>
+                            <div class="hm-section-body">
+                                <button type="button" class="tdm-item" onclick="window.openStackupDialog && window.openStackupDialog()">
+                                    <span class="tdm-ico">📐</span> Настроить стек слоёв…
+                                </button>
+                                <small style="color:#94a3b8; display:block; margin-top:4px; line-height:1.35;">
+                                    Толщина меди/диэлектрика для расчёта импеданса трасс, 3D-рендера и заказа платы.<br>
+                                    Пресеты: 2/4/6/8 слоёв.
+                                </small>
+                            </div>
+                        </div>
                         <div class="hm-section">
                             <div class="hm-section-title">📁 Файл</div>
                             <div class="hm-section-body" id="hm-section-file"></div>
@@ -11155,6 +11168,161 @@ function _getNetClassColor(conn) {
     return cls ? cls.color : null;
 }
 window._getNetClassColor = _getNetClassColor;
+
+// ──────────── 2026-06-02 Lithium-inspired: Physical PCB Stack-up ────────────
+// 7 предопределённых стеков как у Lithium ECAD (Stacks/_*Core.lt в их дистрибутиве).
+// Используется для: 3D-рендера с реалистичной толщиной, импеданса трасс,
+// тепловых расчётов, production-документации.
+window.PCB_STACKUPS = {
+    '2-Core': {
+        name: '2 слоя (Core)',
+        desc: 'Стандартная двухслойная плата 1.6мм',
+        total_mm: 1.536,
+        layers: [
+            { type: 'Signal', name: 'Top Copper',    thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Core',   name: 'FR-4 Core',     thickness_mm: 1.5,   material: 'FR-4', dielectric: 4.5 },
+            { type: 'Signal', name: 'Bottom Copper', thickness_mm: 0.018, material: 'Copper' },
+        ],
+    },
+    '4-Core': {
+        name: '4 слоя (Core)',
+        desc: 'Стандартная 4-слойная плата 1.6мм',
+        total_mm: 1.620,
+        layers: [
+            { type: 'Signal',     name: 'Top Copper',     thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Prepreg',    name: 'Prepreg L1-L2',  thickness_mm: 0.2,   material: 'FR-4 Prepreg', dielectric: 4.2 },
+            { type: 'Signal',     name: 'Inner L2 (GND)', thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Core',       name: 'FR-4 Core',      thickness_mm: 1.1,   material: 'FR-4',         dielectric: 4.5 },
+            { type: 'Signal',     name: 'Inner L3 (PWR)', thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Prepreg',    name: 'Prepreg L3-L4',  thickness_mm: 0.2,   material: 'FR-4 Prepreg', dielectric: 4.2 },
+            { type: 'Signal',     name: 'Bottom Copper',  thickness_mm: 0.018, material: 'Copper' },
+        ],
+    },
+    '4-Foil': {
+        name: '4 слоя (Foil)',
+        desc: '4-слойная с foil construction (тоньше)',
+        total_mm: 0.940,
+        layers: [
+            { type: 'Signal',  name: 'Top Copper',     thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Prepreg', name: 'Prepreg L1-L2',  thickness_mm: 0.18,  material: 'FR-4 Prepreg', dielectric: 4.2 },
+            { type: 'Signal',  name: 'Inner L2',       thickness_mm: 0.035, material: 'Copper' },
+            { type: 'Core',    name: 'FR-4 Core',      thickness_mm: 0.5,   material: 'FR-4',         dielectric: 4.5 },
+            { type: 'Signal',  name: 'Inner L3',       thickness_mm: 0.035, material: 'Copper' },
+            { type: 'Prepreg', name: 'Prepreg L3-L4',  thickness_mm: 0.18,  material: 'FR-4 Prepreg', dielectric: 4.2 },
+            { type: 'Signal',  name: 'Bottom Copper',  thickness_mm: 0.018, material: 'Copper' },
+        ],
+    },
+    '6-Core': {
+        name: '6 слоёв (Core)',
+        desc: 'Многослойная 6-layer (HDI)',
+        total_mm: 1.620,
+        layers: [
+            { type: 'Signal',  name: 'L1 Top',        thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Prepreg', name: 'PP L1-L2',      thickness_mm: 0.15,  material: 'FR-4 Prepreg' },
+            { type: 'Signal',  name: 'L2 GND',        thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Core',    name: 'Core L2-L3',    thickness_mm: 0.3,   material: 'FR-4' },
+            { type: 'Signal',  name: 'L3 Inner',      thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Prepreg', name: 'PP L3-L4',      thickness_mm: 0.4,   material: 'FR-4 Prepreg' },
+            { type: 'Signal',  name: 'L4 Inner',      thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Core',    name: 'Core L4-L5',    thickness_mm: 0.3,   material: 'FR-4' },
+            { type: 'Signal',  name: 'L5 PWR',        thickness_mm: 0.018, material: 'Copper' },
+            { type: 'Prepreg', name: 'PP L5-L6',      thickness_mm: 0.15,  material: 'FR-4 Prepreg' },
+            { type: 'Signal',  name: 'L6 Bottom',     thickness_mm: 0.018, material: 'Copper' },
+        ],
+    },
+    '8-Core': {
+        name: '8 слоёв (Core)',
+        desc: 'High-density 8-layer для сложной электроники',
+        total_mm: 1.620,
+        layers: [/* упрощённая — 8 signal + interleave */],
+    },
+};
+
+function openStackupDialog() {
+    const modalBg = document.createElement('div');
+    modalBg.id = '_stackupModalBg';
+    modalBg.style.cssText = 'position:fixed; inset:0; background:rgba(5,10,25,0.92); backdrop-filter:blur(4px); z-index:99996; display:flex; align-items:center; justify-content:center; padding:20px;';
+
+    const stacks = Object.entries(window.PCB_STACKUPS).filter(([, s]) => s.layers && s.layers.length);
+    const currentStack = (window.currentProject && window.currentProject.stackup_id) || '2-Core';
+
+    const renderStackPreview = (stackId) => {
+        const stk = window.PCB_STACKUPS[stackId];
+        if (!stk || !stk.layers || !stk.layers.length) return '<p style="color:#94a3b8;">Стек пуст</p>';
+        const maxT = Math.max(...stk.layers.map(l => l.thickness_mm));
+        return `<div style="display:flex; flex-direction:column; gap:1px; background:#0a0e27; padding:8px; border-radius:6px;">
+            ${stk.layers.map(l => {
+                const h = Math.max(8, Math.round(28 * l.thickness_mm / maxT));
+                const color = l.type === 'Signal' ? '#d97757' : l.type === 'Core' ? '#3d8a40' : '#5a7a30';
+                return `<div style="background:${color}; height:${h}px; padding:2px 8px; color:#fff; font-size:10px; display:flex; justify-content:space-between; border-radius:2px;">
+                    <span>${l.name}</span><span>${l.thickness_mm}мм · ${l.material || l.type}</span>
+                </div>`;
+            }).join('')}
+            <div style="text-align:right; color:#94a3b8; font-size:11px; margin-top:6px;">Σ ${stk.total_mm}мм</div>
+        </div>`;
+    };
+
+    modalBg.innerHTML = `<div style="background:linear-gradient(135deg,rgba(10,14,39,0.98),rgba(26,39,68,0.98)); border:2px solid #00d4ff; border-radius:14px; max-width:900px; width:100%; max-height:90vh; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(0,212,255,0.2); background:rgba(0,0,0,0.25);">
+            <h2 style="color:#00d4ff; font-size:1.15rem; font-weight:600; margin:0;">📚 Стек слоёв PCB (Stack-up)</h2>
+            <button id="_stackupClose" style="margin-left:auto; background:transparent; border:1px solid rgba(255,138,138,0.4); color:#ff9090; width:30px; height:30px; border-radius:6px; cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding:18px 22px; color:#e6e9ef; display:grid; grid-template-columns: 1fr 1fr; gap:18px;">
+            <div>
+                <h3 style="color:#7fdbff; font-size:0.95rem; margin:0 0 10px;">Доступные стеки</h3>
+                <div id="_stackupList" style="display:flex; flex-direction:column; gap:6px;">
+                    ${stacks.map(([id, s]) => `
+                        <button data-stack-id="${id}" class="_stackupItem" style="text-align:left; padding:10px 14px; background:rgba(0,212,255,${id===currentStack?'0.22':'0.08'}); border:1px solid rgba(0,212,255,${id===currentStack?'0.6':'0.25'}); border-radius:8px; color:#e6e9ef; cursor:pointer; transition:all 0.15s;">
+                            <div style="font-weight:600;">${s.name}</div>
+                            <div style="font-size:0.78rem; color:#94a3b8; margin-top:2px;">${s.desc} — Σ ${s.total_mm}мм</div>
+                        </button>
+                    `).join('')}
+                </div>
+                <small style="display:block; color:#94a3b8; margin-top:10px; line-height:1.4;">
+                    Стек определяет физическую толщину меди, диэлектрика и общее количество проводящих слоёв.
+                    Используется для расчёта импеданса, теплового анализа, 3D-визуализации.
+                </small>
+            </div>
+            <div>
+                <h3 style="color:#7fdbff; font-size:0.95rem; margin:0 0 10px;">Превью</h3>
+                <div id="_stackupPreview">${renderStackPreview(currentStack)}</div>
+                <div style="margin-top:14px; display:flex; gap:8px;">
+                    <button id="_stackupApply" style="flex:1; background:linear-gradient(135deg,#00b894,#00838f); color:#fff; border:none; border-radius:6px; padding:9px 14px; cursor:pointer; font-weight:600;">✓ Применить к проекту</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.appendChild(modalBg);
+    let selectedId = currentStack;
+
+    const items = modalBg.querySelectorAll('._stackupItem');
+    items.forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedId = btn.dataset.stackId;
+            items.forEach(b => {
+                const isSel = b === btn;
+                b.style.background = 'rgba(0,212,255,' + (isSel?'0.22':'0.08') + ')';
+                b.style.borderColor = 'rgba(0,212,255,' + (isSel?'0.6':'0.25') + ')';
+            });
+            const prev = modalBg.querySelector('#_stackupPreview');
+            if (prev) prev.innerHTML = renderStackPreview(selectedId);
+        });
+    });
+
+    modalBg.querySelector('#_stackupClose').onclick = () => modalBg.remove();
+    modalBg.addEventListener('click', e => { if (e.target === modalBg) modalBg.remove(); });
+    modalBg.querySelector('#_stackupApply').onclick = () => {
+        if (!window.currentProject) window.currentProject = {};
+        window.currentProject.stackup_id = selectedId;
+        if (typeof snapshotScheme === 'function') snapshotScheme();
+        if (typeof showNotification === 'function') {
+            showNotification('✓ Стек слоёв «' + window.PCB_STACKUPS[selectedId].name + '» применён', 'success');
+        }
+        modalBg.remove();
+    };
+}
+window.openStackupDialog = openStackupDialog;
 
 // Загружает список блоков и рендерит в drawer
 async function _refreshBlocksDrawer() {
