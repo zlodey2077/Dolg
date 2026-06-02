@@ -355,6 +355,70 @@
         white-space: nowrap;
         line-height: 1.2;
     }
+    /* 2026-06-02 CAD Redesign R.1: Mode tabs (Чертёж / PCB Editor) */
+    .cad-mode-tabs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 8px;
+        padding: 4px 8px;
+        background: rgba(15, 24, 50, 0.7);
+        border: 2px solid var(--accent-cyan, #00d4ff);
+        border-radius: 10px;
+        box-shadow: 0 0 18px rgba(0, 212, 255, 0.18);
+    }
+    .cad-mode-tab {
+        background: rgba(10, 14, 39, 0.7);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        color: #94a3b8;
+        padding: 7px 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.92rem;
+        font-weight: 600;
+        transition: all 0.15s;
+    }
+    .cad-mode-tab:hover {
+        background: rgba(0, 212, 255, 0.15);
+        color: #cfe;
+    }
+    .cad-mode-tab.active {
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.35), rgba(0, 150, 255, 0.25));
+        border-color: var(--accent-cyan, #00d4ff);
+        color: #fff;
+        box-shadow: 0 0 12px rgba(0, 212, 255, 0.55), inset 0 0 8px rgba(0, 212, 255, 0.25);
+    }
+    .cad-mode-spacer { flex: 1; }
+    .cad-mode-hint {
+        color: #94a3b8;
+        font-size: 0.82rem;
+        font-style: italic;
+        padding-right: 8px;
+    }
+    /* В режиме «Чертёж» — скрыть PCB-специфику (Слои PCB, DRC, PCB-tools левые) */
+    body.cad-mode-drawing .pcb-layers-section,
+    body.cad-mode-drawing .cad-view-tabs,
+    body.cad-mode-drawing .cad-drc-panel,
+    body.cad-mode-drawing [data-cad-tool="pcb-trace"],
+    body.cad-mode-drawing [data-cad-tool="pcb-via"],
+    body.cad-mode-drawing [data-cad-tool="pcb-pad"],
+    body.cad-mode-drawing [data-cad-tool="pcb-pour"],
+    body.cad-mode-drawing [data-cad-tool="pcb-outline"] {
+        display: none !important;
+    }
+    /* В режиме «PCB Editor» — скрыть Drawing-специфику (Шаблоны ГОСТ, layers чертежа,
+       свойства рисования с цвет/ширина, generic фон) */
+    body.cad-mode-pcb [data-templates-modal-btn],
+    body.cad-mode-pcb .layers-section,
+    body.cad-mode-pcb #insertSpecBtn,
+    body.cad-mode-pcb .panel-section--collapsible[data-drawing-only],
+    body.cad-mode-pcb [data-cad-tool="line"],
+    body.cad-mode-pcb [data-cad-tool="rectangle"],
+    body.cad-mode-pcb [data-cad-tool="circle"],
+    body.cad-mode-pcb [data-cad-tool="ellipse"] {
+        display: none !important;
+    }
+
     /* 2026-06-02 Quick-fix #2: вертикальные дивайдеры между группами тулбара */
     .cad-toolbar-divider {
         display: inline-block;
@@ -867,6 +931,25 @@
 <script src="{% static 'simulation/scheme-3d.js' %}?v=20260526b"></script>
 
 <div id="app-container">
+    {% comment %}
+    2026-06-02 CAD Redesign R.1: Mode separation
+    «🎨 Чертёж» — графика, примитивы, ЕСКД-рамки, шаблоны ГОСТ
+    «📡 PCB Editor» — Trace/Via/Pad/Pour, PCB-слои, footprints, DRC
+    State в localStorage('dolg.cadMode'). По умолчанию 'drawing'.
+    {% endcomment %}
+    <div class="cad-mode-tabs" role="tablist">
+        <button type="button" class="cad-mode-tab active" data-cad-mode="drawing"
+                title="Режим чертежа: линии, фигуры, тексты, ЕСКД-рамка, шаблоны ГОСТ">
+            🎨 Чертёж
+        </button>
+        <button type="button" class="cad-mode-tab" data-cad-mode="pcb"
+                title="PCB Editor: трассировка, контактные площадки, переходные отверстия, заливка, слои PCB">
+            📡 PCB Editor
+        </button>
+        <span class="cad-mode-spacer"></span>
+        <span class="cad-mode-hint" id="cadModeHint">Графика и оформление чертежа</span>
+    </div>
+
     <!-- Верхняя панель управления -->
     <div class="top-controls">
         <div class="control-group">
@@ -5249,8 +5332,37 @@ function _ensureCad3DOverlay() {
 
 window.addEventListener('DOMContentLoaded', init);
 
-// ──────────── 2026-06-02 CAD Tier A: Top/Bottom + PCB Layers + DRC panel ────────────
+// ──────────── 2026-06-02 CAD Tier A + R.1: Mode + Top/Bottom + PCB Layers + DRC ────────────
 window.addEventListener('DOMContentLoaded', () => {
+    // 0. CAD Mode tabs (R.1): «Чертёж» vs «PCB Editor»
+    const modeTabs = document.querySelectorAll('.cad-mode-tab[data-cad-mode]');
+    const modeHint = document.getElementById('cadModeHint');
+    const modeLabels = {
+        drawing: 'Графика и оформление чертежа',
+        pcb:     'Печатная плата: трассировка, footprints, DRC',
+    };
+    window._cadMode = 'drawing';
+    function _applyCadMode(mode) {
+        if (!modeLabels[mode]) mode = 'drawing';
+        window._cadMode = mode;
+        document.body.classList.remove('cad-mode-drawing', 'cad-mode-pcb');
+        document.body.classList.add('cad-mode-' + mode);
+        modeTabs.forEach(b => b.classList.toggle('active', b.dataset.cadMode === mode));
+        if (modeHint) modeHint.textContent = modeLabels[mode];
+        try { localStorage.setItem('dolg.cadMode', mode); } catch (_e) {}
+        // Если в PCB-режиме переключиться — Top tab по умолчанию active
+        if (mode === 'pcb' && window._cadActiveView !== 'top' && window._cadActiveView !== 'bottom') {
+            const topTab = document.querySelector('.cad-view-tab[data-cad-view="top"]');
+            if (topTab) topTab.click();
+        }
+    }
+    modeTabs.forEach(t => t.addEventListener('click', () => _applyCadMode(t.dataset.cadMode)));
+    try {
+        const saved = localStorage.getItem('dolg.cadMode');
+        if (saved && modeLabels[saved]) _applyCadMode(saved);
+        else _applyCadMode('drawing');
+    } catch (_e) { _applyCadMode('drawing'); }
+
     // 1. Top/Bottom view tabs
     const viewTabs = document.querySelectorAll('.cad-view-tab[data-cad-view]');
     const viewInfo = document.getElementById('cadViewInfo');

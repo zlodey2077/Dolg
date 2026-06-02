@@ -166,6 +166,7 @@
 
 - Добавлен документ [EXTERNAL_RESOURCES_INSPIRATION_20260602.md](EXTERNAL_RESOURCES_INSPIRATION_20260602.md): единый банк идей из Lithium ECAD, инженерных архивов, legal source map, Qucs/Web-CAD подходов, KiCad/Altium/EasyEDA/CircuitLab/Flux и ML-ориентиров.
 - Добавлен рабочий фронт [WORKFRONT_20260602_RESOURCE_DRIVEN.md](WORKFRONT_20260602_RESOURCE_DRIVEN.md): анализ фактического состояния БД/кода и приоритеты `ProjectSession`, `PinERCMatrix`, `NetInspector`, `External Import Preview V2`, `Measurement Core`, `ManufacturingReadiness`, `AI dataset cleanup`.
+- После перепроверки фокуса добавлен уточненный фронт [WORKFRONT_20260602_ADMIN_AI_RECHECK.md](WORKFRONT_20260602_ADMIN_AI_RECHECK.md): часть ML/admin уже реализована, симулятор временно не трогаем, текущий приоритет — операционная админка, persistent `MLJob`, качество датасета, защита импорта от зависаний и neural deep hints без правок simulation engine/UI.
 - Главный вывод: DOLG развивать как web-ориентированную среду инженерного сеанса, а не как копию промышленного PCB CAD.
 - Ближайший пакет после анализа ресурсов: `PinERCMatrix`, `NetInspector` с уровнями/operator filter, `Lithium XML import preview`, `ManufacturingReadiness`, `RequirementsTrace`.
 - Ограничения закреплены явно: не скачивать пиратские книги, не копировать UI/код Lithium, не декомпилировать бинарники, не обучать нейронку на сырых внешних документах без нормализации и разрешения.
