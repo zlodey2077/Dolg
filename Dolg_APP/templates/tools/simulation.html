@@ -877,6 +877,13 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="addComponentFromContext('pnp')">📐 PNP транзистор</button>
             <button onclick="addComponentFromContext('node')">⚪ Узел (Node)</button>
             <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
+            {# 2026-06-02 Lithium R.11: multi-section ИС (LM358 / LM324 / 74HC00) #}
+            <div style="padding:5px 14px;color:rgba(0,212,255,0.6);font-size:0.75rem;font-weight:600;letter-spacing:0.05em;">МИКРОСХЕМЫ (СЕКЦИЙ &gt; 1)</div>
+            <button onclick="window.insertMultisectionChip('LM358'); hideContextMenu();">🧩 LM358 — Dual op-amp</button>
+            <button onclick="window.insertMultisectionChip('LM324'); hideContextMenu();">🧩 LM324 — Quad op-amp</button>
+            <button onclick="window.insertMultisectionChip('74HC00'); hideContextMenu();">🧩 74HC00 — Quad NAND</button>
+            <button onclick="window.openUnplacedSectionsDialog(); hideContextMenu();">📋 Неустановленные секции…</button>
+            <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
             <button onclick="deleteSelected(); hideContextMenu();">🗑️ Удалить выбранное</button>
             <button onclick="clearCanvas(); hideContextMenu();">🧹 Очистить холст</button>
             <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
@@ -894,6 +901,9 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <button onclick="duplicateSelectedComponent(); hideContextMenu();">📑 Дублировать <small style="opacity:0.6;">Ctrl+D</small></button>
             {# 2026-06-02 Lithium-killer: сохранить выделение как переиспользуемый блок #}
             <button onclick="saveAsFunctionalBlock(); hideContextMenu();">💾 Сохранить как блок…</button>
+            {# 2026-06-02 Lithium R.11: только для multi-section (показывается из showContextMenu) #}
+            <button id="ctxAddNextSection" style="display:none;" onclick="window.addNextSectionForSelected(); hideContextMenu();">➕ Следующая секция</button>
+            <button id="ctxUnplacedSections" style="display:none;" onclick="window.openUnplacedSectionsDialog(); hideContextMenu();">📋 Неустановленные секции…</button>
             <button onclick="deleteSelected()">🗑️ Удалить <small style="opacity:0.6;">Del</small></button>
         </div>
         <!-- ПКМ по проводу -->
@@ -7278,6 +7288,20 @@ function drawComponent(comp, isSelected) {
                 drawNode(-w, -h, w, h);
             }
             break;
+        case 'multisection': {
+            // IC-секция: прямоугольный корпус + section_name по центру.
+            // Badge "U1@2" рисуется отдельно (без поворота), как обычный label.
+            ctx.beginPath();
+            ctx.rect(-w + 2, -h + 4, (w - 2) * 2, (h - 4) * 2);
+            ctx.stroke();
+            ctx.save();
+            ctx.font = `${Math.max(8, Math.round((simLabelSize || 11) * 0.85))}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(comp.section_name || '', 0, 0);
+            ctx.restore();
+            break;
+        }
     }
     
     // Портовые ручки показываем только во время редактирования/выделения.
@@ -7425,6 +7449,12 @@ let _displayLabelCache = new WeakMap();
 function getComponentDisplayLabel(comp) {
     const cached = _displayLabelCache.get(comp);
     if (cached && cached._for === components.length && cached._raw === comp.label && cached._type === comp.type) return cached.label;
+    // Multi-section IC: показываем "U1@1 OpAmp_A" — badge с refdes и номером секции.
+    if (comp.type === 'multisection' && comp.refdes) {
+        const lbl = `${comp.refdes}@${comp.section || 1}`;
+        _displayLabelCache.set(comp, { label: lbl, _for: components.length, _raw: comp.label, _type: comp.type });
+        return lbl;
+    }
     const explicit = String(comp.label || '').trim();
     const defaultPrefix = getComponentLabel(comp.type);
     if (comp.type === 'node' || comp.type === 'ground') {
@@ -11922,9 +11952,256 @@ function runPinPinErc() {
             }
         }
     });
+
+    // 2026-06-02 Lithium R.11: multi-section — все секции должны быть размещены.
+    // На PCB они дадут один корпус — если секция не размещена на схеме, останется
+    // подключённый/висящий pin корпуса, что критично для трассировки.
+    if (typeof window.findUnplacedSections === 'function') {
+        const unplaced = window.findUnplacedSections();
+        unplaced.forEach(u => {
+            warnings.push(`Multi-section: ${u.refdes} секция «${u.section_name}» (${u.section}) не размещена на схеме`);
+        });
+    }
     return { errors, warnings };
 }
 window.runPinPinErc = runPinPinErc;
+
+// ──────────── 2026-06-02 Lithium R.11: Multi-section components ────────────
+// Один корпус = несколько символов на схеме (LM358 = 2 op-amp + power).
+// Каждый компонент получает refdes (U1) + section (1/2/3) + section_name (OpAmp_A).
+// На PCB все секции одного refdes → один footprint.
+// Lithium docs: Help/projects/unplaced-parts.html, Help/projects/sections.html.
+
+// Шаблоны multi-section компонентов (расширяемо).
+// Координаты портов рассчитаны под COMPONENT_WIDTH=60, COMPONENT_HEIGHT=40.
+// Op-amp / NAND: 2 порта слева (вверху-внизу), 1 справа (центр).
+// Power: V+ слева, V- справа (по середине).
+const _OPAMP_PORTS = [
+    { id:'+',   label:'IN+', x:-30, y:-12 },
+    { id:'-',   label:'IN-', x:-30, y: 12 },
+    { id:'OUT', label:'OUT', x: 30, y:  0 },
+];
+const _NAND_PORTS = [
+    { id:'A', label:'A', x:-30, y:-12 },
+    { id:'B', label:'B', x:-30, y: 12 },
+    { id:'Y', label:'Y', x: 30, y:  0 },
+];
+const _POWER_PORTS_VV = [
+    { id:'V+', label:'V+', x:-30, y: 0 },
+    { id:'V-', label:'V-', x: 30, y: 0 },
+];
+const _POWER_PORTS_DG = [
+    { id:'VCC', label:'VCC', x:-30, y: 0 },
+    { id:'GND', label:'GND', x: 30, y: 0 },
+];
+const _PIN_OPAMP = { '+':'I', '-':'I', 'OUT':'O' };
+const _PIN_NAND  = { 'A':'I', 'B':'I', 'Y':'O' };
+
+window.MULTISECTION_TEMPLATES = {
+    'LM358': {
+        name: 'LM358',
+        package: 'SOIC-8',
+        sections: [
+            { name: 'OpAmp_A', ports: _OPAMP_PORTS,    pin_types: _PIN_OPAMP },
+            { name: 'OpAmp_B', ports: _OPAMP_PORTS,    pin_types: _PIN_OPAMP },
+            { name: 'Power',   ports: _POWER_PORTS_VV, pin_types: { 'V+':'P', 'V-':'P' } },
+        ],
+    },
+    'LM324': {
+        name: 'LM324',
+        package: 'SOIC-14',
+        sections: [
+            { name: 'OpAmp_A', ports: _OPAMP_PORTS,    pin_types: _PIN_OPAMP },
+            { name: 'OpAmp_B', ports: _OPAMP_PORTS,    pin_types: _PIN_OPAMP },
+            { name: 'OpAmp_C', ports: _OPAMP_PORTS,    pin_types: _PIN_OPAMP },
+            { name: 'OpAmp_D', ports: _OPAMP_PORTS,    pin_types: _PIN_OPAMP },
+            { name: 'Power',   ports: _POWER_PORTS_VV, pin_types: { 'V+':'P', 'V-':'P' } },
+        ],
+    },
+    '74HC00': {
+        name: '74HC00 — Quad NAND',
+        package: 'DIP-14',
+        sections: [
+            { name: 'NAND_A', ports: _NAND_PORTS,    pin_types: _PIN_NAND },
+            { name: 'NAND_B', ports: _NAND_PORTS,    pin_types: _PIN_NAND },
+            { name: 'NAND_C', ports: _NAND_PORTS,    pin_types: _PIN_NAND },
+            { name: 'NAND_D', ports: _NAND_PORTS,    pin_types: _PIN_NAND },
+            { name: 'Power',  ports: _POWER_PORTS_DG, pin_types: { 'VCC':'P', 'GND':'P' } },
+        ],
+    },
+};
+
+// Выдать следующий refdes для multi-section chip'а. U1, U2, ... — пропускаем занятые.
+window.allocMultisectionRefdes = function() {
+    const used = new Set();
+    (components || []).forEach(c => {
+        if (c && c.refdes && /^U\d+$/.test(c.refdes)) used.add(c.refdes);
+    });
+    let n = 1;
+    while (used.has('U' + n)) n++;
+    return 'U' + n;
+};
+
+// Добавить ПЕРВУЮ секцию свежего multi-section компонента.
+window.insertMultisectionChip = function(templateName) {
+    const tpl = window.MULTISECTION_TEMPLATES[templateName];
+    if (!tpl) { if (typeof showNotification === 'function') showNotification('Неизвестный шаблон: ' + templateName, 'error'); return; }
+    const refdes = window.allocMultisectionRefdes();
+    window.placeMultisectionSection({
+        refdes,
+        template: templateName,
+        section: 1,
+        section_name: tpl.sections[0].name,
+        value: tpl.name,
+    });
+};
+
+// Добавить СЛЕДУЮЩУЮ свободную секцию у выбранного компонента.
+window.addNextSectionForSelected = function() {
+    if (!selectedComponent || !selectedComponent.multisection_template) {
+        if (typeof showNotification === 'function') showNotification('Выберите multi-section компонент', 'warning');
+        return;
+    }
+    const refdes = selectedComponent.refdes;
+    const tplName = selectedComponent.multisection_template;
+    const tpl = window.MULTISECTION_TEMPLATES[tplName];
+    if (!tpl) return;
+    const placed = new Set();
+    (components || []).forEach(c => { if (c.refdes === refdes) placed.add(c.section); });
+    for (let s = 1; s <= tpl.sections.length; s++) {
+        if (!placed.has(s)) {
+            window.placeMultisectionSection({
+                refdes,
+                template: tplName,
+                section: s,
+                section_name: tpl.sections[s-1].name,
+                value: selectedComponent.value || tpl.name,
+            });
+            return;
+        }
+    }
+    if (typeof showNotification === 'function') {
+        showNotification(`✓ Все ${tpl.sections.length} секций ${refdes} уже размещены`, 'info');
+    }
+};
+
+// Найти все unplaced sections в текущей схеме
+window.findUnplacedSections = function() {
+    const result = [];
+    // Группируем компоненты по refdes
+    const byRefdes = new Map();
+    (components || []).forEach(c => {
+        if (!c.refdes) return;
+        if (!byRefdes.has(c.refdes)) byRefdes.set(c.refdes, []);
+        byRefdes.get(c.refdes).push(c);
+    });
+    byRefdes.forEach((list, refdes) => {
+        const tplName = list[0].multisection_template;
+        if (!tplName) return;
+        const tpl = window.MULTISECTION_TEMPLATES[tplName];
+        if (!tpl) return;
+        const totalSections = tpl.sections.length;
+        const placed = new Set(list.map(c => c.section));
+        for (let s = 1; s <= totalSections; s++) {
+            if (!placed.has(s)) {
+                result.push({
+                    refdes,
+                    template: tplName,
+                    section: s,
+                    section_name: tpl.sections[s-1].name,
+                    value: list[0].value || tpl.name,
+                });
+            }
+        }
+    });
+    return result;
+};
+
+window.openUnplacedSectionsDialog = function() {
+    const unplaced = window.findUnplacedSections();
+    const modalBg = document.createElement('div');
+    modalBg.style.cssText = 'position:fixed; inset:0; background:rgba(5,10,25,0.92); backdrop-filter:blur(4px); z-index:99996; display:flex; align-items:center; justify-content:center; padding:20px;';
+    let rows = '';
+    if (!unplaced.length) {
+        rows = '<p style="color:#94a3b8; text-align:center; padding:20px;">✓ Все секции multi-section компонентов размещены на схеме.</p>';
+    } else {
+        rows = `<table style="width:100%; border-collapse:collapse; font-size:0.86rem;">
+            <thead><tr style="border-bottom:1px solid rgba(0,212,255,0.3); color:#7fdbff;">
+                <th style="text-align:left; padding:6px 10px;">RefDes</th>
+                <th style="text-align:left; padding:6px 10px;">Value</th>
+                <th style="text-align:left; padding:6px 10px;">Section</th>
+                <th style="text-align:left; padding:6px 10px;">№</th>
+                <th style="text-align:right; padding:6px 10px;">Действие</th>
+            </tr></thead><tbody>
+            ${unplaced.map((u, i) => `
+                <tr style="border-bottom:1px solid rgba(0,212,255,0.1);">
+                    <td style="padding:8px 10px; color:#cfe; font-weight:600;">${u.refdes}</td>
+                    <td style="padding:8px 10px; color:#94a3b8;">${u.value}</td>
+                    <td style="padding:8px 10px; color:#cfe;">${u.section_name}</td>
+                    <td style="padding:8px 10px; color:#94a3b8;">${u.section}/${window.MULTISECTION_TEMPLATES[u.template].sections.length}</td>
+                    <td style="padding:8px 10px; text-align:right;">
+                        <button class="_placeSectionBtn" data-idx="${i}" style="background:linear-gradient(135deg,#00b894,#00838f); color:#fff; border:none; border-radius:5px; padding:5px 12px; cursor:pointer; font-size:0.82rem;">📍 Разместить</button>
+                    </td>
+                </tr>
+            `).join('')}
+            </tbody></table>`;
+    }
+    modalBg.innerHTML = `<div style="background:linear-gradient(135deg,rgba(10,14,39,0.98),rgba(26,39,68,0.98)); border:2px solid #00d4ff; border-radius:14px; max-width:720px; width:100%; max-height:80vh; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(0,212,255,0.2); background:rgba(0,0,0,0.25);">
+            <h2 style="color:#00d4ff; font-size:1.15rem; font-weight:600; margin:0;">🧩 Неустановленные секции</h2>
+            <button id="_unplacedClose" style="margin-left:auto; background:transparent; border:1px solid rgba(255,138,138,0.4); color:#ff9090; width:30px; height:30px; border-radius:6px; cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding:18px 22px; color:#e6e9ef;">${rows}</div>
+        <div style="padding:10px 20px; background:rgba(0,0,0,0.25); color:#94a3b8; font-size:0.78rem; border-top:1px solid rgba(0,212,255,0.18);">
+            💡 Если компонент имеет несколько секций (например op-amp dual A/B + power), все они должны быть размещены на схеме.
+            На печатной плате это будет ОДИН корпус.
+        </div>
+    </div>`;
+    document.body.appendChild(modalBg);
+    modalBg.querySelector('#_unplacedClose').onclick = () => modalBg.remove();
+    modalBg.addEventListener('click', e => { if (e.target === modalBg) modalBg.remove(); });
+    modalBg.querySelectorAll('._placeSectionBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const u = unplaced[parseInt(btn.dataset.idx)];
+            if (typeof window.placeMultisectionSection === 'function') {
+                window.placeMultisectionSection(u);
+                modalBg.remove();
+            }
+        });
+    });
+};
+
+// Размещение секции на холсте — добавляем новый component с тем же refdes
+window.placeMultisectionSection = function(unplacedItem) {
+    if (!components || !canvas) return;
+    const tpl = window.MULTISECTION_TEMPLATES[unplacedItem.template];
+    if (!tpl) return;
+    const section = tpl.sections[unplacedItem.section - 1];
+    if (!section) return;
+    // Центр текущего viewport в world coordinates
+    const cx = (canvas.width / 2 - panX) / zoom;
+    const cy = (canvas.height / 2 - panY) / zoom;
+    const newComp = {
+        id: (typeof nextComponentId === 'function') ? nextComponentId() : (Date.now() + Math.random()),
+        type: 'multisection',
+        refdes: unplacedItem.refdes,
+        section: unplacedItem.section,
+        section_name: section.name,
+        multisection_template: unplacedItem.template,
+        x: cx, y: cy,
+        label: unplacedItem.refdes,
+        value: unplacedItem.value,
+        ports: section.ports.map(p => ({ ...p })),
+        pin_types: { ...section.pin_types },
+        sheet_index: currentSheet,
+    };
+    components.push(newComp);
+    if (typeof snapshotScheme === 'function') snapshotScheme();
+    if (typeof drawCanvas === 'function') drawCanvas();
+    if (typeof showNotification === 'function') {
+        showNotification(`✓ Секция «${section.name}» компонента ${unplacedItem.refdes} размещена`, 'success');
+    }
+};
 
 // v19: Liang-Barsky line-AABB intersection. Возвращает true если отрезок
 // (x1,y1)→(x2,y2) пересекает box {x,y,x2,y2}. Использует параметризацию t∈[0,1].
@@ -13023,6 +13300,12 @@ function showContextMenu(x, y, target) {
         emptyMenu.style.display = 'block';
     } else if (target === 'component') {
         componentMenu.style.display = 'block';
+        // 2026-06-02 Lithium R.11: multi-section пункты — только для multi-section компонента
+        const isMultisection = !!(selectedComponent && selectedComponent.multisection_template);
+        const nextBtn = document.getElementById('ctxAddNextSection');
+        const unplacedBtn = document.getElementById('ctxUnplacedSections');
+        if (nextBtn) nextBtn.style.display = isMultisection ? '' : 'none';
+        if (unplacedBtn) unplacedBtn.style.display = isMultisection ? '' : 'none';
     } else if (target === 'wire') {
         wireMenu.style.display = 'block';
     }
