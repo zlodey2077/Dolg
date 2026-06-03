@@ -3995,17 +3995,17 @@ const PIXI_AUTO_THRESHOLD = 200;  // выше — авто-WebGL
 // Цветовые константы для Pixi (HEX-числа). Соответствуют Canvas2D-палитре.
 const PIXI_COLORS = {
     bg: 0xf4f7fb,
-    grid: 0x0a2540,
+    grid: 0x000000,
     gridAlpha: 0.18,        // было 0.10 — слабая сетка визуально пропадала на ярком фоне
     gridMajorAlpha: 0.35,   // каждая 5-я линия — major, как в Canvas2D-режиме
-    body: 0x0a2540,
+    body: 0x000000,
     bodyAcc: 0x00d4ff,
     port: 0x00ff88,
-    portOccupied: 0x0a2540,
-    wire: 0x0a2540,
+    portOccupied: 0x000000,
+    wire: 0x000000,
     wireSel: 0xff6600,
     selBg: 0xffeb3b,
-    text: 0x0a2540,
+    text: 0x000000,
     textSel: 0xff6600,
 };
 
@@ -7328,35 +7328,32 @@ function getSchematicPalette() {
     if (simSchematicStyle === 'gost') {
         return {
             background: '#f4f7fb',
-            grid: 'rgba(10, 37, 64, 0.14)',
-            majorGrid: 'rgba(10, 37, 64, 0.24)',
-            symbol: '#0a2540',
-            wire: '#0a2540',
+            grid: 'rgba(0, 0, 0, 0.14)',
+            majorGrid: 'rgba(0, 0, 0, 0.24)',
+            symbol: '#000000',
+            wire: '#000000',
             wireHalo: 'rgba(255, 255, 255, 0.92)',
             selected: '#ff6600',
-            label: 'rgba(10, 37, 64, 0.96)',
+            label: '#000000',
             labelHalo: 'rgba(255, 255, 255, 0.95)',
             portFree: '#00aa66',
             portBusy: '#cc2733',
-            portNode: '#0a2540',
+            portNode: '#000000',
         };
     }
     return {
         background: '#f7fafc',
-        grid: 'rgba(34, 91, 125, 0.12)',
-        majorGrid: 'rgba(34, 91, 125, 0.24)',
-        symbol: '#102a43',
-        // Провод тем же цветом, что и УГО-символ — без светло-голубой подсветки.
-        // Это ГОСТ-стиль: непрерывная чёрная линия. Выделение/halo делаются
-        // отдельно через palette.selected / wireHalo и не зависят от wire.
-        wire: '#102a43',
+        grid: 'rgba(0, 0, 0, 0.12)',
+        majorGrid: 'rgba(0, 0, 0, 0.24)',
+        symbol: '#000000',
+        wire: '#000000',
         wireHalo: 'rgba(255, 255, 255, 0.95)',
         selected: '#f97316',
-        label: '#0f172a',
+        label: '#000000',
         labelHalo: 'rgba(255, 255, 255, 0.98)',
         portFree: '#0f9f6e',
         portBusy: '#dc2626',
-        portNode: '#102a43',
+        portNode: '#000000',
     };
 }
 
@@ -11795,7 +11792,7 @@ window.showAllNetLevels = showAllNetLevels;
 // width / clearance / via size. Применяется в DRC и при рисовании.
 // 5 предопределённых классов (MVP без БД, JS-only).
 window.NET_CLASSES = {
-    'Default':  { color: '#7fdbff', default_width: 0.25, min_width: 0.15, min_clearance: 0.2,  min_via: 0.6, desc: 'Стандартная цепь' },
+    'Default':  { color: '#000000', default_width: 0.25, min_width: 0.15, min_clearance: 0.2,  min_via: 0.6, desc: 'Стандартная цепь' },
     'Power':    { color: '#ff9090', default_width: 0.6,  min_width: 0.4,  min_clearance: 0.25, min_via: 0.8, desc: 'Питание (+5V, +12V, VDD…)' },
     'GND':      { color: '#a0a0a0', default_width: 0.5,  min_width: 0.3,  min_clearance: 0.2,  min_via: 0.6, desc: 'Земля / общий провод' },
     'Signal':   { color: '#22d3ee', default_width: 0.2,  min_width: 0.15, min_clearance: 0.15, min_via: 0.5, desc: 'Цифровой сигнал' },
