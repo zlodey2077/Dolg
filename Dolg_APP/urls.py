@@ -21,6 +21,8 @@ urlpatterns = [
     # Admin-only: тренировка нейронки прямо с сайта (background thread + polling).
     # ВАЖНО: префикс staff/, а НЕ admin/ — последний перехвачен django.contrib.admin
     # в корневом urls.py и наши вложенные пути не доходят (404).
+    path("staff/ops/",                       ml_admin_views.staff_ops_dashboard,       name="staff_ops_dashboard"),
+    path("staff/ops/api/snapshot/",          ml_admin_views.staff_ops_snapshot_api,    name="staff_ops_snapshot_api"),
     path("staff/ml-training/",               ml_admin_views.ml_training_page,           name="ml_training_page"),
     path("staff/ml-dataset/",                ml_admin_views.ml_dataset_quality_page,    name="ml_dataset_quality_page"),
     path("staff/ml-training/start/",         ml_admin_views.ml_training_start,          name="ml_training_start"),
@@ -76,6 +78,7 @@ urlpatterns = [
     path("simulation/api/export/pdf/", views.api_export_scheme_pdf, name="api_export_scheme_pdf"),
     path("cad/api/convert-dwg/", views.api_cad_convert_dwg, name="api_cad_convert_dwg"),
     path("cad/api/import/", views.api_cad_import_preview, name="api_cad_import_preview"),
+    path("cad/api/lithium-import/", views.api_lithium_import_preview, name="api_lithium_import_preview"),
 
     # AI-ассистент DOLG (чат с Claude)
     path("api/ai/chat/", views.api_ai_chat, name="api_ai_chat"),

@@ -14,9 +14,9 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
-from django.views.decorators.cache import never_cache
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -24,7 +24,15 @@ from reportlab.pdfgen import canvas
 
 from shop.models import Product
 
-from .models import Announcement, ProjectEvent, ProjectMeasurement, ProjectReview, ProjectVersion, SchematicProject, SimulationRun
+from .models import (
+    Announcement,
+    ProjectEvent,
+    ProjectMeasurement,
+    ProjectReview,
+    ProjectVersion,
+    SchematicProject,
+    SimulationRun,
+)
 from .quotas import (
     check_active_share_links,
     enforce_daily_quota,
@@ -41,11 +49,20 @@ from .services.entitlements import (
     has_feature,
 )
 from .services.learning_by_review import learning_suggestions_from_review
+from .services.lithium_import import (
+    LithiumImportError,
+    detect_lithium_file,
+    parse_lithium_project,
+)
 from .services.project_review import build_design_review, compare_measurement
-from .services.review_i18n import build_measurement_rows, build_metric_rows, localize_review_report, status_label_ru
+from .services.review_i18n import (
+    build_measurement_rows,
+    build_metric_rows,
+    localize_review_report,
+    status_label_ru,
+)
 from .services.rule_ai import build_ai_scheme_context, build_rule_based_reply
 from .simulation_quota import quota_dict
-
 
 logger = logging.getLogger(__name__)
 
@@ -623,8 +640,9 @@ def _comment_to_dict(c, request_user=None):
 @require_GET
 def api_comments_list(request):
     """GET ?project=N или ?article=N → list[comment]"""
-    from .models import Comment
     from moderation.services import visible_queryset
+
+    from .models import Comment
     project_id = request.GET.get('project')
     article_id = request.GET.get('article')
     qs = Comment.objects.select_related('user', 'user__profile').order_by('created_at')
@@ -643,9 +661,10 @@ def api_comments_list(request):
 @require_POST
 def api_comments_create(request):
     """POST {body, project|article, parent_id?} → comment"""
+    from moderation.services import user_is_restricted
+
     from .models import Comment
     from .quotas import get_user_tier
-    from moderation.services import user_is_restricted
     try:
         data = json.loads(request.body or '{}')
     except (json.JSONDecodeError, ValueError):
@@ -2040,6 +2059,51 @@ def api_cad_import_preview(request):
         payload['saved_review'] = _review_to_dict(saved_review)
 
     return JsonResponse(payload, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_lithium_import_preview(request):
+    """Импорт Lithium ECAD проекта (.lpr/.lsc/.lbo).
+
+    Принимает multipart upload (1-3 файла) или JSON со строковым содержимым.
+    Возвращает структурированный summary: компоненты, цепи, слои, ERC, порты.
+    """
+    files_text: dict[str, str] = {}
+
+    if request.FILES:
+        for upload in request.FILES.getlist('files'):
+            try:
+                raw = upload.read().decode('utf-8', errors='replace')
+            except Exception as exc:
+                return _json_error(f'Не удалось прочитать {upload.name}: {exc}')
+            kind = detect_lithium_file(upload.name, raw)
+            if kind:
+                files_text[kind] = raw
+    else:
+        data = _read_json_payload(request)
+        for kind in ('lpr', 'lsc', 'lbo'):
+            text = data.get(f'{kind}_text')
+            if text:
+                files_text[kind] = text
+
+    if not files_text:
+        return _json_error('Загрузите хотя бы один файл .lpr / .lsc / .lbo')
+
+    try:
+        project = parse_lithium_project(
+            lpr_text=files_text.get('lpr'),
+            lsc_text=files_text.get('lsc'),
+            lbo_text=files_text.get('lbo'),
+        )
+    except LithiumImportError as exc:
+        return _json_error(str(exc), status=400)
+
+    return JsonResponse({
+        'ok': True,
+        'summary': project.to_dict(),
+        'imported_files': sorted(files_text.keys()),
+    }, status=200)
 
 
 @login_required(login_url='accounts:login')
