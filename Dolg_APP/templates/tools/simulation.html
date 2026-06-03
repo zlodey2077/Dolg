@@ -6661,30 +6661,27 @@ function buildOrthogonalPath(fromPos, toPos, waypoints, fromComp, fromPortId, to
         const hFrom = Math.abs(fromDir.dx) > 0;
         const hTo   = Math.abs(toDir.dx)   > 0;
 
-        // Прямая: если стабы выровнены по одной оси И порты «смотрят друг
-        // на друга» — соединяем без изгиба.
-        // Раньше straightH/V проверял ТОЛЬКО выравнивание по оси, но не
-        // направление выхода портов. Когда оба порта смотрят в одну сторону
-        // (например, у горизонтальной батареи `+` и у горизонтального резистора
-        // `a` оба выходят ВЛЕВО), «прямая» линия шла через корпуса обоих
-        // компонентов — отсюда провода, проходящие сквозь УГО на схеме.
-        const dxSrcToDst = toPos.x - fromPos.x;
-        const dySrcToDst = toPos.y - fromPos.y;
-        const srcFacesDstH = fromDir.dx * dxSrcToDst > 0;
-        const dstFacesSrcH = toDir.dx * (-dxSrcToDst) > 0;
-        const srcFacesDstV = fromDir.dy * dySrcToDst > 0;
-        const dstFacesSrcV = toDir.dy * (-dySrcToDst) > 0;
-        const straightH = hFrom && hTo && Math.abs(p1.y - p2.y) < EPS && srcFacesDstH && dstFacesSrcH;
-        const straightV = !hFrom && !hTo && Math.abs(p1.x - p2.x) < EPS && srcFacesDstV && dstFacesSrcV;
-
-        // Wrap-around: оба порта смотрят в одну и ту же сторону (например, оба
-        // выходят влево), а целевой компонент — наоборот. Маршрут должен
-        // обойти корпус сверху или снизу. Без этого получаем «прямую через
-        // корпус».
-        const wrapAroundH = hFrom && hTo && Math.abs(p1.y - p2.y) < EPS
-            && !srcFacesDstH && !dstFacesSrcH;
-        const wrapAroundV = !hFrom && !hTo && Math.abs(p1.x - p2.x) < EPS
-            && !srcFacesDstV && !dstFacesSrcV;
+        // Прямая допустима, ТОЛЬКО когда стабы выровнены по оси И прямая
+        // линия не пересекает корпус источника/приёмника. Раньше проверялось
+        // только выравнивание — а если оба горизонтальных порта выходили в
+        // одну сторону (типичный кейс: V.+ и R.a оба смотрят влево), «прямая»
+        // шла прямо через тела обоих компонентов.
+        const straightHCandidate = hFrom && hTo && Math.abs(p1.y - p2.y) < EPS;
+        const straightVCandidate = !hFrom && !hTo && Math.abs(p1.x - p2.x) < EPS;
+        const fromBoxList = fromComp ? [_componentBbox(fromComp)].filter(Boolean) : [];
+        const toBoxList   = toComp   ? [_componentBbox(toComp)  ].filter(Boolean) : [];
+        const xMin = Math.min(p1.x, p2.x), xMax = Math.max(p1.x, p2.x);
+        const yMin = Math.min(p1.y, p2.y), yMax = Math.max(p1.y, p2.y);
+        const straightCrossesBody = (
+            (straightHCandidate && (hSegHitsRects(fromBoxList, p1.y, xMin, xMax)
+                                  || hSegHitsRects(toBoxList,   p1.y, xMin, xMax))) ||
+            (straightVCandidate && (vSegHitsRects(fromBoxList, p1.x, yMin, yMax)
+                                  || vSegHitsRects(toBoxList,   p1.x, yMin, yMax)))
+        );
+        const straightH = straightHCandidate && !straightCrossesBody;
+        const straightV = straightVCandidate && !straightCrossesBody;
+        const wrapAroundH = straightHCandidate && straightCrossesBody;
+        const wrapAroundV = straightVCandidate && straightCrossesBody;
 
         const styleSetting = (window.simWireSettings && window.simWireSettings.style) || 'auto';
         // Direct — игнорируем препятствия, строим минимальную ломаную
