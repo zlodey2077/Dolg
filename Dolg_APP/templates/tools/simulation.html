@@ -4998,9 +4998,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Отключаем стандартное контекстное меню и показываем свое
+    // Отключаем стандартное контекстное меню и показываем свое.
+    // Клик закрывает меню ТОЛЬКО если он снаружи #context-menu —
+    // иначе клик на <summary> группы (раскрытие/сворачивание) тут же
+    // закрывал меню до того, как срабатывал нативный toggle.
     canvas.addEventListener('contextmenu', onCanvasContextMenu);
-    document.addEventListener('click', hideContextMenu);
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.closest && e.target.closest('#context-menu')) return;
+        hideContextMenu();
+    });
 
     // Начальный снимок истории — пустая схема (точка отсчёта для Undo).
     snapshotScheme();
@@ -7220,14 +7226,17 @@ function getSchematicPalette() {
         grid: 'rgba(34, 91, 125, 0.12)',
         majorGrid: 'rgba(34, 91, 125, 0.24)',
         symbol: '#102a43',
-        wire: '#164e78',
+        // Провод тем же цветом, что и УГО-символ — без светло-голубой подсветки.
+        // Это ГОСТ-стиль: непрерывная чёрная линия. Выделение/halo делаются
+        // отдельно через palette.selected / wireHalo и не зависят от wire.
+        wire: '#102a43',
         wireHalo: 'rgba(255, 255, 255, 0.95)',
         selected: '#f97316',
         label: '#0f172a',
         labelHalo: 'rgba(255, 255, 255, 0.98)',
         portFree: '#0f9f6e',
         portBusy: '#dc2626',
-        portNode: '#164e78',
+        portNode: '#102a43',
     };
 }
 
