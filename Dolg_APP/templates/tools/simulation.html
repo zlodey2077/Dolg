@@ -6596,6 +6596,27 @@ function _componentBbox(c) {
     return { l: c.x, t: c.y, r: c.x + COMPONENT_WIDTH, b: c.y + COMPONENT_HEIGHT };
 }
 
+// Проверка L-маршрута (p1 → corner → p2) на пересечение с корпусами:
+// все obstacles + явно from/to (которые из obstacles исключены).
+function _lRouteHitsBodies(p1, corner, p2, obstacles, fromComp, toComp) {
+    const fbox = _componentBbox(fromComp);
+    const tbox = _componentBbox(toComp);
+    const allRects = obstacles.concat(fbox ? [fbox] : []).concat(tbox ? [tbox] : []);
+    // Сегмент 1: p1 → corner. Один из них совпадает по координате.
+    if (Math.abs(corner.y - p1.y) < 0.5) {
+        if (hSegHitsRects(allRects, p1.y, p1.x, corner.x)) return true;
+    } else {
+        if (vSegHitsRects(allRects, p1.x, p1.y, corner.y)) return true;
+    }
+    // Сегмент 2: corner → p2.
+    if (Math.abs(corner.x - p2.x) < 0.5) {
+        if (vSegHitsRects(allRects, p2.x, corner.y, p2.y)) return true;
+    } else {
+        if (hSegHitsRects(allRects, p2.y, corner.x, p2.x)) return true;
+    }
+    return false;
+}
+
 function pickFreeAxisY(initialY, x1, x2, rects, step, p1y, p2y) {
     const sn = (v) => Math.round(v / step) * step;
     const y = sn(initialY);
@@ -6730,22 +6751,37 @@ function buildOrthogonalPath(fromPos, toPos, waypoints, fromComp, fromPortId, to
             const midY = pickFreeAxisY((p1.y + p2.y) / 2, p1.x, p2.x, obstacles, routeStep, p1.y, p2.y);
             pts.push({ x: p1.x, y: midY }, { x: p2.x, y: midY });
         } else if (hFrom && !hTo) {
-            // Горизонтальный → вертикальный: один угол. Сам угол — это (p2.x, p1.y).
-            // Если он внутри препятствия, делаем S-образный обход.
-            if (rectsContainPoint(obstacles, p2.x, p1.y)) {
+            // Горизонтальный → вертикальный: 2 варианта L-угла.
+            // Primary (горизонталь→угол→вертикаль): угол (p2.x, p1.y).
+            // Alt (вертикаль→угол→горизонталь): угол (p1.x, p2.y).
+            // Раньше проверялся только rectsContainPoint на primary corner и
+            // против obstacles (БЕЗ from/to). В типичном кейсе R.b → Q.c primary
+            // L шёл через корпус источника, потому что R исключён из obstacles.
+            // Теперь: проверяем оба варианта сегментами через ВСЕ корпуса
+            // включая from/to. Если оба плохи — S-образный обход.
+            const primary = { x: p2.x, y: p1.y };
+            const alt     = { x: p1.x, y: p2.y };
+            if (!_lRouteHitsBodies(p1, primary, p2, obstacles, fromComp, toComp)) {
+                pts.push(primary);
+            } else if (!_lRouteHitsBodies(p1, alt, p2, obstacles, fromComp, toComp)) {
+                pts.push(alt);
+            } else {
                 const midX = pickFreeAxisX((p1.x + p2.x) / 2, p1.y, p1.y, obstacles, routeStep);
                 const midY = pickFreeAxisY((p1.y + p2.y) / 2, midX, p2.x, obstacles, routeStep);
                 pts.push({ x: midX, y: p1.y }, { x: midX, y: midY }, { x: p2.x, y: midY });
-            } else {
-                pts.push({ x: p2.x, y: p1.y });
             }
         } else {
-            if (rectsContainPoint(obstacles, p1.x, p2.y)) {
+            // Вертикальный → горизонтальный: симметрично.
+            const primary = { x: p1.x, y: p2.y };
+            const alt     = { x: p2.x, y: p1.y };
+            if (!_lRouteHitsBodies(p1, primary, p2, obstacles, fromComp, toComp)) {
+                pts.push(primary);
+            } else if (!_lRouteHitsBodies(p1, alt, p2, obstacles, fromComp, toComp)) {
+                pts.push(alt);
+            } else {
                 const midY = pickFreeAxisY((p1.y + p2.y) / 2, p1.x, p1.x, obstacles, routeStep);
                 const midX = pickFreeAxisX((p1.x + p2.x) / 2, midY, p2.y, obstacles, routeStep);
                 pts.push({ x: p1.x, y: midY }, { x: midX, y: midY }, { x: midX, y: p2.y });
-            } else {
-                pts.push({ x: p1.x, y: p2.y });
             }
         }
     }
