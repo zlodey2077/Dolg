@@ -820,16 +820,35 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
         updateProperties() пишет в тот же div, поэтому вся логика свойств
         (R/C/L/V, catalog, повороты) работает без изменений.
     {% endcomment %}
-    <div id="propertiesFloatPanel" class="float-panel" role="dialog" aria-label="Свойства компонента" aria-hidden="true" hidden>
+    <div id="propertiesFloatPanel" class="float-panel float-panel--tabbed" role="dialog" aria-label="Инспектор" aria-hidden="true" hidden>
         <div class="float-panel__header" data-drag-handle>
-            <span class="float-panel__title">🔧 Свойства</span>
+            <span class="float-panel__title" id="propertiesFloatTitle">🔧 Свойства</span>
             <div class="float-panel__actions">
+                <button type="button" class="float-panel__btn" id="propertiesPanelDock" title="Dock к правому краю" aria-label="Dock">⇥</button>
                 <button type="button" class="float-panel__btn" id="propertiesPanelMinimize" title="Свернуть в иконку" aria-label="Свернуть">—</button>
                 <button type="button" class="float-panel__btn" id="propertiesPanelClose" title="Закрыть панель" aria-label="Закрыть">✕</button>
             </div>
         </div>
-        <div class="float-panel__body" id="propertiesFloatBody">
-            {# Сюда переедет #properties-panel из bottom-panel при загрузке #}
+        <div class="float-panel__tabs" role="tablist" aria-label="Разделы инспектора">
+            <button type="button" class="float-panel__tab active" data-inspector-tab="properties" role="tab" aria-selected="true">🔧 Свойства</button>
+            <button type="button" class="float-panel__tab" data-inspector-tab="nets" role="tab" aria-selected="false">🌐 Цепи</button>
+            <button type="button" class="float-panel__tab" data-inspector-tab="layers" role="tab" aria-selected="false">📐 Слои</button>
+        </div>
+        <div class="float-panel__body float-panel__body--tabbed" id="propertiesFloatBody">
+            <div class="inspector-pane active" data-inspector-pane="properties">
+                {# Сюда переедет #properties-panel из bottom-panel при загрузке #}
+            </div>
+            <div class="inspector-pane" data-inspector-pane="nets" hidden>
+                <div class="inspector-toolbar">
+                    <input type="search" id="netInspectorFilter" placeholder="Фильтр цепей…" class="inspector-search"/>
+                    <span class="inspector-count" id="netInspectorCount">0</span>
+                </div>
+                <ul class="inspector-list" id="netInspectorList"></ul>
+            </div>
+            <div class="inspector-pane" data-inspector-pane="layers" hidden>
+                <ul class="inspector-list inspector-list--layers" id="layerInspectorList"></ul>
+                <div class="inspector-hint">Клик по строке — toggle видимости слоя. ПКМ — открыть Stack-up.</div>
+            </div>
         </div>
         <div class="float-panel__resize" data-resize-handle title="Изменить размер"></div>
     </div>
@@ -2808,6 +2827,128 @@ body.sim-sticky-add .sticky-add-toggle {
 .float-panel__resize:hover { opacity: 1; }
 /* Когда панель minimized — резайз и body спрятаны, header «сжимается» */
 .float-panel--minimized .float-panel__header { padding: 6px 10px; }
+
+/* Tabbed floating panel: компактные вкладки между header и body.
+   Dock-режим прижимает панель к правому краю, чтобы освободить canvas. */
+.float-panel--tabbed { width: 280px; height: 520px; }
+.float-panel__tabs {
+    display: flex;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.18);
+    background: rgba(0, 0, 0, 0.20);
+}
+.float-panel__tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #94a3b8;
+    padding: 7px 4px;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: color .12s, border-color .12s, background .12s;
+}
+.float-panel__tab:hover { color: #cfe; background: rgba(0, 212, 255, 0.06); }
+.float-panel__tab.active {
+    color: #00d4ff;
+    border-bottom-color: #00d4ff;
+    background: rgba(0, 212, 255, 0.10);
+}
+.float-panel__body--tabbed { padding: 0; }
+.inspector-pane { padding: 10px 12px; }
+.inspector-pane[hidden] { display: none; }
+.inspector-toolbar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.inspector-search {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(0, 212, 255, 0.25);
+    border-radius: 4px;
+    color: #cfe;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+.inspector-search:focus { outline: none; border-color: #00d4ff; }
+.inspector-count {
+    font-size: 11px;
+    color: #94a3b8;
+    background: rgba(0, 212, 255, 0.08);
+    padding: 2px 7px;
+    border-radius: 9px;
+    min-width: 22px;
+    text-align: center;
+}
+.inspector-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: calc(100% - 50px);
+}
+.inspector-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #cfe;
+    border-left: 3px solid transparent;
+    transition: background .1s;
+}
+.inspector-list li:hover { background: rgba(0, 212, 255, 0.08); }
+.inspector-list li.active {
+    background: rgba(0, 212, 255, 0.14);
+    border-left-color: #00d4ff;
+}
+.inspector-list li .swatch {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.inspector-list li .meta {
+    margin-left: auto;
+    font-size: 10.5px;
+    color: #94a3b8;
+}
+.inspector-list--layers li .vis-toggle {
+    width: 16px; height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #00d4ff;
+    flex-shrink: 0;
+}
+.inspector-list--layers li.layer-hidden {
+    opacity: 0.45;
+}
+.inspector-list--layers li.layer-hidden .vis-toggle { color: #94a3b8; }
+.inspector-hint {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.25);
+    border-left: 2px solid rgba(0, 212, 255, 0.3);
+    font-size: 11px;
+    color: #94a3b8;
+    border-radius: 3px;
+}
+
+/* Dock to right edge — высота 100vh, ширина 240px, прибит к right:0. */
+.float-panel--docked {
+    top: 60px !important;
+    right: 0 !important;
+    left: auto !important;
+    width: 240px !important;
+    height: calc(100vh - 80px) !important;
+    border-radius: 8px 0 0 8px !important;
+    border-right: none !important;
+}
+.float-panel--docked .float-panel__resize { display: none; }
+.float-panel--docked .float-panel__header { cursor: default; }
 
 /* Hover-popover: read-only сводка свойств компонента при наведении.
    Hidden по умолчанию, JS показывает через .visible и позиционирует
@@ -4878,7 +5019,174 @@ function initFloatingPanels() {
     // (6) Close / minimize / maximize-кнопки.
     _wirePanelControls('propertiesFloatPanel', 'propertiesPanelClose', 'propertiesPanelMinimize', null);
     _wirePanelControls('resultsFloatPanel', 'resultsPanelClose', 'resultsPanelMinimize', 'resultsPanelMaximize');
+
+    // (7) Вкладки + Dock для propertiesFloatPanel.
+    _wireInspectorTabs();
+    _wireDockButton();
 }
+
+const INSPECTOR_TAB_TITLES = {
+    properties: '🔧 Свойства',
+    nets: '🌐 Цепи',
+    layers: '📐 Слои',
+};
+
+function _wireInspectorTabs() {
+    const panel = document.getElementById('propertiesFloatPanel');
+    if (!panel) return;
+    const titleEl = document.getElementById('propertiesFloatTitle');
+    panel.querySelectorAll('.float-panel__tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.inspectorTab;
+            panel.querySelectorAll('.float-panel__tab').forEach(b => {
+                const isActive = b.dataset.inspectorTab === target;
+                b.classList.toggle('active', isActive);
+                b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            panel.querySelectorAll('.inspector-pane').forEach(p => {
+                p.hidden = p.dataset.inspectorPane !== target;
+                p.classList.toggle('active', p.dataset.inspectorPane === target);
+            });
+            if (titleEl && INSPECTOR_TAB_TITLES[target]) {
+                titleEl.textContent = INSPECTOR_TAB_TITLES[target];
+            }
+            if (target === 'nets') renderNetInspector();
+            else if (target === 'layers') renderLayerInspector();
+            try { localStorage.setItem('dolg.inspectorTab', target); } catch (_e) {}
+        });
+    });
+    // Restore last active tab.
+    try {
+        const last = localStorage.getItem('dolg.inspectorTab');
+        if (last && INSPECTOR_TAB_TITLES[last]) {
+            const tab = panel.querySelector(`[data-inspector-tab="${last}"]`);
+            if (tab) tab.click();
+        }
+    } catch (_e) {}
+
+    // Net filter input.
+    const filterInput = document.getElementById('netInspectorFilter');
+    if (filterInput) {
+        filterInput.addEventListener('input', renderNetInspector);
+    }
+}
+
+function _wireDockButton() {
+    const btn = document.getElementById('propertiesPanelDock');
+    const panel = document.getElementById('propertiesFloatPanel');
+    if (!btn || !panel) return;
+    const isDockedNow = () => panel.classList.contains('float-panel--docked');
+    const updateBtn = () => {
+        btn.textContent = isDockedNow() ? '⇤' : '⇥';
+        btn.title = isDockedNow() ? 'Открепить' : 'Dock к правому краю';
+    };
+    btn.addEventListener('click', () => {
+        const willDock = !isDockedNow();
+        panel.classList.toggle('float-panel--docked', willDock);
+        try { localStorage.setItem('dolg.inspectorDocked', willDock ? '1' : '0'); } catch (_e) {}
+        updateBtn();
+    });
+    try {
+        if (localStorage.getItem('dolg.inspectorDocked') === '1') {
+            panel.classList.add('float-panel--docked');
+        }
+    } catch (_e) {}
+    updateBtn();
+}
+
+const PCB_LAYERS_DEFAULT = [
+    { id: 'top_copper',  name: 'Top Copper',     color: '#ff5577', visible: true },
+    { id: 'top_silk',    name: 'Top Silk',       color: '#eeeeee', visible: true },
+    { id: 'top_mask',    name: 'Top Mask',       color: '#aa44ff', visible: false },
+    { id: 'top_paste',   name: 'Top Paste',      color: '#ffbb00', visible: false },
+    { id: 'bot_copper',  name: 'Bottom Copper',  color: '#3399ff', visible: true },
+    { id: 'bot_silk',    name: 'Bottom Silk',    color: '#bbbbbb', visible: false },
+    { id: 'drill',       name: 'Drill',          color: '#ffffff', visible: true },
+    { id: 'outline',     name: 'Board Outline',  color: '#ffff66', visible: true },
+];
+
+window.PCB_LAYERS = window.PCB_LAYERS || PCB_LAYERS_DEFAULT.map(l => ({ ...l }));
+
+function renderNetInspector() {
+    const list = document.getElementById('netInspectorList');
+    const countEl = document.getElementById('netInspectorCount');
+    if (!list) return;
+    const filter = (document.getElementById('netInspectorFilter')?.value || '').toLowerCase();
+
+    const netMap = new Map();
+    (connections || []).forEach((conn, idx) => {
+        const name = (conn.netLabel || '').trim() || `net#${idx}`;
+        if (!netMap.has(name)) netMap.set(name, { name, count: 0, sample: idx, level: conn.netLevel ?? null, className: conn.netClassName || '' });
+        netMap.get(name).count++;
+    });
+    const entries = Array.from(netMap.values())
+        .filter(e => !filter || e.name.toLowerCase().includes(filter))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    list.innerHTML = entries.map(e => {
+        const cls = e.className ? ` · ${e.className}` : '';
+        const lvl = e.level != null ? ` L${e.level}` : '';
+        return `<li data-net="${e.name}" data-conn="${e.sample}">
+            <span class="swatch" style="background:${_netColor(e.name)};"></span>
+            <span>${_escapeHtml(e.name)}</span>
+            <span class="meta">${e.count}${lvl}${cls}</span>
+        </li>`;
+    }).join('') || '<li style="cursor:default; color:#94a3b8;">— цепи отсутствуют —</li>';
+
+    if (countEl) countEl.textContent = String(entries.length);
+
+    list.querySelectorAll('li[data-conn]').forEach(li => {
+        li.addEventListener('click', () => {
+            const idx = parseInt(li.dataset.conn, 10);
+            if (!Number.isNaN(idx) && typeof selectConnection === 'function') {
+                selectConnection(idx);
+                drawCanvas();
+            }
+            list.querySelectorAll('li').forEach(x => x.classList.remove('active'));
+            li.classList.add('active');
+        });
+    });
+}
+
+function renderLayerInspector() {
+    const list = document.getElementById('layerInspectorList');
+    if (!list) return;
+    list.innerHTML = (window.PCB_LAYERS || []).map(l => `
+        <li data-layer="${l.id}" class="${l.visible ? '' : 'layer-hidden'}">
+            <span class="vis-toggle">${l.visible ? '👁' : '·'}</span>
+            <span class="swatch" style="background:${l.color};"></span>
+            <span>${_escapeHtml(l.name)}</span>
+        </li>
+    `).join('');
+    list.querySelectorAll('li[data-layer]').forEach(li => {
+        li.addEventListener('click', () => {
+            const layer = (window.PCB_LAYERS || []).find(l => l.id === li.dataset.layer);
+            if (!layer) return;
+            layer.visible = !layer.visible;
+            renderLayerInspector();
+            if (typeof drawCanvas === 'function') drawCanvas();
+        });
+    });
+}
+
+function _netColor(name) {
+    if (/^GND$/i.test(name) || /ground/i.test(name)) return '#666';
+    if (/^V?\+?5V?$/i.test(name) || /VCC/i.test(name) || /VDD/i.test(name) || /\+5V/.test(name)) return '#ff5566';
+    if (/^V?\+?3.?3V?$/i.test(name) || /3V3/i.test(name)) return '#ff9933';
+    if (/^V?\+?12V?$/i.test(name)) return '#ffcc00';
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+    return `hsl(${h % 360},60%,60%)`;
+}
+
+function _escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+
+window.renderNetInspector = renderNetInspector;
+window.renderLayerInspector = renderLayerInspector;
 
 function _setupFloatPanelGeometry(panelId, defaults) {
     const panel = document.getElementById(panelId);
