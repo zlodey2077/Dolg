@@ -9148,6 +9148,11 @@ let isApplyingHistory = false;
 
 function snapshotScheme() {
     if (isApplyingHistory) return;
+    // Wire-cleanup до снапшота: дубликаты соединений между одинаковыми пинами
+    // и колинеарные перекрывающиеся сегменты схлопываем — иначе граф растёт
+    // мусором при каждом drag/copy-paste, что бьёт по производительности и
+    // делает selection неоднозначным (клик на видимый провод даёт N невидимых).
+    if (typeof cleanupOverlappingWires === 'function') cleanupOverlappingWires();
     const snap = JSON.stringify(buildSchemeData());
     // Идемпотентность: debounced snapshots могут срабатывать после состояния,
     // которое уже зафиксировано (например, последовательные правки одного и
@@ -12507,6 +12512,182 @@ function _netNameFromPort(ports) {
     // Fallback: первый pin как маркер.
     return first.label.split('.')[0];
 }
+
+// ─── Wire topology cleanup: dedup + colinear merge ───
+// Граф соединений обрастает мусором при copy-paste, перетаскивании и
+// импорте: два провода между одинаковыми пинами (полный дубль) или
+// частично перекрывающиеся сегменты на одной прямой. Клик на видимый
+// провод выделяет N невидимых одновременно — UX страдает. Эта функция
+// схлопывает такие случаи перед snapshot/render.
+//
+// Алгоритм:
+//   1. Dedup по endpoint-парe — если два соединения имеют одни и те же
+//      (compId, portId) пары (в любом порядке), оставляем одно. При
+//      сохранении предпочитаем то, у которого есть net_label/класс/level,
+//      чтобы не потерять семантику.
+//   2. Colinear merge — для каждой пары соединений с пересекающимся
+//      сегментом на одной прямой: схлопываем перекрытие, сохраняя
+//      топологию (если на пути есть отвод к третьему пину — НЕ трогаем).
+//      Без shared bus/net_label — если оба соединения имеют разные
+//      net_label, не сливаем (могут быть осознанно разделённые шины).
+function cleanupOverlappingWires() {
+    if (!connections || !connections.length) return 0;
+    let removed = 0;
+
+    // 1. Endpoint-dedup. Ключ — отсортированная пара (comp:port, comp:port).
+    const endpointKey = (c) => {
+        const a = `${c.from.compId}:${c.from.portId}`;
+        const b = `${c.to.compId}:${c.to.portId}`;
+        return a < b ? `${a}|${b}` : `${b}|${a}`;
+    };
+    const seen = new Map();   // key → index в connections
+    const toRemove = new Set();
+    for (let i = 0; i < connections.length; i++) {
+        const conn = connections[i];
+        if (!conn || !conn.from || !conn.to) continue;
+        if (conn.from.compId === conn.to.compId && conn.from.portId === conn.to.portId) {
+            // Self-loop: один и тот же пин — это всегда мусор.
+            toRemove.add(i);
+            continue;
+        }
+        const key = endpointKey(conn);
+        if (!seen.has(key)) {
+            seen.set(key, i);
+            continue;
+        }
+        // Дубль. Решаем какой оставить: с net_label/net_class/net_level
+        // → приоритет. Иначе — старший (меньший index).
+        const prevIdx = seen.get(key);
+        const prev = connections[prevIdx];
+        const curScore = _wireSemanticScore(conn);
+        const prevScore = _wireSemanticScore(prev);
+        if (curScore > prevScore) {
+            toRemove.add(prevIdx);
+            seen.set(key, i);
+        } else {
+            toRemove.add(i);
+        }
+    }
+    if (toRemove.size) {
+        connections = connections.filter((_, idx) => !toRemove.has(idx));
+        removed += toRemove.size;
+    }
+
+    // 2. Colinear segment merge. Для каждой пары соединений с одинаковой
+    // прямой и пересекающимся отрезком: схлопываем waypoints. Если у
+    // соединений разные net_label (явное разделение), пропускаем.
+    // Делаем максимум 2 прохода — после первого мерджа может появиться
+    // новый кандидат.
+    for (let pass = 0; pass < 2; pass++) {
+        const merged = _mergeColinearSegmentsOnce();
+        if (!merged) break;
+        removed += merged;
+    }
+
+    return removed;
+}
+
+function _wireSemanticScore(conn) {
+    let s = 0;
+    if (conn.net_label) s += 4;
+    if (conn.netClassName) s += 2;
+    if (conn.netLevel != null) s += 1;
+    if (Array.isArray(conn.waypoints) && conn.waypoints.length) s += 1;
+    return s;
+}
+
+// Один проход колинеарного мерджа. Возвращает количество удалённых
+// дублирующих сегментов. Простая O(N²) реализация — для N < ~500 wires
+// быстрее, чем bucketing.
+function _mergeColinearSegmentsOnce() {
+    if (!connections || connections.length < 2) return 0;
+    // Строим массив сегментов: каждое соединение раскладываем на line-segments
+    // через его waypoints + endpoint-координаты.
+    const segByConn = new Map();
+    for (let i = 0; i < connections.length; i++) {
+        segByConn.set(i, _connectionSegments(connections[i]));
+    }
+    let removed = 0;
+    const toRemove = new Set();
+    for (let i = 0; i < connections.length; i++) {
+        if (toRemove.has(i)) continue;
+        const a = connections[i];
+        if (!a) continue;
+        const aSegs = segByConn.get(i);
+        for (let j = i + 1; j < connections.length; j++) {
+            if (toRemove.has(j)) continue;
+            const b = connections[j];
+            if (!b) continue;
+            // Разные net_label → не сливаем (осознанное разделение шин).
+            if (a.net_label && b.net_label && a.net_label !== b.net_label) continue;
+            const bSegs = segByConn.get(j);
+            if (_segmentsAreSamePath(aSegs, bSegs)) {
+                // Оба соединения проходят по одному и тому же пути → дубль.
+                const aScore = _wireSemanticScore(a);
+                const bScore = _wireSemanticScore(b);
+                if (bScore > aScore) {
+                    toRemove.add(i);
+                    break;   // a удалён, переходим к следующему i
+                } else {
+                    toRemove.add(j);
+                }
+            }
+        }
+    }
+    if (toRemove.size) {
+        connections = connections.filter((_, idx) => !toRemove.has(idx));
+        removed = toRemove.size;
+    }
+    return removed;
+}
+
+function _connectionSegments(conn) {
+    // Серия отрезков с округлёнными координатами (0.1px → одинаковость).
+    // Если waypoints нет — один отрезок from→to (по port-world coords).
+    const pts = [];
+    const fromComp = components.find(c => c.id === conn.from.compId);
+    const toComp = components.find(c => c.id === conn.to.compId);
+    if (!fromComp || !toComp) return [];
+    const a = typeof getPortWorldPosition === 'function' ? getPortWorldPosition(fromComp, conn.from.portId) : null;
+    const b = typeof getPortWorldPosition === 'function' ? getPortWorldPosition(toComp, conn.to.portId) : null;
+    if (!a || !b) return [];
+    const r = (n) => Math.round(n * 10) / 10;
+    pts.push({ x: r(a.x), y: r(a.y) });
+    if (Array.isArray(conn.waypoints)) {
+        conn.waypoints.forEach(wp => pts.push({ x: r(wp.x), y: r(wp.y) }));
+    }
+    pts.push({ x: r(b.x), y: r(b.y) });
+    const segs = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+        segs.push([pts[i], pts[i + 1]]);
+    }
+    return segs;
+}
+
+function _segmentsAreSamePath(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    // Прямой порядок.
+    let same = true;
+    for (let i = 0; i < a.length; i++) {
+        if (!_segEq(a[i], b[i])) { same = false; break; }
+    }
+    if (same) return true;
+    // Обратный (соединение могло быть проложено from↔to наоборот).
+    same = true;
+    for (let i = 0; i < a.length; i++) {
+        const rb = b[b.length - 1 - i];
+        const rbRev = [rb[1], rb[0]];
+        if (!_segEq(a[i], rbRev)) { same = false; break; }
+    }
+    return same;
+}
+
+function _segEq(s1, s2) {
+    return s1[0].x === s2[0].x && s1[0].y === s2[0].y &&
+           s1[1].x === s2[1].x && s1[1].y === s2[1].y;
+}
+
+window.cleanupOverlappingWires = cleanupOverlappingWires;
 
 // Multi-section компоненты: один корпус (U1) = несколько символов на схеме.
 // Например LM358 = OpAmp_A + OpAmp_B + Power. На PCB все секции одного
