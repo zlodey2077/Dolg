@@ -923,12 +923,12 @@
     собирается scheme_data из state.objects и открывается модальный
     overlay через DolgScheme3D.init().
 {% endcomment %}
-<script src="{% static 'lib/three.min.js' %}?v=r140"></script>
-<script src="{% static 'lib/OrbitControls.js' %}?v=r140"></script>
-<script src="{% static 'lib/GLTFExporter.js' %}?v=r140"></script>
-<script src="{% static 'simulation/scheme-3d-materials.js' %}?v=20260526a"></script>
-<script src="{% static 'simulation/scheme-3d-components.js' %}?v=20260526a"></script>
-<script src="{% static 'simulation/scheme-3d.js' %}?v=20260526b"></script>
+<script src="{% static 'lib/three.min.js' %}?v=r140" defer></script>
+<script src="{% static 'lib/OrbitControls.js' %}?v=r140" defer></script>
+<script src="{% static 'lib/GLTFExporter.js' %}?v=r140" defer></script>
+<script src="{% static 'simulation/scheme-3d-materials.js' %}?v=20260526a" defer></script>
+<script src="{% static 'simulation/scheme-3d-components.js' %}?v=20260526a" defer></script>
+<script src="{% static 'simulation/scheme-3d.js' %}?v=20260526b" defer></script>
 
 <div id="app-container">
     {% comment %}
