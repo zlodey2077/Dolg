@@ -627,6 +627,20 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                         <option value="pixi">WebGL — Pixi.js (быстрый)</option>
                     </select>
                 </label>
+                <label title="Длина прямого участка провода у пина (stub) — короче делает схему плотнее, длиннее даёт «дыхание» углам">
+                    <span>Stub провода (px):</span>
+                    <input type="range" id="sim-wire-stub" min="8" max="40" step="2" value="20"
+                           oninput="setSimWireStub(this.value)">
+                </label>
+                <label title="Авто — система сама выбирает форму. L — один угол. Z — два угла. Direct — кратчайшая ломаная без обхода">
+                    <span>Стиль трасс:</span>
+                    <select id="sim-wire-style" onchange="setSimWireStyle(this.value)">
+                        <option value="auto">Авто (умный обход)</option>
+                        <option value="L">L — один угол</option>
+                        <option value="Z">Z — два угла</option>
+                        <option value="direct">Direct — без обхода</option>
+                    </select>
+                </label>
             </div>
 
         </div>
@@ -906,7 +920,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             </details>
 
             <details class="ctx-group">
-                <summary>📁 Файл и импорт <span class="ctx-badge">4</span></summary>
+                <summary>📁 Файл и импорт <span class="ctx-badge">5</span></summary>
+                <button onclick="window.openSchemePresetsDialog(); hideContextMenu();">📐 Типовые схемы…</button>
                 <button onclick="saveScheme(); hideContextMenu();">💾 Сохранить схему</button>
                 <button onclick="loadScheme(); hideContextMenu();">📂 Загрузить схему</button>
                 <button onclick="importSpiceFile(); hideContextMenu();">📥 Импорт SPICE…</button>
@@ -3578,6 +3593,64 @@ body.sim-sticky-add .sticky-add-toggle {
     margin: 4px 0;
 }
 
+/* Сетка карточек пресетов типовых схем. */
+.scheme-presets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+}
+.scheme-preset-card {
+    background: rgba(0, 0, 0, 0.30);
+    border: 1px solid rgba(0, 212, 255, 0.25);
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    color: #e8eef9;
+}
+.scheme-preset-card:hover {
+    transform: translateY(-2px);
+    border-color: #00d4ff;
+    background: rgba(0, 212, 255, 0.08);
+    box-shadow: 0 6px 18px rgba(0, 212, 255, 0.20);
+}
+.scheme-preset-card__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.scheme-preset-card__emoji { font-size: 1.4rem; }
+.scheme-preset-card h4 {
+    color: #cfe;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+}
+.scheme-preset-card__desc {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    margin: 0 0 8px;
+    min-height: 2.7em;
+}
+.scheme-preset-card__formula {
+    display: block;
+    background: rgba(0, 212, 255, 0.10);
+    color: #7fdbff;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 0.74rem;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    margin-bottom: 6px;
+}
+.scheme-preset-card__meta {
+    color: rgba(0, 212, 255, 0.6);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .context-menu button {
     display: block;
     width: 100%;
@@ -3764,6 +3837,12 @@ let simLabelSize = 10;
 let simSchematicStyle = 'gost';
 let simShowGrid = true;
 
+// Настройки трассировки проводов: длина стаба у пина + предпочтительный
+// стиль маршрутизации (auto/L/Z/direct). buildOrthogonalPath читает их
+// через window.simWireSettings, чтобы избежать ре-bind'а функции при
+// каждом изменении.
+window.simWireSettings = window.simWireSettings || { stub: 20, style: 'auto' };
+
 function _saveSimSettings() {
     try {
         localStorage.setItem('dolg.sim.settings', JSON.stringify({
@@ -3773,6 +3852,8 @@ function _saveSimSettings() {
             labelSize: simLabelSize,
             showGrid: simShowGrid,
             renderMode: renderModeOverride || 'auto',
+            wireStub: window.simWireSettings.stub,
+            wireStyle: window.simWireSettings.style,
         }));
     } catch (e) { /* приватный режим — игнорируем */ }
 }
@@ -3791,6 +3872,12 @@ function loadSimSettings() {
         } else {
             renderModeOverride = null; // 'auto'
         }
+        if (typeof s.wireStub === 'number' && s.wireStub >= 8 && s.wireStub <= 40) {
+            window.simWireSettings.stub = s.wireStub;
+        }
+        if (['auto', 'L', 'Z', 'direct'].includes(s.wireStyle)) {
+            window.simWireSettings.style = s.wireStyle;
+        }
         // Синхронизируем UI
         const apply = (id, val, prop) => { const el = document.getElementById(id); if (el) el[prop || 'value'] = val; };
         apply('sim-grid-size',  simGridSize);
@@ -3799,7 +3886,22 @@ function loadSimSettings() {
         apply('sim-label-size', simLabelSize);
         apply('sim-show-grid',  simShowGrid, 'checked');
         apply('sim-render-mode', renderModeOverride || 'auto');
+        apply('sim-wire-stub',  window.simWireSettings.stub);
+        apply('sim-wire-style', window.simWireSettings.style);
     } catch (e) { /* битая запись — игнорируем */ }
+}
+
+function setSimWireStub(v) {
+    const n = Math.max(8, Math.min(40, parseInt(v, 10) || 20));
+    window.simWireSettings.stub = n;
+    _saveSimSettings();
+    if (typeof drawCanvas === 'function') drawCanvas();
+}
+function setSimWireStyle(v) {
+    const allowed = ['auto', 'L', 'Z', 'direct'];
+    window.simWireSettings.style = allowed.includes(v) ? v : 'auto';
+    _saveSimSettings();
+    if (typeof drawCanvas === 'function') drawCanvas();
 }
 
 function setSimRenderMode(v) {
@@ -6458,7 +6560,7 @@ function pickFreeAxisY(initialY, x1, x2, rects, step, p1y, p2y) {
 // геометрии, а не по индексу соединения. Если на пути встречается чужой
 // корпус — точку поворота сдвигаем в обход.
 function buildOrthogonalPath(fromPos, toPos, waypoints, fromComp, fromPortId, toComp, toPortId, connIdx) {
-    const STUB = 20;
+    const STUB = (window.simWireSettings && window.simWireSettings.stub) || 20;
     const EPS = 0.5;
 
     const fromDir = (fromComp && fromPortId) ? getPortExitDirection(fromComp, fromPortId) : { dx: 1, dy: 0 };
@@ -6512,11 +6614,29 @@ function buildOrthogonalPath(fromPos, toPos, waypoints, fromComp, fromPortId, to
         const straightH = hFrom && hTo && Math.abs(p1.y - p2.y) < EPS;
         const straightV = !hFrom && !hTo && Math.abs(p1.x - p2.x) < EPS;
 
-        const obstacles = getRouteObstacles(fromComp, toComp);
+        const styleSetting = (window.simWireSettings && window.simWireSettings.style) || 'auto';
+        // Direct — игнорируем препятствия, строим минимальную ломаную
+        // (никаких обходов чужих корпусов). Для пользователя, который сам
+        // расставит провода.
+        const obstacles = styleSetting === 'direct' ? [] : getRouteObstacles(fromComp, toComp);
         const routeStep = getSimMoveStep();
+
+        // L-style: всегда один угол (где геометрия позволяет). Z-style:
+        // всегда два угла (даже там, где L бы хватило).
+        const forceL = styleSetting === 'L';
+        const forceZ = styleSetting === 'Z';
 
         if (straightH || straightV) {
             // ничего не добавляем — p1 → p2 пойдёт прямой линией
+        } else if (forceL && hFrom && hTo) {
+            // Один угол между двумя горизонтальными портами: (p2.x, p1.y).
+            pts.push({ x: p2.x, y: p1.y });
+        } else if (forceL && !hFrom && !hTo) {
+            pts.push({ x: p1.x, y: p2.y });
+        } else if (forceZ && hFrom && hTo) {
+            pts.push({ x: (p1.x + p2.x) / 2, y: p1.y }, { x: (p1.x + p2.x) / 2, y: p2.y });
+        } else if (forceZ && !hFrom && !hTo) {
+            pts.push({ x: p1.x, y: (p1.y + p2.y) / 2 }, { x: p2.x, y: (p1.y + p2.y) / 2 });
         } else if (hFrom && hTo) {
             // Z-путь между горизонтальными портами. Ищем такой midX, чтобы
             // ВСЕ ТРИ сегмента (p1→полка1, вертикаль, полка2→p2) были чисты.
@@ -12994,6 +13114,228 @@ window.openUnplacedSectionsDialog = function() {
             }
         });
     });
+};
+
+// ─── Пресеты типовых схем (популярные топологии) ───
+// Каждый пресет — самодостаточный набор компонентов и соединений.
+// Координаты dx/dy — смещения относительно центра вставки (текущий
+// середина viewport). Компоненты расставлены под канонический УГО-вид.
+window.SCHEME_PRESETS = [
+    {
+        id: 'voltage_divider',
+        name: 'Делитель напряжения',
+        emoji: '📐',
+        description: 'Два резистора последовательно. Vout = Vin × R2/(R1+R2).',
+        formula: 'Vout = 9В × 2кОм / (1кОм + 2кОм) ≈ 6В',
+        components: [
+            { type: 'battery',  value: 9,    dx: -180, dy:  0, label: 'V1' },
+            { type: 'resistor', resistance: 1000, dx: -60, dy:  0, label: 'R1' },
+            { type: 'resistor', resistance: 2000, dx:  60, dy:  0, label: 'R2' },
+            { type: 'ground', dx: 120, dy: 40, label: 'GND' },
+            { type: 'ground', dx: -180, dy: 40, label: 'GND' },
+        ],
+        connections: [
+            { from: [0, '+'], to: [1, 'a'] },
+            { from: [1, 'b'], to: [2, 'a'], netLabel: 'VOUT' },
+            { from: [2, 'b'], to: [3, 'a'] },
+            { from: [0, '-'], to: [4, 'a'] },
+        ],
+    },
+    {
+        id: 'rc_lowpass',
+        name: 'RC-фильтр НЧ',
+        emoji: '〰️',
+        description: 'Резистор + конденсатор. Срезает частоты выше f = 1/(2πRC).',
+        formula: 'fc = 1 / (2π × 1кОм × 100нФ) ≈ 1.6 кГц',
+        components: [
+            { type: 'battery',   value: 5,        dx: -180, dy:  0, label: 'V1' },
+            { type: 'resistor',  resistance: 1000, dx: -60, dy:  0, label: 'R1' },
+            { type: 'capacitor', capacitance: 0.1, dx:  60, dy:  60, label: 'C1' },
+            { type: 'ground', dx: 60, dy: 130, label: 'GND' },
+            { type: 'ground', dx: -180, dy: 60, label: 'GND' },
+        ],
+        connections: [
+            { from: [0, '+'], to: [1, 'a'] },
+            { from: [1, 'b'], to: [2, 'a'], netLabel: 'VOUT' },
+            { from: [2, 'b'], to: [3, 'a'] },
+            { from: [0, '-'], to: [4, 'a'] },
+        ],
+    },
+    {
+        id: 'rc_highpass',
+        name: 'RC-фильтр ВЧ',
+        emoji: '⤴️',
+        description: 'Конденсатор + резистор. Срезает частоты ниже f = 1/(2πRC).',
+        formula: 'fc = 1 / (2π × 1кОм × 100нФ) ≈ 1.6 кГц',
+        components: [
+            { type: 'battery',   value: 5,        dx: -180, dy:  0, label: 'V1' },
+            { type: 'capacitor', capacitance: 0.1, dx: -60, dy:  0, label: 'C1' },
+            { type: 'resistor',  resistance: 1000, dx:  60, dy:  60, label: 'R1' },
+            { type: 'ground', dx: 60, dy: 130, label: 'GND' },
+            { type: 'ground', dx: -180, dy: 60, label: 'GND' },
+        ],
+        connections: [
+            { from: [0, '+'], to: [1, 'a'] },
+            { from: [1, 'b'], to: [2, 'a'], netLabel: 'VOUT' },
+            { from: [2, 'b'], to: [3, 'a'] },
+            { from: [0, '-'], to: [4, 'a'] },
+        ],
+    },
+    {
+        id: 'led_indicator',
+        name: 'LED-индикатор',
+        emoji: '💡',
+        description: 'Батарея + токоограничивающий резистор + светодиод. I = (Vin − Vf) / R.',
+        formula: 'I = (5В − 2В) / 330Ом ≈ 9 мА',
+        components: [
+            { type: 'battery',  value: 5,    dx: -180, dy:  0, label: 'V1' },
+            { type: 'resistor', resistance: 330, dx: -60, dy: 0, label: 'R1' },
+            { type: 'led',      dx:  60, dy:  0, label: 'D1' },
+            { type: 'ground', dx: 150, dy: 40, label: 'GND' },
+            { type: 'ground', dx: -180, dy: 40, label: 'GND' },
+        ],
+        connections: [
+            { from: [0, '+'], to: [1, 'a'] },
+            { from: [1, 'b'], to: [2, 'a'] },
+            { from: [2, 'b'], to: [3, 'a'] },
+            { from: [0, '-'], to: [4, 'a'] },
+        ],
+    },
+    {
+        id: 'npn_switch',
+        name: 'Транзисторный ключ NPN',
+        emoji: '🔘',
+        description: 'NPN в режиме ключа: ток базы открывает коллекторный канал.',
+        formula: 'Ic = β × Ib, для β=100 и Ib=1 мА → Ic ≈ 100 мА',
+        components: [
+            { type: 'battery',  value: 12,   dx: -180, dy: -60, label: 'V1' },
+            { type: 'resistor', resistance: 10000, dx: -120, dy: 60, label: 'R_B' },
+            { type: 'resistor', resistance: 1000,  dx:  60, dy: -60, label: 'R_C' },
+            { type: 'npn',      dx:  60, dy:  60, label: 'Q1' },
+            { type: 'ground', dx: 60, dy: 160, label: 'GND' },
+            { type: 'ground', dx: -180, dy: 0, label: 'GND' },
+        ],
+        connections: [
+            { from: [0, '+'], to: [2, 'a'], netLabel: 'VCC' },
+            { from: [2, 'b'], to: [3, 'c'], netLabel: 'COLLECTOR' },
+            { from: [1, 'b'], to: [3, 'b'], netLabel: 'BASE' },
+            { from: [3, 'e'], to: [4, 'a'] },
+            { from: [0, '-'], to: [5, 'a'] },
+            { from: [1, 'a'], to: [0, '+'], netLabel: 'IN' },
+        ],
+    },
+    {
+        id: 'rectifier_halfwave',
+        name: 'Полумостовой выпрямитель',
+        emoji: '⏬',
+        description: 'Диод пропускает только положительную полуволну, конденсатор сглаживает.',
+        formula: 'Vout ≈ Vpeak − Vf − ripple',
+        components: [
+            { type: 'battery',   value: 12,        dx: -180, dy:  0, label: 'V_AC' },
+            { type: 'diode',     dx: -60, dy:  0, label: 'D1' },
+            { type: 'capacitor', capacitance: 100, dx:  60, dy:  60, label: 'C_smooth' },
+            { type: 'resistor',  resistance: 1000, dx:  150, dy: 0, label: 'R_load' },
+            { type: 'ground', dx: 60, dy: 130, label: 'GND' },
+            { type: 'ground', dx: 150, dy: 60, label: 'GND' },
+            { type: 'ground', dx: -180, dy: 60, label: 'GND' },
+        ],
+        connections: [
+            { from: [0, '+'], to: [1, 'a'] },
+            { from: [1, 'b'], to: [2, 'a'], netLabel: 'VOUT' },
+            { from: [1, 'b'], to: [3, 'a'] },
+            { from: [2, 'b'], to: [4, 'a'] },
+            { from: [3, 'b'], to: [5, 'a'] },
+            { from: [0, '-'], to: [6, 'a'] },
+        ],
+    },
+];
+
+window.openSchemePresetsDialog = function() {
+    const cards = window.SCHEME_PRESETS.map(p => `
+        <div class="scheme-preset-card" data-preset-id="${p.id}">
+            <div class="scheme-preset-card__head">
+                <span class="scheme-preset-card__emoji">${p.emoji}</span>
+                <h4>${p.name}</h4>
+            </div>
+            <p class="scheme-preset-card__desc">${p.description}</p>
+            <code class="scheme-preset-card__formula">${p.formula}</code>
+            <div class="scheme-preset-card__meta">${p.components.length} комп. · ${p.connections.length} цепей</div>
+        </div>
+    `).join('');
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(5,10,25,0.92); backdrop-filter:blur(4px); z-index:99996; display:flex; align-items:center; justify-content:center; padding:20px;';
+    modal.innerHTML = `<div style="background:linear-gradient(135deg,rgba(10,14,39,0.98),rgba(26,39,68,0.98)); border:2px solid #00d4ff; border-radius:14px; max-width:880px; width:100%; max-height:86vh; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(0,212,255,0.2); background:rgba(0,0,0,0.25);">
+            <h2 style="color:#00d4ff; font-size:1.15rem; font-weight:600; margin:0;">📐 Типовые схемы</h2>
+            <button id="_presetsClose" style="margin-left:auto; background:transparent; border:1px solid rgba(255,138,138,0.4); color:#ff9090; width:30px; height:30px; border-radius:6px; cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding:18px 22px;">
+            <p style="color:#94a3b8; font-size:0.85rem; margin:0 0 16px;">
+                Канонические топологии из учебника. Вставляются в центр текущего viewport с готовыми номиналами и подписями цепей.
+            </p>
+            <div class="scheme-presets-grid">${cards}</div>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#_presetsClose').onclick = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    modal.querySelectorAll('.scheme-preset-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const id = card.dataset.presetId;
+            window.insertSchemePreset(id);
+            modal.remove();
+        });
+    });
+};
+
+window.insertSchemePreset = function(presetId) {
+    const preset = (window.SCHEME_PRESETS || []).find(p => p.id === presetId);
+    if (!preset) return;
+    // Центр текущего viewport в world coords (как в multi-section).
+    const cx = Math.round(((canvas.width / 2 - panX) / zoom) / getSimMoveStep()) * getSimMoveStep();
+    const cy = Math.round(((canvas.height / 2 - panY) / zoom) / getSimMoveStep()) * getSimMoveStep();
+
+    const createdIds = [];
+    preset.components.forEach(spec => {
+        const id = _allocComponentId();
+        const comp = {
+            id,
+            type: spec.type,
+            x: cx + (spec.dx || 0) - COMPONENT_WIDTH / 2,
+            y: cy + (spec.dy || 0) - COMPONENT_HEIGHT / 2,
+            rotation: spec.rotation || 0,
+            label: spec.label || getComponentLabel(spec.type),
+            ports: getComponentPorts(spec.type),
+            sheet_index: currentSheet,
+            catalog_ref: '',
+            spice_model: '',
+            catalog_parameters: {},
+        };
+        if (spec.resistance != null) comp.resistance = spec.resistance;
+        if (spec.capacitance != null) comp.capacitance = spec.capacitance;
+        if (spec.inductance != null) comp.inductance = spec.inductance;
+        if (spec.value != null) comp.voltage = spec.value;
+        components.push(comp);
+        createdIds.push(id);
+    });
+    preset.connections.forEach(c => {
+        const fromCompId = createdIds[c.from[0]];
+        const toCompId = createdIds[c.to[0]];
+        if (fromCompId == null || toCompId == null) return;
+        const conn = {
+            id: _allocConnectionId(),
+            from: { compId: fromCompId, portId: c.from[1] },
+            to:   { compId: toCompId,   portId: c.to[1] },
+            waypoints: [],
+        };
+        if (c.netLabel) conn.net_label = c.netLabel;
+        connections.push(conn);
+    });
+    snapshotScheme();
+    updateProperties();
+    updateStats();
+    drawCanvas();
+    showNotification(`✓ Схема «${preset.name}» вставлена (${preset.components.length} комп.)`, 'success');
 };
 
 // Размещение секции на холсте — добавляем новый component с тем же refdes
