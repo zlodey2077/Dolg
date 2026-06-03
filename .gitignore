@@ -87,3 +87,12 @@ deploy/cloudflared.exe
 # ───── Backup tarballs от hourly-snapshot.bat ─────
 backups/
 *.tar.gz
+
+# ───── Microsoft Office lock-файлы ─────
+# При открытии .docx/.xlsx/.pptx Word/Excel создают рядом ~$file.docx —
+# при сохранении файл удаляется, но при крэше остаётся «турбочкой».
+~$*
+
+# ───── Audit/temp screenshot папки ─────
+.tmp_catalog_shots/
+**/tmp_image_audit/
