@@ -17,24 +17,26 @@
 
 {% block content %}
 {% comment %}
-Pixi.js v7 — WebGL-рендер для тяжёлых схем (от 200 элементов).
-   Локальный билд: shop/static/lib/pixi.min.js (~456 КБ). Подгружается
-   синхронно в content, чтобы PIXI был доступен в нашем DOMContentLoaded.
+Все теги — defer: HTML парсится без блокировки, скрипты исполняются по
+порядку перед DOMContentLoaded (так что глобальные PIXI / THREE / наши
+scheme-* всё равно доступны для inline-JS в нашем DOMContentLoaded-
+хендлере). Раньше шли синхронно → каждый блокировал парсер на свой
+размер (pixi 456 КБ + three 600 КБ = >1 МБ блокирующего JS).
 {% endcomment %}
-<script src="{% static 'lib/pixi.min.js' %}?v=7.4.2"></script>
-<script src="{% static 'lib/three.min.js' %}?v=r140"></script>
-<script src="{% static 'lib/OrbitControls.js' %}?v=r140"></script>
-<script src="{% static 'lib/GLTFExporter.js' %}?v=r140"></script>
-<script src="{% static 'simulation/scheme-normalizer.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-export.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-bom.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-netlist.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-3d-materials.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-3d-components.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-3d.js' %}?v=20260601-recovery21"></script>
-<script src="{% static 'simulation/scheme-lab.js' %}?v=20260601-recovery21"></script>
+<script src="{% static 'lib/pixi.min.js' %}?v=7.4.2" defer></script>
+<script src="{% static 'lib/three.min.js' %}?v=r140" defer></script>
+<script src="{% static 'lib/OrbitControls.js' %}?v=r140" defer></script>
+<script src="{% static 'lib/GLTFExporter.js' %}?v=r140" defer></script>
+<script src="{% static 'simulation/scheme-normalizer.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-export.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-bom.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-netlist.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-3d-materials.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-3d-components.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-3d.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/scheme-lab.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'simulation/ml-toolbar.js' %}?v=20260601-recovery21" defer></script>
-<script src="{% static 'lib/qrcode.min.js' %}?v=1.0.0"></script>
+<script src="{% static 'lib/qrcode.min.js' %}?v=1.0.0" defer></script>
 
 {# ============== Keyboard shortcuts panel (нажми ? для справки) ============== #}
 <style>
