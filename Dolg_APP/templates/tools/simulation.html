@@ -12372,9 +12372,141 @@ function runPinPinErc() {
             warnings.push(`Multi-section: ${u.refdes} секция «${u.section_name}» (${u.section}) не размещена на схеме`);
         });
     }
+
+    // Logic-level ERC: правила, работающие НА УРОВНЕ NET'А, а не пары пинов.
+    // Дополняют попарную matrix — она ловит "OO на одной цепи плохо", а здесь
+    // ловим "OO на цепи где также OC + нет pullup" — конкретные паттерны,
+    // которые в pairwise-matrix невыразимы.
+    const logic = runLogicErc(nets);
+    errors.push(...logic.errors);
+    warnings.push(...logic.warnings);
+
     return { errors, warnings };
 }
 window.runPinPinErc = runPinPinErc;
+
+// ─── Логические ERC-правила (NET-level), вне pairwise-matrix ───
+// Каждое правило — обход net'ов с подсчётом pin-types и применением правила.
+// Возвращает {errors, warnings} — мерджится с pin-pin результатами.
+function runLogicErc(netsMap) {
+    const errors = [];
+    const warnings = [];
+    if (!netsMap || !netsMap.size) return { errors, warnings };
+
+    // Power-rail классификация по net-label.
+    const railFromLabel = (label) => {
+        const s = String(label || '').toUpperCase();
+        if (!s) return null;
+        if (/^GND$|GROUND/.test(s)) return 'GND';
+        if (/^(\+?5V?|VCC|VDD)$/.test(s)) return '5V';
+        if (/^\+?3[._]?3V?$|^V3V3$/.test(s)) return '3V3';
+        if (/^\+?12V?$/.test(s)) return '12V';
+        if (/^\+?24V?$/.test(s)) return '24V';
+        if (/^-?5V$/.test(s)) return '-5V';
+        if (/^V[+-]$/.test(s)) return s;
+        return null;
+    };
+
+    netsMap.forEach((portsMap) => {
+        const ports = Array.from(portsMap.values());
+        if (!ports.length) return;
+
+        const counts = { I: 0, O: 0, B: 0, P: 0, C: 0, W: 0, H: 0, N: 0, U: 0 };
+        ports.forEach(p => { counts[p.pinType] = (counts[p.pinType] || 0) + 1; });
+
+        const netLabel = (ports[0] && ports[0].label || '').split('.')[0];
+        const sample = (ports[0] && ports[0].label) || '';
+        const netName = _netNameFromPort(ports) || '(безымянная)';
+
+        // L1. Multiple drivers — несколько output'ов на одной цепи без OC/wired-or:
+        // классический КЗ. OC+OC и WW допустимы (Wired-OR/AND), их пропускаем.
+        if (counts.O >= 2 && counts.C === 0 && counts.W === 0) {
+            const drivers = ports.filter(p => p.pinType === 'O').map(p => p.label).join(', ');
+            errors.push(`Logic ERC: ${counts.O} драйверов на цепи «${netName}» — КЗ (${drivers})`);
+        }
+
+        // L2. Floating input — Input/Bidir подключён, но на цепи НЕТ источника
+        // (Power / Output / Bidir / OC / Wired-OR). Только висящие inputs.
+        if ((counts.I > 0 || counts.B > 0) &&
+            counts.O === 0 && counts.P === 0 && counts.C === 0 &&
+            counts.W === 0 && counts.B <= counts.I) {
+            // Если есть только Bidir-ы — могут сами быть драйверами, не warn.
+            if (counts.I > 0) {
+                const inputs = ports.filter(p => p.pinType === 'I').map(p => p.label).join(', ');
+                warnings.push(`Logic ERC: input без драйвера на цепи «${netName}» (${inputs}) — добавьте источник или pull-up/down`);
+            }
+        }
+
+        // L3. Open-collector / Wired-OR без pull-up — на цепи есть OC/W, но
+        // нет Power-pin'а (значит нечем подтягивать). Без подтяжки сигнал
+        // плавает между активным «0» и «Z».
+        if ((counts.C > 0 || counts.W > 0) && counts.P === 0) {
+            warnings.push(`Logic ERC: ${counts.C ? 'open-collector' : 'wired-or'} на цепи «${netName}» без pull-up (нет Power-пина для подтяжки)`);
+        }
+
+        // L4. Power-rail conflict — на одной цепи два разных типа Power-пинов
+        // (V+ и V-, VCC и GND). Используем netLabel + наличие Power-пинов
+        // с противоположными «семантическими» именами.
+        if (counts.P >= 2) {
+            const powerNames = new Set();
+            ports.filter(p => p.pinType === 'P').forEach(p => {
+                const localName = (p.label.split('.')[1] || '').toUpperCase();
+                if (/^GND|V-$|^-/.test(localName)) powerNames.add('NEG');
+                else if (/V\+|VCC|VDD|^\+/.test(localName)) powerNames.add('POS');
+            });
+            if (powerNames.has('POS') && powerNames.has('NEG')) {
+                errors.push(`Logic ERC: на цепи «${netName}» сошлись Power-пины + и - (короткое замыкание питания)`);
+            }
+        }
+
+        // L5. Power-domain crossing — net-label говорит о power rail (5V/3V3),
+        // но к нему подключён Output/Bidir (не Power). Это сигнал, идущий
+        // в питающую шину — почти всегда ошибка топологии.
+        const rail = railFromLabel(netLabel);
+        if (rail && (counts.O > 0 || counts.B > 0)) {
+            warnings.push(`Logic ERC: на power-rail «${netName}» (${rail}) подключён сигнальный output — нужен level-shifter или это ошибка соединения`);
+        }
+
+        // L6. Mixed power rails — net-label = 5V но на цепи также присутствует
+        // Power-пин, традиционно ассоциированный с 3.3V/GND.
+        if (rail && counts.P >= 2) {
+            const railNames = new Set();
+            ports.filter(p => p.pinType === 'P').forEach(p => {
+                const r = railFromLabel((p.label.split('.')[1] || '').toUpperCase());
+                if (r) railNames.add(r);
+            });
+            railNames.add(rail);
+            if (railNames.size >= 2) {
+                errors.push(`Logic ERC: смешение питающих шин на цепи «${netName}» (${Array.from(railNames).join(' + ')})`);
+            }
+        }
+
+        // L7. NoConnect tied — у компонента есть NC-пин, физически
+        // подключённый к чему-либо. Это design-error: NC должен быть
+        // изолирован (производитель оставил резерв или связано с die).
+        if (counts.N > 0 && ports.length > counts.N) {
+            const nc = ports.filter(p => p.pinType === 'N').map(p => p.label).join(', ');
+            errors.push(`Logic ERC: NoConnect-пин подключён к цепи «${netName}» (${nc}) — отключите`);
+        }
+    });
+
+    return { errors, warnings };
+}
+
+function _netNameFromPort(ports) {
+    // Имя net'а пробуем взять из net_label соединения (если известно).
+    // Если не доступно, возвращаем синтетику по первому компоненту.
+    if (!ports.length || !connections) return '';
+    // Ищем хотя бы одно соединение, в котором участвует первый порт.
+    const first = ports[0];
+    for (const c of connections) {
+        if ((c.from.compId === first.comp?.id) || (c.to.compId === first.comp?.id)) {
+            if (c.net_label) return c.net_label;
+        }
+    }
+    // Fallback: первый pin как маркер.
+    return first.label.split('.')[0];
+}
 
 // Multi-section компоненты: один корпус (U1) = несколько символов на схеме.
 // Например LM358 = OpAmp_A + OpAmp_B + Power. На PCB все секции одного
