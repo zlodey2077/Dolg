@@ -11835,10 +11835,14 @@ function _openNetClassDialog() {
 }
 window._openNetClassDialog = _openNetClassDialog;
 
-// Helper: цвет провода из net_class (используется в drawConnectionPath)
+// Helper: цвет провода из net_class. Возвращает null, если провод
+// БЕЗ явного net_class — тогда drawConnectionPath берёт palette.wire
+// (УГО-чёрный). Раньше fallback к 'Default' заливал ВСЕ провода
+// циановым #7fdbff, перекрывая нормальный цвет — отсюда «синие
+// провода на белом фоне».
 function _getNetClassColor(conn) {
-    const className = (conn && conn.net_class) || 'Default';
-    const cls = window.NET_CLASSES[className];
+    if (!conn || !conn.net_class) return null;
+    const cls = window.NET_CLASSES[conn.net_class];
     return cls ? cls.color : null;
 }
 window._getNetClassColor = _getNetClassColor;
@@ -13294,6 +13298,7 @@ window.openSchemePresetsDialog = function() {
 window.insertSchemePreset = function(presetId) {
     const preset = (window.SCHEME_PRESETS || []).find(p => p.id === presetId);
     if (!preset) return;
+    console.log(`[DOLG presets v3] insert ${presetId}: ${preset.components.length} comp + ${preset.connections.length} conn`);
     // Центр текущего viewport в world coords (как в multi-section).
     const cx = Math.round(((canvas.width / 2 - panX) / zoom) / getSimMoveStep()) * getSimMoveStep();
     const cy = Math.round(((canvas.height / 2 - panY) / zoom) / getSimMoveStep()) * getSimMoveStep();
