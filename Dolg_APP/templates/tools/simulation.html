@@ -878,37 +878,44 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     <div id="context-menu" class="context-menu" style="display: none;">
         <!-- ПКМ по пустому месту — инструменты + компоненты -->
         <div id="context-menu-empty">
-            <div style="padding:5px 14px;color:rgba(0,212,255,0.6);font-size:0.75rem;font-weight:600;letter-spacing:0.05em;">ИНСТРУМЕНТЫ</div>
             <button onclick="resetMode(); hideContextMenu();">🔄 Режим выбора</button>
             <button onclick="activateWireMode(); hideContextMenu();">🔌 Режим провода</button>
-            <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
-            <div style="padding:5px 14px;color:rgba(0,212,255,0.6);font-size:0.75rem;font-weight:600;letter-spacing:0.05em;">ДОБАВИТЬ КОМПОНЕНТ</div>
-            <button onclick="addComponentFromContext('resistor')">⚡ Резистор</button>
-            <button onclick="addComponentFromContext('capacitor')">🔋 Конденсатор</button>
-            <button onclick="addComponentFromContext('inductor')">🌀 Индуктор</button>
-            <button onclick="addComponentFromContext('diode')">▶ Диод</button>
-            <button onclick="addComponentFromContext('led')">💡 LED</button>
-            <button onclick="addComponentFromContext('battery')">🔌 Батарея (V)</button>
-            <button onclick="addComponentFromContext('current_source')">⟳ Источник тока (I)</button>
-            <button onclick="addComponentFromContext('switch')">🔘 Переключатель</button>
-            <button onclick="addComponentFromContext('ground')">⏚ Земля</button>
-            <button onclick="addComponentFromContext('npn')">📐 NPN транзистор</button>
-            <button onclick="addComponentFromContext('pnp')">📐 PNP транзистор</button>
-            <button onclick="addComponentFromContext('node')">⚪ Узел (Node)</button>
-            <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
-            <div style="padding:5px 14px;color:rgba(0,212,255,0.6);font-size:0.75rem;font-weight:600;letter-spacing:0.05em;">МИКРОСХЕМЫ (СЕКЦИЙ &gt; 1)</div>
-            <button onclick="window.insertMultisectionChip('LM358'); hideContextMenu();">🧩 LM358 — Dual op-amp</button>
-            <button onclick="window.insertMultisectionChip('LM324'); hideContextMenu();">🧩 LM324 — Quad op-amp</button>
-            <button onclick="window.insertMultisectionChip('74HC00'); hideContextMenu();">🧩 74HC00 — Quad NAND</button>
-            <button onclick="window.openUnplacedSectionsDialog(); hideContextMenu();">📋 Неустановленные секции…</button>
-            <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
+
+            <details class="ctx-group" open>
+                <summary>📦 Добавить компонент <span class="ctx-badge">12</span></summary>
+                <button onclick="addComponentFromContext('resistor')">⚡ Резистор</button>
+                <button onclick="addComponentFromContext('capacitor')">🔋 Конденсатор</button>
+                <button onclick="addComponentFromContext('inductor')">🌀 Индуктор</button>
+                <button onclick="addComponentFromContext('diode')">▶ Диод</button>
+                <button onclick="addComponentFromContext('led')">💡 LED</button>
+                <button onclick="addComponentFromContext('battery')">🔌 Батарея (V)</button>
+                <button onclick="addComponentFromContext('current_source')">⟳ Источник тока (I)</button>
+                <button onclick="addComponentFromContext('switch')">🔘 Переключатель</button>
+                <button onclick="addComponentFromContext('ground')">⏚ Земля</button>
+                <button onclick="addComponentFromContext('npn')">📐 NPN транзистор</button>
+                <button onclick="addComponentFromContext('pnp')">📐 PNP транзистор</button>
+                <button onclick="addComponentFromContext('node')">⚪ Узел (Node)</button>
+            </details>
+
+            <details class="ctx-group">
+                <summary>🧩 Микросхемы (секций &gt; 1) <span class="ctx-badge">4</span></summary>
+                <button onclick="window.insertMultisectionChip('LM358'); hideContextMenu();">🧩 LM358 — Dual op-amp</button>
+                <button onclick="window.insertMultisectionChip('LM324'); hideContextMenu();">🧩 LM324 — Quad op-amp</button>
+                <button onclick="window.insertMultisectionChip('74HC00'); hideContextMenu();">🧩 74HC00 — Quad NAND</button>
+                <button onclick="window.openUnplacedSectionsDialog(); hideContextMenu();">📋 Неустановленные секции…</button>
+            </details>
+
+            <details class="ctx-group">
+                <summary>📁 Файл и импорт <span class="ctx-badge">4</span></summary>
+                <button onclick="saveScheme(); hideContextMenu();">💾 Сохранить схему</button>
+                <button onclick="loadScheme(); hideContextMenu();">📂 Загрузить схему</button>
+                <button onclick="importSpiceFile(); hideContextMenu();">📥 Импорт SPICE…</button>
+                <button onclick="importLithiumProject(); hideContextMenu();">📥 Импорт Lithium ECAD (.lpr/.lsc/.lbo)…</button>
+            </details>
+
+            <div class="ctx-divider"></div>
             <button onclick="deleteSelected(); hideContextMenu();">🗑️ Удалить выбранное</button>
             <button onclick="clearCanvas(); hideContextMenu();">🧹 Очистить холст</button>
-            <div style="height:1px;background:rgba(0,212,255,0.2);margin:4px 0;"></div>
-            <button onclick="saveScheme(); hideContextMenu();">💾 Сохранить схему</button>
-            <button onclick="loadScheme(); hideContextMenu();">📂 Загрузить схему</button>
-            <button onclick="importSpiceFile(); hideContextMenu();">📥 Импорт SPICE...</button>
-            <button onclick="importLithiumProject(); hideContextMenu();">📥 Импорт Lithium ECAD (.lpr/.lsc/.lbo)…</button>
         </div>
         <!-- ПКМ по компоненту -->
         <div id="context-menu-component" style="display: none;">
@@ -3511,8 +3518,64 @@ body.sim-sticky-add .sticky-add-toggle {
     border-radius: 8px;
     min-width: 220px;
     max-width: 280px;
+    max-height: 80vh;
+    overflow-y: auto;
     box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
     z-index: 10000;
+    padding: 4px 0;
+}
+
+/* Свёртываемые группы пунктов через нативные details/summary.
+   Сохраняют состояние «открыто/закрыто» в localStorage через ctx-group-state. */
+.ctx-group { margin: 0; }
+.ctx-group > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 8px 14px;
+    color: #00d4ff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    background: rgba(0, 212, 255, 0.08);
+    border-top: 1px solid rgba(0, 212, 255, 0.15);
+    border-bottom: 1px solid rgba(0, 212, 255, 0.10);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+    transition: background 0.15s;
+}
+.ctx-group > summary::-webkit-details-marker { display: none; }
+.ctx-group > summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 10px;
+    font-size: 0.7rem;
+    transition: transform 0.18s ease;
+}
+.ctx-group[open] > summary::before { transform: rotate(90deg); }
+.ctx-group > summary:hover {
+    background: rgba(0, 212, 255, 0.18);
+}
+.ctx-badge {
+    margin-left: auto;
+    background: rgba(0, 212, 255, 0.20);
+    color: #cfe;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 9px;
+    min-width: 16px;
+    text-align: center;
+}
+.ctx-group > button {
+    padding-left: 26px !important;
+    font-size: 0.85rem !important;
+}
+.ctx-divider {
+    height: 1px;
+    background: rgba(0, 212, 255, 0.2);
+    margin: 4px 0;
 }
 
 .context-menu button {
@@ -4658,10 +4721,37 @@ function importSpiceFile() {
 // Каждый клик по кнопке-trigger тоггллит класс .open на родительском .tool-dropdown.
 // Клик вне dropdown'а закрывает все. Клик по пункту меню — сам закрывает (event-bubble).
 function _initToolbarDropdowns() {
-    // 2026-06-01 v12: простая absolute-логика. Меню остаётся в parent .tool-dropdown.
-    // .open класс на parent → CSS показывает меню. Без перемещения в body.
+    // Меню — position: fixed с координатами от bounding rect триггера.
+    // Это решает проблему «дропдаун пропадает при скролле»: при absolute-
+    // позиционировании достаточно одному из родителей иметь overflow:hidden
+    // / overflow:auto, чтобы меню обрезалось. Fixed-позиционирование
+    // независимо от ancestor-overflow + пересчёт координат на каждое
+    // открытие даёт стабильное поведение.
     function _closeAllDropdowns() {
         document.querySelectorAll('.tool-dropdown.open').forEach(d => d.classList.remove('open'));
+    }
+    function _positionDropdownMenu(parent) {
+        const trigger = parent.querySelector('[data-dropdown-toggle]');
+        const menu = parent.querySelector('.tool-dropdown-menu');
+        if (!trigger || !menu) return;
+        const rect = trigger.getBoundingClientRect();
+        // Используем CSS-переменные, чтобы CSS-правило применило их через top/left
+        // у .tool-dropdown.open > .tool-dropdown-menu. Position computed in fixed.
+        menu.style.position = 'fixed';
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.left = rect.left + 'px';
+        // Если меню вылезает за правый край — прижимаем к нему
+        requestAnimationFrame(() => {
+            const m = menu.getBoundingClientRect();
+            if (m.right > window.innerWidth - 8) {
+                menu.style.left = Math.max(8, window.innerWidth - 8 - m.width) + 'px';
+            }
+            // Если по высоте не помещается снизу — открываем ВВЕРХ от триггера
+            if (m.bottom > window.innerHeight - 8) {
+                const topUp = Math.max(8, rect.top - m.height - 4);
+                menu.style.top = topUp + 'px';
+            }
+        });
     }
     document.querySelectorAll('[data-dropdown-toggle]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -4670,16 +4760,25 @@ function _initToolbarDropdowns() {
             if (!parent) return;
             const wasOpen = parent.classList.contains('open');
             _closeAllDropdowns();
-            if (!wasOpen) parent.classList.add('open');
+            if (!wasOpen) {
+                parent.classList.add('open');
+                _positionDropdownMenu(parent);
+            }
             btn.setAttribute('aria-expanded', !wasOpen);
         });
     });
-    // Scroll страницы — закрываем dropdown (он position:absolute, движется с парентом)
-    let _scrollCloseTimer = null;
-    window.addEventListener('scroll', () => {
-        if (_scrollCloseTimer) clearTimeout(_scrollCloseTimer);
-        _scrollCloseTimer = setTimeout(_closeAllDropdowns, 100);
+    // Scroll — закрываем dropdown ТОЛЬКО если он скроллится снаружи (не
+    // внутри самого меню). Раньше capture:true ловило скролл и внутри
+    // .tool-dropdown-menu (max-height + overflow-y:auto), из-за чего
+    // пролистывание длинного списка тут же убивало само меню.
+    window.addEventListener('scroll', (e) => {
+        if (e.target && e.target.closest && e.target.closest('.tool-dropdown-menu')) return;
+        // Open dropdown'ы есть → пересчитываем их позицию (триггер уехал)
+        document.querySelectorAll('.tool-dropdown.open').forEach(_positionDropdownMenu);
     }, { capture: true, passive: true });
+    window.addEventListener('resize', () => {
+        document.querySelectorAll('.tool-dropdown.open').forEach(_positionDropdownMenu);
+    });
     window._closeAllDropdowns = _closeAllDropdowns;
     // Любой клик по пункту меню (.tdm-item) — закрываем dropdown.
     // disabled-пункты не закрывают (нечем кликать).
@@ -14001,11 +14100,27 @@ function goToHome() {
 function showContextMenu(x, y, target) {
     // contextMenuX/Y уже установлены в мировых координатах перед вызовом
     contextMenuTarget = target;
-    
+
     const menu = document.getElementById('context-menu');
     const emptyMenu = document.getElementById('context-menu-empty');
     const componentMenu = document.getElementById('context-menu-component');
     const wireMenu = document.getElementById('context-menu-wire');
+
+    // Восстанавливаем состояние свёрнутости групп из localStorage один раз
+    if (!menu.dataset.ctxGroupsInit) {
+        menu.dataset.ctxGroupsInit = '1';
+        menu.querySelectorAll('.ctx-group').forEach((det, i) => {
+            const key = `dolg.ctxGroup.${i}`;
+            try {
+                const saved = localStorage.getItem(key);
+                if (saved === '0') det.removeAttribute('open');
+                else if (saved === '1') det.setAttribute('open', '');
+            } catch (_e) {}
+            det.addEventListener('toggle', () => {
+                try { localStorage.setItem(key, det.open ? '1' : '0'); } catch (_e) {}
+            });
+        });
+    }
     
     // Скрываем все подменю
     emptyMenu.style.display = 'none';
