@@ -3992,7 +3992,12 @@ let pixiTextLayer = null; // PIXI.Container для подписей
 let pixiTextPool = [];    // переиспользуем PIXI.Text объекты (дорого создавать)
 let renderMode = 'canvas2d';      // 'canvas2d' | 'pixi'
 let renderModeOverride = null;    // 'auto' | 'canvas2d' | 'pixi' (из настроек)
-const PIXI_AUTO_THRESHOLD = 200;  // выше — авто-WebGL
+// Авто-переключение на WebGL (Pixi) при росте схемы. 80 = от средней
+// топологии (импорт BluePill даёт ~40 размещений + ~116 цепей). Ниже
+// этого Canvas2D справляется без падений по FPS. Раньше было 200 —
+// для импортированных проектов всегда оставался Canvas2D и pan/zoom
+// тормозил. Юзер может переключить вручную в Настройки → Рендер.
+const PIXI_AUTO_THRESHOLD = 80;
 
 // Цветовые константы для Pixi (HEX-числа). Соответствуют Canvas2D-палитре.
 const PIXI_COLORS = {
