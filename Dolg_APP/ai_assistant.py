@@ -256,8 +256,13 @@ def build_system_blocks(mode, catalog, scheme=None, target_pn=None):
     """
     profile = AGENT_PROFILES.get(mode) or AGENT_PROFILES['recommend']
     catalog_json = json.dumps(catalog, ensure_ascii=False, default=str)[:CATALOG_BYTES_BUDGET]
+    # Prompt-injection hardening — добавляется в самое начало system prompt,
+    # чтобы LLM прочитал правила безопасности раньше всего остального.
+    from .services.ai_prompt_guard import SYSTEM_HARDENING_PREFIX
+
     stable_text = '\n'.join(
         [
+            SYSTEM_HARDENING_PREFIX,
             profile['persona'],
             '\nОтвечай на русском, кратко (до трёх абзацев), по делу. '
             'Если данных мало — открыто скажи об этом, не выдумывай.',

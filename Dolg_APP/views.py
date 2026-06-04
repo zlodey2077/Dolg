@@ -2602,11 +2602,18 @@ def api_ai_chat(request):
     if denied:
         return denied
 
-    user_message = (data.get('message') or '').strip()
-    if not user_message:
+    raw_message = (data.get('message') or '').strip()
+    if not raw_message:
         return _json_error('message is required')
-    if len(user_message) > AI_MAX_MESSAGE_LEN:
+    if len(raw_message) > AI_MAX_MESSAGE_LEN:
         return _json_error(f'message too long (макс. {AI_MAX_MESSAGE_LEN} символов)')
+    # Prompt-injection guard: sanitize + wrap в делимитер.
+    from .services.ai_prompt_guard import sanitize_user_input, wrap_user_message
+
+    user_message_clean, _suspicious = sanitize_user_input(raw_message, max_len=AI_MAX_MESSAGE_LEN)
+    if _suspicious:
+        logger.warning('ai_chat: prompt-injection markers in message from user=%s', request.user.id)
+    user_message = wrap_user_message(user_message_clean)
 
     if _ai_rate_limit(request):
         return JsonResponse(
