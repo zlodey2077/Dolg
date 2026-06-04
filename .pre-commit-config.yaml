@@ -78,3 +78,21 @@ repos:
         args: ['-r', 'requirements.txt', '--strict', '--disable-pip']
         pass_filenames: false
         stages: [pre-push]
+
+      # Полный ruff по ВСЕМУ проекту перед push. Хук на staged-файлах не
+      # ловит аккумулированный долг (видели в commit `8601bb1`: 69 ошибок
+      # копились пока ruff бегал только на изменённом). Тут ловим тот же
+      # набор файлов что и CI workflow.
+      - id: ruff-all-files
+        name: ruff check --all-files (CI parity)
+        entry: ruff check Dolg_APP shop accounts orders knowledge Dolg_PR
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: ruff-format-all-files
+        name: ruff format --check (CI parity)
+        entry: ruff format --check Dolg_APP shop accounts orders knowledge Dolg_PR
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

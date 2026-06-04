@@ -1,0 +1,19 @@
+# CODEOWNERS — авто-reviewer на PR + защита критичных путей.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-configuration/customizing-your-repository/about-code-owners
+
+# Дефолт — владелец репо
+*                                  @zlodey2077
+
+# Settings / прод-конфиг — двойная проверка
+/Dolg_PR/                          @zlodey2077
+/deploy/                           @zlodey2077
+/.github/                          @zlodey2077
+/.pre-commit-config.yaml           @zlodey2077
+/requirements*.txt                 @zlodey2077
+
+# Security-чувствительные модули
+/Dolg_APP/two_factor*.py           @zlodey2077
+/Dolg_APP/middleware.py            @zlodey2077
+/Dolg_APP/services/entitlements.py @zlodey2077
+/SECURITY.md                       @zlodey2077
+/docs/SECURITY_BACKLOG.md          @zlodey2077

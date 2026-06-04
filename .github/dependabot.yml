@@ -1,0 +1,29 @@
+# Dependabot — еженедельный аудит CVE на pip + github-actions.
+# PR с фиксом версии автоматически открываются для main.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    # Группируем minor/patch апдейты в один PR — иначе спам.
+    groups:
+      runtime:
+        applies-to: version-updates
+        update-types: [minor, patch]
+      security:
+        applies-to: security-updates
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - github-actions
+      - security
