@@ -18,7 +18,9 @@ jobs:
       - name: Ruff lint
         run: ruff check Dolg_APP shop accounts orders knowledge Dolg_PR
       - name: Ruff format check
-        run: ruff format --check Dolg_APP shop accounts orders knowledge Dolg_PR
+        run: |
+          ruff --version
+          ruff format --check --diff Dolg_APP shop accounts orders knowledge Dolg_PR
 
   security:
     runs-on: ubuntu-latest
@@ -31,9 +33,13 @@ jobs:
         run: pip install pip-audit
       - name: Scan dependencies for known CVEs
         # exit-code != 0 если найдена уязвимость → CI красный.
-        # Падающие dev-зависимости (pytest, ruff) исключаем через --ignore-vuln,
-        # если возникнут шумные false-positives — добавлять сюда.
-        run: pip-audit --requirement requirements.txt --strict
+        # --no-deps: проверяем ТОЛЬКО pinned в requirements.txt (без resolve
+        # транзитивных), потому что некоторые наши прямые либы тянут
+        # пакеты, которые на нашей версии Python не имеют wheel'ов.
+        # --strict: fail при любой ошибке.
+        # Падающие dev-зависимости исключаем через --ignore-vuln если
+        # появятся шумные false-positives.
+        run: pip-audit --requirement requirements.txt --no-deps --strict --vulnerability-service osv
 
   test:
     runs-on: ubuntu-latest
