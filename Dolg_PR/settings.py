@@ -98,14 +98,18 @@ INSTALLED_APPS = [
     # daphne ДО django.contrib.staticfiles — Django requirement для ASGI.
     # daphne подменяет runserver на ASGI-сервер, что даёт WebSocket-поддержку
     # в dev-режиме без отдельного процесса. В production — отдельный daphne/uvicorn.
-    'daphne',
+    #
+    # 2026-06-05 startup-perf: daphne+channels+twisted+autobahn = ~4.5 сек на
+    # eager import. Если запускаем CLI-команды (migrate, shell, check, test) —
+    # WebSocket НЕ нужен. Skip через `DOLG_SKIP_ASGI=1` для batch-задач.
+    *(['daphne'] if not os.getenv('DOLG_SKIP_ASGI') else []),
     'Dolg_APP',
     'shop',
     'accounts',
     'orders',
     'knowledge',
     'moderation',
-    'channels',
+    *(['channels'] if not os.getenv('DOLG_SKIP_ASGI') else []),
     # 2FA через django-otp: TOTPDevice (Google Authenticator / Authy / 1Password).
     # Enforcement по org-policy require_2fa — см. Dolg_APP/two_factor.py.
     'django_otp',
