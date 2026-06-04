@@ -182,7 +182,45 @@
 | 11.8 | Admin views с `is_staff` checks | 🟡 см 2.12 | 🔥 | 1-2 ч |
 | 11.9 | DWG-converter subprocess (`views.py:1002`) — path traversal в tmp_path | 🟧 нужно проверить, что tmp_path = `Path(tempfile.mkdtemp())` (не user-controlled) | 🟧 | 5 мин аудита |
 
-## 12. Docker / K8s roadmap (явный запрос юзера на будущее)
+## 12. File hygiene / репозиторий
+
+| # | Что | Состояние | Прио | Усилие |
+|---|---|---|---|---|
+| 12.1 | Очистка артефактов (`*.log`, `~$*.docx`, `.tmp_*/`) | ✅ commit `837a59c` (16 PNG + 5 JPG + 2 Office-локов снесены, `.gitignore` расширен) | — | — |
+| 12.2 | **`docs/` консолидация** 52 → ≤10 файлов: слить `NEXT_PLAN` + `IMPROVEMENT_PLAN_*` + `PRIORITY_ROADMAP_*` + `CAD_REDESIGN_PLAN` + `CAD_HARD_UPGRADE_PLAN` + `SIMULATOR_LIVENESS_PLAN` в один `BACKLOG.md`; 8× `WORKFRONT_*` + 4× `AUDIT_*` + `EMERGENCY_*` + `ACCUMULATED_ISSUES` + `SCHEMATIC_EDITOR_FIXES` + `FULL_CODE_AUDIT` + `CODE_AUDIT_AND_DEFENSE_DOCS_WORKFLOW` + `ENGINEERING_PROCESS_NOTES` + `PROJECT_SESSION_*` → `docs/archive/` (или просто `git rm`, история сохранится) | 🟧 | 2 ч (нужен confirm на удаление) |
+| 12.3 | **`scripts/` чистка** — one-shot генераторы с датами: `update_diploma_materials_20260519.py` (60 КБ), `build_presentation_*_20260519.py` (×2 × 29 КБ, почти дубль), `update_speech_scheme_questions_20260519.py`, `rebuild_defense_materials_20260524.py` (40 КБ), `generate_diploma_two_chapter_rework.py` (59 КБ), `update_diploma_v3_from_docs_20260510.py`, DRC-chain (`expand_drc_rules.py` 46 КБ + `finalize_drc_rules.py` + `enable_drc_rules.py`), `seed_ml_dataset.py` (59 КБ) → `scripts/archive/` или `git rm` | 🟧 | 1 ч (нужен confirm) |
+| 12.4 | `management/commands/` ревизия (38 файлов) — отметить one-shot (seed/backfill/migrate/normalize) → `archive/`; репитативные → оставить или объединить в `health_check` | 🟧 | 2-3 ч |
+| 12.5 | `simulation.html` split (18 640 строк → отдельные `shop/static/simulation/scheme-{presets,erc,multisection,router,utils}.js`) | 📚 | 1 день, **post-defense** (риск ломануть рендер) |
+| 12.6 | `media/` orphan-файлы — фото товаров без `Product`, ML артефакты без модели → cleanup-команда + cron | 🟢 | 1 ч |
+| 12.7 | `backups/` retention policy — `hourly-snapshot.bat` создаёт tarballs, нет авто-удаления старых | 🟢 | 30 мин (`find … -mtime +14 -delete` в bat) |
+| 12.8 | DB squash миграций (16+ → `0001_initial_squashed.py`) | 📚 | post-defense, ускоряет fresh `migrate` |
+| 12.9 | `.dockerignore` (не копируем `.git`, `.venv`, `docs/`, `backups/` в контейнер) | 🟧 | 5 мин |
+| 12.10 | LFS / large binaries audit — нет ли больших `.docx` / `.pptx` без LFS | 🟢 | `git lfs ls-files` + audit |
+
+## 13. GitHub hygiene (репо settings + workflows + history)
+
+| # | Что | Состояние | Прио | Усилие |
+|---|---|---|---|---|
+| 13.1 | **Branch protection** на `main` — require PR review, require checks pass, no force-push, no direct push | ❓ нужно глянуть в Settings | 🔥 | 5 мин в Settings → Branches |
+| 13.2 | **`SECURITY.md`** — vulnerability disclosure policy (контакт, scope, response time) | ❌ | 🟧 | 10 мин (template) |
+| 13.3 | `CODEOWNERS` файл (`* @zlodey2077`) — авто-reviewer на PR | ❌ | 🟢 | 5 мин |
+| 13.4 | PR template + Issue templates (`.github/ISSUE_TEMPLATE/`) | ❓ нужно глянуть | 🟢 | 10 мин |
+| 13.5 | GitHub Actions workflows — pin actions по SHA (не по `@v3`, который mutable) | ❓ нужен аудит `.github/workflows/` | 🟧 | 30 мин |
+| 13.6 | `permissions:` в Actions (default — `contents: read`, явно разрешать `write` только где нужно) | ❓ | 🟧 | 30 мин |
+| 13.7 | GitHub Secrets — аудит, что хранится; rotate если что-то старше 90 дней | ❓ | 🟢 | manual в Settings |
+| 13.8 | **Dependabot security updates** — `dependabot.yml` для pip + github-actions | ❌ | 🟧 | 10 мин (`.github/dependabot.yml`) |
+| 13.9 | **Repo visibility** — частный/публичный, по статусу диплома | ❓ зависит от защиты — публичный после защиты, до — лучше private/internal | 🟧 | manual |
+| 13.10 | `.github/workflows/ci.yml` — добавить `bandit` + `pip-audit` + `gitleaks` step'ы (= H4 из § 9) | ❌ | 🔥 | 30 мин |
+| 13.11 | **Git history scrub** — secrets (если найдутся через H5 gitleaks), AI-fingerprints (датированные комменты — отдельный backlog [[project-anti-ai-cleanup-backlog]]) | ❌ | 🟧 после H5 | 1-2 ч `git filter-repo` + force-push (требует приватного репо или координации) |
+| 13.12 | Stale branches / closed PRs cleanup | ❓ глянуть `git branch -a` | 🟢 | 5 мин |
+| 13.13 | Release tags / changelog | 🟡 `docs/CHANGELOG.md` есть, но git tags нет | 🟢 | 5 мин на тег `v1.0.0-defense` |
+| 13.14 | Repository description + topics + README badges (защитные значки security/license/python-version) | 🟢 | 10 мин на Settings |
+| 13.15 | GitHub Advanced Security — code scanning (CodeQL) — бесплатно для public repo | ❌ | 🟢 | 5 мин на `.github/workflows/codeql.yml` |
+| 13.16 | Dependabot alerts включены в Settings → Code security | ❓ | 🟧 | 1 клик |
+| 13.17 | Secret scanning alerts (GitHub native, public repo only) | ❓ | 🟧 | 1 клик |
+| 13.18 | Push protection (отказ push'а с обнаруженным secret'ом) | ❓ | 🟧 | 1 клик |
+
+## 14. Docker / K8s roadmap (явный запрос юзера на будущее)
 
 | # | Что | Состояние | Прио | Усилие |
 |---|---|---|---|---|
