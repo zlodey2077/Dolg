@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import math
+import re
 from io import StringIO
 
 import matplotlib
@@ -465,7 +466,69 @@ def _nearest_marker(x_values, y_values, marker):
     }
 
 
+_FORMULA_MAX_LEN = 256
+# Только: переменные/функции (буквы/цифры/_), числа с точкой/E,
+# арифметика + - * / ** ( ) , пробелы. НИКАКИХ [], dict, attributes (точка
+# разрешена только в числовых литералах через спец-проверку ниже).
+_FORMULA_SAFE_RE = re.compile(r'^[A-Za-z0-9_+\-*/().,\s]+$')
+# Whitelist of allowed sympy callables (математические функции).
+_FORMULA_ALLOWED_FUNCS = frozenset(
+    {
+        'sin',
+        'cos',
+        'tan',
+        'asin',
+        'acos',
+        'atan',
+        'atan2',
+        'sinh',
+        'cosh',
+        'tanh',
+        'log',
+        'log2',
+        'log10',
+        'exp',
+        'sqrt',
+        'abs',
+        'pi',
+        'E',
+        'Min',
+        'Max',
+        're',
+        'im',
+        'floor',
+        'ceiling',
+        'sign',
+        'pow',
+    }
+)
+
+
 def _formula_value(expression, variables):
+    """Безопасно вычислить пользовательскую формулу.
+
+    SymPy ``sympify`` официально документирован как unsafe для untrusted
+    input (вызывает eval). Защита: regex-whitelist символов перед парсингом
+    + post-проверка, что в выражении нет 'функциональных' имён вне белого
+    списка (т.е. злоумышленник не может передать ``__import__`` или
+    ``Symbol('x').__class__.__mro__[1].__subclasses__()`` трюк).
+    """
+    expr_str = str(expression or '')
+    if not expr_str or len(expr_str) > _FORMULA_MAX_LEN:
+        return {'ok': False, 'expression': expr_str, 'error': 'formula_too_long_or_empty'}
+    if not _FORMULA_SAFE_RE.match(expr_str):
+        return {'ok': False, 'expression': expr_str, 'error': 'formula_contains_disallowed_chars'}
+    # Проверка: имена-идентификаторы должны быть либо переменными из
+    # variables, либо в allowed_funcs.
+    var_keys = {key for key in (variables or {}) if isinstance(key, str)}
+    names_in_expr = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*', expr_str))
+    forbidden = names_in_expr - var_keys - _FORMULA_ALLOWED_FUNCS
+    if forbidden:
+        return {
+            'ok': False,
+            'expression': expr_str,
+            'error': f'formula_uses_unknown_names: {sorted(forbidden)}',
+        }
     try:
         import sympy as sp
 
@@ -473,13 +536,13 @@ def _formula_value(expression, variables):
             key: float(value) for key, value in (variables or {}).items() if isinstance(value, (int, float))
         }
         symbols = {key: sp.Symbol(key) for key in allowed}
-        expr = sp.sympify(str(expression), locals=symbols)
+        expr = sp.sympify(expr_str, locals=symbols)
         value = float(expr.evalf(subs=allowed))
         if math.isfinite(value):
-            return {'ok': True, 'expression': str(expression), 'value': value}
+            return {'ok': True, 'expression': expr_str, 'value': value}
     except Exception as exc:
-        return {'ok': False, 'expression': str(expression), 'error': str(exc)}
-    return {'ok': False, 'expression': str(expression), 'error': 'formula_not_finite'}
+        return {'ok': False, 'expression': expr_str, 'error': str(exc)}
+    return {'ok': False, 'expression': expr_str, 'error': 'formula_not_finite'}
 
 
 def postprocess_simulation(payload):
