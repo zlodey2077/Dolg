@@ -1,4 +1,4 @@
-Django==6.0.4
+Django==6.0.6
 # 2026-06-01 v22: production-сервер для Render/Heroku/любой PaaS
 gunicorn==23.0.0
 # WhiteNoise — отдача статики из Django без nginx (для Render free tier)
@@ -76,7 +76,7 @@ stripe==15.0.1
 sympy==1.14.0
 typing_extensions==4.15.0
 tzdata==2026.1
-urllib3==2.6.3
+urllib3==2.7.0
 # .env подгрузка — settings.py загружает HF_TOKEN, SECRET_KEY и т.п.
 # из BASE_DIR/.env при старте. Без него env-vars нужно задавать в shell.
 python-dotenv==1.1.0
@@ -89,6 +89,8 @@ sentry-sdk==2.45.0
 # Prometheus exporter — отдаёт /metrics/, который Prometheus собирает,
 # а Grafana визуализирует. Docker-compose в deploy/ поднимает оба сервиса.
 django-prometheus==2.4.1
+# Runtime process metrics for staff monitoring: RSS/CPU/threads/disk snapshots.
+psutil==7.2.2
 # Django Silk — профайлер SQL-запросов и запросов (dev/staging). В production
 # выключается через middleware-флаг.
 django-silk==5.5.0

@@ -12,7 +12,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-      - run: pip install ruff
+      # Pin ruff к той же версии что в .pre-commit-config.yaml — иначе
+      # local и CI расходятся по правилам форматирования (видели в run #16-18).
+      - run: pip install 'ruff==0.15.13'
       - name: Ruff lint
         run: ruff check Dolg_APP shop accounts orders knowledge Dolg_PR
       - name: Ruff format check
