@@ -2595,7 +2595,192 @@ function onKeyDown(e) {
         if (e.key === 'h' || e.key === 'H') { mirrorSelection('h'); }
         else if (e.key === 'v' || e.key === 'V') { mirrorSelection('v'); }
         else if (e.key === 'r' || e.key === 'R') { rotateSelection90(); }
+        else if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault(); openArrayDialog();
+        }
     }
+}
+
+// AutoCAD-стиль массив: прямоугольная сетка ИЛИ круговой паттерн вокруг центра.
+// Применяется к текущему selection. Хоткей A (без Ctrl) на CAD-странице.
+function openArrayDialog() {
+    const selected = selectionObjects();
+    if (!selected.length) return;
+    const bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed; inset:0; background:rgba(5,10,25,0.92); backdrop-filter:blur(4px); z-index:99996; display:flex; align-items:center; justify-content:center; padding:20px;';
+    bg.innerHTML = `<div style="background:linear-gradient(135deg,rgba(10,14,39,0.98),rgba(26,39,68,0.98)); border:2px solid #00d4ff; border-radius:14px; max-width:520px; width:100%; display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(0,212,255,0.2); background:rgba(0,0,0,0.25);">
+            <h2 style="color:#00d4ff; font-size:1.1rem; font-weight:600; margin:0;">📐 Массив</h2>
+            <span style="color:#94a3b8; font-size:0.85rem;">из ${selected.length} объект(ов)</span>
+            <button id="_arrClose" style="margin-left:auto; background:transparent; border:1px solid rgba(255,138,138,0.4); color:#ff9090; width:30px; height:30px; border-radius:6px; cursor:pointer;">✕</button>
+        </div>
+        <div style="display:flex; gap:2px; padding:0 20px; margin-top:14px;">
+            <button id="_arrTabRect" class="_arrTab active" style="flex:1; padding:8px; border:1px solid rgba(0,212,255,0.3); border-bottom:none; background:rgba(0,212,255,0.15); color:#cfe; cursor:pointer; border-radius:6px 6px 0 0;">▦ Прямоугольный</button>
+            <button id="_arrTabPolar" class="_arrTab" style="flex:1; padding:8px; border:1px solid rgba(0,212,255,0.3); border-bottom:none; background:rgba(0,0,0,0.25); color:#94a3b8; cursor:pointer; border-radius:6px 6px 0 0;">⊙ Круговой</button>
+        </div>
+        <div id="_arrPaneRect" style="padding:18px 22px; color:#e8eef9; display:grid; grid-template-columns:auto 1fr; gap:10px 14px; align-items:center;">
+            <label>Строк:</label>          <input id="_arrRows" type="number" value="3" min="1" max="50" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label>Столбцов:</label>       <input id="_arrCols" type="number" value="3" min="1" max="50" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label>Шаг X (px):</label>     <input id="_arrDx" type="number" value="40" step="5" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label>Шаг Y (px):</label>     <input id="_arrDy" type="number" value="40" step="5" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+        </div>
+        <div id="_arrPanePolar" style="padding:18px 22px; color:#e8eef9; display:none; grid-template-columns:auto 1fr; gap:10px 14px; align-items:center;">
+            <label>Копий:</label>          <input id="_arrCount" type="number" value="6" min="2" max="60" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label>Полный угол (°):</label><input id="_arrTotalAngle" type="number" value="360" min="-360" max="360" step="15" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label>Центр X (px):</label>   <input id="_arrCenterX" type="number" value="0" step="10" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label>Центр Y (px):</label>   <input id="_arrCenterY" type="number" value="0" step="10" style="background:rgba(0,0,0,0.35); border:1px solid rgba(0,212,255,0.25); color:#cfe; padding:6px 10px; border-radius:4px;">
+            <label style="grid-column:1/-1; color:#94a3b8; font-size:0.85rem; margin-top:4px;">Центр по умолчанию — bbox-центр выделения, обновляется при открытии.</label>
+        </div>
+        <div style="padding:12px 20px; background:rgba(0,0,0,0.25); border-top:1px solid rgba(0,212,255,0.18); display:flex; gap:10px;">
+            <button id="_arrApply" style="background:linear-gradient(135deg,#00b894,#00838f); color:#fff; border:none; border-radius:6px; padding:8px 16px; cursor:pointer; font-weight:600;">✓ Применить</button>
+            <button id="_arrCancel" style="background:transparent; border:1px solid rgba(255,255,255,0.2); color:#cfe; border-radius:6px; padding:8px 16px; cursor:pointer;">Отмена</button>
+        </div>
+    </div>`;
+    document.body.appendChild(bg);
+
+    // Заполняем центр по умолчанию = центр bbox выделения
+    const bbox = _selectionBbox(selected);
+    if (bbox) {
+        document.getElementById('_arrCenterX').value = Math.round((bbox.minX + bbox.maxX) / 2);
+        document.getElementById('_arrCenterY').value = Math.round((bbox.minY + bbox.maxY) / 2);
+    }
+
+    const close = () => bg.remove();
+    bg.querySelector('#_arrClose').onclick = close;
+    bg.querySelector('#_arrCancel').onclick = close;
+    bg.addEventListener('click', e => { if (e.target === bg) close(); });
+
+    let mode = 'rect';
+    document.getElementById('_arrTabRect').onclick = () => {
+        mode = 'rect';
+        document.getElementById('_arrTabRect').classList.add('active');
+        document.getElementById('_arrTabRect').style.background = 'rgba(0,212,255,0.15)';
+        document.getElementById('_arrTabRect').style.color = '#cfe';
+        document.getElementById('_arrTabPolar').classList.remove('active');
+        document.getElementById('_arrTabPolar').style.background = 'rgba(0,0,0,0.25)';
+        document.getElementById('_arrTabPolar').style.color = '#94a3b8';
+        document.getElementById('_arrPaneRect').style.display = 'grid';
+        document.getElementById('_arrPanePolar').style.display = 'none';
+    };
+    document.getElementById('_arrTabPolar').onclick = () => {
+        mode = 'polar';
+        document.getElementById('_arrTabPolar').classList.add('active');
+        document.getElementById('_arrTabPolar').style.background = 'rgba(0,212,255,0.15)';
+        document.getElementById('_arrTabPolar').style.color = '#cfe';
+        document.getElementById('_arrTabRect').classList.remove('active');
+        document.getElementById('_arrTabRect').style.background = 'rgba(0,0,0,0.25)';
+        document.getElementById('_arrTabRect').style.color = '#94a3b8';
+        document.getElementById('_arrPaneRect').style.display = 'none';
+        document.getElementById('_arrPanePolar').style.display = 'grid';
+    };
+
+    document.getElementById('_arrApply').onclick = () => {
+        if (mode === 'rect') {
+            const rows = Math.max(1, Math.min(50, parseInt(document.getElementById('_arrRows').value) || 1));
+            const cols = Math.max(1, Math.min(50, parseInt(document.getElementById('_arrCols').value) || 1));
+            const dx = parseFloat(document.getElementById('_arrDx').value) || 0;
+            const dy = parseFloat(document.getElementById('_arrDy').value) || 0;
+            arraySelectedRect(rows, cols, dx, dy);
+        } else {
+            const count = Math.max(2, Math.min(60, parseInt(document.getElementById('_arrCount').value) || 2));
+            const totalAngle = parseFloat(document.getElementById('_arrTotalAngle').value) || 360;
+            const cx = parseFloat(document.getElementById('_arrCenterX').value) || 0;
+            const cy = parseFloat(document.getElementById('_arrCenterY').value) || 0;
+            arraySelectedPolar(cx, cy, count, totalAngle);
+        }
+        close();
+    };
+}
+
+function _selectionBbox(objs) {
+    if (!objs || !objs.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const o of objs) {
+        const x = o.x ?? Math.min(o.x1 ?? 0, o.x2 ?? 0);
+        const y = o.y ?? Math.min(o.y1 ?? 0, o.y2 ?? 0);
+        const w = o.width ?? Math.abs((o.x2 ?? 0) - (o.x1 ?? 0));
+        const h = o.height ?? Math.abs((o.y2 ?? 0) - (o.y1 ?? 0));
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+    }
+    return { minX, minY, maxX, maxY };
+}
+
+function arraySelectedRect(rows, cols, dx, dy) {
+    const selected = selectionObjects();
+    if (!selected.length || (rows === 1 && cols === 1)) return;
+    const copies = [];
+    let counter = Date.now();
+    selected.forEach(obj => {
+        const found = selectedLayerAndIndexFor(obj);
+        if (!found) return;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (r === 0 && c === 0) continue; // оригинал не дублируем
+                const copy = JSON.parse(JSON.stringify(obj));
+                copy.id = ++counter;
+                translateObject(copy, c * dx, r * dy);
+                found.layer.objs.push(copy);
+                copies.push(copy);
+            }
+        }
+    });
+    State.objects = State.layers.flatMap(l => l.objs);
+    setCadSelection(selected.concat(copies));
+    saveHistory();
+    render();
+    renderSelectedObjPanel();
+    if (typeof renderDrcPanel === 'function') renderDrcPanel();
+    if (typeof renderBomPanel === 'function') renderBomPanel();
+    document.getElementById('objCountSpan').textContent = `Объектов: ${State.objects.length}`;
+}
+
+function arraySelectedPolar(cx, cy, count, totalAngleDeg) {
+    const selected = selectionObjects();
+    if (!selected.length || count < 2) return;
+    const copies = [];
+    let counter = Date.now();
+    const angStep = (totalAngleDeg * Math.PI / 180) / count;
+    selected.forEach(obj => {
+        const found = selectedLayerAndIndexFor(obj);
+        if (!found) return;
+        for (let i = 1; i < count; i++) {
+            const angle = angStep * i;
+            const copy = JSON.parse(JSON.stringify(obj));
+            copy.id = ++counter;
+            _rotateObjectAround(copy, cx, cy, angle);
+            found.layer.objs.push(copy);
+            copies.push(copy);
+        }
+    });
+    State.objects = State.layers.flatMap(l => l.objs);
+    setCadSelection(selected.concat(copies));
+    saveHistory();
+    render();
+    renderSelectedObjPanel();
+    if (typeof renderDrcPanel === 'function') renderDrcPanel();
+    if (typeof renderBomPanel === 'function') renderBomPanel();
+    document.getElementById('objCountSpan').textContent = `Объектов: ${State.objects.length}`;
+}
+
+function _rotateObjectAround(obj, cx, cy, angle) {
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const rot = (x, y) => {
+        const rx = x - cx, ry = y - cy;
+        return { x: cx + rx * cos - ry * sin, y: cy + rx * sin + ry * cos };
+    };
+    if (obj.x1 != null && obj.y1 != null) {
+        const a = rot(obj.x1, obj.y1); obj.x1 = a.x; obj.y1 = a.y;
+        const b = rot(obj.x2, obj.y2); obj.x2 = b.x; obj.y2 = b.y;
+        obj.x = Math.min(obj.x1, obj.x2);
+        obj.y = Math.min(obj.y1, obj.y2);
+    } else if (obj.x != null && obj.y != null) {
+        const p = rot(obj.x, obj.y); obj.x = p.x; obj.y = p.y;
+        if (obj.cx != null) { const c = rot(obj.cx, obj.cy); obj.cx = c.x; obj.cy = c.y; }
+    }
+    obj.rotation = (obj.rotation || 0) + angle * 180 / Math.PI;
 }
 
 function commitCadTransform() {
