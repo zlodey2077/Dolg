@@ -11,7 +11,9 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument('--force', action='store_true', help='Regenerate PNG files even if they already exist.')
+        parser.add_argument(
+            '--force', action='store_true', help='Regenerate PNG files even if they already exist.'
+        )
         parser.add_argument(
             '--force-generated',
             action='store_true',

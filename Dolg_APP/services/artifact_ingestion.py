@@ -8,12 +8,10 @@ reused by ProjectReview, learning-by-artifact and neural training examples.
 from __future__ import annotations
 
 import hashlib
-import math
 import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
-
 
 TEXT_LIMIT = 20000
 
@@ -284,7 +282,7 @@ def parse_dxf(path: Path, data: bytes) -> dict[str, Any]:
         data=data,
         parser='dxf',
         artifact_type='cad_drawing',
-        summary=f"DXF {doc.dxfversion}: {sum(entity_types.values())} entities, {len(layers)} layers.",
+        summary=f'DXF {doc.dxfversion}: {sum(entity_types.values())} entities, {len(layers)} layers.',
         facts=facts,
     )
 
@@ -298,11 +296,13 @@ def parse_pcad_net(path: Path, data: bytes) -> dict[str, Any]:
         lines = [line.strip() for line in block.splitlines() if line.strip()]
         if not lines:
             continue
-        components.append({
-            'ref': lines[0],
-            'package': lines[1] if len(lines) > 1 else '',
-            'part_number': lines[2] if len(lines) > 2 else '',
-        })
+        components.append(
+            {
+                'ref': lines[0],
+                'package': lines[1] if len(lines) > 1 else '',
+                'part_number': lines[2] if len(lines) > 2 else '',
+            }
+        )
     nets = []
     for block in net_blocks:
         lines = [line.strip() for line in block.splitlines() if line.strip()]
@@ -336,7 +336,9 @@ def parse_pcad_net(path: Path, data: bytes) -> dict[str, Any]:
 def parse_pcad_drc(path: Path, data: bytes) -> dict[str, Any]:
     text = _decode_bytes(data)
     findings = []
-    for match in re.finditer(r'Error\s+(\d+)\s+--\s+(.*?)(?=\nError\s+\d+\s+--|\n[-=]{6,}|\Z)', text, flags=re.S):
+    for match in re.finditer(
+        r'Error\s+(\d+)\s+--\s+(.*?)(?=\nError\s+\d+\s+--|\n[-=]{6,}|\Z)', text, flags=re.S
+    ):
         number = int(match.group(1))
         raw = _clean_text(match.group(2))
         findings.append(_pcad_drc_finding(number, raw))
@@ -411,7 +413,15 @@ def parse_ole_metadata(path: Path, data: bytes) -> dict[str, Any]:
         streams = ['/'.join(item) for item in ole.listdir(streams=True, storages=False)]
         metadata = ole.get_metadata()
         props = {}
-        for key in ('title', 'subject', 'author', 'last_saved_by', 'creating_application', 'num_pages', 'num_words'):
+        for key in (
+            'title',
+            'subject',
+            'author',
+            'last_saved_by',
+            'creating_application',
+            'num_pages',
+            'num_words',
+        ):
             value = getattr(metadata, key, None)
             if value:
                 props[key] = _decode_metadata(value)
@@ -434,7 +444,9 @@ def parse_ole_metadata(path: Path, data: bytes) -> dict[str, Any]:
         status='partial',
         summary=f'OLE artifact: {len(streams)} streams; metadata keys: {len(props)}.',
         facts=facts,
-        warnings=['Only OLE metadata was extracted; content conversion is required for full text/diagram analysis.'],
+        warnings=[
+            'Only OLE metadata was extracted; content conversion is required for full text/diagram analysis.'
+        ],
     )
 
 
@@ -511,7 +523,9 @@ def parse_pcad_binary_stub(path: Path, data: bytes) -> dict[str, Any]:
         status='partial',
         summary=f'P-CAD binary artifact: {len(strings)} readable strings extracted.',
         facts=facts,
-        warnings=['P-CAD binary content is partially readable; use netlist/DRC/ERC/DXF exports for full analysis.'],
+        warnings=[
+            'P-CAD binary content is partially readable; use netlist/DRC/ERC/DXF exports for full analysis.'
+        ],
     )
 
 
@@ -524,19 +538,21 @@ def artifact_reports_from_project(project, *, limit: int = 12) -> list[dict[str,
         return []
     reports = []
     for artifact in qs:
-        reports.append({
-            'source_name': artifact.source_name,
-            'source_path': artifact.source_path,
-            'artifact_type': artifact.artifact_type,
-            'parser': artifact.parser,
-            'status': artifact.status,
-            'checksum': artifact.checksum,
-            'size_bytes': artifact.size_bytes,
-            'summary': artifact.summary,
-            'facts': artifact.facts or {},
-            'warnings': artifact.warnings or [],
-            'errors': artifact.errors or [],
-        })
+        reports.append(
+            {
+                'source_name': artifact.source_name,
+                'source_path': artifact.source_path,
+                'artifact_type': artifact.artifact_type,
+                'parser': artifact.parser,
+                'status': artifact.status,
+                'checksum': artifact.checksum,
+                'size_bytes': artifact.size_bytes,
+                'summary': artifact.summary,
+                'facts': artifact.facts or {},
+                'warnings': artifact.warnings or [],
+                'errors': artifact.errors or [],
+            }
+        )
     return reports
 
 
@@ -567,7 +583,7 @@ def review_external_cad_artifacts(reports: list[dict[str, Any]] | None) -> dict[
 
 def learning_tasks_from_artifact(report: dict[str, Any], *, limit: int = 4) -> list[dict[str, Any]]:
     tasks = []
-    check_report = ((report.get('facts') or {}).get('check_report') or {})
+    check_report = (report.get('facts') or {}).get('check_report') or {}
     for finding in check_report.get('findings') or []:
         category = finding.get('category') or 'drc'
         title = {
@@ -575,17 +591,19 @@ def learning_tasks_from_artifact(report: dict[str, Any], *, limit: int = 4) -> l
             'outside_board': 'Move elements back inside the board outline',
             'uncommitted_pin': 'Fix an uncommitted or unconnected pin',
         }.get(category, 'Explain an imported DRC finding')
-        tasks.append({
-            'task_type': 'circuit_build',
-            'title': title,
-            'prompt': finding.get('title') or finding.get('raw') or title,
-            'rubric': {
-                'source_artifact': report.get('source_name'),
-                'source_parser': report.get('parser'),
-                'source_rule_id': finding.get('rule_id'),
-                'expected_fix': finding.get('recommendation'),
-            },
-        })
+        tasks.append(
+            {
+                'task_type': 'circuit_build',
+                'title': title,
+                'prompt': finding.get('title') or finding.get('raw') or title,
+                'rubric': {
+                    'source_artifact': report.get('source_name'),
+                    'source_parser': report.get('parser'),
+                    'source_rule_id': finding.get('rule_id'),
+                    'expected_fix': finding.get('recommendation'),
+                },
+            }
+        )
         if len(tasks) >= limit:
             break
     return tasks
@@ -596,30 +614,34 @@ def training_examples_from_artifact(report: dict[str, Any], *, limit: int = 10) 
     facts = report.get('facts') or {}
     check_report = facts.get('check_report') or {}
     for finding in check_report.get('findings') or []:
-        examples.append({
-            'kind': 'drc_finding',
-            'prompt': f"Explain {finding.get('rule_id')} from {report.get('source_name')}",
-            'target': finding.get('recommendation') or finding.get('title') or finding.get('raw') or '',
-            'features': {
-                'source_name': report.get('source_name'),
-                'parser': report.get('parser'),
-                'finding': finding,
-            },
-        })
+        examples.append(
+            {
+                'kind': 'drc_finding',
+                'prompt': f'Explain {finding.get("rule_id")} from {report.get("source_name")}',
+                'target': finding.get('recommendation') or finding.get('title') or finding.get('raw') or '',
+                'features': {
+                    'source_name': report.get('source_name'),
+                    'parser': report.get('parser'),
+                    'finding': finding,
+                },
+            }
+        )
         if len(examples) >= limit:
             return examples
     summary = report.get('summary') or ''
     if summary:
-        examples.append({
-            'kind': 'artifact_summary',
-            'prompt': f"Summarize engineering artifact {report.get('source_name')}",
-            'target': summary,
-            'features': {
-                'artifact_type': report.get('artifact_type'),
-                'parser': report.get('parser'),
-                'keywords': (facts.get('document_summary') or {}).get('keywords', []),
-            },
-        })
+        examples.append(
+            {
+                'kind': 'artifact_summary',
+                'prompt': f'Summarize engineering artifact {report.get("source_name")}',
+                'target': summary,
+                'features': {
+                    'artifact_type': report.get('artifact_type'),
+                    'parser': report.get('parser'),
+                    'keywords': (facts.get('document_summary') or {}).get('keywords', []),
+                },
+            }
+        )
     return examples[:limit]
 
 
@@ -753,5 +775,5 @@ def _first_int(pattern: str, text: str) -> int | None:
         return None
     try:
         return int(match.group(1))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

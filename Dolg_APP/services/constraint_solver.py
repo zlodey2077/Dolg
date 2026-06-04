@@ -23,7 +23,7 @@ def _z3():
 def _standard_values(min_value: float, max_value: float):
     values = []
     for decade in range(-2, 9):
-        scale = 10 ** decade
+        scale = 10**decade
         for base in E12_BASE:
             value = base * scale
             if min_value <= value <= max_value:
@@ -67,12 +67,14 @@ def solve_led_resistor(inputs):
         current = voltage / resistor if resistor else math.inf
         if min_current <= current <= max_current:
             power = current * current * resistor
-            options.append({
-                'resistance_ohm': resistor,
-                'current_a': current,
-                'power_w': power,
-                'recommendation': f'use {resistor:g} ohm, current {current * 1000:.2f} mA',
-            })
+            options.append(
+                {
+                    'resistance_ohm': resistor,
+                    'current_a': current,
+                    'power_w': power,
+                    'recommendation': f'use {resistor:g} ohm, current {current * 1000:.2f} mA',
+                }
+            )
         if len(options) >= 8:
             break
     return {'ok': bool(options), 'kind': 'led_resistor', 'engine': 'z3+e12', 'options': options}
@@ -104,13 +106,15 @@ def solve_voltage_divider(inputs):
                 continue
             vout = vin * rv2 / total
             if low <= vout <= high:
-                options.append({
-                    'r1_ohm': rv1,
-                    'r2_ohm': rv2,
-                    'vout_v': vout,
-                    'error_percent': abs(vout - target) / target * 100 if target else 0,
-                    'recommendation': f'R1={rv1:g} ohm, R2={rv2:g} ohm -> Vout={vout:.3g} V',
-                })
+                options.append(
+                    {
+                        'r1_ohm': rv1,
+                        'r2_ohm': rv2,
+                        'vout_v': vout,
+                        'error_percent': abs(vout - target) / target * 100 if target else 0,
+                        'recommendation': f'R1={rv1:g} ohm, R2={rv2:g} ohm -> Vout={vout:.3g} V',
+                    }
+                )
         if len(options) >= 12:
             break
     options.sort(key=lambda item: item['error_percent'])
@@ -129,13 +133,15 @@ def solve_rc_cutoff(inputs):
         for capacitance in capacitors:
             cutoff = 1 / (2 * math.pi * resistance * capacitance)
             if low <= cutoff <= high:
-                options.append({
-                    'resistance_ohm': resistance,
-                    'capacitance_f': capacitance,
-                    'cutoff_hz': cutoff,
-                    'error_percent': abs(cutoff - target) / target * 100 if target else 0,
-                    'recommendation': f'R={resistance:g} ohm, C={capacitance:g} F -> fc={cutoff:.3g} Hz',
-                })
+                options.append(
+                    {
+                        'resistance_ohm': resistance,
+                        'capacitance_f': capacitance,
+                        'cutoff_hz': cutoff,
+                        'error_percent': abs(cutoff - target) / target * 100 if target else 0,
+                        'recommendation': f'R={resistance:g} ohm, C={capacitance:g} F -> fc={cutoff:.3g} Hz',
+                    }
+                )
         if len(options) >= 16:
             break
     options.sort(key=lambda item: item['error_percent'])
@@ -156,15 +162,17 @@ def solve_ne555_astable(inputs):
                 frequency = 1 / (0.693 * (r1 + 2 * r2) * capacitance)
                 if low <= frequency <= high:
                     duty = (r1 + r2) / (r1 + 2 * r2) * 100
-                    options.append({
-                        'r1_ohm': r1,
-                        'r2_ohm': r2,
-                        'capacitance_f': capacitance,
-                        'frequency_hz': frequency,
-                        'duty_cycle_percent': duty,
-                        'error_percent': abs(frequency - target) / target * 100 if target else 0,
-                        'recommendation': f'R1={r1:g}, R2={r2:g}, C={capacitance:g} -> f={frequency:.3g} Hz',
-                    })
+                    options.append(
+                        {
+                            'r1_ohm': r1,
+                            'r2_ohm': r2,
+                            'capacitance_f': capacitance,
+                            'frequency_hz': frequency,
+                            'duty_cycle_percent': duty,
+                            'error_percent': abs(frequency - target) / target * 100 if target else 0,
+                            'recommendation': f'R1={r1:g}, R2={r2:g}, C={capacitance:g} -> f={frequency:.3g} Hz',
+                        }
+                    )
                 if len(options) >= 10:
                     break
             if len(options) >= 10:
@@ -190,22 +198,28 @@ def solve_linear_regulator(inputs):
         'ok': ok,
         'kind': 'linear_regulator',
         'engine': 'constraint-formula',
-        'options': [{
-            'power_w': power,
-            'junction_temperature_c': junction,
-            'thermal_margin_c': margin,
-            'recommendation': 'thermal margin is acceptable' if ok else 'reduce current, add heatsink or use switching regulator',
-        }],
+        'options': [
+            {
+                'power_w': power,
+                'junction_temperature_c': junction,
+                'thermal_margin_c': margin,
+                'recommendation': 'thermal margin is acceptable'
+                if ok
+                else 'reduce current, add heatsink or use switching regulator',
+            }
+        ],
     }
 
 
 def solve_thermal_margin(inputs):
-    return solve_linear_regulator({
-        'vin': inputs.get('power_w', 1.5),
-        'vout': 0,
-        'load_current_ma': 1000,
-        'theta_ja': inputs.get('theta_ja', 50),
-        'ambient_c': inputs.get('ambient_c', 25),
-        'max_junction_c': inputs.get('max_junction_c', 125),
-        'min_margin_c': inputs.get('min_margin_c', 20),
-    }) | {'kind': 'thermal_margin'}
+    return solve_linear_regulator(
+        {
+            'vin': inputs.get('power_w', 1.5),
+            'vout': 0,
+            'load_current_ma': 1000,
+            'theta_ja': inputs.get('theta_ja', 50),
+            'ambient_c': inputs.get('ambient_c', 25),
+            'max_junction_c': inputs.get('max_junction_c', 125),
+            'min_margin_c': inputs.get('min_margin_c', 20),
+        }
+    ) | {'kind': 'thermal_margin'}

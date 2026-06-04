@@ -6,10 +6,9 @@ torch unless the neural backend is explicitly requested.
 
 from __future__ import annotations
 
-import json
+import importlib.util
 import math
 import random
-import importlib.util
 from collections import Counter
 from pathlib import Path
 
@@ -171,20 +170,28 @@ def scheme_to_features(scheme_data):
     has_source = 1.0 if counts.get('battery', 0) else 0.0
     density = len(connections) / max(1, len(components))
     passive = counts.get('resistor', 0) + counts.get('capacitor', 0) + counts.get('inductor', 0)
-    active = counts.get('battery', 0) + counts.get('led', 0) + counts.get('diode', 0) + counts.get('transistor', 0) + counts.get('ic', 0)
+    active = (
+        counts.get('battery', 0)
+        + counts.get('led', 0)
+        + counts.get('diode', 0)
+        + counts.get('transistor', 0)
+        + counts.get('ic', 0)
+    )
 
-    features.extend([
-        min(len(components), 20) / 20.0,
-        min(len(connections), 30) / 30.0,
-        has_ground,
-        has_source,
-        min(isolated_count, 10) / 10.0,
-        min(density, 3.0) / 3.0,
-        passive / total,
-        active / total,
-        1.0 if counts.get('led', 0) and not counts.get('resistor', 0) else 0.0,
-        1.0 if has_source and not has_ground else 0.0,
-    ])
+    features.extend(
+        [
+            min(len(components), 20) / 20.0,
+            min(len(connections), 30) / 30.0,
+            has_ground,
+            has_source,
+            min(isolated_count, 10) / 10.0,
+            min(density, 3.0) / 3.0,
+            passive / total,
+            active / total,
+            1.0 if counts.get('led', 0) and not counts.get('resistor', 0) else 0.0,
+            1.0 if has_source and not has_ground else 0.0,
+        ]
+    )
     features.extend(_graph_features(scheme_data, total))
     return features
 
@@ -193,7 +200,8 @@ def _graph_features(scheme_data, total):
     """Small NetworkX-derived topology features; falls back to zeros."""
     try:
         from Dolg_APP.services.schematic_graph import analyze_graph_topology
-        metrics = (analyze_graph_topology(scheme_data).get('metrics') or {})
+
+        metrics = analyze_graph_topology(scheme_data).get('metrics') or {}
     except Exception:
         return [0.0] * GRAPH_FEATURE_DIM
     topology = metrics.get('topology') or 'generic'
@@ -225,8 +233,7 @@ def _require_torch():
         from torch import nn
     except Exception as exc:
         raise NeuralUnavailable(
-            'PyTorch не установлен. Установите optional AI-зависимости: '
-            'pip install -r requirements-ai.txt'
+            'PyTorch не установлен. Установите optional AI-зависимости: pip install -r requirements-ai.txt'
         ) from exc
     return torch, nn
 
@@ -343,7 +350,9 @@ def compare_prediction_to_teacher(scheme_data, prediction):
     topology_confidence = float(prediction.get('topology_confidence') or 0.0)
     next_confidence = float(ranked_next[0].get('confidence') or 0.0) if ranked_next else 0.0
     calibrated_confidence = round(
-        max(0.0, min(1.0, (agreement_score * 0.55) + (topology_confidence * 0.25) + (next_confidence * 0.20))),
+        max(
+            0.0, min(1.0, (agreement_score * 0.55) + (topology_confidence * 0.25) + (next_confidence * 0.20))
+        ),
         4,
     )
     if not prediction.get('trained'):
@@ -577,7 +586,9 @@ def train_tiny_model(
         for item in extra_schemes:
             if not isinstance(item, dict) or not item.get('components'):
                 continue
-            metadata = item.get('__training_metadata') if isinstance(item.get('__training_metadata'), dict) else {}
+            metadata = (
+                item.get('__training_metadata') if isinstance(item.get('__training_metadata'), dict) else {}
+            )
             for source_id in metadata.get('source_ids') or []:
                 if source_id not in curated_source_ids:
                     curated_source_ids.append(source_id)
@@ -602,15 +613,15 @@ def train_tiny_model(
         if not schemes_subset:
             return None, None, None, None
         x = torch.tensor([scheme_to_features(item) for item in schemes_subset], dtype=torch.float32)
-        y_topology = torch.tensor([
-            TOPOLOGY_LABELS.index(_detect_teacher_topology(item))
-            for item in schemes_subset
-        ], dtype=torch.long)
+        y_topology = torch.tensor(
+            [TOPOLOGY_LABELS.index(_detect_teacher_topology(item)) for item in schemes_subset],
+            dtype=torch.long,
+        )
         y_risk = torch.tensor([_risk_teacher(item) for item in schemes_subset], dtype=torch.float32)
-        y_next = torch.tensor([
-            NEXT_COMPONENT_LABELS.index(_next_component_teacher(item))
-            for item in schemes_subset
-        ], dtype=torch.long)
+        y_next = torch.tensor(
+            [NEXT_COMPONENT_LABELS.index(_next_component_teacher(item)) for item in schemes_subset],
+            dtype=torch.long,
+        )
         return x, y_topology, y_risk, y_next
 
     x_train_base, yt_train, yr_train, yn_train = _to_tensors(train_schemes)
@@ -645,7 +656,6 @@ def train_tiny_model(
     best_epoch = 0
     patience_left = early_stopping_patience
     final_train_loss = 0.0
-    final_val_loss = float('inf')
 
     for epoch in range(int(epochs)):
         model.train()
@@ -678,7 +688,6 @@ def train_tiny_model(
                     + loss_risk(val_risk, yr_val)
                 )
                 val_loss_value = float(val_loss.item())
-                final_val_loss = val_loss_value
 
                 # Early stopping + best checkpoint
                 if val_loss_value < best_val_loss - 1e-5:
@@ -689,12 +698,14 @@ def train_tiny_model(
                 else:
                     patience_left -= 1
 
-        history.append({
-            'epoch': epoch + 1,
-            'train_loss': round(final_train_loss, 6),
-            'val_loss': round(val_loss_value, 6) if val_loss_value is not None else None,
-            'lr': round(optimizer.param_groups[0]['lr'], 6),
-        })
+        history.append(
+            {
+                'epoch': epoch + 1,
+                'train_loss': round(final_train_loss, 6),
+                'val_loss': round(val_loss_value, 6) if val_loss_value is not None else None,
+                'lr': round(optimizer.param_groups[0]['lr'], 6),
+            }
+        )
 
         # Progress callback (для admin UI)
         if progress_callback is not None:

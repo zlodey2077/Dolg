@@ -56,13 +56,14 @@ AI_TOOLS: dict[str, dict] = {
         'destructive': False,
         'modules': ['simulation'],
     },
-
     # ---- Редактирование схемы ----
     'scheme.add_component': {
         'label': 'Добавить компонент',
         'description': 'Добавить новый элемент в схему. Тип передаётся через params.type.',
         'icon': '➕',
-        'params_schema': ['type'],  # 'resistor' | 'capacitor' | 'ground' | 'battery' | 'led' | 'diode' | 'transistor' | 'switch' | 'inductor'
+        'params_schema': [
+            'type'
+        ],  # 'resistor' | 'capacitor' | 'ground' | 'battery' | 'led' | 'diode' | 'transistor' | 'switch' | 'inductor'
         'requires_confirm': False,
         'destructive': False,
         'modules': ['simulation', 'cad'],
@@ -103,7 +104,6 @@ AI_TOOLS: dict[str, dict] = {
         'destructive': False,
         'modules': ['simulation', 'cad'],
     },
-
     # ---- View / overlays ----
     'view.show_3d': {
         'label': 'Открыть 3D',
@@ -141,7 +141,6 @@ AI_TOOLS: dict[str, dict] = {
         'destructive': False,
         'modules': ['simulation', 'cad'],
     },
-
     # ---- Экспорт ----
     'export.png': {
         'label': 'PNG',
@@ -179,7 +178,6 @@ AI_TOOLS: dict[str, dict] = {
         'destructive': False,
         'modules': ['simulation', 'cad'],
     },
-
     # ---- Pipeline / analysis ----
     'pipeline.run_review': {
         'label': 'Engineering Review',
@@ -212,16 +210,18 @@ def list_tools(module: str | None = None) -> list[dict]:
     for name, spec in AI_TOOLS.items():
         if module and module not in (spec.get('modules') or []):
             continue
-        out.append({
-            'name': name,
-            'label': spec['label'],
-            'description': spec['description'],
-            'icon': spec['icon'],
-            'params_schema': spec.get('params_schema') or [],
-            'requires_confirm': spec.get('requires_confirm', False),
-            'destructive': spec.get('destructive', False),
-            'modules': spec.get('modules') or [],
-        })
+        out.append(
+            {
+                'name': name,
+                'label': spec['label'],
+                'description': spec['description'],
+                'icon': spec['icon'],
+                'params_schema': spec.get('params_schema') or [],
+                'requires_confirm': spec.get('requires_confirm', False),
+                'destructive': spec.get('destructive', False),
+                'modules': spec.get('modules') or [],
+            }
+        )
     return out
 
 
@@ -235,7 +235,9 @@ def is_tool_allowed(name: str, module: str | None = None) -> bool:
     return True
 
 
-def build_tool_action(name: str, params: dict | None = None, *, override_label: str | None = None) -> dict | None:
+def build_tool_action(
+    name: str, params: dict | None = None, *, override_label: str | None = None
+) -> dict | None:
     """Build a tool-action dict for inclusion in quick_actions response.
 
     Returns None if tool is not whitelisted — caller can skip silently.

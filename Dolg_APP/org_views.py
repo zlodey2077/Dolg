@@ -14,6 +14,7 @@ Endpoints:
 
 Все view (кроме accept-invite) требуют auth + соответствующее org.permission.
 """
+
 import secrets
 from datetime import timedelta
 
@@ -40,15 +41,18 @@ def _request_org(request, *args, **kwargs):
 def org_list(request):
     """Список организаций, в которых юзер состоит."""
     memberships = (
-        request.user.org_memberships
-        .filter(deactivated_at__isnull=True)
+        request.user.org_memberships.filter(deactivated_at__isnull=True)
         .select_related('organization')
         .order_by('organization__name')
     )
-    return render(request, 'orgs/list.html', {
-        'memberships': memberships,
-        'can_create_more': True,   # пока всем разрешено
-    })
+    return render(
+        request,
+        'orgs/list.html',
+        {
+            'memberships': memberships,
+            'can_create_more': True,  # пока всем разрешено
+        },
+    )
 
 
 # ============================================================
@@ -79,7 +83,10 @@ def org_create(request):
 
     # Required legal-чекбоксы
     legal_versions = {
-        'msa': '1.0', 'dpa': '1.0', 'aup': '1.0', 'privacy': '1.0',
+        'msa': '1.0',
+        'dpa': '1.0',
+        'aup': '1.0',
+        'privacy': '1.0',
     }
     missing = [k for k in legal_versions if not request.POST.get(f'agree_{k}')]
     if missing:
@@ -89,22 +96,31 @@ def org_create(request):
     seats = {'1-5': 5, '6-20': 10, '21-50': 50, '50+': 100}.get(size, 10)
 
     org = Organization.objects.create(
-        name=name, slug=slug,
+        name=name,
+        slug=slug,
         billing_email=billing_email,
-        plan=plan, seats_max=seats,
+        plan=plan,
+        seats_max=seats,
         owner=request.user,
     )
     OrganizationMember.objects.create(
-        organization=org, user=request.user, role='owner',
+        organization=org,
+        user=request.user,
+        role='owner',
         invited_by=request.user,
     )
 
     # Audit-log: фиксация создания + согласие с legal-документами
     AuditLog.log(
-        actor=request.user, action='org.create', organization=org,
-        object_type='Organization', object_id=org.id,
+        actor=request.user,
+        action='org.create',
+        organization=org,
+        object_type='Organization',
+        object_id=org.id,
         payload={
-            'name': org.name, 'plan': org.plan, 'seats_max': org.seats_max,
+            'name': org.name,
+            'plan': org.plan,
+            'seats_max': org.seats_max,
             'legal_versions_accepted': legal_versions,
         },
         request=request,
@@ -131,20 +147,24 @@ def org_dashboard(request, org_slug):
     if user_can(request.user, org, 'audit.read'):
         recent_audit = list(org.audit_log.order_by('-timestamp')[:10])
 
-    return render(request, 'orgs/dashboard.html', {
-        'org': org,
-        'role': role,
-        'entitlements': feature_summary(request.user, organization=org),
-        'members_total': members_total,
-        'projects_total': projects_total,
-        'pending_reviews': pending_reviews,
-        'recent_audit': recent_audit,
-        'can_invite': user_can(request.user, org, 'org.members.invite'),
-        'can_audit': user_can(request.user, org, 'audit.read'),
-        'can_settings': user_can(request.user, org, 'org.update'),
-        'can_billing': user_can(request.user, org, 'org.billing'),
-        'can_catalog_add': user_can(request.user, org, 'catalog.product.create'),
-    })
+    return render(
+        request,
+        'orgs/dashboard.html',
+        {
+            'org': org,
+            'role': role,
+            'entitlements': feature_summary(request.user, organization=org),
+            'members_total': members_total,
+            'projects_total': projects_total,
+            'pending_reviews': pending_reviews,
+            'recent_audit': recent_audit,
+            'can_invite': user_can(request.user, org, 'org.members.invite'),
+            'can_audit': user_can(request.user, org, 'audit.read'),
+            'can_settings': user_can(request.user, org, 'org.update'),
+            'can_billing': user_can(request.user, org, 'org.billing'),
+            'can_catalog_add': user_can(request.user, org, 'catalog.product.create'),
+        },
+    )
 
 
 # ============================================================
@@ -155,21 +175,24 @@ def org_dashboard(request, org_slug):
 def org_members(request, org_slug):
     org = request.organization
     members = (
-        org.memberships
-        .filter(deactivated_at__isnull=True)
+        org.memberships.filter(deactivated_at__isnull=True)
         .select_related('user')
         .order_by('-role', 'joined_at')
     )
     pending_invites = org.invites.filter(accepted_at__isnull=True).order_by('-created_at')
-    return render(request, 'orgs/members.html', {
-        'org': org,
-        'members': members,
-        'pending_invites': pending_invites,
-        'can_invite': user_can(request.user, org, 'org.members.invite'),
-        'can_remove': user_can(request.user, org, 'org.members.remove'),
-        'can_change_role': user_can(request.user, org, 'org.members.role_change'),
-        'role_choices': OrganizationMember.ROLE_CHOICES,
-    })
+    return render(
+        request,
+        'orgs/members.html',
+        {
+            'org': org,
+            'members': members,
+            'pending_invites': pending_invites,
+            'can_invite': user_can(request.user, org, 'org.members.invite'),
+            'can_remove': user_can(request.user, org, 'org.members.remove'),
+            'can_change_role': user_can(request.user, org, 'org.members.role_change'),
+            'role_choices': OrganizationMember.ROLE_CHOICES,
+        },
+    )
 
 
 @require_POST
@@ -211,9 +234,7 @@ def org_invite_create(request, org_slug):
     )
 
     # Send email
-    accept_url = request.build_absolute_uri(
-        f'/orgs/{org.slug}/invite/{invite.token}/'
-    )
+    accept_url = request.build_absolute_uri(f'/orgs/{org.slug}/invite/{invite.token}/')
     send_mail(
         subject=f'Приглашение в команду «{org.name}» на DOLG',
         message=(
@@ -229,8 +250,11 @@ def org_invite_create(request, org_slug):
     )
 
     AuditLog.log(
-        actor=request.user, action='org.members.invite', organization=org,
-        object_type='OrganizationInvite', object_id=invite.id,
+        actor=request.user,
+        action='org.members.invite',
+        organization=org,
+        object_type='OrganizationInvite',
+        object_id=invite.id,
         payload={'email': email, 'role': role},
         request=request,
     )
@@ -256,15 +280,18 @@ def org_member_role(request, org_slug, member_id):
     if member.user_id == org.owner_id and new_role != 'owner':
         messages.error(
             request,
-            'Нельзя понизить owner\'а. Сначала передайте ownership другому admin.',
+            "Нельзя понизить owner'а. Сначала передайте ownership другому admin.",
         )
         return redirect('hello:org_members', org_slug=org_slug)
 
     member.role = new_role
     member.save(update_fields=['role'])
     AuditLog.log(
-        actor=request.user, action='org.members.role_change', organization=org,
-        object_type='OrganizationMember', object_id=member.id,
+        actor=request.user,
+        action='org.members.role_change',
+        organization=org,
+        object_type='OrganizationMember',
+        object_id=member.id,
         payload={'user': member.user.username, 'old_role': old_role, 'new_role': new_role},
         request=request,
     )
@@ -280,13 +307,16 @@ def org_member_remove(request, org_slug, member_id):
     org = request.organization
     member = get_object_or_404(OrganizationMember, id=member_id, organization=org)
     if member.user_id == org.owner_id:
-        messages.error(request, 'Нельзя удалить owner\'а. Сначала transfer ownership.')
+        messages.error(request, "Нельзя удалить owner'а. Сначала transfer ownership.")
         return redirect('hello:org_members', org_slug=org_slug)
     member.deactivated_at = timezone.now()
     member.save(update_fields=['deactivated_at'])
     AuditLog.log(
-        actor=request.user, action='org.members.remove', organization=org,
-        object_type='OrganizationMember', object_id=member.id,
+        actor=request.user,
+        action='org.members.remove',
+        organization=org,
+        object_type='OrganizationMember',
+        object_id=member.id,
         payload={'user': member.user.username, 'former_role': member.role},
         request=request,
     )
@@ -307,15 +337,14 @@ def org_invite_accept(request, org_slug, token):
         messages.info(request, 'Это приглашение уже принято.')
         return redirect('hello:org_dashboard', org_slug=org.slug)
     if invite.is_expired():
-        messages.error(request, 'Приглашение истекло (7 дней). Попросите admin\'а отправить новое.')
+        messages.error(request, "Приглашение истекло (7 дней). Попросите admin'а отправить новое.")
         return redirect('hello:org_list')
 
     # Соответствие email — мягкая проверка (warning, не блок)
     if invite.email.lower() != (request.user.email or '').lower():
         messages.warning(
             request,
-            f'⚠ Приглашение отправлено на {invite.email}, '
-            f'а вы вошли как {request.user.email}. Принимаем.',
+            f'⚠ Приглашение отправлено на {invite.email}, а вы вошли как {request.user.email}. Принимаем.',
         )
 
     if org.has_member(request.user):
@@ -325,16 +354,21 @@ def org_invite_accept(request, org_slug, token):
         return redirect('hello:org_dashboard', org_slug=org.slug)
 
     OrganizationMember.objects.create(
-        organization=org, user=request.user,
-        role=invite.role, invited_by=invite.invited_by,
+        organization=org,
+        user=request.user,
+        role=invite.role,
+        invited_by=invite.invited_by,
     )
     invite.accepted_at = timezone.now()
     invite.accepted_by = request.user
     invite.save(update_fields=['accepted_at', 'accepted_by'])
 
     AuditLog.log(
-        actor=request.user, action='org.members.join', organization=org,
-        object_type='OrganizationMember', object_id=invite.id,
+        actor=request.user,
+        action='org.members.join',
+        organization=org,
+        object_type='OrganizationMember',
+        object_id=invite.id,
         payload={'role': invite.role, 'invite_id': invite.id},
         request=request,
     )
@@ -360,13 +394,17 @@ def org_audit(request, org_slug):
         qs = qs.filter(actor__username__icontains=actor_filter)
     entries = qs[:200]
     distinct_actions = sorted(set(org.audit_log.values_list('action', flat=True)[:500]))
-    return render(request, 'orgs/audit.html', {
-        'org': org,
-        'entries': entries,
-        'distinct_actions': distinct_actions,
-        'action_filter': action_filter,
-        'actor_filter': actor_filter,
-    })
+    return render(
+        request,
+        'orgs/audit.html',
+        {
+            'org': org,
+            'entries': entries,
+            'distinct_actions': distinct_actions,
+            'action_filter': action_filter,
+            'actor_filter': actor_filter,
+        },
+    )
 
 
 # ============================================================
@@ -381,18 +419,24 @@ def org_audit(request, org_slug):
 def org_approval_queue(request, org_slug):
     """Очередь проектов на ревью. Видна reviewer+, action только reviewer+."""
     from .models import SchematicProject
+
     org = request.organization
     pending = (
-        SchematicProject.objects
-        .filter(organization=org, approval_state='pending_review', deleted_at__isnull=True)
+        SchematicProject.objects.filter(
+            organization=org, approval_state='pending_review', deleted_at__isnull=True
+        )
         .select_related('user')
         .order_by('updated_at')
     )
-    return render(request, 'orgs/approval_queue.html', {
-        'org': org,
-        'pending': pending,
-        'can_approve': user_can(request.user, org, 'bom.approve'),
-    })
+    return render(
+        request,
+        'orgs/approval_queue.html',
+        {
+            'org': org,
+            'pending': pending,
+            'can_approve': user_can(request.user, org, 'bom.approve'),
+        },
+    )
 
 
 @require_POST
@@ -402,6 +446,7 @@ def org_approval_queue(request, org_slug):
 def project_submit_for_review(request, org_slug, pk):
     """Engineer submits project for review."""
     from .models import SchematicProject
+
     org = request.organization
     project = get_object_or_404(SchematicProject, pk=pk, organization=org)
     if project.approval_state == 'pending_review':
@@ -410,8 +455,11 @@ def project_submit_for_review(request, org_slug, pk):
     project.approval_state = 'pending_review'
     project.save(update_fields=['approval_state', 'updated_at'])
     AuditLog.log(
-        actor=request.user, action='bom.submit', organization=org,
-        object_type='SchematicProject', object_id=project.id,
+        actor=request.user,
+        action='bom.submit',
+        organization=org,
+        object_type='SchematicProject',
+        object_id=project.id,
         payload={'project_name': project.name, 'from_state': 'draft'},
         request=request,
     )
@@ -425,14 +473,18 @@ def project_submit_for_review(request, org_slug, pk):
 @require_feature('enterprise_approval_workflow', organization_getter=_request_org)
 def project_approve(request, org_slug, pk):
     from .models import SchematicProject
+
     org = request.organization
     project = get_object_or_404(SchematicProject, pk=pk, organization=org)
     comment = (request.POST.get('comment') or '').strip()[:500]
     project.approval_state = 'approved'
     project.save(update_fields=['approval_state', 'updated_at'])
     AuditLog.log(
-        actor=request.user, action='bom.approve', organization=org,
-        object_type='SchematicProject', object_id=project.id,
+        actor=request.user,
+        action='bom.approve',
+        organization=org,
+        object_type='SchematicProject',
+        object_id=project.id,
         payload={'project_name': project.name, 'comment': comment},
         request=request,
     )
@@ -446,14 +498,18 @@ def project_approve(request, org_slug, pk):
 @require_feature('enterprise_approval_workflow', organization_getter=_request_org)
 def project_reject(request, org_slug, pk):
     from .models import SchematicProject
+
     org = request.organization
     project = get_object_or_404(SchematicProject, pk=pk, organization=org)
     comment = (request.POST.get('comment') or '').strip()[:500]
     project.approval_state = 'rejected'
     project.save(update_fields=['approval_state', 'updated_at'])
     AuditLog.log(
-        actor=request.user, action='bom.reject', organization=org,
-        object_type='SchematicProject', object_id=project.id,
+        actor=request.user,
+        action='bom.reject',
+        organization=org,
+        object_type='SchematicProject',
+        object_id=project.id,
         payload={'project_name': project.name, 'comment': comment},
         request=request,
     )
@@ -468,11 +524,15 @@ def org_api_tokens(request, org_slug):
     """API tokens management: list + create-form."""
     org = request.organization
     tokens = org.api_tokens.order_by('-created_at')
-    return render(request, 'orgs/api_tokens.html', {
-        'org': org,
-        'tokens': tokens,
-        'just_created_token': request.session.pop('_just_created_token', None),
-    })
+    return render(
+        request,
+        'orgs/api_tokens.html',
+        {
+            'org': org,
+            'tokens': tokens,
+            'just_created_token': request.session.pop('_just_created_token', None),
+        },
+    )
 
 
 @require_POST
@@ -481,6 +541,7 @@ def org_api_tokens(request, org_slug):
 @require_feature('enterprise_api_tokens', organization_getter=_request_org)
 def org_api_token_create(request, org_slug):
     from .models import OrganizationApiToken
+
     org = request.organization
     name = (request.POST.get('name') or '').strip()[:120]
     scope = (request.POST.get('scope') or 'projects.read').split(',')
@@ -489,14 +550,18 @@ def org_api_token_create(request, org_slug):
         return redirect('hello:org_api_tokens', org_slug=org.slug)
     token = 'dolg_' + secrets.token_urlsafe(40)
     OrganizationApiToken.objects.create(
-        organization=org, name=name, token=token,
+        organization=org,
+        name=name,
+        token=token,
         scope=[s.strip() for s in scope if s.strip()],
         created_by=request.user,
     )
     # Один раз показываем сырой token (потом только маска)
     request.session['_just_created_token'] = token
     AuditLog.log(
-        actor=request.user, action='api.token.create', organization=org,
+        actor=request.user,
+        action='api.token.create',
+        organization=org,
         object_type='OrganizationApiToken',
         payload={'name': name, 'scope': scope},
         request=request,
@@ -511,13 +576,17 @@ def org_api_token_create(request, org_slug):
 @require_feature('enterprise_api_tokens', organization_getter=_request_org)
 def org_api_token_revoke(request, org_slug, token_id):
     from .models import OrganizationApiToken
+
     org = request.organization
     tok = get_object_or_404(OrganizationApiToken, id=token_id, organization=org)
     tok.revoked_at = timezone.now()
     tok.save(update_fields=['revoked_at'])
     AuditLog.log(
-        actor=request.user, action='api.token.revoke', organization=org,
-        object_type='OrganizationApiToken', object_id=tok.id,
+        actor=request.user,
+        action='api.token.revoke',
+        organization=org,
+        object_type='OrganizationApiToken',
+        object_id=tok.id,
         payload={'name': tok.name},
         request=request,
     )
@@ -534,6 +603,7 @@ def org_analytics(request, org_slug):
     from datetime import timedelta
 
     from django.db.models import Count
+
     org = request.organization
     cutoff = timezone.now() - timedelta(days=30)
 
@@ -555,15 +625,19 @@ def org_analytics(request, org_slug):
     approved = org.projects.filter(approval_state='approved').count()
     rejected = org.projects.filter(approval_state='rejected').count()
 
-    return render(request, 'orgs/analytics.html', {
-        'org': org,
-        'top_actors': top_actors,
-        'action_counts': action_counts,
-        'pending': pending,
-        'approved': approved,
-        'rejected': rejected,
-        'period_days': 30,
-    })
+    return render(
+        request,
+        'orgs/analytics.html',
+        {
+            'org': org,
+            'top_actors': top_actors,
+            'action_counts': action_counts,
+            'pending': pending,
+            'approved': approved,
+            'rejected': rejected,
+            'period_days': 30,
+        },
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -577,7 +651,13 @@ def org_settings(request, org_slug):
         org.custom_color = (request.POST.get('custom_color') or '').strip()[:20]
         # Policies
         settings_data = dict(org.settings or {})
-        for key in ('require_2fa', 'disable_ai', 'disable_public_sharing', 'require_order_approval', 'sso_enabled'):
+        for key in (
+            'require_2fa',
+            'disable_ai',
+            'disable_public_sharing',
+            'require_order_approval',
+            'sso_enabled',
+        ):
             settings_data[key] = bool(request.POST.get(f'policy_{key}'))
         allowed_domains = (request.POST.get('allowed_domains') or '').strip()
         settings_data['allowed_domains'] = [
@@ -592,7 +672,7 @@ def org_settings(request, org_slug):
         if 'custom_logo' in request.FILES:
             logo = request.FILES['custom_logo']
             ALLOWED = {'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'}
-            MAX_SIZE = 5 * 1024 * 1024   # 5 МБ
+            MAX_SIZE = 5 * 1024 * 1024  # 5 МБ
             if logo.size > MAX_SIZE:
                 messages.error(request, 'Логотип >5 МБ — не загружен')
             elif logo.content_type not in ALLOWED:
@@ -602,18 +682,25 @@ def org_settings(request, org_slug):
                 messages.success(request, '🎨 Logo обновлён')
         org.save()
         AuditLog.log(
-            actor=request.user, action='org.settings_update', organization=org,
-            object_type='Organization', object_id=org.id,
+            actor=request.user,
+            action='org.settings_update',
+            organization=org,
+            object_type='Organization',
+            object_id=org.id,
             payload={'settings': settings_data},
             request=request,
         )
         messages.success(request, 'Настройки сохранены')
         return redirect('hello:org_settings', org_slug=org.slug)
 
-    return render(request, 'orgs/settings.html', {
-        'org': org,
-        'can_delete': user_can(request.user, org, 'org.delete'),
-    })
+    return render(
+        request,
+        'orgs/settings.html',
+        {
+            'org': org,
+            'can_delete': user_can(request.user, org, 'org.delete'),
+        },
+    )
 
 
 # ============================================================
@@ -659,11 +746,12 @@ def org_catalog_add(request, org_slug):
             errors.append('Краткое описание обязательно.')
         try:
             from decimal import Decimal, InvalidOperation
+
             price = Decimal(price_raw.replace(',', '.')) if price_raw else None
             if price is None or price < 0:
                 errors.append('Укажите корректную цену.')
             # Product.price = DecimalField(max_digits=10, decimal_places=2).
-                # Граница: 99999999.99. Если юзер вписал 1e28 (scientific), Decimal
+            # Граница: 99999999.99. Если юзер вписал 1e28 (scientific), Decimal
             # это съест, но DB сломается при следующем чтении. Каппируем явно.
             elif price >= Decimal('100000000') or price.adjusted() > 8:
                 errors.append('Цена слишком велика. Максимум 99 999 999.99 ₽.')
@@ -671,7 +759,7 @@ def org_catalog_add(request, org_slug):
             # Квантизация до 2 знаков — иначе DB cast потом тоже может ругаться
             elif price is not None:
                 price = price.quantize(Decimal('0.01'))
-        except (InvalidOperation, ValueError):
+        except InvalidOperation, ValueError:
             errors.append('Цена должна быть числом.')
             price = None
         try:
@@ -686,7 +774,7 @@ def org_catalog_add(request, org_slug):
         if category_id and not errors:
             try:
                 category = Category.objects.get(pk=int(category_id))
-            except (Category.DoesNotExist, ValueError):
+            except Category.DoesNotExist, ValueError:
                 errors.append('Категория не найдена.')
 
         if not errors and category is not None and price is not None:
@@ -721,13 +809,18 @@ def org_catalog_add(request, org_slug):
                 i += 1
 
             product = Product(
-                name=name, category=category, description=description,
-                price=price, stock=stock,
+                name=name,
+                category=category,
+                description=description,
+                price=price,
+                stock=stock,
                 manufacturer=manufacturer_value,
                 part_number=part_number,
                 package_type=package_type,
                 datasheet_url=datasheet_url,
-                lifecycle_status=lifecycle_status if lifecycle_status in {'active', 'nrnd', 'eol', 'obsolete'} else 'active',
+                lifecycle_status=lifecycle_status
+                if lifecycle_status in {'active', 'nrnd', 'eol', 'obsolete'}
+                else 'active',
                 parameters=params,
                 slug=slug,
             )
@@ -739,9 +832,11 @@ def org_catalog_add(request, org_slug):
             # принимает относительные пути через MEDIA_URL.
             ds_file = request.FILES.get('datasheet_file')
             if ds_file:
+                from pathlib import Path as _Path
+
                 from django.conf import settings as dj_settings
                 from django.core.files.storage import default_storage
-                from pathlib import Path as _Path
+
                 ext = (_Path(ds_file.name).suffix or '.pdf').lower()
                 ds_path = f'datasheets/{slug}{ext}'
                 saved_path = default_storage.save(ds_path, ds_file)
@@ -751,10 +846,18 @@ def org_catalog_add(request, org_slug):
             product.save()
 
             AuditLog.log(
-                actor=request.user, action='catalog.product.create', organization=org,
-                object_type='Product', object_id=str(product.id),
-                payload={'name': name, 'category': category.slug, 'slug': slug,
-                         'has_image': bool(uploaded), 'has_datasheet': bool(ds_file)},
+                actor=request.user,
+                action='catalog.product.create',
+                organization=org,
+                object_type='Product',
+                object_id=str(product.id),
+                payload={
+                    'name': name,
+                    'category': category.slug,
+                    'slug': slug,
+                    'has_image': bool(uploaded),
+                    'has_datasheet': bool(ds_file),
+                },
                 request=request,
             )
             messages.success(request, f'Товар «{product.name}» добавлен в каталог.')
@@ -766,23 +869,36 @@ def org_catalog_add(request, org_slug):
     manufacturer_choices = [
         (f'__org__:{org.slug}', f'{org.name} (моя организация)'),
         ('other', 'Other / не указан'),
-        ('yageo', 'Yageo'), ('vishay', 'Vishay'),
-        ('murata', 'Murata'), ('tdk', 'TDK'), ('kemet', 'KEMET'),
-        ('st', 'STMicroelectronics'), ('nxp', 'NXP'),
-        ('ti', 'Texas Instruments'), ('infineon', 'Infineon'),
-        ('onsemi', 'onsemi'), ('bourns', 'Bourns'),
-        ('panasonic', 'Panasonic'), ('nichicon', 'Nichicon'),
+        ('yageo', 'Yageo'),
+        ('vishay', 'Vishay'),
+        ('murata', 'Murata'),
+        ('tdk', 'TDK'),
+        ('kemet', 'KEMET'),
+        ('st', 'STMicroelectronics'),
+        ('nxp', 'NXP'),
+        ('ti', 'Texas Instruments'),
+        ('infineon', 'Infineon'),
+        ('onsemi', 'onsemi'),
+        ('bourns', 'Bourns'),
+        ('panasonic', 'Panasonic'),
+        ('nichicon', 'Nichicon'),
         ('wurth', 'Würth Elektronik'),
     ]
 
-    return render(request, 'orgs/catalog_add.html', {
-        'org': org,
-        'categories': categories,
-        'manufacturer_choices': manufacturer_choices,
-        'lifecycle_choices': [
-            ('active', 'Active'), ('nrnd', 'NRND'),
-            ('eol', 'EOL'), ('obsolete', 'Obsolete'),
-        ],
-        'errors': errors,
-        'form_data': form_data,
-    })
+    return render(
+        request,
+        'orgs/catalog_add.html',
+        {
+            'org': org,
+            'categories': categories,
+            'manufacturer_choices': manufacturer_choices,
+            'lifecycle_choices': [
+                ('active', 'Active'),
+                ('nrnd', 'NRND'),
+                ('eol', 'EOL'),
+                ('obsolete', 'Obsolete'),
+            ],
+            'errors': errors,
+            'form_data': form_data,
+        },
+    )

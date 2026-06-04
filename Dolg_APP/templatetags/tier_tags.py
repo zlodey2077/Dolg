@@ -4,6 +4,7 @@
 Pro-фич (Markdown comments, темы, custom logo). Не падает если у юзера
 нет Subscription записи — возвращает False.
 """
+
 from django import template
 
 register = template.Library()
@@ -26,6 +27,7 @@ def is_pro_user(user) -> bool:
 def user_tier(user) -> str:
     """Возвращает строку tier: guest/free/pro/unlimited."""
     from ..quotas import get_user_tier
+
     return get_user_tier(user)
 
 
@@ -33,6 +35,7 @@ def user_tier(user) -> str:
 def user_can_tag(user, organization, action: str) -> bool:
     """{% user_can user org 'bom.approve' as can_approve %}{% if can_approve %}…{% endif %}"""
     from ..org_permissions import user_can
+
     return user_can(user, organization, action)
 
 
@@ -40,6 +43,7 @@ def user_can_tag(user, organization, action: str) -> bool:
 def user_role_tag(user, organization) -> str:
     """{% user_role user org as role %}"""
     from ..org_permissions import get_user_role
+
     return get_user_role(user, organization)
 
 
@@ -51,9 +55,6 @@ def user_orgs(user):
     if user is None or not getattr(user, 'is_authenticated', False):
         return []
     try:
-        return list(
-            user.org_memberships.filter(deactivated_at__isnull=True)
-                .select_related('organization')
-        )
+        return list(user.org_memberships.filter(deactivated_at__isnull=True).select_related('organization'))
     except Exception:
         return []

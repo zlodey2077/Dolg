@@ -33,7 +33,9 @@ def parse_spice_component_line(line: str) -> dict:
         tree = _spice_line_parser().parse(text)
     except Exception as exc:
         return {'ok': False, 'tokens': [], 'error': str(exc)}
-    tokens = [str(token) for token in tree.scan_values(lambda item: getattr(item, 'type', None) in {'REF', 'TOKEN'})]
+    tokens = [
+        str(token) for token in tree.scan_values(lambda item: getattr(item, 'type', None) in {'REF', 'TOKEN'})
+    ]
     if len(tokens) < 4:
         return {'ok': False, 'tokens': tokens, 'error': 'too few fields'}
     return {'ok': True, 'tokens': tokens, 'error': ''}

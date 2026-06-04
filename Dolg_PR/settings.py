@@ -24,6 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Если python-dotenv не установлен — пропускаем, переменные нужно задавать руками.
 try:
     from dotenv import load_dotenv
+
     load_dotenv(BASE_DIR / '.env', override=False)
 except ImportError:
     pass
@@ -31,6 +32,7 @@ except ImportError:
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+
 
 def env_bool(name, default=False):
     value = os.getenv(name)
@@ -59,14 +61,13 @@ ALLOWED_HOSTS = env_list(
     # .trycloudflare.com — домены Cloudflare Quick Tunnel (для демо публичного доступа).
     # .ngrok-free.app / .ngrok.io — ngrok (на случай переключения туннеля).
     'localhost,127.0.0.1,[::1],.localhost,dolg.local,shop.dolg.local,www.dolg.local,'
-    '.trycloudflare.com,.ngrok-free.app,.ngrok.io'
+    '.trycloudflare.com,.ngrok-free.app,.ngrok.io',
 )
 
 # CSRF trusted origins — Django 4.0+ требует явно перечислить источники
 # для POST-запросов с https/non-default домена.
 CSRF_TRUSTED_ORIGINS = env_list(
-    'CSRF_TRUSTED_ORIGINS',
-    'https://*.trycloudflare.com,https://*.ngrok-free.app,https://*.ngrok.io'
+    'CSRF_TRUSTED_ORIGINS', 'https://*.trycloudflare.com,https://*.ngrok-free.app,https://*.ngrok.io'
 )
 
 if not DEBUG and SECRET_KEY == DEFAULT_INSECURE_SECRET_KEY and not IS_TESTING:
@@ -84,7 +85,9 @@ if not DEBUG and not ALLOWED_HOSTS and not IS_TESTING:
 
 EMAIL_BACKEND = os.getenv(
     'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
+    'django.core.mail.backends.console.EmailBackend'
+    if DEBUG
+    else 'django.core.mail.backends.smtp.EmailBackend',
 )
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'DOLG <noreply@dolg.local>')
 
@@ -107,7 +110,7 @@ INSTALLED_APPS = [
     # Enforcement по org-policy require_2fa — см. Dolg_APP/two_factor.py.
     'django_otp',
     'django_otp.plugins.otp_totp',
-    'django_otp.plugins.otp_static',   # backup-коды на случай потери телефона
+    'django_otp.plugins.otp_static',  # backup-коды на случай потери телефона
     # SSO через django-allauth (real OAuth: Google/Microsoft/GitHub).
     # Mock-SSO (Dolg_APP/sso_views.py) оставлен для demo Enterprise tier.
     # allauth требует django.contrib.sites — см. ниже SITE_ID.
@@ -131,6 +134,7 @@ INSTALLED_APPS = [
 # Grafana stack подцепляется через docker-compose в deploy/.
 try:
     import django_prometheus  # noqa: F401
+
     INSTALLED_APPS.append('django_prometheus')
     _HAS_PROMETHEUS = True
 except ImportError:
@@ -142,6 +146,7 @@ except ImportError:
 # Default ВСЕГДА False; включается явно через env-var ПОСЛЕ `manage.py migrate`.
 try:
     import axes  # noqa: F401
+
     _HAS_AXES = env_bool('ENABLE_AXES', False)
     if _HAS_AXES:
         INSTALLED_APPS.append('axes')
@@ -150,12 +155,14 @@ except ImportError:
 
 try:
     import csp  # noqa: F401
+
     _HAS_CSP = env_bool('ENABLE_CSP', False)
 except ImportError:
     _HAS_CSP = False
 
 try:
     import silk  # noqa: F401
+
     _HAS_SILK = env_bool('ENABLE_SILK', False)
     if _HAS_SILK:
         INSTALLED_APPS.append('silk')
@@ -232,8 +239,10 @@ if _HAS_SILK:
     SILKY_PYTHON_PROFILER = False  # cprofile heavy — выключен
     SILKY_AUTHENTICATION = True
     SILKY_AUTHORISATION = True
+
     def _silk_admin_only(user):
         return user.is_authenticated and user.is_staff
+
     SILKY_PERMISSIONS = _silk_admin_only
 
 ROOT_URLCONF = 'Dolg_PR.urls'
@@ -278,6 +287,7 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+
 # DATABASE_URL — стандарт 12-factor. Если задан, парсим вручную (без
 # зависимости dj-database-url) и переключаемся на Postgres. Иначе — SQLite.
 # Поддерживаем postgresql:// и postgres:// (исторический алиас).
@@ -290,6 +300,7 @@ def _parse_database_url(url):
     требует TLS, и без sslmode=require коннект отвалится.
     """
     from urllib.parse import parse_qs, unquote, urlparse
+
     p = urlparse(url)
     options = {}
     for key, values in parse_qs(p.query).items():
@@ -297,11 +308,11 @@ def _parse_database_url(url):
             options[key] = values[0]
     return {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':   (p.path or '').lstrip('/'),
-        'USER':   unquote(p.username or ''),
+        'NAME': (p.path or '').lstrip('/'),
+        'USER': unquote(p.username or ''),
         'PASSWORD': unquote(p.password or ''),
-        'HOST':   p.hostname or '',
-        'PORT':   str(p.port or ''),
+        'HOST': p.hostname or '',
+        'PORT': str(p.port or ''),
         'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),  # пул на 60 с
         'OPTIONS': options,
     }
@@ -325,9 +336,14 @@ else:
 # (нужно для тестов, которые проверяют миграционную семантику).
 # Использование:  $env:FAST_TESTS=1; manage.py test
 if IS_TESTING and env_bool('FAST_TESTS'):
+
     class _DisableMigrations:
-        def __contains__(self, _item): return True
-        def __getitem__(self, _item): return None
+        def __contains__(self, _item):
+            return True
+
+        def __getitem__(self, _item):
+            return None
+
     MIGRATION_MODULES = _DisableMigrations()
 
 
@@ -435,12 +451,14 @@ if SENTRY_DSN and not IS_TESTING:
     try:
         import sentry_sdk
         from sentry_sdk.integrations.django import DjangoIntegration
+
         # release-tagging: связать ошибки с конкретным деплоем. CI/CD должен
         # передать SHA коммита через RELEASE_SHA. Без него — fallback на
         # дату/час, чтобы хотя бы группировка по деплоям работала.
         release = os.getenv('RELEASE_SHA') or os.getenv('GIT_SHA')
         if not release:
             import datetime
+
             release = 'dolg@' + datetime.datetime.utcnow().strftime('%Y%m%d-%H')
         sentry_sdk.init(
             dsn=SENTRY_DSN,
@@ -452,8 +470,7 @@ if SENTRY_DSN and not IS_TESTING:
         )
     except ImportError:
         warnings.warn(
-            'SENTRY_DSN задан, но пакет sentry-sdk не установлен. '
-            'Поставьте: pip install sentry-sdk',
+            'SENTRY_DSN задан, но пакет sentry-sdk не установлен. Поставьте: pip install sentry-sdk',
             RuntimeWarning,
         )
 
@@ -474,7 +491,7 @@ OTP_TOTP_ISSUER = 'DOLG'
 # При rerun сервера TOTP-токены не должны инвалидироваться. django-otp
 # уже не привязывает их к процессу, но явно зафиксируем секрет для шифрования
 # raw-секретов в БД (Fernet под капотом).
-OTP_TOTP_THROTTLE_FACTOR = 1   # без throttle — для дипломной демки
+OTP_TOTP_THROTTLE_FACTOR = 1  # без throttle — для дипломной демки
 
 # === SSO через django-allauth ===
 # SITE_ID — обязательно для django.contrib.sites (используется allauth для
@@ -484,25 +501,25 @@ SITE_ID = 1
 # Backends авторизации: стандартный + allauth.
 # Порядок имеет значение — first wins.
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',          # email/password
-    'allauth.account.auth_backends.AuthenticationBackend', # SSO
+    'django.contrib.auth.backends.ModelBackend',  # email/password
+    'allauth.account.auth_backends.AuthenticationBackend',  # SSO
 ]
 
 # allauth конфиг: используем email как primary identifier (без username при SSO).
 ACCOUNT_LOGIN_METHODS = {'email', 'username'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
-ACCOUNT_EMAIL_VERIFICATION = 'optional'   # для demo; на проде — 'mandatory'
+ACCOUNT_EMAIL_VERIFICATION = 'optional'  # для demo; на проде — 'mandatory'
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_RATE_LIMITS = {
-    'login_failed': '5/5m',   # 5 неудачных попыток за 5 мин → throttle
+    'login_failed': '5/5m',  # 5 неудачных попыток за 5 мин → throttle
 }
 
 # Social account настройки. Provider'ы конфигурируются через
 # /admin/socialaccount/socialapp/ ИЛИ через SOCIALACCOUNT_PROVIDERS env.
 # По умолчанию в demo-mode ничего не сконфигурировано — кнопки SSO неактивны.
-SOCIALACCOUNT_LOGIN_ON_GET = True   # один клик «Войти через Google» вместо confirm-страницы
-SOCIALACCOUNT_AUTO_SIGNUP = True    # создаёт User автоматически при первом SSO-входе
-SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'   # email от Google УЖЕ verified
+SOCIALACCOUNT_LOGIN_ON_GET = True  # один клик «Войти через Google» вместо confirm-страницы
+SOCIALACCOUNT_AUTO_SIGNUP = True  # создаёт User автоматически при первом SSO-входе
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'  # email от Google УЖЕ verified
 SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
@@ -512,7 +529,7 @@ SOCIALACCOUNT_PROVIDERS = {
         # (чтобы не хранить secrets в коде).
     },
     'microsoft': {
-        'TENANT': 'common',   # all Azure AD tenants + personal accounts
+        'TENANT': 'common',  # all Azure AD tenants + personal accounts
     },
     'github': {
         'SCOPE': ['read:user', 'user:email'],

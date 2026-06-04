@@ -22,6 +22,7 @@ class GuestPublicAccessTests(TestCase):
     def test_category_page_accessible(self):
         # Берём любую существующую категорию (в чистой test-БД может не быть GPU)
         from shop.models import Category
+
         cat = Category.objects.first()
         if cat is None:
             self.skipTest('no categories in DB')
@@ -30,6 +31,7 @@ class GuestPublicAccessTests(TestCase):
     def test_product_detail_accessible(self):
         # Любой продукт — берём первый из БД
         from shop.models import Product
+
         p = Product.objects.first()
         if p is None:
             self.skipTest('no products in DB')
@@ -154,6 +156,7 @@ class CartGuestFlowTests(TestCase):
     def test_cart_guest_sees_register_button(self):
         # Сначала добавим что-то в корзину
         from shop.models import Product
+
         p = Product.objects.first()
         if p is None:
             self.skipTest('no products')
@@ -172,11 +175,13 @@ class AnonymizeIPMiddlewareTests(TestCase):
 
     def test_ipv4_anonymized_without_consent(self):
         from Dolg_APP.middleware import _anonymize_ipv4
+
         self.assertEqual(_anonymize_ipv4('192.168.1.42'), '192.168.1.0')
-        self.assertEqual(_anonymize_ipv4('10.0.0.255'),   '10.0.0.0')
+        self.assertEqual(_anonymize_ipv4('10.0.0.255'), '10.0.0.0')
 
     def test_ipv6_anonymized_without_consent(self):
         from Dolg_APP.middleware import _anonymize_ipv6
+
         # /64 truncation: первые 4 группы остаются, остальное → 0:0:0:0
         result = _anonymize_ipv6('2001:db8:1234:5678:abcd:ef01:2345:6789')
         self.assertEqual(result, '2001:db8:1234:5678:0:0:0:0')
@@ -184,15 +189,18 @@ class AnonymizeIPMiddlewareTests(TestCase):
     def test_ip_preserved_with_analytics_consent(self):
         """С consent.analytics=true оригинал остаётся."""
         from Dolg_APP.middleware import AnonymizeIPMiddleware
+
         captured = {}
 
         def fake_response(request):
             captured['ip'] = request.META.get('REMOTE_ADDR', '')
             from django.http import HttpResponse
+
             return HttpResponse('ok')
 
         mw = AnonymizeIPMiddleware(fake_response)
         from django.test import RequestFactory
+
         rf = RequestFactory()
         request = rf.get('/')
         request.META['REMOTE_ADDR'] = '192.168.1.42'
@@ -203,15 +211,18 @@ class AnonymizeIPMiddlewareTests(TestCase):
 
     def test_ip_anonymized_without_cookie(self):
         from Dolg_APP.middleware import AnonymizeIPMiddleware
+
         captured = {}
 
         def fake_response(request):
             captured['ip'] = request.META.get('REMOTE_ADDR', '')
             from django.http import HttpResponse
+
             return HttpResponse('ok')
 
         mw = AnonymizeIPMiddleware(fake_response)
         from django.test import RequestFactory
+
         rf = RequestFactory()
         request = rf.get('/')
         request.META['REMOTE_ADDR'] = '192.168.1.42'

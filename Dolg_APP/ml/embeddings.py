@@ -3,6 +3,7 @@
 Phase 1: ручные feature-векторы из Product.parameters + cosine-similarity.
 Phase 2: learned embeddings через autoencoder или contrastive learning.
 """
+
 import math
 
 # Какие параметры используем для feature-вектора. Каждый параметр
@@ -16,7 +17,7 @@ NUMERIC_FEATURES = {
     'current': 'log',
     'power': 'log',
     'wattage': 'log',
-    'capacity': 'log',         # SSD/RAM объём
+    'capacity': 'log',  # SSD/RAM объём
     'frequency': 'log',
     'tdp': 'linear',
     'cores': 'linear',
@@ -34,12 +35,26 @@ def _parse_numeric(value) -> float | None:
         return float(value)
     s = str(value).strip().lower().replace(',', '.')
     multipliers = {
-        'к': 1e3, 'k': 1e3, 'м': 1e-3, 'm': 1e-3, 'мк': 1e-6, 'u': 1e-6,
-        'н': 1e-9, 'n': 1e-9, 'п': 1e-12, 'p': 1e-12,
-        'мег': 1e6, 'meg': 1e6, 'г': 1e9, 'g': 1e9, 'т': 1e12, 't': 1e12,
+        'к': 1e3,
+        'k': 1e3,
+        'м': 1e-3,
+        'm': 1e-3,
+        'мк': 1e-6,
+        'u': 1e-6,
+        'н': 1e-9,
+        'n': 1e-9,
+        'п': 1e-12,
+        'p': 1e-12,
+        'мег': 1e6,
+        'meg': 1e6,
+        'г': 1e9,
+        'g': 1e9,
+        'т': 1e12,
+        't': 1e12,
     }
     # Простой парсер: число + опционально префикс + опционально единица
     import re
+
     m = re.match(r'^([-+]?\d*\.?\d+)\s*([a-zа-я]*)', s)
     if not m:
         return None
@@ -147,9 +162,13 @@ def find_similar_products(product, top_k: int = 5) -> list:
 
     # Берём кандидатов в той же категории (для других категорий cross-comparisons
     # обычно бесполезны: резистор и видеокарта не «аналоги»).
-    candidates_qs = Product.objects.filter(
-        category=product.category,
-    ).exclude(pk=product.pk).exclude(stock=0)[:200]   # limit чтобы не perf-hit
+    candidates_qs = (
+        Product.objects.filter(
+            category=product.category,
+        )
+        .exclude(pk=product.pk)
+        .exclude(stock=0)[:200]
+    )  # limit чтобы не perf-hit
 
     scored = []
     for candidate in candidates_qs:
@@ -164,11 +183,13 @@ def find_similar_products(product, top_k: int = 5) -> list:
                 pretty = k.replace('cat_', '').replace('_', ' ')
                 why_parts.append(f'{pretty}: {cfeats[k]}')
         why = ', '.join(why_parts[:3]) or 'общая категория'
-        scored.append({
-            'product': candidate,
-            'score': round(score, 3),
-            'why': why,
-        })
+        scored.append(
+            {
+                'product': candidate,
+                'score': round(score, 3),
+                'why': why,
+            }
+        )
 
     scored.sort(key=lambda x: -x['score'])
     return scored[:top_k]

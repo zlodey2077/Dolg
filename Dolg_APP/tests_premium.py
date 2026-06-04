@@ -9,6 +9,7 @@
 - CAD-темы UI флаг
 - Pro-badge в navbar
 """
+
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -129,7 +130,7 @@ class SubscriptionTests(TestCase):
         activate_pro(self.user, months=1)
         sub = Subscription.objects.get(user=self.user)
         sub.period_end = timezone.now() - timedelta(days=1)
-        sub.status = 'cancelled'   # auto_renew по умолчанию True после activate_pro
+        sub.status = 'cancelled'  # auto_renew по умолчанию True после activate_pro
         sub.save()
         call_command('expire_subscriptions')
         sub.refresh_from_db()
@@ -196,18 +197,24 @@ class AIPipelineTests(TestCase):
     def test_anomalies_endpoint_free_allowed(self):
         self.client.force_login(self.free)
         import json as _j
-        r = self.client.post('/api/ai/pipeline/anomalies/',
-                             data=_j.dumps({'scheme_data': self.demo_scheme}),
-                             content_type='application/json')
+
+        r = self.client.post(
+            '/api/ai/pipeline/anomalies/',
+            data=_j.dumps({'scheme_data': self.demo_scheme}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['action'], 'detect_anomalies')
 
     def test_explain_endpoint_blocked_for_free(self):
         self.client.force_login(self.free)
         import json as _j
-        r = self.client.post('/api/ai/pipeline/explain/',
-                             data=_j.dumps({'scheme_data': self.demo_scheme}),
-                             content_type='application/json')
+
+        r = self.client.post(
+            '/api/ai/pipeline/explain/',
+            data=_j.dumps({'scheme_data': self.demo_scheme}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(r.json().get('error'), 'plan_required')
         self.assertEqual(r.json().get('plan_required'), 'pro')
@@ -215,9 +222,12 @@ class AIPipelineTests(TestCase):
     def test_explain_endpoint_allowed_for_pro(self):
         self.client.force_login(self.pro)
         import json as _j
-        r = self.client.post('/api/ai/pipeline/explain/',
-                             data=_j.dumps({'scheme_data': self.demo_scheme}),
-                             content_type='application/json')
+
+        r = self.client.post(
+            '/api/ai/pipeline/explain/',
+            data=_j.dumps({'scheme_data': self.demo_scheme}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 200)
         data = r.json()
         self.assertIn('topology', data)
@@ -227,26 +237,34 @@ class AIPipelineTests(TestCase):
     def test_recommend_endpoint_blocked_for_free(self):
         self.client.force_login(self.free)
         import json as _j
-        r = self.client.post('/api/ai/pipeline/recommend/',
-                             data=_j.dumps({'scheme_data': self.demo_scheme}),
-                             content_type='application/json')
+
+        r = self.client.post(
+            '/api/ai/pipeline/recommend/',
+            data=_j.dumps({'scheme_data': self.demo_scheme}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(r.json().get('plan_required'), 'pro')
 
     @override_settings(ANTHROPIC_API_KEY='')
     def test_ai_chat_extended_mode_blocked_for_free_and_allowed_for_pro(self):
         import json as _j
+
         self.client.force_login(self.free)
-        r = self.client.post('/api/ai/chat/',
-                             data=_j.dumps({'mode': 'explain', 'message': 'Разбери схему'}),
-                             content_type='application/json')
+        r = self.client.post(
+            '/api/ai/chat/',
+            data=_j.dumps({'mode': 'explain', 'message': 'Разбери схему'}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(r.json().get('plan_required'), 'pro')
 
         self.client.force_login(self.pro)
-        r = self.client.post('/api/ai/chat/',
-                             data=_j.dumps({'mode': 'explain', 'message': 'Разбери схему'}),
-                             content_type='application/json')
+        r = self.client.post(
+            '/api/ai/chat/',
+            data=_j.dumps({'mode': 'explain', 'message': 'Разбери схему'}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 200)
         self.assertIn('token_usage', r.json())
 
@@ -265,12 +283,13 @@ class CommentsTests(TestCase):
     def _post(self, user, body, project_id=None):
         self.client.force_login(user)
         import json as _j
+
         payload = {'body': body}
         if project_id:
             payload['project'] = project_id
-        return self.client.post('/api/comments/create/',
-                                data=_j.dumps(payload),
-                                content_type='application/json')
+        return self.client.post(
+            '/api/comments/create/', data=_j.dumps(payload), content_type='application/json'
+        )
 
     def test_free_comment_plain_text(self):
         r = self._post(self.free, 'Простой комментарий', project_id=self.project.id)
@@ -294,9 +313,7 @@ class CommentsTests(TestCase):
         """bleach удаляет опасные теги, текст оставляет как plain.
         Браузер не выполнит JS из <p>alert(1)</p> — это безопасно.
         """
-        r = self._post(self.pro,
-                       '<script>alert(1)</script>**ok**',
-                       project_id=self.project.id)
+        r = self._post(self.pro, '<script>alert(1)</script>**ok**', project_id=self.project.id)
         self.assertEqual(r.status_code, 200)
         c = Comment.objects.get(id=r.json()['comment']['id'])
         html = c.render_html()

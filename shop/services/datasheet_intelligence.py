@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from shop.card_helpers import INTERNAL_PARAM_KEYS
-
 
 FIELD_PATTERNS = {
     'pinout_keywords': (
@@ -49,16 +48,45 @@ FIELD_PATTERNS = {
 PARAM_FIELD_KEYS = {
     'pinout_keywords': ('pins', 'pin_count', 'package', 'package_type'),
     'absolute_maximum_ratings': (
-        'voltage', 'supply_voltage', 'vds', 'vceo', 'vrrm', 'vz',
-        'current', 'max_current', 'id', 'ic', 'if', 'output_current', 'contact_rating',
-        'power', 'tdp_w', 'rated_power_w',
+        'voltage',
+        'supply_voltage',
+        'vds',
+        'vceo',
+        'vrrm',
+        'vz',
+        'current',
+        'max_current',
+        'id',
+        'ic',
+        'if',
+        'output_current',
+        'contact_rating',
+        'power',
+        'tdp_w',
+        'rated_power_w',
     ),
     'recommended_operating_conditions': (
-        'resistance', 'capacitance', 'inductance', 'voltage', 'supply_voltage',
-        'current', 'coil_voltage', 'freq', 'gbw', 'vf', 'rds_on',
+        'resistance',
+        'capacitance',
+        'inductance',
+        'voltage',
+        'supply_voltage',
+        'current',
+        'coil_voltage',
+        'freq',
+        'gbw',
+        'vf',
+        'rds_on',
     ),
     'package': ('package', 'package_type', 'mounting', 'form_factor'),
-    'thermal_data': ('max_temp', 'temperature', 'junction_temperature', 'thermal_resistance', 'power', 'tdp_w'),
+    'thermal_data': (
+        'max_temp',
+        'temperature',
+        'junction_temperature',
+        'thermal_resistance',
+        'power',
+        'tdp_w',
+    ),
     'typical_application_hints': ('applications', 'type', 'family', 'interface'),
 }
 
@@ -96,10 +124,12 @@ def extract_from_text(text: str, source_url: str = '') -> dict[str, Any]:
 
     return {
         'source_url': source_url,
-        'checked_at': datetime.now(timezone.utc).isoformat(),
+        'checked_at': datetime.now(UTC).isoformat(),
         'confidence': round(confidence, 2),
         'fields': fields,
-        'text_hash': hashlib.sha256(text[:200000].encode('utf-8', errors='ignore')).hexdigest() if text else '',
+        'text_hash': hashlib.sha256(text[:200000].encode('utf-8', errors='ignore')).hexdigest()
+        if text
+        else '',
     }
 
 
@@ -112,7 +142,9 @@ def extract_from_pdf_path(path: str | Path, source_url: str = '') -> dict[str, A
     return result
 
 
-def build_product_datasheet_record(product, pdf_path: str | Path | None = None, fallback_text: str = '') -> dict[str, Any]:
+def build_product_datasheet_record(
+    product, pdf_path: str | Path | None = None, fallback_text: str = ''
+) -> dict[str, Any]:
     if pdf_path:
         result = extract_from_pdf_path(pdf_path, source_url=product.datasheet_url)
         return merge_product_metadata(result, product)
@@ -124,17 +156,19 @@ def build_product_datasheet_record(product, pdf_path: str | Path | None = None, 
 
 
 def product_metadata_text(product) -> str:
-    return ' '.join([
-        product.name or '',
-        product.part_number or '',
-        product.description or '',
-        product.package_type or '',
-        ' '.join(
-            f'{key}: {value}'
-            for key, value in (product.parameters or {}).items()
-            if key not in INTERNAL_PARAM_KEYS and not str(key).startswith('_')
-        ),
-    ])
+    return ' '.join(
+        [
+            product.name or '',
+            product.part_number or '',
+            product.description or '',
+            product.package_type or '',
+            ' '.join(
+                f'{key}: {value}'
+                for key, value in (product.parameters or {}).items()
+                if key not in INTERNAL_PARAM_KEYS and not str(key).startswith('_')
+            ),
+        ]
+    )
 
 
 def merge_product_metadata(record: dict[str, Any], product) -> dict[str, Any]:
@@ -150,10 +184,7 @@ def merge_product_metadata(record: dict[str, Any], product) -> dict[str, Any]:
                 inferred_count += 1
     result['fields'] = fields
     result['metadata_fallback_used'] = True
-    result['metadata_inferred_fields'] = [
-        key for key, value in inferred.items()
-        if value
-    ]
+    result['metadata_inferred_fields'] = [key for key, value in inferred.items() if value]
     if inferred_count:
         matched = len(result['metadata_inferred_fields'])
         result['confidence'] = max(float(result.get('confidence') or 0), min(0.9, 0.35 + matched * 0.1))
@@ -183,11 +214,15 @@ def infer_product_fields(product) -> dict[str, list[str]]:
 
     abs_values = _collect_labeled_values(params, PARAM_FIELD_KEYS['absolute_maximum_ratings'])
     if abs_values:
-        fields['absolute_maximum_ratings'].append('Предельные значения из карточки: ' + '; '.join(abs_values[:8]))
+        fields['absolute_maximum_ratings'].append(
+            'Предельные значения из карточки: ' + '; '.join(abs_values[:8])
+        )
 
     operating_values = _collect_labeled_values(params, PARAM_FIELD_KEYS['recommended_operating_conditions'])
     if operating_values:
-        fields['recommended_operating_conditions'].append('Рабочие параметры из карточки: ' + '; '.join(operating_values[:8]))
+        fields['recommended_operating_conditions'].append(
+            'Рабочие параметры из карточки: ' + '; '.join(operating_values[:8])
+        )
 
     thermal_values = _collect_labeled_values(params, PARAM_FIELD_KEYS['thermal_data'])
     if thermal_values:

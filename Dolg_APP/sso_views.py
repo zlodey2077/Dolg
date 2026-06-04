@@ -11,6 +11,7 @@
 Если организация не имеет SSO-настроенной (org.sso_config пуст) — кнопка
 SSO не показывается; идёт обычный login.
 """
+
 import secrets
 
 from django.conf import settings
@@ -44,13 +45,17 @@ def sso_redirect(request, org_slug):
     request.session['sso_nonce'] = nonce
     request.session['sso_org_slug'] = org.slug
 
-    return render(request, 'orgs/sso_mock.html', {
-        'org': org,
-        'provider': provider,
-        'nonce': nonce,
-        # Mock — заранее знаем какой email будет
-        'suggested_email': f'employee@{org.settings.get("primary_domain", org.slug + ".com")}',
-    })
+    return render(
+        request,
+        'orgs/sso_mock.html',
+        {
+            'org': org,
+            'provider': provider,
+            'nonce': nonce,
+            # Mock — заранее знаем какой email будет
+            'suggested_email': f'employee@{org.settings.get("primary_domain", org.slug + ".com")}',
+        },
+    )
 
 
 @require_POST
@@ -99,12 +104,15 @@ def sso_callback(request, org_slug):
         user.set_unusable_password()  # не разрешаем password-login для SSO юзеров
         user.save()
         from accounts.models import UserProfile
+
         UserProfile.objects.get_or_create(user=user, defaults={'email_verified': True})
 
     # Auto-add в org с дефолтной ролью (engineer)
     if not org.has_member(user):
         OrganizationMember.objects.create(
-            organization=org, user=user, role='engineer',
+            organization=org,
+            user=user,
+            role='engineer',
         )
 
     # Login
@@ -112,8 +120,11 @@ def sso_callback(request, org_slug):
     login(request, user)
 
     AuditLog.log(
-        actor=user, action='auth.sso_login', organization=org,
-        object_type='User', object_id=user.id,
+        actor=user,
+        action='auth.sso_login',
+        organization=org,
+        object_type='User',
+        object_id=user.id,
         payload={'provider': org.settings.get('sso_provider', 'mock'), 'created': created},
         request=request,
     )

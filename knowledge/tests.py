@@ -128,7 +128,8 @@ class LegalSourcesTests(TestCase):
         )
         self.assertGreaterEqual(result['learning_tasks'], 9)
         sourced_tasks = [
-            task for task in LearningTask.objects.all()
+            task
+            for task in LearningTask.objects.all()
             if isinstance(task.rubric, dict) and task.rubric.get('source_ids')
         ]
         self.assertGreaterEqual(len(sourced_tasks), 9)
@@ -222,7 +223,9 @@ class LearningModelAndGraderTests(TestCase):
         progress.mark_task_solved(self.simulation_task.id)
 
         self.assertTrue(progress.is_completed)
-        self.assertEqual(progress.solved_task_ids, [self.math_task.id, self.circuit_task.id, self.simulation_task.id])
+        self.assertEqual(
+            progress.solved_task_ids, [self.math_task.id, self.circuit_task.id, self.simulation_task.id]
+        )
 
     def test_grade_math_task_accepts_value_in_tolerance(self):
         result = grade_math_task(self.math_task, '2.90 В')
@@ -505,13 +508,16 @@ class LearningViewsTests(TestCase):
 
 class EngineeringLabTests(TestCase):
     def test_transistor_switch_calculation_returns_engineering_assessment(self):
-        result = calculate_lab('transistor_switch', {
-            'supply_voltage': 5,
-            'load_voltage': 2,
-            'load_current_ma': 20,
-            'input_voltage': 5,
-            'forced_beta': 10,
-        })
+        result = calculate_lab(
+            'transistor_switch',
+            {
+                'supply_voltage': 5,
+                'load_voltage': 2,
+                'load_current_ma': 20,
+                'input_voltage': 5,
+                'forced_beta': 10,
+            },
+        )
 
         self.assertTrue(result['ok'])
         self.assertEqual(result['status'], 'ok')
@@ -519,14 +525,17 @@ class EngineeringLabTests(TestCase):
         self.assertAlmostEqual(result['outputs']['base_resistor_ohm']['value'], 2150, delta=1)
 
     def test_linear_regulator_detects_thermal_risk(self):
-        result = calculate_lab('linear_regulator', {
-            'vin': 12,
-            'vout': 5,
-            'load_current_ma': 500,
-            'theta_ja': 50,
-            'ambient_c': 25,
-            'max_junction_c': 125,
-        })
+        result = calculate_lab(
+            'linear_regulator',
+            {
+                'vin': 12,
+                'vout': 5,
+                'load_current_ma': 500,
+                'theta_ja': 50,
+                'ambient_c': 25,
+                'max_junction_c': 125,
+            },
+        )
 
         self.assertTrue(result['ok'])
         self.assertIn(result['status'], {'risk', 'overheat'})
@@ -541,10 +550,12 @@ class EngineeringLabTests(TestCase):
     def test_lab_api_calculates_ne555(self):
         response = self.client.post(
             reverse('knowledge:engineering_lab_api'),
-            data=json.dumps({
-                'kind': 'ne555_astable',
-                'inputs': {'r1_ohm': '10k', 'r2_ohm': '68k', 'capacitance_f': '100n'},
-            }),
+            data=json.dumps(
+                {
+                    'kind': 'ne555_astable',
+                    'inputs': {'r1_ohm': '10k', 'r2_ohm': '68k', 'capacitance_f': '100n'},
+                }
+            ),
             content_type='application/json',
         )
 
@@ -552,7 +563,6 @@ class EngineeringLabTests(TestCase):
         data = response.json()
         self.assertEqual(data['status'], 'ok')
         self.assertAlmostEqual(data['outputs']['frequency_hz']['value'], 98.6, delta=1)
-
 
     def test_lab_sweep_reuses_calculators_for_what_if(self):
         result = run_lab_sweep(
@@ -599,9 +609,15 @@ class PopulateKnowledgeLearningTests(TestCase):
         call_command('populate_knowledge', verbosity=0)
 
         self.assertGreaterEqual(LearningTrack.objects.filter(is_published=True).count(), 2)
-        self.assertGreaterEqual(LearningLesson.objects.filter(track__title='Прикладные узлы электроники').count(), 5)
-        self.assertGreaterEqual(LearningTask.objects.filter(lesson__track__title='Прикладные узлы электроники').count(), 12)
-        self.assertTrue(any(
-            'lab' in (task.rubric or {})
-            for task in LearningTask.objects.filter(lesson__track__title='Прикладные узлы электроники')
-        ))
+        self.assertGreaterEqual(
+            LearningLesson.objects.filter(track__title='Прикладные узлы электроники').count(), 5
+        )
+        self.assertGreaterEqual(
+            LearningTask.objects.filter(lesson__track__title='Прикладные узлы электроники').count(), 12
+        )
+        self.assertTrue(
+            any(
+                'lab' in (task.rubric or {})
+                for task in LearningTask.objects.filter(lesson__track__title='Прикладные узлы электроники')
+            )
+        )

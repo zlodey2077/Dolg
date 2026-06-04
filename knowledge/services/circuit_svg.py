@@ -56,12 +56,15 @@ def render_training_circuit(kind, params=None):
         return _svg_from_drawing(drawing)
 
     if kind == 'ne555_astable':
-        drawing += elm.Ic(pins=[
-            elm.IcPin(name='GND', pin='1', side='left'),
-            elm.IcPin(name='TRIG', pin='2', side='left'),
-            elm.IcPin(name='OUT', pin='3', side='right'),
-            elm.IcPin(name='VCC', pin='8', side='right'),
-        ], label='NE555')
+        drawing += elm.Ic(
+            pins=[
+                elm.IcPin(name='GND', pin='1', side='left'),
+                elm.IcPin(name='TRIG', pin='2', side='left'),
+                elm.IcPin(name='OUT', pin='3', side='right'),
+                elm.IcPin(name='VCC', pin='8', side='right'),
+            ],
+            label='NE555',
+        )
         drawing += elm.Capacitor().down().label(str(params.get('capacitor', 'C')))
         drawing += elm.Ground()
         return _svg_from_drawing(drawing)

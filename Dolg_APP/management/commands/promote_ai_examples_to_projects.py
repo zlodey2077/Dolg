@@ -18,14 +18,21 @@ class Command(BaseCommand):
     help = 'Promote curated AITrainingExample schemes into controlled SchematicProject records.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--owner', help='Username, email or numeric user id. Defaults to example user, then staff bot.')
+        parser.add_argument(
+            '--owner', help='Username, email or numeric user id. Defaults to example user, then staff bot.'
+        )
         parser.add_argument('--organization-id', type=int, help='Attach created projects to an organization.')
         parser.add_argument('--visibility', choices=['private', 'team', 'public'], default='private')
         parser.add_argument('--approval-state', choices=['draft', 'pending_review', 'approved', 'rejected'])
         parser.add_argument('--demo', action='store_true', help='Create public approved demo projects.')
         parser.add_argument('--limit', type=int, default=100)
         parser.add_argument('--min-quality', type=int, default=68)
-        parser.add_argument('--source', action='append', dest='sources', help='Filter by features.source/dataset_source/evidence_kind.')
+        parser.add_argument(
+            '--source',
+            action='append',
+            dest='sources',
+            help='Filter by features.source/dataset_source/evidence_kind.',
+        )
         parser.add_argument('--example-id', action='append', type=int, dest='example_ids')
         parser.add_argument('--include-unvalidated', action='store_true')
         parser.add_argument('--dry-run', action='store_true')
@@ -69,8 +76,10 @@ class Command(BaseCommand):
         if options['as_json']:
             self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
             return
-        self.stdout.write(self.style.SUCCESS(
-            f"Scanned {result['scanned']}; created {result['created']}; "
-            f"updated {result['updated']}; skipped empty {result['skipped_empty']}; "
-            f"skipped quality {result['skipped_quality']}."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Scanned {result["scanned"]}; created {result["created"]}; '
+                f'updated {result["updated"]}; skipped empty {result["skipped_empty"]}; '
+                f'skipped quality {result["skipped_quality"]}.'
+            )
+        )

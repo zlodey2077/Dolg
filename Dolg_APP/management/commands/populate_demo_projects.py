@@ -10,6 +10,7 @@
 Формат scheme_data повторяет тот, что редактор сохраняет через buildSchemeData()
 в Dolg_APP/templates/tools/simulation.html (версия 2).
 """
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -62,28 +63,41 @@ def _c(id_, type_, x, y, **extra):
         'inductance': 1,
         'rotation': 0,
         'label': {
-            'resistor': 'R', 'capacitor': 'C', 'inductor': 'L',
-            'diode': 'D', 'led': 'LED', 'battery': 'V',
-            'switch': 'S', 'npn': 'Q', 'pnp': 'Q',
-            'ground': 'GND', 'node': '•',
+            'resistor': 'R',
+            'capacitor': 'C',
+            'inductor': 'L',
+            'diode': 'D',
+            'led': 'LED',
+            'battery': 'V',
+            'switch': 'S',
+            'npn': 'Q',
+            'pnp': 'Q',
+            'ground': 'GND',
+            'node': '•',
         }.get(type_, '?'),
         'ports': [],
     }
     # Порты — как в getComponentPorts()
     if type_ == 'battery':
-        base['ports'] = [{'id': '+', 'label': '+', 'x': -30, 'y': 0},
-                         {'id': '-', 'label': '-', 'x': 30,  'y': 0}]
+        base['ports'] = [
+            {'id': '+', 'label': '+', 'x': -30, 'y': 0},
+            {'id': '-', 'label': '-', 'x': 30, 'y': 0},
+        ]
     elif type_ == 'ground':
         base['ports'] = [{'id': 'a', 'label': 'GND', 'x': 0, 'y': -20}]
     elif type_ == 'node':
         base['ports'] = [{'id': 'a', 'label': '•', 'x': 0, 'y': 0}]
     elif type_ in ('npn', 'pnp'):
-        base['ports'] = [{'id': 'b', 'label': 'B', 'x': -30, 'y': 0},
-                         {'id': 'c', 'label': 'C', 'x': 0,   'y': -20},
-                         {'id': 'e', 'label': 'E', 'x': 0,   'y': 20}]
+        base['ports'] = [
+            {'id': 'b', 'label': 'B', 'x': -30, 'y': 0},
+            {'id': 'c', 'label': 'C', 'x': 0, 'y': -20},
+            {'id': 'e', 'label': 'E', 'x': 0, 'y': 20},
+        ]
     else:
-        base['ports'] = [{'id': 'a', 'label': '+', 'x': -30, 'y': 0},
-                         {'id': 'b', 'label': '-', 'x': 30,  'y': 0}]
+        base['ports'] = [
+            {'id': 'a', 'label': '+', 'x': -30, 'y': 0},
+            {'id': 'b', 'label': '-', 'x': 30, 'y': 0},
+        ]
     base.update(extra)
     return base
 
@@ -92,7 +106,7 @@ def _w(from_id, from_port, to_id, to_port, waypoints=None):
     return {
         'id': None,
         'from': {'compId': from_id, 'portId': from_port},
-        'to':   {'compId': to_id,   'portId': to_port},
+        'to': {'compId': to_id, 'portId': to_port},
         'waypoints': list(waypoints) if waypoints else [],
     }
 
@@ -123,16 +137,21 @@ def _component_port_xy(component, port_id):
     проходил «сквозь» резистор. После фикса elbow аккуратный.
     """
     import math
+
     cx = component['x'] + COMPONENT_WIDTH / 2
     cy = component['y'] + COMPONENT_HEIGHT / 2
     rot = int(component.get('rotation') or 0) % 360
     for port in component.get('ports', []):
         if port.get('id') == port_id:
             lx, ly = port.get('x', 0), port.get('y', 0)
-            if rot == 90:    wx, wy = cx - ly, cy + lx
-            elif rot == 180: wx, wy = cx - lx, cy - ly
-            elif rot == 270: wx, wy = cx + ly, cy - lx
-            elif rot == 0:   wx, wy = cx + lx, cy + ly
+            if rot == 90:
+                wx, wy = cx - ly, cy + lx
+            elif rot == 180:
+                wx, wy = cx - lx, cy - ly
+            elif rot == 270:
+                wx, wy = cx + ly, cy - lx
+            elif rot == 0:
+                wx, wy = cx + lx, cy + ly
             else:
                 rad = rot * math.pi / 180
                 wx = cx + lx * math.cos(rad) - ly * math.sin(rad)
@@ -228,7 +247,9 @@ def _orthogonalize_connection(connection, by_id):
 
 
 def scheme(components, connections):
-    normalized_components = [_normalize_component_position(component) for component in _assign_designators(components)]
+    normalized_components = [
+        _normalize_component_position(component) for component in _assign_designators(components)
+    ]
     by_id = {component['id']: component for component in normalized_components}
     normalized_connections = []
     for index, connection in enumerate(connections):
@@ -259,11 +280,11 @@ def demo_led_basic():
     """5 В батарея → резистор 220 Ом → LED → GND. Минимальная цепь.
     Узел N1 у GND собирает обратную ветвь от LED и от батареи (-)."""
     comps = [
-        _c(0, 'battery',  200, 200, voltage=5),
+        _c(0, 'battery', 200, 200, voltage=5),
         _c(1, 'resistor', 360, 200, resistance=220),
-        _c(2, 'led',      520, 200),
-        _c(3, 'ground',   460, 380),
-        _c(4, 'node',     460, 320),  # N1: общая «земляная» точка
+        _c(2, 'led', 520, 200),
+        _c(3, 'ground', 460, 380),
+        _c(4, 'node', 460, 320),  # N1: общая «земляная» точка
     ]
     conns = [
         _w(0, '+', 1, 'a'),
@@ -288,11 +309,11 @@ def demo_voltage_divider():
     """Два резистора — типовой вход ADC для опорного напряжения.
     Узел N1 — общий «минус» (батарея и нижний R сходятся к GND)."""
     comps = [
-        _c(0, 'battery',  200, 180, voltage=9),
+        _c(0, 'battery', 200, 180, voltage=9),
         _c(1, 'resistor', 360, 240, resistance=10_000),
         _c(2, 'resistor', 360, 360, resistance=4_700),
-        _c(3, 'ground',   280, 500),
-        _c(4, 'node',     280, 440),  # N1
+        _c(3, 'ground', 280, 500),
+        _c(4, 'node', 280, 440),  # N1
     ]
     conns = [
         _w(0, '+', 1, 'a'),
@@ -317,17 +338,17 @@ def demo_rc_filter():
     """Г-образный фильтр низких частот: R горизонтально в сигнальной линии,
     C вертикально на землю. Классическое УГО — как в учебнике."""
     comps = [
-        _c(0, 'battery',  180, 240, voltage=5),
+        _c(0, 'battery', 180, 240, voltage=5),
         _c(1, 'resistor', 340, 240, resistance=1_000),
         # Конденсатор шунтирует на землю — поворачиваем вертикально.
-        _c(2, 'capacitor',460, 320, capacitance=0.1, rotation=90),
-        _c(3, 'ground',   460, 500),
-        _c(4, 'node',     280, 400),
+        _c(2, 'capacitor', 460, 320, capacitance=0.1, rotation=90),
+        _c(3, 'ground', 460, 500),
+        _c(4, 'node', 280, 400),
     ]
     conns = [
         _w(0, '+', 1, 'a'),
-        _w(1, 'b', 2, 'a'),     # R.b → C.вход (верх)
-        _w(2, 'b', 3, 'a'),     # C.выход (низ) → GND-узел
+        _w(1, 'b', 2, 'a'),  # R.b → C.вход (верх)
+        _w(2, 'b', 3, 'a'),  # C.выход (низ) → GND-узел
         _w(0, '-', 4, 'a'),
         _w(4, 'a', 3, 'a'),
     ]
@@ -347,7 +368,7 @@ def demo_bridge_rectifier():
     """4 диода + сглаживающий конденсатор — мост Греца.
     4 узла: N1 (вход +), N2 (выход +), N3 (вход −), N4 (выход −/GND)."""
     comps = [
-        _c(0, 'battery',   180, 300, voltage=12),
+        _c(0, 'battery', 180, 300, voltage=12),
         # Мост из 4 диодов
         _c(1, 'diode', 380, 220),
         _c(2, 'diode', 380, 380),
@@ -355,11 +376,11 @@ def demo_bridge_rectifier():
         _c(4, 'diode', 540, 380),
         # Сглаживающий конденсатор + нагрузка
         _c(5, 'capacitor', 700, 260, capacitance=100),  # 100 мкФ
-        _c(6, 'resistor',  700, 380, resistance=1_000),
-        _c(7, 'ground',    700, 580),
+        _c(6, 'resistor', 700, 380, resistance=1_000),
+        _c(7, 'ground', 700, 580),
         # Узлы
-        _c(8,  'node', 280, 300),  # N1: входной +
-        _c(9,  'node', 660, 220),  # N2: выходной + (после D3)
+        _c(8, 'node', 280, 300),  # N1: входной +
+        _c(9, 'node', 660, 220),  # N2: выходной + (после D3)
         _c(10, 'node', 280, 460),  # N3: вход − (батарея и D4.b)
         _c(11, 'node', 700, 520),  # N4: GND и обратные ветви
     ]
@@ -395,23 +416,23 @@ def demo_lc_tank():
     """Параллельный LC + последовательный R демпфер. L и C нарисованы
     вертикально между сигнальной линией и землёй — классический LC-tank."""
     comps = [
-        _c(0, 'battery',  180, 240, voltage=10),
+        _c(0, 'battery', 180, 240, voltage=10),
         _c(1, 'resistor', 340, 240, resistance=100),
-        _c(2, 'inductor', 480, 320, inductance=10, rotation=90),    # L шунт
-        _c(3, 'capacitor',600, 320, capacitance=10, rotation=90),   # C шунт
-        _c(4, 'ground',   540, 540),
-        _c(5, 'node',     440, 240),  # ветвление на L и C
-        _c(6, 'node',     600, 240),  # верх C
-        _c(7, 'node',     540, 440),  # общая земля
+        _c(2, 'inductor', 480, 320, inductance=10, rotation=90),  # L шунт
+        _c(3, 'capacitor', 600, 320, capacitance=10, rotation=90),  # C шунт
+        _c(4, 'ground', 540, 540),
+        _c(5, 'node', 440, 240),  # ветвление на L и C
+        _c(6, 'node', 600, 240),  # верх C
+        _c(7, 'node', 540, 440),  # общая земля
     ]
     conns = [
         _w(0, '+', 1, 'a'),
         _w(1, 'b', 5, 'a'),
-        _w(5, 'a', 2, 'a'),     # вход L
-        _w(5, 'a', 6, 'a'),     # переход к C по верху
-        _w(6, 'a', 3, 'a'),     # вход C
-        _w(2, 'b', 7, 'a'),     # низ L → земля
-        _w(3, 'b', 7, 'a'),     # низ C → земля
+        _w(5, 'a', 2, 'a'),  # вход L
+        _w(5, 'a', 6, 'a'),  # переход к C по верху
+        _w(6, 'a', 3, 'a'),  # вход C
+        _w(2, 'b', 7, 'a'),  # низ L → земля
+        _w(3, 'b', 7, 'a'),  # низ C → земля
         _w(0, '-', 7, 'a'),
         _w(7, 'a', 4, 'a'),
     ]
@@ -432,21 +453,21 @@ def demo_wheatstone_bridge():
     Сбалансирован при R1·R4 = R2·R3. ngspice решает за миллисекунды.
     N1: батарея(+) → R1, R2; N2: R3, R4 → GND, вместе с батареей(-)."""
     comps = [
-        _c(0, 'battery',  180, 320, voltage=10),
+        _c(0, 'battery', 180, 320, voltage=10),
         _c(1, 'resistor', 360, 220, resistance=10_000),
         _c(2, 'resistor', 360, 420, resistance=22_000),
         _c(3, 'resistor', 540, 220, resistance=22_000),
         _c(4, 'resistor', 540, 420, resistance=47_000),
-        _c(5, 'ground',   720, 540),
-        _c(6, 'node',     280, 320),  # N1: V+ ветвление
-        _c(7, 'node',     720, 460),  # N2: GND ветвление
+        _c(5, 'ground', 720, 540),
+        _c(6, 'node', 280, 320),  # N1: V+ ветвление
+        _c(7, 'node', 720, 460),  # N2: GND ветвление
     ]
     conns = [
         _w(0, '+', 6, 'a'),
         _w(6, 'a', 1, 'a'),
         _w(6, 'a', 2, 'a'),
-        _w(1, 'b', 3, 'a'),    # узел A прямо в проводе R1.b—R3.a
-        _w(2, 'b', 4, 'a'),    # узел B прямо в проводе R2.b—R4.a
+        _w(1, 'b', 3, 'a'),  # узел A прямо в проводе R1.b—R3.a
+        _w(2, 'b', 4, 'a'),  # узел B прямо в проводе R2.b—R4.a
         _w(3, 'b', 7, 'a'),
         _w(4, 'b', 7, 'a'),
         _w(0, '-', 7, 'a'),
@@ -468,23 +489,23 @@ def demo_cascade_rc_lpf():
     """Два RC-каскада подряд (Π-LPF): резисторы горизонтально в сигнальной
     линии, конденсаторы вертикально на землю. Крутизна спада −40 дБ/дек."""
     comps = [
-        _c(0, 'battery',  180, 240, voltage=5),
+        _c(0, 'battery', 180, 240, voltage=5),
         _c(1, 'resistor', 340, 240, resistance=2_200),
-        _c(2, 'capacitor',440, 320, capacitance=0.047, rotation=90),  # шунт C1
+        _c(2, 'capacitor', 440, 320, capacitance=0.047, rotation=90),  # шунт C1
         _c(3, 'resistor', 540, 240, resistance=4_700),
-        _c(4, 'capacitor',640, 320, capacitance=0.022, rotation=90),  # шунт C2
-        _c(5, 'ground',   540, 540),
-        _c(6, 'node',     440, 240),  # выход R1 ветвится на C1 и R2
-        _c(7, 'node',     540, 440),  # общая земля
+        _c(4, 'capacitor', 640, 320, capacitance=0.022, rotation=90),  # шунт C2
+        _c(5, 'ground', 540, 540),
+        _c(6, 'node', 440, 240),  # выход R1 ветвится на C1 и R2
+        _c(7, 'node', 540, 440),  # общая земля
     ]
     conns = [
         _w(0, '+', 1, 'a'),
         _w(1, 'b', 6, 'a'),
-        _w(6, 'a', 2, 'a'),     # C1 верх
-        _w(6, 'a', 3, 'a'),     # цепь дальше → R2
-        _w(2, 'b', 7, 'a'),     # C1 низ → земля
-        _w(3, 'b', 4, 'a'),     # выход R2 → C2 верх
-        _w(4, 'b', 7, 'a'),     # C2 низ → земля
+        _w(6, 'a', 2, 'a'),  # C1 верх
+        _w(6, 'a', 3, 'a'),  # цепь дальше → R2
+        _w(2, 'b', 7, 'a'),  # C1 низ → земля
+        _w(3, 'b', 4, 'a'),  # выход R2 → C2 верх
+        _w(4, 'b', 7, 'a'),  # C2 низ → земля
         _w(0, '-', 7, 'a'),
         _w(7, 'a', 5, 'a'),
     ]
@@ -505,14 +526,14 @@ def demo_current_divider():
     I_n = I_total × G_n/G_sum. Земля собирается через 2 узла-каскад,
     чтобы ни в одном узле не было больше 4 проводов."""
     comps = [
-        _c(0, 'battery',  180, 240, voltage=10),
+        _c(0, 'battery', 180, 240, voltage=10),
         _c(1, 'resistor', 340, 320, resistance=1_000, rotation=90),
         _c(2, 'resistor', 460, 320, resistance=2_200, rotation=90),
         _c(3, 'resistor', 580, 320, resistance=4_700, rotation=90),
-        _c(4, 'ground',   460, 540),
-        _c(5, 'node',     280, 240),  # V+ ветвление
-        _c(6, 'node',     400, 440),  # сбор R1.b и R2.b
-        _c(7, 'node',     520, 440),  # сбор R3.b и batt(-) → GND
+        _c(4, 'ground', 460, 540),
+        _c(5, 'node', 280, 240),  # V+ ветвление
+        _c(6, 'node', 400, 440),  # сбор R1.b и R2.b
+        _c(7, 'node', 520, 440),  # сбор R3.b и batt(-) → GND
     ]
     conns = [
         _w(0, '+', 5, 'a'),
@@ -552,13 +573,13 @@ def demo_big_ladder():
     - Y нижней шины = ровно Y_MID + 30 (= где сидят rsh.b порты),
       раньше Y_BOT был на 60 px ниже и приходилось делать обход.
     """
-    SECTIONS = 12                 # 12-битный DAC — реальная разрядность
-    GRID = 100                    # шаг секции
-    Y_TOP = 180                   # верхняя Vref-шина (где сидят rs.a/rs.b)
-    Y_MID = 290                   # центр вертикальных шунтов 2R
-    Y_BUS = 320                   # нижняя GND-шина (= Y_MID + 30 = где rsh.b)
-    X_BAT = 120                   # x-координата батареи и ground (слева)
-    X_START = 240                 # x-координата первой секции
+    SECTIONS = 12  # 12-битный DAC — реальная разрядность
+    GRID = 100  # шаг секции
+    Y_TOP = 180  # верхняя Vref-шина (где сидят rs.a/rs.b)
+    Y_MID = 290  # центр вертикальных шунтов 2R
+    Y_BUS = 320  # нижняя GND-шина (= Y_MID + 30 = где rsh.b)
+    X_BAT = 120  # x-координата батареи и ground (слева)
+    X_START = 240  # x-координата первой секции
     comps = []
     conns = []
 
@@ -568,7 +589,7 @@ def demo_big_ladder():
     # для источника, питающего «верхнюю» шину и заземление.
     comps.append(_c(bat_id, 'battery', X_BAT, Y_MID, rotation=270, voltage=10))
     # Ground строго под батареей, на одной вертикали — короткая ветка.
-    comps.append(_c(gnd_id, 'ground',  X_BAT, Y_BUS + 60))
+    comps.append(_c(gnd_id, 'ground', X_BAT, Y_BUS + 60))
 
     next_id = 2
     prev_top_id = bat_id
@@ -579,17 +600,18 @@ def demo_big_ladder():
     for k in range(SECTIONS):
         x = X_START + k * GRID
         # Последовательный R сверху (10 кОм) — горизонтально
-        rs_id = next_id; next_id += 1
+        rs_id = next_id
+        next_id += 1
         comps.append(_c(rs_id, 'resistor', x, Y_TOP, resistance=10_000))
         # Шунт 2R вертикально (20 кОм) — центр в Y_MID, b-порт сидит на Y_BUS
-        rsh_id = next_id; next_id += 1
+        rsh_id = next_id
+        next_id += 1
         comps.append(_c(rsh_id, 'resistor', x, Y_MID, resistance=20_000, rotation=90))
 
         # Верхняя шина: prev.port → rs.a (или bat.+ для первой секции)
         if k == 0:
             # bat.+ at (X_BAT, Y_MID-30=260) → up to (X_BAT, Y_TOP) → right to rs.a
-            conns.append(_w(prev_top_id, prev_top_port, rs_id, 'a',
-                            waypoints=[{'x': X_BAT, 'y': Y_TOP}]))
+            conns.append(_w(prev_top_id, prev_top_port, rs_id, 'a', waypoints=[{'x': X_BAT, 'y': Y_TOP}]))
         else:
             conns.append(_w(prev_top_id, prev_top_port, rs_id, 'a'))
         # rs.b → rsh.a (вниз к шунту). rs.b ещё используется как prev_top
@@ -640,11 +662,11 @@ def demo_long_rc_chain():
       шина, '-' снизу → GND. Без обходных проводов.
     - Y нижней шины = Y_MID + 30 (где сидят cs.b), без вылета вниз.
     """
-    SECTIONS = 8                   # 8-pole LPF — реальный AA-фильтр
+    SECTIONS = 8  # 8-pole LPF — реальный AA-фильтр
     GRID = 100
     Y_TOP = 180
     Y_MID = 290
-    Y_BUS = 320                    # = Y_MID + 30 = где cs.b
+    Y_BUS = 320  # = Y_MID + 30 = где cs.b
     X_BAT = 120
     X_START = 240
     comps = []
@@ -653,7 +675,7 @@ def demo_long_rc_chain():
     bat_id = 0
     gnd_id = 1
     comps.append(_c(bat_id, 'battery', X_BAT, Y_MID, rotation=270, voltage=5))
-    comps.append(_c(gnd_id, 'ground',  X_BAT, Y_BUS + 60))
+    comps.append(_c(gnd_id, 'ground', X_BAT, Y_BUS + 60))
 
     next_id = 2
     prev_top_id = bat_id
@@ -663,14 +685,15 @@ def demo_long_rc_chain():
 
     for k in range(SECTIONS):
         x = X_START + k * GRID
-        rs_id = next_id; next_id += 1
+        rs_id = next_id
+        next_id += 1
         comps.append(_c(rs_id, 'resistor', x, Y_TOP, resistance=1_000))
-        cs_id = next_id; next_id += 1
+        cs_id = next_id
+        next_id += 1
         comps.append(_c(cs_id, 'capacitor', x, Y_MID, capacitance=0.1, rotation=90))
 
         if k == 0:
-            conns.append(_w(prev_top_id, prev_top_port, rs_id, 'a',
-                            waypoints=[{'x': X_BAT, 'y': Y_TOP}]))
+            conns.append(_w(prev_top_id, prev_top_port, rs_id, 'a', waypoints=[{'x': X_BAT, 'y': Y_TOP}]))
         else:
             conns.append(_w(prev_top_id, prev_top_port, rs_id, 'a'))
         conns.append(_w(rs_id, 'b', cs_id, 'a'))
@@ -692,7 +715,7 @@ def demo_long_rc_chain():
         'name': '📉 RC-LPF 8-го порядка (anti-aliasing)',
         'description': (
             f'{SECTIONS} последовательных RC-секций (R=1кОм, C=0.1мкФ). '
-            f'Совокупный спад {SECTIONS*20} дБ/декада выше fc≈1.6 кГц — '
+            f'Совокупный спад {SECTIONS * 20} дБ/декада выше fc≈1.6 кГц — '
             f'каноническая структура AA-фильтра перед ADC. '
             f'Электрически: {total} компонентов, {len(conns)} проводов.'
         ),
@@ -743,14 +766,15 @@ def demo_class_a_amplifier():
 
     def CC(t, cx, cy, **kw):
         c = _c(nid[0], t, cx - 30, cy - 20, **kw)
-        comps.append(c); nid[0] += 1
+        comps.append(c)
+        nid[0] += 1
         return nid[0] - 1
 
     def WW(fid, fp, tid, tp):
         conns.append(_w(fid, fp, tid, tp))
 
     # ===== Vcc-узлы (y=80) =====
-    n_vcc_l   = CC('node', 120, 80)   # якорь L1→Vcc (degree=2, невидим)
+    n_vcc_l = CC('node', 120, 80)  # якорь L1→Vcc (degree=2, невидим)
     n_vcc_csm = CC('node', 240, 80)
     n_vcc_rb1 = CC('node', 600, 80)
     n_vcc_rc1 = CC('node', 720, 80)
@@ -770,30 +794,30 @@ def demo_class_a_amplifier():
 
     # ===== Внутренние узлы каскадов =====
     n_base1 = CC('node', 600, 290)
-    n_col1  = CC('node', 720, 230)
-    n_em1   = CC('node', 720, 350)
+    n_col1 = CC('node', 720, 230)
+    n_em1 = CC('node', 720, 350)
     n_base2 = CC('node', 1080, 290)
-    n_col2  = CC('node', 1200, 230)
-    n_em2   = CC('node', 1200, 350)
+    n_col2 = CC('node', 1200, 230)
+    n_em2 = CC('node', 1200, 350)
 
     # ===== Блок питания (вертикальный столбик cx=120) =====
-    bat = CC('battery',  120, 440, rotation=90, voltage=15)
-    sw1 = CC('switch',   120, 350, rotation=90)
-    d1  = CC('diode',    120, 260, rotation=270)  # анод снизу, катод сверху
-    l1  = CC('inductor', 120, 170, rotation=90, inductance=10)
+    bat = CC('battery', 120, 440, rotation=90, voltage=15)
+    sw1 = CC('switch', 120, 350, rotation=90)
+    d1 = CC('diode', 120, 260, rotation=270)  # анод снизу, катод сверху
+    l1 = CC('inductor', 120, 170, rotation=90, inductance=10)
 
     # ===== Сглаживание (между Vcc=80 и GND=540, cy=310 — посередине) =====
     c_sm = CC('capacitor', 240, 310, rotation=90, capacitance=100)
 
     # ===== Сигнал и вход =====
-    vsig = CC('battery',   360, 440, rotation=90, voltage=0)
+    vsig = CC('battery', 360, 440, rotation=90, voltage=0)
     c_in = CC('capacitor', 480, 290, capacitance=1)
 
     # ===== Каскад 1 =====
     r_b1 = CC('resistor', 600, 140, rotation=90, resistance=47_000)
     r_b2 = CC('resistor', 600, 440, rotation=90, resistance=10_000)
     r_c1 = CC('resistor', 720, 140, rotation=90, resistance=4_700)
-    q1   = CC('npn',      720, 290)
+    q1 = CC('npn', 720, 290)
     r_e1 = CC('resistor', 720, 440, rotation=90, resistance=470)
     c_e1 = CC('capacitor', 840, 440, rotation=90, capacitance=10)
 
@@ -802,23 +826,23 @@ def demo_class_a_amplifier():
     r_b3 = CC('resistor', 1080, 140, rotation=90, resistance=47_000)
     r_b4 = CC('resistor', 1080, 440, rotation=90, resistance=10_000)
     r_c2 = CC('resistor', 1200, 140, rotation=90, resistance=4_700)
-    q2   = CC('npn',      1200, 290)
+    q2 = CC('npn', 1200, 290)
     r_e2 = CC('resistor', 1200, 440, rotation=90, resistance=470)
     c_e2 = CC('capacitor', 1320, 440, rotation=90, capacitance=10)
 
     # ===== Выход =====
-    c_out  = CC('capacitor', 1440, 230, capacitance=10)
-    r_load = CC('resistor',  1560, 440, rotation=90, resistance=10_000)
-    gnd    = CC('ground',    1560, 600)
+    c_out = CC('capacitor', 1440, 230, capacitance=10)
+    r_load = CC('resistor', 1560, 440, rotation=90, resistance=10_000)
+    gnd = CC('ground', 1560, 600)
 
     # ============== Соединения ==============
     # --- Питание ---
-    WW(bat, '-', n_gnd_csm, 'a')        # bat- сразу на GND-шину (без n_gnd_bat)
+    WW(bat, '-', n_gnd_csm, 'a')  # bat- сразу на GND-шину (без n_gnd_bat)
     WW(bat, '+', sw1, 'b')
-    WW(sw1, 'a', d1, 'a')               # ток в анод d1 (rot=270 → анод снизу)
+    WW(sw1, 'a', d1, 'a')  # ток в анод d1 (rot=270 → анод снизу)
     WW(d1, 'b', l1, 'b')
     WW(l1, 'a', n_vcc_l, 'a')
-    WW(n_vcc_l, 'a', n_vcc_csm, 'a')    # горизонтальный участок Vcc-шины
+    WW(n_vcc_l, 'a', n_vcc_csm, 'a')  # горизонтальный участок Vcc-шины
 
     # --- Vcc-шина (y=80) ---
     WW(n_vcc_csm, 'a', n_vcc_rb1, 'a')
@@ -868,7 +892,7 @@ def demo_class_a_amplifier():
 
     # --- Каскад 2 ---
     WW(n_vcc_rb3, 'a', r_b3, 'a')
-    WW(n_vcc_rc2, 'a', r_c2, 'a')       # отдельный Vcc-тап (без пиггибэка на n_vcc_rb3)
+    WW(n_vcc_rc2, 'a', r_c2, 'a')  # отдельный Vcc-тап (без пиггибэка на n_vcc_rb3)
     WW(r_b3, 'b', n_base2, 'a')
     WW(n_base2, 'a', r_b4, 'a')
     WW(r_b4, 'b', n_gnd_rb4, 'a')
@@ -924,16 +948,16 @@ def demo_thermal_showcase():
     топ-5 с предупреждениями ⚠️ для перегруженных резисторов.
     """
     comps = [
-        _c(0, 'battery',  180, 270, voltage=12),
-        _c(1, 'node',     390, 270),  # верхняя шина (V+)
+        _c(0, 'battery', 180, 270, voltage=12),
+        _c(1, 'node', 390, 270),  # верхняя шина (V+)
         # Параллельные резисторы — каждый с порта 'a' к верхней шине, 'b' к нижней
         _c(2, 'resistor', 480, 240, resistance=10000),  # green
-        _c(3, 'resistor', 480, 300, resistance=1000),   # yellow
-        _c(4, 'resistor', 480, 360, resistance=680),    # orange
-        _c(5, 'resistor', 480, 420, resistance=470),    # red
-        _c(6, 'resistor', 480, 480, resistance=220),    # red²
-        _c(7, 'node',     600, 540),                    # нижняя шина (GND)
-        _c(8, 'ground',   390, 540),
+        _c(3, 'resistor', 480, 300, resistance=1000),  # yellow
+        _c(4, 'resistor', 480, 360, resistance=680),  # orange
+        _c(5, 'resistor', 480, 420, resistance=470),  # red
+        _c(6, 'resistor', 480, 480, resistance=220),  # red²
+        _c(7, 'node', 600, 540),  # нижняя шина (GND)
+        _c(8, 'ground', 390, 540),
     ]
     conns = [
         # battery+ → верхняя шина
@@ -978,10 +1002,17 @@ def demo_thermal_showcase():
 # Огрызки demo_r2r_dac_4bit / demo_lpf_3section / demo_single_stage_ce
 # удалены — больше не нужны.
 DEMO_PROJECTS = [
-    demo_led_basic, demo_voltage_divider, demo_rc_filter,
-    demo_bridge_rectifier, demo_lc_tank,
-    demo_wheatstone_bridge, demo_cascade_rc_lpf, demo_current_divider,
-    demo_big_ladder, demo_long_rc_chain, demo_class_a_amplifier,
+    demo_led_basic,
+    demo_voltage_divider,
+    demo_rc_filter,
+    demo_bridge_rectifier,
+    demo_lc_tank,
+    demo_wheatstone_bridge,
+    demo_cascade_rc_lpf,
+    demo_current_divider,
+    demo_big_ladder,
+    demo_long_rc_chain,
+    demo_class_a_amplifier,
     demo_thermal_showcase,
 ]
 
@@ -998,7 +1029,11 @@ class Command(BaseCommand):
         try:
             owner = User.objects.get(username=opts['owner'])
         except User.DoesNotExist:
-            self.stderr.write(self.style.ERROR(f"Пользователь '{opts['owner']}' не найден. Создайте его или укажите --owner."))
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Пользователь '{opts['owner']}' не найден. Создайте его или укажите --owner."
+                )
+            )
             return
 
         if opts['reset']:
@@ -1014,9 +1049,9 @@ class Command(BaseCommand):
                 is_demo=True,
                 defaults={
                     'description': data['description'],
-                    'difficulty':  data['difficulty'],
-                    'category':    data['category'],
-                    'status':      'completed',
+                    'difficulty': data['difficulty'],
+                    'category': data['category'],
+                    'status': 'completed',
                     'scheme_data': data['scheme_data'],
                 },
             )
@@ -1026,6 +1061,6 @@ class Command(BaseCommand):
                 updated += 1
 
         total = SchematicProject.objects.filter(is_demo=True).count()
-        self.stdout.write(self.style.SUCCESS(
-            f'OK: создано {created}, обновлено {updated}. Всего демо-проектов: {total}.'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f'OK: создано {created}, обновлено {updated}. Всего демо-проектов: {total}.')
+        )

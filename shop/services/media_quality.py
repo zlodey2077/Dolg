@@ -130,15 +130,17 @@ def audit_product_image(product, *, media_root: Path | None = None) -> dict[str,
     luma_range = int(luma_max - luma_min)
     edge_density = _edge_density(image)
 
-    report['metrics'].update({
-        'width': width,
-        'height': height,
-        'aspect_ratio': round(aspect_ratio, 3),
-        'entropy': round(entropy, 3),
-        'luma_range': luma_range,
-        'edge_density': round(edge_density, 4),
-        'format': image_path.suffix.lower().lstrip('.'),
-    })
+    report['metrics'].update(
+        {
+            'width': width,
+            'height': height,
+            'aspect_ratio': round(aspect_ratio, 3),
+            'entropy': round(entropy, 3),
+            'luma_range': luma_range,
+            'edge_density': round(edge_density, 4),
+            'format': image_path.suffix.lower().lstrip('.'),
+        }
+    )
     report['hashes'] = _image_hashes(image)
 
     if width < MIN_WIDTH or height < MIN_HEIGHT:
@@ -167,10 +169,8 @@ def audit_catalog_media_quality(products: Iterable[Any], *, media_root: Path | N
             continue
         phash = (item.get('hashes') or {}).get('perceptual_hash')
         if phash:
-            phash_groups.setdefault(phash, []).append(f"{item['slug']}: {item['image']}")
-    duplicate_phashes = {
-        digest: refs for digest, refs in phash_groups.items() if len(refs) > 1
-    }
+            phash_groups.setdefault(phash, []).append(f'{item["slug"]}: {item["image"]}')
+    duplicate_phashes = {digest: refs for digest, refs in phash_groups.items() if len(refs) > 1}
 
     scores = [item['quality_score'] for item in reports]
     return {
@@ -180,12 +180,10 @@ def audit_catalog_media_quality(products: Iterable[Any], *, media_root: Path | N
         'error_count': len(errors),
         'warning_count': len(warnings),
         'errors': [
-            {'slug': item['slug'], 'image': item['image'], 'errors': item['errors']}
-            for item in errors
+            {'slug': item['slug'], 'image': item['image'], 'errors': item['errors']} for item in errors
         ],
         'warnings': [
-            {'slug': item['slug'], 'image': item['image'], 'warnings': item['warnings']}
-            for item in warnings
+            {'slug': item['slug'], 'image': item['image'], 'warnings': item['warnings']} for item in warnings
         ],
         'perceptual_duplicate_groups': duplicate_phashes,
         'imagehash_available': any((item.get('hashes') or {}).get('available') for item in reports),

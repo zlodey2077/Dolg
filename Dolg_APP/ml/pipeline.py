@@ -47,12 +47,12 @@ class DolgAIPipeline:
                            heuristic/expert baseline, а добавляет
                            вероятностную подсказку.
     """
+
     SUPPORTED_BACKENDS = {'heuristic', 'neural'}
 
     def __init__(self, backend: str = 'heuristic'):
         if backend not in self.SUPPORTED_BACKENDS:
-            raise ValueError(f'Unknown backend: {backend!r}. '
-                             f'Supported: {sorted(self.SUPPORTED_BACKENDS)}')
+            raise ValueError(f'Unknown backend: {backend!r}. Supported: {sorted(self.SUPPORTED_BACKENDS)}')
         self.backend = backend
         self._neural = None
         self.neural_unavailable_reason = ''
@@ -60,6 +60,7 @@ class DolgAIPipeline:
         if backend == 'neural':
             try:
                 from .neural import MODEL_VERSION, NeuralCircuitAdvisor
+
                 self._neural = NeuralCircuitAdvisor()
                 self._model_version = MODEL_VERSION
             except Exception as exc:
@@ -98,25 +99,29 @@ class DolgAIPipeline:
         # Доп. эвристика: схема без ground = подозрительно
         types = count_components_by_type(scheme_data)
         if types.get('ground', 0) == 0 and len(scheme_data.get('components', [])) > 2:
-            anomalies.append({
-                'type': 'no_ground',
-                'severity': 'warning',
-                'message': 'В схеме нет ground-компонента. Узлы могут «плавать», '
-                           'SPICE-симуляция вернёт ошибку.',
-                'component_ids': [],
-            })
+            anomalies.append(
+                {
+                    'type': 'no_ground',
+                    'severity': 'warning',
+                    'message': 'В схеме нет ground-компонента. Узлы могут «плавать», '
+                    'SPICE-симуляция вернёт ошибку.',
+                    'component_ids': [],
+                }
+            )
         neural = self._neural_prediction(scheme_data)
         if neural and neural.get('risk_score', 0) >= 0.65:
-            anomalies.append({
-                'type': 'neural_deep_hint',
-                'severity': 'warning',
-                'message': (
-                    'PyTorch deep-hint считает схему рискованной '
-                    f"({neural.get('risk_score'):.2f}); проверьте GND, связи и BOM."
-                ),
-                'component_ids': [],
-                'neural': neural,
-            })
+            anomalies.append(
+                {
+                    'type': 'neural_deep_hint',
+                    'severity': 'warning',
+                    'message': (
+                        'PyTorch deep-hint считает схему рискованной '
+                        f'({neural.get("risk_score"):.2f}); проверьте GND, связи и BOM.'
+                    ),
+                    'component_ids': [],
+                    'neural': neural,
+                }
+            )
         return anomalies
 
     # ── 3. Explain scheme ─────────────────────────────────────────────
@@ -171,11 +176,13 @@ class DolgAIPipeline:
                 }
         """
         if not scheme_data:
-            return [{
-                'component_type': 'battery',
-                'reason': 'Начните с источника питания.',
-                'confidence': 0.9,
-            }]
+            return [
+                {
+                    'component_type': 'battery',
+                    'reason': 'Начните с источника питания.',
+                    'confidence': 0.9,
+                }
+            ]
         recs = suggest_next_component_by_rules(scheme_data)
         neural = self._neural_prediction(scheme_data)
         if neural:
@@ -183,12 +190,14 @@ class DolgAIPipeline:
             for item in neural.get('next_components') or []:
                 if item.get('component_type') in seen:
                     continue
-                recs.append({
-                    'component_type': item.get('component_type'),
-                    'reason': 'PyTorch deep-hint: ' + item.get('reason', ''),
-                    'confidence': item.get('confidence', 0.0),
-                    'backend': 'neural',
-                })
+                recs.append(
+                    {
+                        'component_type': item.get('component_type'),
+                        'reason': 'PyTorch deep-hint: ' + item.get('reason', ''),
+                        'confidence': item.get('confidence', 0.0),
+                        'backend': 'neural',
+                    }
+                )
                 seen.add(item.get('component_type'))
         return recs[:3]
 
@@ -208,25 +217,34 @@ class DolgAIPipeline:
         neural_ready = False
         neural_trained = False
         try:
-            from .neural import default_model_path, torch_available as _torch_available
+            from .neural import default_model_path
+            from .neural import torch_available as _torch_available
+
             torch_available = _torch_available()
             model_path = str(default_model_path())
             neural_ready = bool(self._neural is not None and torch_available)
             if self._neural is not None:
-                neural_trained = bool(getattr(self._neural, 'model_path', None) and self._neural.model_path.exists())
+                neural_trained = bool(
+                    getattr(self._neural, 'model_path', None) and self._neural.model_path.exists()
+                )
         except Exception as exc:
             self.neural_unavailable_reason = str(exc)
         dataset = {}
         try:
             from Dolg_APP.services.ai_training import summarize_ai_training_examples
+
             dataset = summarize_ai_training_examples()
         except Exception:
             dataset = {'ok': False}
         return {
             'backend': self.backend,
             'model_version': self._model_version,
-            'capabilities': ['find_analogs', 'detect_anomalies',
-                             'explain_scheme', 'recommend_next_component'],
+            'capabilities': [
+                'find_analogs',
+                'detect_anomalies',
+                'explain_scheme',
+                'recommend_next_component',
+            ],
             'neural': {
                 'torch_available': torch_available,
                 'ready': neural_ready,

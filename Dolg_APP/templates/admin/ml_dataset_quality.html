@@ -173,6 +173,7 @@
             <p>Контроль корпуса для Self AI, PyTorch deep hint и будущих графовых моделей.</p>
         </div>
         <div class="mlq-actions">
+            <a href="{% url 'hello:staff_ops_dashboard' %}">Ops dashboard</a>
             <a href="{% url 'hello:ml_training_page' %}">Тренировка</a>
             <a href="/admin/Dolg_APP/aitrainingexample/">AITrainingExample admin</a>
         </div>
@@ -182,6 +183,7 @@
         <div class="mlq-card mlq-stat"><b>{{ summary.total|default:0 }}</b><span>примеров</span></div>
         <div class="mlq-card mlq-stat"><b>{{ summary.validated|default:0 }}</b><span>валидировано</span></div>
         <div class="mlq-card mlq-stat"><b>{{ summary.with_scheme_data|default:0 }}</b><span>со схемой</span></div>
+        <div class="mlq-card mlq-stat"><b>{{ summary.graph_training_ready|default:0 }}</b><span>graph-ready</span></div>
         <div class="mlq-card mlq-stat"><b>{{ summary.with_source_ids|default:0 }}</b><span>с источниками</span></div>
         <div class="mlq-card mlq-stat"><b>{{ validation.errors_count|default:0 }}</b><span>ошибок</span></div>
         <div class="mlq-card mlq-stat"><b>{{ validation.warnings_count|default:0 }}</b><span>предупреждений</span></div>
@@ -219,6 +221,7 @@
             <h2>Команды корпуса</h2>
             <pre class="mlq-code">python manage.py collect_ai_training_examples --source curated
 python manage.py collect_ai_training_examples --source all --limit 100
+python manage.py normalize_ai_dataset_metadata --validated-only
 python manage.py validate_ai_dataset --json
 python manage.py export_ai_dataset --limit 500
 python manage.py evaluate_circuit_ai --include-curated --json</pre>
@@ -226,6 +229,16 @@ python manage.py evaluate_circuit_ai --include-curated --json</pre>
     </div>
 
     <div class="mlq-section">
+        <div class="mlq-card">
+            <h2>Dataset kind</h2>
+            <div class="mlq-table">
+                {% for key, value in summary.by_dataset_kind.items %}
+                    <span class="k">{{ key }}</span><span class="v">{{ value }}</span>
+                {% empty %}
+                    <span class="k">нет данных</span><span class="v">0</span>
+                {% endfor %}
+            </div>
+        </div>
         <div class="mlq-card">
             <h2>Evidence kind</h2>
             <div class="mlq-table">
@@ -236,6 +249,9 @@ python manage.py evaluate_circuit_ai --include-curated --json</pre>
                 {% endfor %}
             </div>
         </div>
+    </div>
+
+    <div class="mlq-section">
         <div class="mlq-card">
             <h2>Topology</h2>
             <div class="mlq-table">

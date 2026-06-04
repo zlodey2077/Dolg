@@ -36,7 +36,9 @@ from .smart_search import smart_search
 
 
 def _log_bom_project_event(request, payload, event_type, event_payload):
-    project_id = ((payload.get('project') or {}).get('id') if isinstance(payload.get('project'), dict) else None) or payload.get('project_id')
+    project_id = (
+        (payload.get('project') or {}).get('id') if isinstance(payload.get('project'), dict) else None
+    ) or payload.get('project_id')
     if not project_id:
         return
     try:
@@ -126,11 +128,26 @@ MANUFACTURER_RESOURCE_URLS = {
 }
 
 CATEGORY_ICONS = {
-    'smartphones': '📱', 'laptops': '💻', 'tablets': '🖥️', 'accessories': '🎧',
-    'cpu': '⚙️', 'gpu': '🎮', 'ram': '💾', 'ssd': '💿',
-    'psu': '🔌', 'cooling': '🌀', 'monitors': '🖥️', 'motherboards': '🔧',
-    'resistors': '⚡', 'capacitors': '🔋', 'transistors': '🔀', 'ics': '🔲',
-    'diodes': '➡️', 'inductors': '〰️', 'connectors': '🔗', 'relays': '🔄',
+    'smartphones': '📱',
+    'laptops': '💻',
+    'tablets': '🖥️',
+    'accessories': '🎧',
+    'cpu': '⚙️',
+    'gpu': '🎮',
+    'ram': '💾',
+    'ssd': '💿',
+    'psu': '🔌',
+    'cooling': '🌀',
+    'monitors': '🖥️',
+    'motherboards': '🔧',
+    'resistors': '⚡',
+    'capacitors': '🔋',
+    'transistors': '🔀',
+    'ics': '🔲',
+    'diodes': '➡️',
+    'inductors': '〰️',
+    'connectors': '🔗',
+    'relays': '🔄',
 }
 
 ENGINEERING_FILTERS = {
@@ -143,10 +160,31 @@ ENGINEERING_FILTERS = {
     'pins': ('pins', 'pin_count', 'contact_count'),
     'pitch': ('pitch',),
     'frequency': ('frequency', 'base_clock', 'boost_clock', 'refresh_rate', 'bandwidth'),
-    'capacity': ('capacity', 'ram', 'storage', 'vram', 'battery', 'battery_earbuds', 'battery_case', 'cache_l3'),
+    'capacity': (
+        'capacity',
+        'ram',
+        'storage',
+        'vram',
+        'battery',
+        'battery_earbuds',
+        'battery_case',
+        'cache_l3',
+    ),
     'display': ('screen_size', 'resolution', 'panel', 'display', 'hdr'),
     'platform': ('socket', 'chipset', 'chipset_support', 'chip', 'cpu', 'gpu', 'gpu_chip', 'process'),
-    'connectivity': ('connectivity', 'network', 'outputs', 'inputs', 'power_conn', 'm2_slots', 'pcie', 'ram_slots', 'charging', 'os', 'codec'),
+    'connectivity': (
+        'connectivity',
+        'network',
+        'outputs',
+        'inputs',
+        'power_conn',
+        'm2_slots',
+        'pcie',
+        'ram_slots',
+        'charging',
+        'os',
+        'codec',
+    ),
     # Расширенные фильтры — раньше эти поля показывались в чипах, но не были
     # кликабельны. Теперь юзер может зайти в категорию и отфильтровать товары
     # по тому же интерфейсу / форм-фактору / диэлектрику.
@@ -159,7 +197,14 @@ ENGINEERING_FILTERS = {
     'size': ('length', 'width', 'diameter', 'size', 'board_size', 'hole_count', 'points', 'power_rails'),
     'wire': ('gauge', 'section', 'color'),
     'configuration': ('configuration', 'orientation', 'gender'),
-    'temperature_range': ('temperature_range', 'operating_temp', 'max_temp', 'temp_max', 'min_temp', 'melting_point'),
+    'temperature_range': (
+        'temperature_range',
+        'operating_temp',
+        'max_temp',
+        'temp_max',
+        'min_temp',
+        'melting_point',
+    ),
     'compatibility': ('compatibility',),
     'mode': ('mode', 'signal'),
     'safety': ('safety',),
@@ -209,7 +254,11 @@ def _official_product_resources(product):
         ('cad_model_url', 'CAD/3D-модель'),
     ):
         add(label, params.get(key), key)
-    add(f'Сайт: {product.get_manufacturer_display()}', MANUFACTURER_RESOURCE_URLS.get(product.manufacturer), 'manufacturer')
+    add(
+        f'Сайт: {product.get_manufacturer_display()}',
+        MANUFACTURER_RESOURCE_URLS.get(product.manufacturer),
+        'manufacturer',
+    )
     return resources
 
 
@@ -245,7 +294,7 @@ def _project_context_from_payload(request, payload, added_items, limited, skippe
     if project_id:
         try:
             project_id = int(project_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             project_id = None
 
     if project_id:
@@ -260,7 +309,7 @@ def _project_context_from_payload(request, payload, added_items, limited, skippe
             project = project_qs.first()
             if project:
                 project_name = project.name
-                project_url = f"{reverse('hello:simulation')}?project={project.id}"
+                project_url = f'{reverse("hello:simulation")}?project={project.id}'
             else:
                 project_id = None
         except Exception:
@@ -298,12 +347,12 @@ def _apply_filters(products, request):
 
 SORT_OPTIONS = [
     ('', 'По релевантности'),
-    ('price_asc',  '💰 Цена ↑ (дешевле)'),
+    ('price_asc', '💰 Цена ↑ (дешевле)'),
     ('price_desc', '💰 Цена ↓ (дороже)'),
-    ('rating',     '⭐ По рейтингу'),
-    ('newest',     '🆕 Сначала новые'),
-    ('stock',      '📦 По наличию'),
-    ('name',       '🔤 По названию'),
+    ('rating', '⭐ По рейтингу'),
+    ('newest', '🆕 Сначала новые'),
+    ('stock', '📦 По наличию'),
+    ('name', '🔤 По названию'),
 ]
 
 
@@ -327,6 +376,7 @@ def _apply_sort(products, sort_key):
         return sorted(products, key=lambda p: (p.name or '').lower())
     if sort_key == 'rating':
         from shop.card_helpers import product_rating
+
         return sorted(products, key=lambda p: product_rating(p)['value'], reverse=True)
     return products
 
@@ -377,12 +427,14 @@ def readyz(request):
         }
         try:
             from knowledge.models import Article
+
             payload['articles'] = Article.objects.filter(is_published=True).count()
         except Exception as exc:  # pragma: no cover - defensive probe
             payload['ok'] = False
             payload['knowledge_error'] = str(exc)
         try:
             from Dolg_APP.models import SchematicProject
+
             payload['demo_projects'] = SchematicProject.objects.filter(is_demo=True).count()
         except Exception as exc:  # pragma: no cover - defensive probe
             payload['ok'] = False
@@ -401,16 +453,17 @@ def about(request):
     """
     from Dolg_APP.models import SchematicProject
     from knowledge.models import Article
+
     stats = {
-        'products':       Product.objects.count(),
-        'reb_products':   Product.objects.filter(category__slug__in=REB_SLUGS).count(),
-        'categories':     Category.objects.count(),
-        'demo_projects':  SchematicProject.objects.filter(is_demo=True).count(),
-        'articles':       Article.objects.count(),
+        'products': Product.objects.count(),
+        'reb_products': Product.objects.filter(category__slug__in=REB_SLUGS).count(),
+        'categories': Category.objects.count(),
+        'demo_projects': SchematicProject.objects.filter(is_demo=True).count(),
+        'articles': Article.objects.count(),
         # Тесты считаются на момент последнего прогона CI. Если есть
         # docs/TESTS_AND_REPORTS — оттуда. Пока — статичная цифра, легче
         # пересчитать через скрипт `manage.py refresh_about_stats`.
-        'tests':          263,
+        'tests': 263,
     }
     return render(request, 'shop/about.html', {'stats': stats})
 
@@ -488,7 +541,8 @@ def _tool_results(query):
     if not q:
         return tools[:4]
     return [
-        item for item in tools
+        item
+        for item in tools
         if q in item['title'].lower() or q in item['description'].lower() or q in item['keywords'].lower()
     ]
 
@@ -523,8 +577,7 @@ def _legal_source_results(query, *, limit=8):
         by_url = {}
         for item in find_legal_sources(query, limit=limit):
             material = (
-                ArticleMaterial.objects
-                .select_related('article', 'article__category')
+                ArticleMaterial.objects.select_related('article', 'article__category')
                 .filter(is_public=True, url=item['url'], article__is_published=True)
                 .order_by('article__order', 'order')
                 .first()
@@ -542,8 +595,7 @@ def _legal_source_results(query, *, limit=8):
             }
 
         materials = (
-            ArticleMaterial.objects
-            .select_related('article', 'article__category')
+            ArticleMaterial.objects.select_related('article', 'article__category')
             .filter(is_public=True, article__is_published=True)
             .filter(Q(title__icontains=query) | Q(description__icontains=query) | Q(url__icontains=query))
             .order_by('article__order', 'order')[:limit]
@@ -578,36 +630,33 @@ def global_search(request):
 
     if query:
         products = (
-            Product.objects
-            .select_related('category')
+            Product.objects.select_related('category')
             .filter(
-                Q(name__icontains=query) |
-                Q(description__icontains=query) |
-                Q(part_number__icontains=query) |
-                Q(package_type__icontains=query) |
-                Q(manufacturer__icontains=query) |
-                Q(category__name__icontains=query)
+                Q(name__icontains=query)
+                | Q(description__icontains=query)
+                | Q(part_number__icontains=query)
+                | Q(package_type__icontains=query)
+                | Q(manufacturer__icontains=query)
+                | Q(category__name__icontains=query)
             )
             .order_by('category__name', 'name')[:12]
         )
-        categories = (
-            Category.objects
-            .filter(Q(name__icontains=query) | Q(description__icontains=query) | Q(slug__icontains=query))
-            .order_by('name')[:8]
-        )
+        categories = Category.objects.filter(
+            Q(name__icontains=query) | Q(description__icontains=query) | Q(slug__icontains=query)
+        ).order_by('name')[:8]
 
         try:
             from knowledge.models import Article
+
             articles = (
-                Article.objects
-                .select_related('category')
+                Article.objects.select_related('category')
                 .filter(is_published=True)
                 .filter(
-                    Q(title__icontains=query) |
-                    Q(summary__icontains=query) |
-                    Q(body__icontains=query) |
-                    Q(related_components_note__icontains=query) |
-                    Q(category__name__icontains=query)
+                    Q(title__icontains=query)
+                    | Q(summary__icontains=query)
+                    | Q(body__icontains=query)
+                    | Q(related_components_note__icontains=query)
+                    | Q(category__name__icontains=query)
                 )
                 .order_by('category__order', 'order', 'title')[:10]
             )
@@ -616,21 +665,21 @@ def global_search(request):
 
         try:
             from knowledge.models import LearningLesson
+
             query_variants = {query, query.lower(), query.upper(), query.capitalize(), query.title()}
             learning_filter = Q()
             for term in query_variants:
                 learning_filter |= (
-                    Q(title__icontains=term) |
-                    Q(summary__icontains=term) |
-                    Q(theory__icontains=term) |
-                    Q(formula__icontains=term) |
-                    Q(track__title__icontains=term) |
-                    Q(tasks__title__icontains=term) |
-                    Q(tasks__prompt__icontains=term)
+                    Q(title__icontains=term)
+                    | Q(summary__icontains=term)
+                    | Q(theory__icontains=term)
+                    | Q(formula__icontains=term)
+                    | Q(track__title__icontains=term)
+                    | Q(tasks__title__icontains=term)
+                    | Q(tasks__prompt__icontains=term)
                 )
             learning_lessons = (
-                LearningLesson.objects
-                .select_related('track')
+                LearningLesson.objects.select_related('track')
                 .filter(is_published=True, track__is_published=True)
                 .filter(learning_filter)
                 .distinct()
@@ -645,14 +694,19 @@ def global_search(request):
         products = Product.objects.select_related('category').order_by('-created_at')[:8]
         try:
             from knowledge.models import Article
-            articles = Article.objects.select_related('category').filter(is_published=True).order_by('category__order', 'order')[:6]
+
+            articles = (
+                Article.objects.select_related('category')
+                .filter(is_published=True)
+                .order_by('category__order', 'order')[:6]
+            )
         except Exception:
             articles = []
         try:
             from knowledge.models import LearningLesson
+
             learning_lessons = (
-                LearningLesson.objects
-                .select_related('track')
+                LearningLesson.objects.select_related('track')
                 .filter(is_published=True, track__is_published=True)
                 .order_by('track__order', 'order', 'title')[:6]
             )
@@ -662,26 +716,34 @@ def global_search(request):
 
     tools = _tool_results(query)
     total_results = (
-        len(products) + len(categories) + len(articles) + len(learning_lessons)
-        + len(projects) + len(tools) + len(source_results)
+        len(products)
+        + len(categories)
+        + len(articles)
+        + len(learning_lessons)
+        + len(projects)
+        + len(tools)
+        + len(source_results)
     )
-    return render(request, 'shop/search_results.html', {
-        'query': query,
-        'products': products,
-        'categories_found': categories,
-        'articles': articles,
-        'learning_lessons': learning_lessons,
-        'projects': projects,
-        'tools': tools,
-        'source_results': source_results,
-        'total_results': total_results,
-    })
+    return render(
+        request,
+        'shop/search_results.html',
+        {
+            'query': query,
+            'products': products,
+            'categories_found': categories,
+            'articles': articles,
+            'learning_lessons': learning_lessons,
+            'projects': projects,
+            'tools': tools,
+            'source_results': source_results,
+            'total_results': total_results,
+        },
+    )
 
 
 def demo_route(request):
     featured_product = (
-        Product.objects
-        .select_related('category')
+        Product.objects.select_related('category')
         .filter(category__slug__in=REB_SLUGS, image__isnull=False)
         .order_by('category__slug', 'price')
         .first()
@@ -690,9 +752,9 @@ def demo_route(request):
     featured_article = None
     try:
         from knowledge.models import Article
+
         featured_article = (
-            Article.objects
-            .select_related('category')
+            Article.objects.select_related('category')
             .filter(is_published=True)
             .order_by('category__order', 'order', 'title')
             .first()
@@ -703,6 +765,7 @@ def demo_route(request):
     demo_project = None
     try:
         from Dolg_APP.models import SchematicProject
+
         demo_project = SchematicProject.objects.filter(is_demo=True).order_by('-difficulty', 'name').first()
     except Exception:
         demo_project = None
@@ -712,15 +775,21 @@ def demo_route(request):
             'label': 'Каталог',
             'title': 'Найти реальный компонент',
             'description': 'Открываем товар с фото, параметрами, lifecycle и datasheet.',
-            'url': featured_product.get_absolute_url() if hasattr(featured_product, 'get_absolute_url') else (
-                reverse('shop:product_detail', args=[featured_product.slug]) if featured_product else reverse('shop:index')
+            'url': featured_product.get_absolute_url()
+            if hasattr(featured_product, 'get_absolute_url')
+            else (
+                reverse('shop:product_detail', args=[featured_product.slug])
+                if featured_product
+                else reverse('shop:index')
             ),
         },
         {
             'label': 'Энциклопедия',
             'title': 'Понять применение',
             'description': 'Переходим к статье, материалам, схемам включения и практическим подсказкам.',
-            'url': reverse('knowledge:article', args=[featured_article.slug]) if featured_article else reverse('knowledge:index'),
+            'url': reverse('knowledge:article', args=[featured_article.slug])
+            if featured_article
+            else reverse('knowledge:index'),
         },
         {
             'label': 'CAD',
@@ -747,12 +816,16 @@ def demo_route(request):
             'url': reverse('shop:cart'),
         },
     ]
-    return render(request, 'shop/demo_route.html', {
-        'steps': steps,
-        'featured_product': featured_product,
-        'featured_article': featured_article,
-        'demo_project': demo_project,
-    })
+    return render(
+        request,
+        'shop/demo_route.html',
+        {
+            'steps': steps,
+            'featured_product': featured_product,
+            'featured_article': featured_article,
+            'demo_project': demo_project,
+        },
+    )
 
 
 def index(request):
@@ -760,9 +833,7 @@ def index(request):
     # шаблон index.html использовал {{ cat.products.count }} в loop = 12+
     # запросов на каждом рендере главной. Фильтрация reb/consumer теперь
     # в Python (1 раз материализуем, потом фильтруем по slug).
-    all_categories_list = list(
-        Category.objects.annotate(products_count_cached=Count('products')).all()
-    )
+    all_categories_list = list(Category.objects.annotate(products_count_cached=Count('products')).all())
     reb_categories = [c for c in all_categories_list if c.slug in REB_SLUGS]
     consumer_categories = [c for c in all_categories_list if c.slug not in REB_SLUGS]
 
@@ -787,19 +858,20 @@ def index(request):
     if not has_active_filters:
         for category in all_categories_list:
             shelf_products = list(
-                Product.objects
-                .select_related('category')
+                Product.objects.select_related('category')
                 .filter(category=category)
                 .order_by('-created_at', 'name')[:6]
             )
             if not shelf_products:
                 continue
-            catalog_shelves.append({
-                'category': category,
-                'products': shelf_products,
-                # Берём аннотацию вместо отдельного .count() — экономия 1 SQL на категорию.
-                'count': category.products_count_cached,
-            })
+            catalog_shelves.append(
+                {
+                    'category': category,
+                    'products': shelf_products,
+                    # Берём аннотацию вместо отдельного .count() — экономия 1 SQL на категорию.
+                    'count': category.products_count_cached,
+                }
+            )
 
     # Без фильтров «Новые позиции» обязаны быть disjoint с полками категорий —
     # иначе те же товары рендерятся дважды (полка → ниже общий список).
@@ -818,8 +890,8 @@ def index(request):
     manufacturer_choices = dict(Product.MANUFACTURER_CHOICES)
     lifecycle_choices = dict(Product.LIFECYCLE_CHOICES)
     context = {
-        'products': page_obj,        # iterable — шаблон не трогаем
-        'page_obj': page_obj,        # для ссылок previous/next
+        'products': page_obj,  # iterable — шаблон не трогаем
+        'page_obj': page_obj,  # для ссылок previous/next
         'paginator': paginator,
         'product_total': product_total,
         'catalog_shelves': catalog_shelves,
@@ -846,7 +918,11 @@ def index(request):
         'lifecycle_choices': lifecycle_choices,
         'category_icons': CATEGORY_ICONS,
     }
-    context.update(_catalog_filter_context(request, reverse('shop:index'), products, manufacturer_choices, lifecycle_choices))
+    context.update(
+        _catalog_filter_context(
+            request, reverse('shop:index'), products, manufacturer_choices, lifecycle_choices
+        )
+    )
     return render(request, 'shop/index.html', context)
 
 
@@ -899,13 +975,15 @@ def category_products(request, slug):
         'lifecycle_choices': lifecycle_choices,
         'category_icons': CATEGORY_ICONS,
     }
-    context.update(_catalog_filter_context(
-        request,
-        reverse('shop:category', args=[category.slug]),
-        products,
-        manufacturer_choices,
-        lifecycle_choices,
-    ))
+    context.update(
+        _catalog_filter_context(
+            request,
+            reverse('shop:category', args=[category.slug]),
+            products,
+            manufacturer_choices,
+            lifecycle_choices,
+        )
+    )
     return render(request, 'shop/category.html', context)
 
 
@@ -920,13 +998,16 @@ def product_detail(request, slug):
     # остаётся сессионная история (см. ниже recently_viewed_ids).
     if request.user.is_authenticated:
         from .models import ViewedProduct
+
         ViewedProduct.objects.update_or_create(
-            user=request.user, product=product,
+            user=request.user,
+            product=product,
         )
     related_products = Product.objects.filter(category=product.category).exclude(id=product.id)[:4]
     alternative_products = (
-        Product.objects
-        .filter(category=product.category, stock__gt=0, lifecycle_status__in=['active', 'nrnd'])
+        Product.objects.filter(
+            category=product.category, stock__gt=0, lifecycle_status__in=['active', 'nrnd']
+        )
         .exclude(id=product.id)
         .order_by('price', 'name')[:6]
     )
@@ -937,23 +1018,41 @@ def product_detail(request, slug):
     elif product.stock < 10:
         engineering_warnings.append(f'Небольшой остаток на складе: {product.stock} шт.')
     if product.lifecycle_status != 'active':
-        engineering_warnings.append(f'Lifecycle: {product.get_lifecycle_status_display()}. Перед заказом стоит проверить замену.')
+        engineering_warnings.append(
+            f'Lifecycle: {product.get_lifecycle_status_display()}. Перед заказом стоит проверить замену.'
+        )
     if product.is_reb() and not product.datasheet_url:
-        engineering_warnings.append('Нет datasheet-ссылки: проверьте корпус, распиновку и предельные параметры вручную.')
+        engineering_warnings.append(
+            'Нет datasheet-ссылки: проверьте корпус, распиновку и предельные параметры вручную.'
+        )
     if product.is_reb() and not (product.parameters or {}).get('spice_model'):
-        engineering_warnings.append('SPICE-модель не указана: симулятор использует типовую модель или упрощенный расчет.')
+        engineering_warnings.append(
+            'SPICE-модель не указана: симулятор использует типовую модель или упрощенный расчет.'
+        )
 
     template_map = {
         'resistors': [
-            ('Делитель напряжения', 'Подбор плеч делителя и проверка мощности резисторов.', '/simulation/?tour=1'),
+            (
+                'Делитель напряжения',
+                'Подбор плеч делителя и проверка мощности резисторов.',
+                '/simulation/?tour=1',
+            ),
             ('Измерительный шунт', 'Оценка падения напряжения и рассеиваемой мощности.', '/cad/'),
         ],
         'capacitors': [
-            ('RC-фильтр', 'Частота среза, переходный процесс и подбор рабочего напряжения.', '/simulation/?tour=1'),
+            (
+                'RC-фильтр',
+                'Частота среза, переходный процесс и подбор рабочего напряжения.',
+                '/simulation/?tour=1',
+            ),
             ('Фильтр питания', 'Сглаживание пульсаций и проверка ESR/температуры.', '/cad/'),
         ],
         'diodes': [
-            ('Выпрямитель', 'Проверка падения напряжения, обратного напряжения и нагрева.', '/simulation/?tour=1'),
+            (
+                'Выпрямитель',
+                'Проверка падения напряжения, обратного напряжения и нагрева.',
+                '/simulation/?tour=1',
+            ),
             ('Защита входа', 'TVS/сигнальные диоды в цепях защиты.', '/cad/'),
         ],
         'transistors': [
@@ -961,7 +1060,11 @@ def product_detail(request, slug):
             ('Усилительный каскад', 'Рабочая точка и малосигнальный режим.', '/cad/'),
         ],
         'ics': [
-            ('Стабилизатор или таймер', 'Проверка питания, обвязки и типовой схемы включения.', '/simulation/?tour=1'),
+            (
+                'Стабилизатор или таймер',
+                'Проверка питания, обвязки и типовой схемы включения.',
+                '/simulation/?tour=1',
+            ),
             ('ОУ/логика', 'Питание, входы, выходы и неподключенные пины.', '/cad/'),
         ],
         'inductors': [
@@ -971,29 +1074,40 @@ def product_detail(request, slug):
             ('Ввод питания/сигнала', 'Проверка контактов, шага и допустимого тока.', '/cad/'),
         ],
         'relays': [
-            ('Коммутация нагрузки', 'Катушка, контакты, защитный диод и ток нагрузки.', '/simulation/?tour=1'),
+            (
+                'Коммутация нагрузки',
+                'Катушка, контакты, защитный диод и ток нагрузки.',
+                '/simulation/?tour=1',
+            ),
         ],
     }
-    compatible_templates = template_map.get(product.category.slug, [
-        ('Применение в проекте', 'Добавьте товар в проектную корзину или используйте как позицию спецификации.', reverse('hello:cad')),
-    ])
+    compatible_templates = template_map.get(
+        product.category.slug,
+        [
+            (
+                'Применение в проекте',
+                'Добавьте товар в проектную корзину или используйте как позицию спецификации.',
+                reverse('hello:cad'),
+            ),
+        ],
+    )
 
     related_articles = []
     try:
         from knowledge.models import Article
+
         terms = [product.category.name, product.category.slug, product.part_number, product.name]
         article_query = Q()
         for term in terms:
             if term:
                 article_query |= (
-                    Q(title__icontains=term) |
-                    Q(summary__icontains=term) |
-                    Q(body__icontains=term) |
-                    Q(related_components_note__icontains=term)
+                    Q(title__icontains=term)
+                    | Q(summary__icontains=term)
+                    | Q(body__icontains=term)
+                    | Q(related_components_note__icontains=term)
                 )
         related_articles = (
-            Article.objects
-            .select_related('category')
+            Article.objects.select_related('category')
             .filter(is_published=True)
             .filter(article_query)
             .order_by('category__order', 'order', 'title')[:6]
@@ -1030,11 +1144,12 @@ def product_detail(request, slug):
 @require_POST
 def add_to_cart(request, slug):
     from django.contrib import messages as _msg
+
     product = get_object_or_404(Product, slug=slug)
     cart_filter = _cart_owner_filter(request)
     try:
         quantity = max(1, int(request.POST.get('quantity', 1)))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         quantity = 1
 
     if product.stock <= 0:
@@ -1052,13 +1167,13 @@ def add_to_cart(request, slug):
             _msg.warning(
                 request,
                 f'В корзине уже {already_in_cart} шт. товара «{product.name}» — '
-                f'это весь доступный остаток ({product.stock}).'
+                f'это весь доступный остаток ({product.stock}).',
             )
             return redirect('shop:cart')
         _msg.warning(
             request,
             f'Доступно только {product.stock} шт. товара «{product.name}». '
-            f'Добавлено {capped_quantity} (а не {quantity}).'
+            f'Добавлено {capped_quantity} (а не {quantity}).',
         )
         quantity = capped_quantity
 
@@ -1077,7 +1192,7 @@ def add_to_cart(request, slug):
         _msg.info(
             request,
             f'✓ «{product.name}» добавлен в корзину. Корзина сохранится в текущей сессии — '
-            f'войдите, чтобы оформить заказ.'
+            f'войдите, чтобы оформить заказ.',
         )
     else:
         _msg.success(request, f'✓ «{product.name}» добавлен в корзину')
@@ -1116,7 +1231,7 @@ def update_cart_item(request, item_id):
     cart_item = get_object_or_404(CartItem, id=item_id, **_cart_owner_filter(request))
     try:
         quantity = int(request.POST.get('quantity', 1))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         quantity = 1
 
     if quantity > 0 and cart_item.product.stock > 0:
@@ -1135,35 +1250,35 @@ def update_cart_item(request, item_id):
 # Тип компонента в редакторе схем → slug категории в каталоге.
 # LED — это диод, поэтому маппится в "diodes".
 COMPONENT_TO_CATEGORY = {
-    'resistor':   'resistors',
-    'capacitor':  'capacitors',
-    'inductor':   'inductors',
-    'diode':      'diodes',
-    'led':        'diodes',
+    'resistor': 'resistors',
+    'capacitor': 'capacitors',
+    'inductor': 'inductors',
+    'diode': 'diodes',
+    'led': 'diodes',
     'transistor': 'transistors',
-    'npn':        'transistors',
-    'pnp':        'transistors',
-    'ic':         'ics',
-    'connector':  'connectors',
-    'relay':      'relays',
-    'switch':     'relays',
+    'npn': 'transistors',
+    'pnp': 'transistors',
+    'ic': 'ics',
+    'connector': 'connectors',
+    'relay': 'relays',
+    'switch': 'relays',
 }
 
 # Человекочитаемые названия для UI BOM
 COMPONENT_LABELS = {
-    'resistor':   'Резистор',
-    'capacitor':  'Конденсатор',
-    'inductor':   'Катушка индуктивности',
-    'diode':      'Диод',
-    'led':        'Светодиод',
+    'resistor': 'Резистор',
+    'capacitor': 'Конденсатор',
+    'inductor': 'Катушка индуктивности',
+    'diode': 'Диод',
+    'led': 'Светодиод',
     'transistor': 'Транзистор',
-    'ic':         'Микросхема',
-    'connector':  'Разъём',
-    'relay':      'Реле',
-    'switch':     'Переключатель',
-    'battery':    'Батарея',
-    'ground':     'Земля',
-    'node':       'Узел',
+    'ic': 'Микросхема',
+    'connector': 'Разъём',
+    'relay': 'Реле',
+    'switch': 'Переключатель',
+    'battery': 'Батарея',
+    'ground': 'Земля',
+    'node': 'Узел',
 }
 
 
@@ -1189,8 +1304,9 @@ def _bom_product_dict(p):
 
 
 BOM_MAX_COMPONENTS = 1000  # Защита от DoS: вызов с миллионом компонентов
-                            # съест RAM на dict-агрегации и запросах к БД.
-                            # Большая реальная схема — < 500 компонентов.
+# съест RAM на dict-агрегации и запросах к БД.
+# Большая реальная схема — < 500 компонентов.
+
 
 def _build_bom_matches(components):
     if not isinstance(components, list):
@@ -1221,8 +1337,7 @@ def _build_bom_matches(components):
 
     for catalog_ref, count in explicit_counts.items():
         product = (
-            Product.objects
-            .select_related('category')
+            Product.objects.select_related('category')
             .filter(Q(slug__iexact=catalog_ref) | Q(part_number__iexact=catalog_ref))
             .first()
         )
@@ -1242,8 +1357,7 @@ def _build_bom_matches(components):
             entry['line_total'] = round(float(product.price) * count, 2)
             grand_total += entry['line_total']
             alternatives = (
-                Product.objects
-                .select_related('category')
+                Product.objects.select_related('category')
                 .filter(category=product.category, stock__gt=0, lifecycle_status__in=['active', 'nrnd'])
                 .order_by('price')[:5]
             )
@@ -1273,8 +1387,7 @@ def _build_bom_matches(components):
 
         if slug:
             products = list(
-                Product.objects
-                .select_related('category')
+                Product.objects.select_related('category')
                 .filter(category__slug=slug, stock__gt=0, lifecycle_status__in=['active', 'nrnd'])
                 .order_by('price')[:5]
             )
@@ -1311,21 +1424,23 @@ def api_component_search(request):
         products = products.filter(category__slug=category_slug)
     if query:
         products = products.filter(
-            Q(name__icontains=query) |
-            Q(part_number__icontains=query) |
-            Q(description__icontains=query) |
-            Q(package_type__icontains=query)
+            Q(name__icontains=query)
+            | Q(part_number__icontains=query)
+            | Q(description__icontains=query)
+            | Q(package_type__icontains=query)
         )
     elif not category_slug:
         return JsonResponse({'ok': True, 'results': []})
 
     products = products.order_by('price', 'name')[:8]
-    return JsonResponse({
-        'ok': True,
-        'component_type': component_type,
-        'category_slug': category_slug or '',
-        'results': [_bom_product_dict(product) for product in products],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'component_type': component_type,
+            'category_slug': category_slug or '',
+            'results': [_bom_product_dict(product) for product in products],
+        }
+    )
 
 
 @require_POST
@@ -1334,7 +1449,7 @@ def api_bom_match(request):
     подходящий товар для каждого типа. Возвращает match'и и итоговую цену."""
     try:
         payload = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
     try:
@@ -1342,12 +1457,14 @@ def api_bom_match(request):
     except ValueError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
 
-    return JsonResponse({
-        'ok': True,
-        'matches': matches,
-        'grand_total': grand_total,
-        'total_components': total_components,
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'matches': matches,
+            'grand_total': grand_total,
+            'total_components': total_components,
+        }
+    )
 
 
 @require_POST
@@ -1355,7 +1472,7 @@ def api_bom_export_xlsx(request):
     """Build an Excel-compatible BOM workbook for the current schematic."""
     try:
         payload = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
     try:
@@ -1464,12 +1581,17 @@ def api_bom_export_xlsx(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = 'attachment; filename="dolg_bom.xlsx"'
-    _log_bom_project_event(request, payload, 'bom_exported', {
-        'total_components': total_components,
-        'matched_rows': len([item for item in matches if item.get('product')]),
-        'grand_total': grand_total,
-        'format': 'xlsx',
-    })
+    _log_bom_project_event(
+        request,
+        payload,
+        'bom_exported',
+        {
+            'total_components': total_components,
+            'matched_rows': len([item for item in matches if item.get('product')]),
+            'grand_total': grand_total,
+            'format': 'xlsx',
+        },
+    )
     return response
 
 
@@ -1479,7 +1601,7 @@ def api_bom_add_all(request):
     body: {"items": [{"slug": "...", "quantity": 3}, ...]}"""
     try:
         payload = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
     items = payload.get('items', [])
@@ -1501,7 +1623,7 @@ def api_bom_add_all(request):
         slug = (item.get('slug') or '').strip()
         try:
             qty = max(1, int(item.get('quantity', 1)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if not slug:
             continue
@@ -1515,7 +1637,8 @@ def api_bom_add_all(request):
             continue
 
         cart_item, created = CartItem.objects.get_or_create(
-            product=product, **cart_filter,
+            product=product,
+            **cart_filter,
             defaults={'quantity': 0, **cart_defaults},
         )
         available = max(product.stock - cart_item.quantity, 0)
@@ -1528,14 +1651,16 @@ def api_bom_add_all(request):
         cart_item.quantity += add_qty
         cart_item.save(update_fields=['quantity'])
         added += 1
-        added_items.append({
-            'slug': product.slug,
-            'name': product.name,
-            'part_number': product.part_number,
-            'quantity': add_qty,
-            'unit_price': float(product.price),
-            'line_total': round(float(product.price) * add_qty, 2),
-        })
+        added_items.append(
+            {
+                'slug': product.slug,
+                'name': product.name,
+                'part_number': product.part_number,
+                'quantity': add_qty,
+                'unit_price': float(product.price),
+                'line_total': round(float(product.price) * add_qty, 2),
+            }
+        )
 
     project_context = None
     if added_items:
@@ -1543,14 +1668,16 @@ def api_bom_add_all(request):
         request.session[PROJECT_CART_SESSION_KEY] = project_context
         request.session.modified = True
 
-    return JsonResponse({
-        'ok': True,
-        'added': added,
-        'limited': limited,
-        'skipped': skipped,
-        'cart_url': reverse('shop:cart'),
-        'project_cart': project_context,
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'added': added,
+            'limited': limited,
+            'skipped': skipped,
+            'cart_url': reverse('shop:cart'),
+            'project_cart': project_context,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1561,17 +1688,21 @@ def api_bom_add_all(request):
 # + macOS. Первая найденная пара (regular, bold) выигрывает. Расширяемо.
 _CYRILLIC_FONT_CANDIDATES = [
     # Windows
-    ('C:/Windows/Fonts/arial.ttf',           'C:/Windows/Fonts/arialbd.ttf'),
-    ('C:/Windows/Fonts/times.ttf',           'C:/Windows/Fonts/timesbd.ttf'),
-    ('C:/Windows/Fonts/calibri.ttf',         'C:/Windows/Fonts/calibrib.ttf'),
+    ('C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/arialbd.ttf'),
+    ('C:/Windows/Fonts/times.ttf', 'C:/Windows/Fonts/timesbd.ttf'),
+    ('C:/Windows/Fonts/calibri.ttf', 'C:/Windows/Fonts/calibrib.ttf'),
     # Linux (Debian/Ubuntu — fonts-dejavu, fonts-liberation)
-    ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-     '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
-    ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-     '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'),
+    (
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    ),
+    (
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+    ),
     # macOS
-    ('/Library/Fonts/Arial.ttf',             '/Library/Fonts/Arial Bold.ttf'),
-    ('/System/Library/Fonts/Helvetica.ttc',  '/System/Library/Fonts/Helvetica.ttc'),
+    ('/Library/Fonts/Arial.ttf', '/Library/Fonts/Arial Bold.ttf'),
+    ('/System/Library/Fonts/Helvetica.ttc', '/System/Library/Fonts/Helvetica.ttc'),
 ]
 _pdf_logger = logging.getLogger(__name__)
 
@@ -1583,6 +1714,7 @@ def _register_pdf_cyrillic_fonts():
     fallback на Helvetica реально применился (значит, нужен fonts-пакет в проде)."""
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+
     # Идемпотентность: если уже зарегистрировали в прошлый вызов — переиспользуем.
     if 'DolgCyr' in pdfmetrics.getRegisteredFontNames():
         return 'DolgCyr', 'DolgCyr-Bold'
@@ -1623,16 +1755,30 @@ def _generate_pdf(title, product, sections):
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=A4,
-        leftMargin=2 * cm, rightMargin=2 * cm,
-        topMargin=2 * cm, bottomMargin=2 * cm,
+        buf,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
     )
 
     styles = getSampleStyleSheet()
-    h1 = ParagraphStyle('h1', parent=styles['Title'], fontName=font_bold, fontSize=18, textColor=colors.HexColor('#004080'))
-    h2 = ParagraphStyle('h2', parent=styles['Heading2'], fontName=font_bold, fontSize=13, textColor=colors.HexColor('#002d5a'), spaceAfter=6)
+    h1 = ParagraphStyle(
+        'h1', parent=styles['Title'], fontName=font_bold, fontSize=18, textColor=colors.HexColor('#004080')
+    )
+    h2 = ParagraphStyle(
+        'h2',
+        parent=styles['Heading2'],
+        fontName=font_bold,
+        fontSize=13,
+        textColor=colors.HexColor('#002d5a'),
+        spaceAfter=6,
+    )
     body = ParagraphStyle('body', parent=styles['BodyText'], fontName=font_name, fontSize=10.5, leading=15)
-    small = ParagraphStyle('small', parent=styles['BodyText'], fontName=font_name, fontSize=8.5, textColor=colors.grey)
+    small = ParagraphStyle(
+        'small', parent=styles['BodyText'], fontName=font_name, fontSize=8.5, textColor=colors.grey
+    )
 
     story = [
         Paragraph('ДОЛГ — Магазин электронных компонентов', small),
@@ -1660,17 +1806,23 @@ def _generate_pdf(title, product, sections):
         [['Подпись: ____________________', 'М.П.']],
         colWidths=[9 * cm, 7 * cm],
     )
-    sig_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, -1), font_name),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-    ]))
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ]
+        )
+    )
     story.append(sig_table)
     story.append(Spacer(1, 0.8 * cm))
-    story.append(Paragraph(
-        f'Документ сгенерирован автоматически. ID заказа: DOLG-{product.id}-{product.slug}',
-        small,
-    ))
+    story.append(
+        Paragraph(
+            f'Документ сгенерирован автоматически. ID заказа: DOLG-{product.id}-{product.slug}',
+            small,
+        )
+    )
 
     doc.build(story)
     buf.seek(0)
@@ -1681,20 +1833,29 @@ def product_warranty_pdf(request, slug):
     """Генерирует гарантийный талон на товар."""
     product = get_object_or_404(Product, slug=slug)
     sections = [
-        ('Условия гарантии', [
-            'Настоящий гарантийный талон подтверждает качество приобретённого товара и право покупателя на бесплатный ремонт или замену в случае выявления производственных дефектов.',
-            '<b>Срок гарантии:</b> 12 месяцев с даты приобретения.',
-            '<b>Объём гарантии:</b> устранение недостатков, возникших по вине производителя, либо замена товара на аналогичный.',
-        ]),
-        ('Гарантия не распространяется на', [
-            '• Повреждения, вызванные нарушением правил эксплуатации или монтажа;',
-            '• Механические повреждения (сколы, деформация выводов, следы попадания влаги);',
-            '• Дефекты, возникшие в результате естественного износа;',
-            '• Товары с признаками вскрытия, самостоятельного ремонта или изменения маркировки.',
-        ]),
-        ('Порядок предъявления претензий', [
-            'Для предъявления претензии обратитесь в службу поддержки ДОЛГ по адресу support@dolg-shop.ru с указанием Part Number и номера заказа. Срок рассмотрения — до 10 рабочих дней.',
-        ]),
+        (
+            'Условия гарантии',
+            [
+                'Настоящий гарантийный талон подтверждает качество приобретённого товара и право покупателя на бесплатный ремонт или замену в случае выявления производственных дефектов.',
+                '<b>Срок гарантии:</b> 12 месяцев с даты приобретения.',
+                '<b>Объём гарантии:</b> устранение недостатков, возникших по вине производителя, либо замена товара на аналогичный.',
+            ],
+        ),
+        (
+            'Гарантия не распространяется на',
+            [
+                '• Повреждения, вызванные нарушением правил эксплуатации или монтажа;',
+                '• Механические повреждения (сколы, деформация выводов, следы попадания влаги);',
+                '• Дефекты, возникшие в результате естественного износа;',
+                '• Товары с признаками вскрытия, самостоятельного ремонта или изменения маркировки.',
+            ],
+        ),
+        (
+            'Порядок предъявления претензий',
+            [
+                'Для предъявления претензии обратитесь в службу поддержки ДОЛГ по адресу support@dolg-shop.ru с указанием Part Number и номера заказа. Срок рассмотрения — до 10 рабочих дней.',
+            ],
+        ),
     ]
     pdf = _generate_pdf(f'Гарантийный талон №{product.id:06d}', product, sections)
     response = HttpResponse(pdf, content_type='application/pdf')
@@ -1707,18 +1868,27 @@ def product_certificate_pdf(request, slug):
     product = get_object_or_404(Product, slug=slug)
     pn = product.part_number or f'DOLG-{product.id}'
     sections = [
-        ('Заявление о соответствии', [
-            f'Настоящим подтверждается, что компонент <b>{pn}</b> производства {product.get_manufacturer_display()} соответствует заявленным техническим характеристикам и допущен к реализации на территории Российской Федерации.',
-        ]),
-        ('Соответствие стандартам', [
-            '• ГОСТ Р 51317.4.2-2010 — электростатическое разрядное воздействие;',
-            '• ГОСТ Р 51318.22-2006 — электромагнитная совместимость;',
-            '• IEC 61000-4-x — устойчивость к помехам;',
-            '• RoHS 2 (Directive 2011/65/EU) — ограничение использования опасных веществ.',
-        ]),
-        ('Условия применения', [
-            'Компонент предназначен для использования в составе промышленной электроники, систем РЭБ, радиоприёмных и передающих устройств, средств автоматики. При соблюдении условий эксплуатации (температура, влажность, электрические параметры) обеспечивается заявленный ресурс.',
-        ]),
+        (
+            'Заявление о соответствии',
+            [
+                f'Настоящим подтверждается, что компонент <b>{pn}</b> производства {product.get_manufacturer_display()} соответствует заявленным техническим характеристикам и допущен к реализации на территории Российской Федерации.',
+            ],
+        ),
+        (
+            'Соответствие стандартам',
+            [
+                '• ГОСТ Р 51317.4.2-2010 — электростатическое разрядное воздействие;',
+                '• ГОСТ Р 51318.22-2006 — электромагнитная совместимость;',
+                '• IEC 61000-4-x — устойчивость к помехам;',
+                '• RoHS 2 (Directive 2011/65/EU) — ограничение использования опасных веществ.',
+            ],
+        ),
+        (
+            'Условия применения',
+            [
+                'Компонент предназначен для использования в составе промышленной электроники, систем РЭБ, радиоприёмных и передающих устройств, средств автоматики. При соблюдении условий эксплуатации (температура, влажность, электрические параметры) обеспечивается заявленный ресурс.',
+            ],
+        ),
     ]
     pdf = _generate_pdf(f'Сертификат качества №{product.id:06d}/К', product, sections)
     response = HttpResponse(pdf, content_type='application/pdf')
@@ -1748,7 +1918,10 @@ def compare_toggle(request, slug):
     else:
         if len(slugs) >= MAX_COMPARE:
             from django.contrib import messages
-            messages.warning(request, f'В сравнении уже {MAX_COMPARE} товара. Удалите один, чтобы добавить новый.')
+
+            messages.warning(
+                request, f'В сравнении уже {MAX_COMPARE} товара. Удалите один, чтобы добавить новый.'
+            )
             return redirect(request.META.get('HTTP_REFERER') or 'shop:index')
         slugs = slugs + [slug]
         added = True
@@ -1772,17 +1945,44 @@ import re as _re
 
 # Метки и ключи параметров, для которых МЕНЬШЕ = ЛУЧШЕ (цена, вес, потребление, задержка).
 _LOWER_BETTER_HINTS = (
-    'цен', 'price', 'руб', '₽', '$', '€',
-    'вес', 'weight', 'масс', 'mass',
-    'tdp', 'потребл', 'consumption', 'мощност',
-    'толщин', 'thickness',
-    'задержк', 'latency', 'cas',
-    'время', 'response',
-    'esr', 'rds', 'утечк', 'leakage',
+    'цен',
+    'price',
+    'руб',
+    '₽',
+    '$',
+    '€',
+    'вес',
+    'weight',
+    'масс',
+    'mass',
+    'tdp',
+    'потребл',
+    'consumption',
+    'мощност',
+    'толщин',
+    'thickness',
+    'задержк',
+    'latency',
+    'cas',
+    'время',
+    'response',
+    'esr',
+    'rds',
+    'утечк',
+    'leakage',
 )
 # Категориальные строки — не сравниваем.
-_SKIP_HINTS = ('производитель', 'manufacturer', 'категори', 'category',
-               'part number', 'partnumber', 'корпус', 'package', 'lifecycle')
+_SKIP_HINTS = (
+    'производитель',
+    'manufacturer',
+    'категори',
+    'category',
+    'part number',
+    'partnumber',
+    'корпус',
+    'package',
+    'lifecycle',
+)
 
 _NUM_RE = _re.compile(r'-?\d+(?:[.,]\d+)?')
 
@@ -1820,7 +2020,7 @@ def _annotate_row(row):
     if len(valid) < 2:
         row['best_idx'] = None
         return row
-    if len({n for _, n in valid}) == 1:    # ничья
+    if len({n for _, n in valid}) == 1:  # ничья
         row['best_idx'] = None
         return row
     best_i, _ = (min if kind == 'lower' else max)(valid, key=lambda p: p[1])
@@ -1844,9 +2044,11 @@ def compare_view(request):
 
     rows = []
     rows.append({'label': 'Производитель', 'values': [p.get_manufacturer_display() for p in products]})
-    rows.append({'label': 'Категория',      'values': [p.category.name for p in products]})
-    rows.append({'label': 'Цена',           'values': [f'{p.price} ₽' for p in products]})
-    rows.append({'label': 'Наличие',        'values': [f'{p.stock} шт.' if p.is_available() else '✕ нет' for p in products]})
+    rows.append({'label': 'Категория', 'values': [p.category.name for p in products]})
+    rows.append({'label': 'Цена', 'values': [f'{p.price} ₽' for p in products]})
+    rows.append(
+        {'label': 'Наличие', 'values': [f'{p.stock} шт.' if p.is_available() else '✕ нет' for p in products]}
+    )
     if any(p.part_number for p in products):
         rows.append({'label': 'Part number', 'values': [p.part_number or '—' for p in products]})
     if any(p.lifecycle_status for p in products):
@@ -1855,10 +2057,12 @@ def compare_view(request):
         rows.append({'label': 'Корпус', 'values': [p.package_type or '—' for p in products]})
     for key in param_keys:
         label = key.replace('_', ' ').capitalize()
-        rows.append({
-            'label': label,
-            'values': [str((p.parameters or {}).get(key, '—')) for p in products],
-        })
+        rows.append(
+            {
+                'label': label,
+                'values': [str((p.parameters or {}).get(key, '—')) for p in products],
+            }
+        )
 
     # Аннотируем каждую строку индексом «лучшего» столбца
     rows = [_annotate_row(r) for r in rows]
@@ -1874,14 +2078,18 @@ def compare_view(request):
     if overall_best is not None and len(set(wins)) == 1:
         overall_best = None  # ничья по всем строкам
 
-    return render(request, 'shop/compare.html', {
-        'products': products,
-        'rows': rows,
-        'wins': wins,
-        'summary': summary,
-        'overall_best': overall_best,
-        'max_compare': MAX_COMPARE,
-    })
+    return render(
+        request,
+        'shop/compare.html',
+        {
+            'products': products,
+            'rows': rows,
+            'wins': wins,
+            'summary': summary,
+            'overall_best': overall_best,
+            'max_compare': MAX_COMPARE,
+        },
+    )
 
 
 # =============================================================================
@@ -1897,22 +2105,23 @@ def search_suggest(request):
     q = (request.GET.get('q') or '').strip()
     if len(q) < 2:
         return JsonResponse({'ok': True, 'results': []})
-    base = (
-        Product.objects
-        .select_related('category')
-        .only('id', 'name', 'slug', 'part_number', 'manufacturer', 'price', 'category__name')
+    base = Product.objects.select_related('category').only(
+        'id', 'name', 'slug', 'part_number', 'manufacturer', 'price', 'category__name'
     )
     qs, _tokens = smart_search(base, q)
     qs = qs[:10]
-    results = [{
-        'name': p.name,
-        'slug': p.slug,
-        'url': f'/product/{p.slug}/',
-        'part_number': p.part_number or '',
-        'manufacturer': p.get_manufacturer_display(),
-        'category': p.category.name,
-        'price': float(p.price),
-    } for p in qs]
+    results = [
+        {
+            'name': p.name,
+            'slug': p.slug,
+            'url': f'/product/{p.slug}/',
+            'part_number': p.part_number or '',
+            'manufacturer': p.get_manufacturer_display(),
+            'category': p.category.name,
+            'price': float(p.price),
+        }
+        for p in qs
+    ]
     return JsonResponse({'ok': True, 'results': results, 'fuzzy': bool(_tokens) and not bool(results)})
 
 
@@ -1929,75 +2138,86 @@ def global_search_suggest(request):
     results = []
 
     # 1) Товары — через smart_search (fuzzy на опечатки)
-    base = (
-        Product.objects
-        .select_related('category')
-        .only('id', 'name', 'slug', 'part_number', 'manufacturer', 'price', 'category__name')
+    base = Product.objects.select_related('category').only(
+        'id', 'name', 'slug', 'part_number', 'manufacturer', 'price', 'category__name'
     )
     prod_qs, _ = smart_search(base, q)
     for p in prod_qs[:4]:
-        results.append({
-            'type': 'product',
-            'name': p.name,
-            'url': reverse('shop:product_detail', args=[p.slug]),
-            'meta': f'{p.get_manufacturer_display()} · {p.category.name} · {int(p.price)} ₽',
-            'icon': '🛒',
-        })
+        results.append(
+            {
+                'type': 'product',
+                'name': p.name,
+                'url': reverse('shop:product_detail', args=[p.slug]),
+                'meta': f'{p.get_manufacturer_display()} · {p.category.name} · {int(p.price)} ₽',
+                'icon': '🛒',
+            }
+        )
 
     # 2) Категории — простой icontains
     for cat in Category.objects.filter(Q(name__icontains=q) | Q(slug__icontains=q))[:3]:
-        results.append({
-            'type': 'category',
-            'name': cat.name,
-            'url': reverse('shop:category', args=[cat.slug]),
-            'meta': 'Категория каталога',
-            'icon': '📂',
-        })
+        results.append(
+            {
+                'type': 'category',
+                'name': cat.name,
+                'url': reverse('shop:category', args=[cat.slug]),
+                'meta': 'Категория каталога',
+                'icon': '📂',
+            }
+        )
 
     # 3) Статьи энциклопедии (если приложение доступно)
     try:
         from knowledge.models import Article
+
         articles = (
-            Article.objects
-            .select_related('category')
+            Article.objects.select_related('category')
             .filter(is_published=True)
             .filter(Q(title__icontains=q) | Q(summary__icontains=q) | Q(category__name__icontains=q))[:3]
         )
         for a in articles:
-            results.append({
-                'type': 'article',
-                'name': a.title,
-                'url': reverse('knowledge:article', args=[a.slug]),
-                'meta': f'Энциклопедия · {a.category.name}' if a.category_id else 'Энциклопедия',
-                'icon': '📚',
-            })
+            results.append(
+                {
+                    'type': 'article',
+                    'name': a.title,
+                    'url': reverse('knowledge:article', args=[a.slug]),
+                    'meta': f'Энциклопедия · {a.category.name}' if a.category_id else 'Энциклопедия',
+                    'icon': '📚',
+                }
+            )
     except Exception:
         pass
 
     # 4) Официальные источники и документация
     for source in _legal_source_results(q, limit=3):
-        results.append({
-            'type': 'legal_source',
-            'name': source['title'],
-            'url': source['article_url'],
-            'meta': f'Источник · {source.get("topic", "")}',
-            'icon': '🔎',
-        })
+        results.append(
+            {
+                'type': 'legal_source',
+                'name': source['title'],
+                'url': source['article_url'],
+                'meta': f'Источник · {source.get("topic", "")}',
+                'icon': '🔎',
+            }
+        )
 
     # 5) Уроки (если есть)
     try:
         from knowledge.models import LearningLesson
+
         lessons = LearningLesson.objects.filter(
             Q(title__icontains=q) | Q(summary__icontains=q)
         ).select_related('track')[:2]
-        for l in lessons:
-            results.append({
-                'type': 'lesson',
-                'name': l.title,
-                'url': reverse('knowledge:learning_lesson', args=[l.slug]),
-                'meta': f'Обучение · {l.track.title}' if getattr(l, 'track_id', None) else 'Обучение',
-                'icon': '🎓',
-            })
+        for lesson in lessons:
+            results.append(
+                {
+                    'type': 'lesson',
+                    'name': lesson.title,
+                    'url': reverse('knowledge:learning_lesson', args=[lesson.slug]),
+                    'meta': f'Обучение · {lesson.track.title}'
+                    if getattr(lesson, 'track_id', None)
+                    else 'Обучение',
+                    'icon': '🎓',
+                }
+            )
     except Exception:
         pass
 

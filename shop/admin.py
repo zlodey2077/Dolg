@@ -41,14 +41,31 @@ class CategoryAdmin(admin.ModelAdmin):
     def products_count(self, obj):
         return obj._products_count
 
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'part_number', 'category', 'manufacturer', 'lifecycle_status',
-        'price', 'stock', 'datasheet_status', 'model_status', 'image_status',
-        'needs_review_flag', 'created_at',
+        'name',
+        'part_number',
+        'category',
+        'manufacturer',
+        'lifecycle_status',
+        'price',
+        'stock',
+        'datasheet_status',
+        'model_status',
+        'image_status',
+        'needs_review_flag',
+        'created_at',
     )
-    list_filter = ('category', 'manufacturer', 'lifecycle_status', 'package_type', DatasheetQualityFilter, 'created_at')
+    list_filter = (
+        'category',
+        'manufacturer',
+        'lifecycle_status',
+        'package_type',
+        DatasheetQualityFilter,
+        'created_at',
+    )
     list_editable = ('lifecycle_status', 'price', 'stock')
     search_fields = ('name', 'description', 'part_number', 'package_type', 'datasheet_url')
     readonly_fields = ('created_at', 'updated_at', 'data_quality_summary')
@@ -66,7 +83,19 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {'fields': ('name', 'slug', 'category', 'description', 'image')}),
         ('Цена и наличие', {'fields': ('price', 'stock')}),
-        ('Технические данные', {'fields': ('part_number', 'manufacturer', 'lifecycle_status', 'package_type', 'datasheet_url', 'parameters')}),
+        (
+            'Технические данные',
+            {
+                'fields': (
+                    'part_number',
+                    'manufacturer',
+                    'lifecycle_status',
+                    'package_type',
+                    'datasheet_url',
+                    'parameters',
+                )
+            },
+        ),
         ('Контроль качества данных', {'fields': ('data_quality_summary',), 'classes': ('collapse',)}),
         ('Метаданные', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
@@ -178,6 +207,7 @@ class ProductAdmin(admin.ModelAdmin):
     def mark_lifecycle_active(self, request, queryset):
         updated = queryset.update(lifecycle_status='active')
         self.message_user(request, f'Lifecycle Active установлен для {updated} товаров.')
+
 
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):

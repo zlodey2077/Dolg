@@ -164,6 +164,14 @@
 {% block content %}
 <div class="mlt-wrap">
     <div class="mlt-card">
+        <h2>Операционный контроль <small>ML jobs + dataset quality</small></h2>
+        <p class="mlt-meta">
+            <a href="{% url 'hello:staff_ops_dashboard' %}" style="color:#bff4ff;font-weight:700;">Ops dashboard</a>
+            · <a href="{% url 'hello:ml_dataset_quality_page' %}" style="color:#bff4ff;font-weight:700;">Dataset quality</a>
+            · <a href="/admin/Dolg_APP/mljob/" style="color:#bff4ff;font-weight:700;">MLJob admin</a>
+        </p>
+    </div>
+    <div class="mlt-card">
         <h2>🧠 Тренировка нейронки DOLG <small>tiny PyTorch · только для staff</small></h2>
         <p class="mlt-meta">
             Запускает <code>train_tiny_model</code> в фоне.

@@ -5,7 +5,6 @@ from django.test import TestCase, override_settings
 
 from Dolg_APP.models import Comment, SchematicProject
 
-
 User = get_user_model()
 
 
@@ -67,10 +66,12 @@ class AccessHardeningTests(TestCase):
         self.client.force_login(self.bob)
         response = self.client.post(
             '/api/sim/monte_carlo/',
-            data=json.dumps({
-                'scheme_data': {'components': [{'id': 'R1', 'type': 'resistor'}], 'connections': []},
-                'iterations': 10,
-            }),
+            data=json.dumps(
+                {
+                    'scheme_data': {'components': [{'id': 'R1', 'type': 'resistor'}], 'connections': []},
+                    'iterations': 10,
+                }
+            ),
             content_type='application/json',
         )
 

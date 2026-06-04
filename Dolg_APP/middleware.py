@@ -25,7 +25,7 @@ def _parse_consent(request):
     try:
         data = json.loads(raw)
         return data if isinstance(data, dict) else {}
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return {}
 
 
@@ -98,11 +98,13 @@ class AuditContextMiddleware:
         from Dolg_APP.middleware import get_current_request
         AuditLog.log(actor=user, action='x', request=get_current_request())
     """
+
     _thread_local = None
 
     def __init__(self, get_response):
         self.get_response = get_response
         import threading
+
         AuditContextMiddleware._thread_local = threading.local()
 
     def __call__(self, request):
@@ -171,11 +173,16 @@ class Require2FAMiddleware:
     # - static/media для CSS+JS на странице verify
     # - healthz для liveness-probe
     EXEMPT_PREFIXES = (
-        '/accounts/login/', '/accounts/logout/', '/accounts/password',
+        '/accounts/login/',
+        '/accounts/logout/',
+        '/accounts/password',
         '/2fa/verify/',
-        '/admin/login/', '/admin/logout/',
-        '/static/', '/media/',
-        '/healthz/', '/readyz/',
+        '/admin/login/',
+        '/admin/logout/',
+        '/static/',
+        '/media/',
+        '/healthz/',
+        '/readyz/',
     )
 
     def __init__(self, get_response):
@@ -190,9 +197,11 @@ class Require2FAMiddleware:
         if not getattr(request.user, 'is_verified', lambda: False)():
             # Импортируем lazily — circular: middleware → models → middleware
             from .two_factor import user_has_confirmed_totp
+
             if user_has_confirmed_totp(request.user):
                 # Сохраняем целевой URL чтобы вернуть после успешного verify
                 from django.shortcuts import redirect
+
                 request.session['_dolg_pending_2fa_next'] = request.get_full_path()
                 return redirect('hello:two_factor_verify')
         return self.get_response(request)

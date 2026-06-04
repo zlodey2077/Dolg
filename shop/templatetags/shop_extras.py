@@ -10,6 +10,7 @@
 8 шаблонов с `{% load shop_extras %}` продолжают работать без изменений —
 для них API остался тем же.
 """
+
 from django import template
 
 from shop import card_helpers
@@ -49,7 +50,7 @@ register.filter('product_reviews')(card_helpers.product_reviews)
 def catalog_filter_url(context, base_url, key, value):
     request = context.get('request')
     params = getattr(request, 'GET', {}) if request else {}
-    return f"{base_url}{catalog_filters.querystring_with(params, key, value, leading_question=True)}"
+    return f'{base_url}{catalog_filters.querystring_with(params, key, value, leading_question=True)}'
 
 
 @register.simple_tag(takes_context=True)

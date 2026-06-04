@@ -15,6 +15,7 @@ Pipeline:
     python manage.py import_product_photos --keep-source    # не удалять файлы из incoming
     python manage.py import_product_photos --dry-run        # показать что будет сделано без записи
 """
+
 import shutil
 from pathlib import Path
 
@@ -42,7 +43,7 @@ class Command(BaseCommand):
             '--slug',
             action='append',
             default=[],
-            help='Импорт только этих slug\'ов (можно повторить или через запятую).',
+            help="Импорт только этих slug'ов (можно повторить или через запятую).",
         )
         parser.add_argument(
             '--keep-source',
@@ -60,10 +61,12 @@ class Command(BaseCommand):
         incoming = media_root / INCOMING_DIR
         if not incoming.exists():
             incoming.mkdir(parents=True, exist_ok=True)
-            self.stdout.write(self.style.WARNING(
-                f'Папка {incoming} создана. Положите туда файлы вида <slug>.png/.jpg/.jpeg/.webp '
-                f'и перезапустите команду.'
-            ))
+            self.stdout.write(
+                self.style.WARNING(
+                    f'Папка {incoming} создана. Положите туда файлы вида <slug>.png/.jpg/.jpeg/.webp '
+                    f'и перезапустите команду.'
+                )
+            )
             return
 
         # Парсим --slug whitelist
@@ -78,9 +81,7 @@ class Command(BaseCommand):
                 continue
             ext = path.suffix.lower()
             if ext not in LOCAL_ASSET_SUFFIXES:
-                self.stdout.write(self.style.WARNING(
-                    f'  пропуск (формат не поддерживается): {path.name}'
-                ))
+                self.stdout.write(self.style.WARNING(f'  пропуск (формат не поддерживается): {path.name}'))
                 continue
             slug = path.stem.lower().strip()
             if slug_filter and slug not in slug_filter:
@@ -115,14 +116,16 @@ class Command(BaseCommand):
                 product = Product.objects.get(slug=slug)
             except Product.DoesNotExist:
                 skipped_no_product += 1
-                self.stdout.write(self.style.WARNING(
-                    f'  ⚠ Product со slug "{slug}" не найден — пропуск {source_path.name}'
-                ))
+                self.stdout.write(
+                    self.style.WARNING(f'  ⚠ Product со slug "{slug}" не найден — пропуск {source_path.name}')
+                )
                 continue
 
             dest = media_root / 'products' / f'{slug}{chosen_ext}'
             action = 'DRY-RUN' if dry_run else 'импорт'
-            self.stdout.write(f'  {action}: {source_path.name} → {dest.relative_to(media_root)} (товар: {product.name[:50]!r})')
+            self.stdout.write(
+                f'  {action}: {source_path.name} → {dest.relative_to(media_root)} (товар: {product.name[:50]!r})'
+            )
 
             if dry_run:
                 continue
@@ -137,13 +140,9 @@ class Command(BaseCommand):
             changed = apply_product_image_policy(product, force=False)
             if changed:
                 imported += 1
-                self.stdout.write(self.style.SUCCESS(
-                    f'    ✓ product.image = {product.image.name}'
-                ))
+                self.stdout.write(self.style.SUCCESS(f'    ✓ product.image = {product.image.name}'))
             else:
-                self.stdout.write(
-                    '    (товар уже использует этот файл — image не менялся)'
-                )
+                self.stdout.write('    (товар уже использует этот файл — image не менялся)')
 
             if not keep_source:
                 source_path.unlink()
@@ -152,17 +151,23 @@ class Command(BaseCommand):
             # игнорируем «лишние»: один товар = одно изображение.
             for extra_ext, extra_path in items[1:]:
                 if keep_source:
-                    self.stdout.write(self.style.WARNING(
-                        f'    ⚠ оставлен дубль: {extra_path.name} (приоритет уже у {chosen_ext})'
-                    ))
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f'    ⚠ оставлен дубль: {extra_path.name} (приоритет уже у {chosen_ext})'
+                        )
+                    )
                 else:
                     extra_path.unlink()
 
         if dry_run:
-            self.stdout.write(self.style.SUCCESS(
-                f'\nDRY-RUN. План: {len(by_slug)} файлов к импорту, {skipped_no_product} без товара.'
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'\nDRY-RUN. План: {len(by_slug)} файлов к импорту, {skipped_no_product} без товара.'
+                )
+            )
         else:
-            self.stdout.write(self.style.SUCCESS(
-                f'\nГотово: импортировано {imported}, пропущено {skipped_no_product} без товара.'
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'\nГотово: импортировано {imported}, пропущено {skipped_no_product} без товара.'
+                )
+            )

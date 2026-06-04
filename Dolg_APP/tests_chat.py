@@ -8,6 +8,7 @@
 - Announcement: показывается в сайдбаре, expires
 - Polling endpoints
 """
+
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -32,9 +33,7 @@ User = get_user_model()
 
 
 def _make_user(username, verified=True):
-    user = User.objects.create_user(
-        username=username, email=f'{username}@x.test', password='Pass-123456'
-    )
+    user = User.objects.create_user(username=username, email=f'{username}@x.test', password='Pass-123456')
     profile, _ = UserProfile.objects.get_or_create(user=user)
     if verified:
         profile.email_verified = True
@@ -46,7 +45,10 @@ def _make_org_with_owner(slug='c-org', owner=None):
     if owner is None:
         owner = _make_user('owner_' + slug.replace('-', '_'))
     org = Organization.objects.create(
-        name=slug.title(), slug=slug, billing_email='b@x.test', owner=owner,
+        name=slug.title(),
+        slug=slug,
+        billing_email='b@x.test',
+        owner=owner,
     )
     OrganizationMember.objects.create(organization=org, user=owner, role='owner')
     return org, owner
@@ -99,18 +101,19 @@ class ChatPermissionsTests(TestCase):
         self.assertNotIn(b'name="body"', r.content.split(b'<form')[1] if b'<form' in r.content else b'')
 
     def test_guest_cannot_post(self):
-        r = self.client.post(reverse('hello:chat_topic_create'), {
-            'title': 't', 'body': 'b', 'category': 'general'
-        })
+        r = self.client.post(
+            reverse('hello:chat_topic_create'), {'title': 't', 'body': 'b', 'category': 'general'}
+        )
         # @login_required → redirect to login
         self.assertEqual(r.status_code, 302)
         self.assertIn('/login', r.url.lower())
 
     def test_free_user_can_create_topic(self):
         self.client.force_login(self.free_user)
-        r = self.client.post(reverse('hello:chat_topic_create'), {
-            'title': 'My question', 'body': 'help me', 'category': 'simulation'
-        })
+        r = self.client.post(
+            reverse('hello:chat_topic_create'),
+            {'title': 'My question', 'body': 'help me', 'category': 'simulation'},
+        )
         self.assertEqual(r.status_code, 302)
         t = ChatTopic.objects.get(title='My question')
         self.assertEqual(t.author, self.free_user)
@@ -134,6 +137,7 @@ class ChatPermissionsTests(TestCase):
     def test_free_user_emoji_restricted_to_thumbs(self):
         self.client.force_login(self.free_user)
         import json as _j
+
         r = self.client.post(
             reverse('hello:chat_reaction_toggle'),
             data=_j.dumps({'target_type': 'topic', 'target_id': self.topic.id, 'emoji': '🎉'}),
@@ -145,13 +149,16 @@ class ChatPermissionsTests(TestCase):
     def test_pro_user_can_use_custom_emoji(self):
         self.client.force_login(self.pro_user)
         import json as _j
+
         r = self.client.post(
             reverse('hello:chat_reaction_toggle'),
             data=_j.dumps({'target_type': 'topic', 'target_id': self.topic.id, 'emoji': '🚀'}),
             content_type='application/json',
         )
         self.assertEqual(r.status_code, 200)
-        self.assertTrue(ChatReaction.objects.filter(target_topic=self.topic, emoji='🚀', user=self.pro_user).exists())
+        self.assertTrue(
+            ChatReaction.objects.filter(target_topic=self.topic, emoji='🚀', user=self.pro_user).exists()
+        )
 
 
 # ============================================================
@@ -169,9 +176,14 @@ class ChatRateLimitTests(TestCase):
         usage.chat_topics_count = 5
         usage.save(update_fields=['chat_topics_count'])
 
-        self.client.post(reverse('hello:chat_topic_create'), {
-            'title': 't', 'body': 'b', 'category': 'general',
-        })
+        self.client.post(
+            reverse('hello:chat_topic_create'),
+            {
+                'title': 't',
+                'body': 'b',
+                'category': 'general',
+            },
+        )
         # Должен быть redirect с error (или 400 для AJAX). Топик НЕ создан.
         self.assertEqual(ChatTopic.objects.filter(author=self.user).count(), 0)
 
@@ -222,17 +234,25 @@ class OrgConversationTests(TestCase):
     def test_only_admin_can_create_conversation(self):
         # Engineer → 403
         self.client.force_login(self.engineer)
-        r = self.client.post(reverse('hello:org_conversation_create', args=[self.org.slug]), {
-            'title': 'Sprint planning', 'description': '',
-        })
+        r = self.client.post(
+            reverse('hello:org_conversation_create', args=[self.org.slug]),
+            {
+                'title': 'Sprint planning',
+                'description': '',
+            },
+        )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(self.org.conversations.count(), 0)
 
         # Owner → ok
         self.client.force_login(self.owner)
-        r = self.client.post(reverse('hello:org_conversation_create', args=[self.org.slug]), {
-            'title': 'Sprint planning', 'description': '',
-        })
+        r = self.client.post(
+            reverse('hello:org_conversation_create', args=[self.org.slug]),
+            {
+                'title': 'Sprint planning',
+                'description': '',
+            },
+        )
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.org.conversations.count(), 1)
 
@@ -247,9 +267,10 @@ class OrgConversationTests(TestCase):
     def test_engineer_can_post_message(self):
         conv = OrgConversation.objects.create(organization=self.org, title='Sprint', created_by=self.owner)
         self.client.force_login(self.engineer)
-        r = self.client.post(reverse('hello:org_conversation_message_create',
-                                     args=[self.org.slug, conv.id]),
-                             {'body': 'Hello team **bold**'})
+        r = self.client.post(
+            reverse('hello:org_conversation_message_create', args=[self.org.slug, conv.id]),
+            {'body': 'Hello team **bold**'},
+        )
         self.assertEqual(r.status_code, 302)
         msgs = list(conv.messages.all())
         self.assertEqual(len(msgs), 1)
@@ -257,12 +278,15 @@ class OrgConversationTests(TestCase):
 
     def test_archived_conversation_rejects_new_messages(self):
         conv = OrgConversation.objects.create(
-            organization=self.org, title='Old', created_by=self.owner, is_archived=True,
+            organization=self.org,
+            title='Old',
+            created_by=self.owner,
+            is_archived=True,
         )
         self.client.force_login(self.engineer)
-        r = self.client.post(reverse('hello:org_conversation_message_create',
-                                     args=[self.org.slug, conv.id]),
-                             {'body': 'no'})
+        r = self.client.post(
+            reverse('hello:org_conversation_message_create', args=[self.org.slug, conv.id]), {'body': 'no'}
+        )
         # 404 because filter() excludes is_archived=True in view get_object_or_404
         self.assertEqual(r.status_code, 404)
         self.assertEqual(conv.messages.count(), 0)
@@ -270,8 +294,7 @@ class OrgConversationTests(TestCase):
     def test_admin_can_archive(self):
         conv = OrgConversation.objects.create(organization=self.org, title='Sprint', created_by=self.owner)
         self.client.force_login(self.owner)
-        r = self.client.post(reverse('hello:org_conversation_archive',
-                                     args=[self.org.slug, conv.id]))
+        r = self.client.post(reverse('hello:org_conversation_archive', args=[self.org.slug, conv.id]))
         self.assertEqual(r.status_code, 302)
         conv.refresh_from_db()
         self.assertTrue(conv.is_archived)
@@ -279,9 +302,10 @@ class OrgConversationTests(TestCase):
     def test_mentions_parsed(self):
         conv = OrgConversation.objects.create(organization=self.org, title='M', created_by=self.owner)
         self.client.force_login(self.engineer)
-        r = self.client.post(reverse('hello:org_conversation_message_create',
-                                     args=[self.org.slug, conv.id]),
-                             {'body': f'Hi @{self.owner.username} please review'})
+        r = self.client.post(
+            reverse('hello:org_conversation_message_create', args=[self.org.slug, conv.id]),
+            {'body': f'Hi @{self.owner.username} please review'},
+        )
         self.assertEqual(r.status_code, 302)
         msg = conv.messages.first()
         self.assertIn(self.owner.id, msg.mentions)
@@ -304,7 +328,8 @@ class AnnouncementTests(TestCase):
 
     def test_expired_announcement_not_in_sidebar(self):
         Announcement.objects.create(
-            title='Old news', body='b',
+            title='Old news',
+            body='b',
             expires_at=timezone.now() - timedelta(days=1),
         )
         r = self.client.get(reverse('hello:chat_list'))

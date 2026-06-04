@@ -5,6 +5,7 @@
 
 Локально (DEBUG=True) — команда тихо проходит, чтобы dev-цикл не страдал.
 """
+
 import os
 import sys
 
@@ -17,9 +18,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         if settings.DEBUG:
-            self.stdout.write(self.style.NOTICE(
-                'DEBUG=True — production assertions skipped (dev mode).'
-            ))
+            self.stdout.write(self.style.NOTICE('DEBUG=True — production assertions skipped (dev mode).'))
             return
 
         errors = []
@@ -29,8 +28,8 @@ class Command(BaseCommand):
         if settings.SECRET_KEY == default_key:
             errors.append(
                 'SECRET_KEY использует дефолт. Сгенерируйте свой:\n'
-                "   python -c \"from django.core.management.utils "
-                "import get_random_secret_key; print(get_random_secret_key())\""
+                '   python -c "from django.core.management.utils '
+                'import get_random_secret_key; print(get_random_secret_key())"'
             )
 
         # 2. ALLOWED_HOSTS — не пустой
@@ -48,8 +47,7 @@ class Command(BaseCommand):
         # 4. SECRET_KEY — длина (Django generates 50 chars by default)
         if len(settings.SECRET_KEY) < 32:
             errors.append(
-                f'SECRET_KEY всего {len(settings.SECRET_KEY)} символов — слишком короткий. '
-                'Должен быть ≥ 32.'
+                f'SECRET_KEY всего {len(settings.SECRET_KEY)} символов — слишком короткий. Должен быть ≥ 32.'
             )
 
         # 5. Security headers активны (мы их сами проставляем в settings.py)
@@ -72,20 +70,24 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('⚠ ' + w))
 
         if errors:
-            self.stdout.write(self.style.ERROR(
-                f'\n❌ Production-config непригоден ({len(errors)} ошибок):\n'
-            ))
+            self.stdout.write(
+                self.style.ERROR(f'\n❌ Production-config непригоден ({len(errors)} ошибок):\n')
+            )
             for i, err in enumerate(errors, 1):
                 self.stdout.write(self.style.ERROR(f' {i}. {err}\n'))
-            self.stdout.write(self.style.ERROR(
-                '\nИсправьте через переменные окружения / .env и попробуйте снова.\n'
-                'Если нужно ПРИНУДИТЕЛЬНО проигнорировать (НЕ в проде!) — установите '
-                'SKIP_PROD_CHECKS=1.\n'
-            ))
+            self.stdout.write(
+                self.style.ERROR(
+                    '\nИсправьте через переменные окружения / .env и попробуйте снова.\n'
+                    'Если нужно ПРИНУДИТЕЛЬНО проигнорировать (НЕ в проде!) — установите '
+                    'SKIP_PROD_CHECKS=1.\n'
+                )
+            )
             if os.getenv('SKIP_PROD_CHECKS') == '1':
-                self.stdout.write(self.style.WARNING(
-                    'SKIP_PROD_CHECKS=1 — нарушения проигнорированы. На свой страх и риск.'
-                ))
+                self.stdout.write(
+                    self.style.WARNING(
+                        'SKIP_PROD_CHECKS=1 — нарушения проигнорированы. На свой страх и риск.'
+                    )
+                )
                 return
             sys.exit(1)
 

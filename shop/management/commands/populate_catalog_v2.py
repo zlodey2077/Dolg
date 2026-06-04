@@ -21,10 +21,10 @@ from django.utils.text import slugify
 
 from shop.models import Category, Product
 
-
 # ============================================================================
 # Helpers
 # ============================================================================
+
 
 def _make_slug(name):
     """Slug на латинице с фоллбэком на slugify для русских названий."""
@@ -65,6 +65,7 @@ def _format_capacitance(picofarad):
 # Item lists
 # ============================================================================
 
+
 def resistor_items(cats):
     """E12 × 3 корпуса × 2 серии = ~72 резистора. Берём подмножество E12
     (12 значений × 3 декады × 2 корпуса) = ~72."""
@@ -81,24 +82,26 @@ def resistor_items(cats):
             ohm = int(v * multi)
             for pkg, mfr, prefix, price, stock in packages:
                 code = f'{prefix}-{ohm}-1%'
-                items.append({
-                    'name': f'{mfr.title()} {code}',
-                    'category': cats['resistors'],
-                    'part_number': code,
-                    'manufacturer': mfr,
-                    'description': f'Резистор {_format_resistance(ohm)}, 1%, {pkg}. Серия для массового применения.',
-                    'price': price,
-                    'stock': stock,
-                    'lifecycle_status': 'active',
-                    'package_type': pkg,
-                    'parameters': {
-                        'resistance': _format_resistance(ohm),
-                        'tolerance': '1%',
-                        'power': '0.1 Вт' if 'SMD' in pkg else '0.25 Вт',
-                        'mounting': 'SMD' if 'SMD' in pkg else 'THT',
-                        'catalog_version': 'v2',
-                    },
-                })
+                items.append(
+                    {
+                        'name': f'{mfr.title()} {code}',
+                        'category': cats['resistors'],
+                        'part_number': code,
+                        'manufacturer': mfr,
+                        'description': f'Резистор {_format_resistance(ohm)}, 1%, {pkg}. Серия для массового применения.',
+                        'price': price,
+                        'stock': stock,
+                        'lifecycle_status': 'active',
+                        'package_type': pkg,
+                        'parameters': {
+                            'resistance': _format_resistance(ohm),
+                            'tolerance': '1%',
+                            'power': '0.1 Вт' if 'SMD' in pkg else '0.25 Вт',
+                            'mounting': 'SMD' if 'SMD' in pkg else 'THT',
+                            'catalog_version': 'v2',
+                        },
+                    }
+                )
     return items
 
 
@@ -106,9 +109,15 @@ def capacitor_items(cats):
     items = []
     # Керамика SMD MLCC (X7R) — основной номиналы
     ceramics = [
-        (10, '10 пФ'), (22, '22 пФ'), (100, '100 пФ'), (470, '470 пФ'),
-        (1_000, '1 нФ'), (10_000, '10 нФ'), (100_000, '100 нФ'),
-        (1_000_000, '1 мкФ'), (10_000_000, '10 мкФ'),
+        (10, '10 пФ'),
+        (22, '22 пФ'),
+        (100, '100 пФ'),
+        (470, '470 пФ'),
+        (1_000, '1 нФ'),
+        (10_000, '10 нФ'),
+        (100_000, '100 нФ'),
+        (1_000_000, '1 мкФ'),
+        (10_000_000, '10 мкФ'),
     ]
     for pf, label in ceramics:
         for pkg, mfr, price, stock in [
@@ -116,39 +125,63 @@ def capacitor_items(cats):
             ('SMD 0805', 'kemet', Decimal('4.50'), 5000),
         ]:
             code = f'C{pkg.split()[-1]}-{label.replace(" ", "")}-X7R'
-            items.append({
-                'name': f'{mfr.title()} {code}',
-                'category': cats['capacitors'],
-                'part_number': code,
-                'manufacturer': mfr,
-                'description': f'Керамический конденсатор MLCC {label}, 50 В, X7R, ±10%, {pkg}.',
-                'price': price,
-                'stock': stock,
-                'lifecycle_status': 'active',
-                'package_type': pkg,
-                'parameters': {'capacitance': label, 'voltage': '50 В', 'dielectric': 'X7R',
-                               'tolerance': '±10%', 'mounting': 'SMD', 'catalog_version': 'v2'},
-            })
+            items.append(
+                {
+                    'name': f'{mfr.title()} {code}',
+                    'category': cats['capacitors'],
+                    'part_number': code,
+                    'manufacturer': mfr,
+                    'description': f'Керамический конденсатор MLCC {label}, 50 В, X7R, ±10%, {pkg}.',
+                    'price': price,
+                    'stock': stock,
+                    'lifecycle_status': 'active',
+                    'package_type': pkg,
+                    'parameters': {
+                        'capacitance': label,
+                        'voltage': '50 В',
+                        'dielectric': 'X7R',
+                        'tolerance': '±10%',
+                        'mounting': 'SMD',
+                        'catalog_version': 'v2',
+                    },
+                }
+            )
     # Электролиты THT
     electrolytics = [
-        (1, 50), (4.7, 50), (10, 50), (22, 50), (47, 35), (100, 35),
-        (220, 25), (470, 25), (1000, 16), (2200, 10), (4700, 6.3),
+        (1, 50),
+        (4.7, 50),
+        (10, 50),
+        (22, 50),
+        (47, 35),
+        (100, 35),
+        (220, 25),
+        (470, 25),
+        (1000, 16),
+        (2200, 10),
+        (4700, 6.3),
     ]
     for cap_uf, voltage in electrolytics:
         code = f'E-{cap_uf}uF-{voltage}V'
-        items.append({
-            'name': f'Nichicon UVR {cap_uf}мкФ/{voltage}В',
-            'category': cats['capacitors'],
-            'part_number': code,
-            'manufacturer': 'nichicon',
-            'description': f'Электролитический конденсатор {cap_uf} мкФ, {voltage} В, радиальный, 105°C.',
-            'price': Decimal('3.50') + Decimal(str(cap_uf)) * Decimal('0.05'),
-            'stock': 1500,
-            'lifecycle_status': 'active',
-            'package_type': 'THT radial',
-            'parameters': {'capacitance': f'{cap_uf} мкФ', 'voltage': f'{voltage} В',
-                           'temp_max': '105°C', 'mounting': 'THT', 'catalog_version': 'v2'},
-        })
+        items.append(
+            {
+                'name': f'Nichicon UVR {cap_uf}мкФ/{voltage}В',
+                'category': cats['capacitors'],
+                'part_number': code,
+                'manufacturer': 'nichicon',
+                'description': f'Электролитический конденсатор {cap_uf} мкФ, {voltage} В, радиальный, 105°C.',
+                'price': Decimal('3.50') + Decimal(str(cap_uf)) * Decimal('0.05'),
+                'stock': 1500,
+                'lifecycle_status': 'active',
+                'package_type': 'THT radial',
+                'parameters': {
+                    'capacitance': f'{cap_uf} мкФ',
+                    'voltage': f'{voltage} В',
+                    'temp_max': '105°C',
+                    'mounting': 'THT',
+                    'catalog_version': 'v2',
+                },
+            }
+        )
     return items
 
 
@@ -180,10 +213,15 @@ def diode_items(cats):
 
 def _diode_dict(pn, mfr, descr, price, stock, cats):
     return {
-        'name': f'{mfr.title()} {pn}', 'category': cats['diodes'],
-        'part_number': pn, 'manufacturer': mfr if mfr in {'onsemi','infineon','vishay','st','nxp'} else 'other',
-        'description': descr, 'price': price, 'stock': stock,
-        'lifecycle_status': 'active', 'package_type': pn.split('-')[-1] if '-' in pn else 'DO-35',
+        'name': f'{mfr.title()} {pn}',
+        'category': cats['diodes'],
+        'part_number': pn,
+        'manufacturer': mfr if mfr in {'onsemi', 'infineon', 'vishay', 'st', 'nxp'} else 'other',
+        'description': descr,
+        'price': price,
+        'stock': stock,
+        'lifecycle_status': 'active',
+        'package_type': pn.split('-')[-1] if '-' in pn else 'DO-35',
         'parameters': {'catalog_version': 'v2'},
     }
 
@@ -206,14 +244,21 @@ def transistor_items(cats):
         ('BSS138', 'N-MOSFET SOT-23, 60 В, для level-shift.', Decimal('5.50')),
         ('TIP120', 'NPN Darlington, 60 В, 5 А, TO-220.', Decimal('25.00')),
     ]
-    return [{
-        'name': f'OnSemi {pn}', 'category': cats['transistors'],
-        'part_number': pn, 'manufacturer': 'onsemi',
-        'description': descr, 'price': price, 'stock': 1500,
-        'lifecycle_status': 'active',
-        'package_type': pn.rsplit('-', 1)[-1] if '-' in pn and pn[-3:].startswith('TO') else 'TO-92',
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': f'OnSemi {pn}',
+            'category': cats['transistors'],
+            'part_number': pn,
+            'manufacturer': 'onsemi',
+            'description': descr,
+            'price': price,
+            'stock': 1500,
+            'lifecycle_status': 'active',
+            'package_type': pn.rsplit('-', 1)[-1] if '-' in pn and pn[-3:].startswith('TO') else 'TO-92',
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 def ic_items(cats):
@@ -246,14 +291,21 @@ def ic_items(cats):
         ('DS18B20', 'other', 'Цифровой датчик температуры 1-Wire, TO-92.', Decimal('120.00')),
         ('AT24C32', 'other', 'I²C EEPROM 32 Кбит, DIP-8.', Decimal('40.00')),
     ]
-    return [{
-        'name': f'{mfr.upper() if mfr in {"ti","st","nxp"} else "Generic"} {pn}',
-        'category': cats['ics'], 'part_number': pn,
-        'manufacturer': mfr, 'description': descr,
-        'price': price, 'stock': 800, 'lifecycle_status': 'active',
-        'package_type': 'DIP-8' if 'DIP-8' in descr else ('TO-220' if 'TO-220' in descr else 'DIP'),
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, mfr, descr, price in rows]
+    return [
+        {
+            'name': f'{mfr.upper() if mfr in {"ti", "st", "nxp"} else "Generic"} {pn}',
+            'category': cats['ics'],
+            'part_number': pn,
+            'manufacturer': mfr,
+            'description': descr,
+            'price': price,
+            'stock': 800,
+            'lifecycle_status': 'active',
+            'package_type': 'DIP-8' if 'DIP-8' in descr else ('TO-220' if 'TO-220' in descr else 'DIP'),
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, mfr, descr, price in rows
+    ]
 
 
 def inductor_items(cats):
@@ -267,13 +319,21 @@ def inductor_items(cats):
         ('AXIAL-1mH', '1 мГн, 200 мА, осевой выводной.', Decimal('20.00')),
         ('TOR-220uH', 'Тороидальный 220 мкГн, 3 А.', Decimal('45.00')),
     ]
-    return [{
-        'name': f'Würth {pn}', 'category': cats['inductors'], 'part_number': pn,
-        'manufacturer': 'wurth', 'description': descr,
-        'price': price, 'stock': 800, 'lifecycle_status': 'active',
-        'package_type': pn.split('-')[0],
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': f'Würth {pn}',
+            'category': cats['inductors'],
+            'part_number': pn,
+            'manufacturer': 'wurth',
+            'description': descr,
+            'price': price,
+            'stock': 800,
+            'lifecycle_status': 'active',
+            'package_type': pn.split('-')[0],
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 def connector_items(cats):
@@ -295,13 +355,21 @@ def connector_items(cats):
         ('SCREW-TERMINAL-2P', 'Винтовая клемма 2-pin, шаг 5.08 мм.', Decimal('18.00')),
         ('SCREW-TERMINAL-3P', 'Винтовая клемма 3-pin, шаг 5.08 мм.', Decimal('25.00')),
     ]
-    return [{
-        'name': pn.replace('-', ' '), 'category': cats['connectors'],
-        'part_number': pn, 'manufacturer': 'other',
-        'description': descr, 'price': price, 'stock': 1200, 'lifecycle_status': 'active',
-        'package_type': 'THT' if 'THT' in pn else 'SMD',
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': pn.replace('-', ' '),
+            'category': cats['connectors'],
+            'part_number': pn,
+            'manufacturer': 'other',
+            'description': descr,
+            'price': price,
+            'stock': 1200,
+            'lifecycle_status': 'active',
+            'package_type': 'THT' if 'THT' in pn else 'SMD',
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 def relay_items(cats):
@@ -313,13 +381,21 @@ def relay_items(cats):
         ('G5LE-1-12V', 'Реле Omron G5LE 12 В, 10 А.', Decimal('180.00')),
         ('SSR-25DA', 'Твёрдотельное реле DC-AC 25 А.', Decimal('350.00')),
     ]
-    return [{
-        'name': f'Реле {pn}', 'category': cats['relays'],
-        'part_number': pn, 'manufacturer': 'other',
-        'description': descr, 'price': price, 'stock': 400, 'lifecycle_status': 'active',
-        'package_type': 'THT',
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': f'Реле {pn}',
+            'category': cats['relays'],
+            'part_number': pn,
+            'manufacturer': 'other',
+            'description': descr,
+            'price': price,
+            'stock': 400,
+            'lifecycle_status': 'active',
+            'package_type': 'THT',
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 def module_items(cats):
@@ -363,13 +439,21 @@ def module_items(cats):
         ('MQ-2', 'Датчик газа (дым / LPG / CO).', Decimal('180.00')),
         ('MQ-135', 'Датчик качества воздуха.', Decimal('220.00')),
     ]
-    return [{
-        'name': pn.replace('-', ' '), 'category': cats['modules'],
-        'part_number': pn, 'manufacturer': 'other',
-        'description': descr, 'price': price, 'stock': 200, 'lifecycle_status': 'active',
-        'package_type': 'Module',
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': pn.replace('-', ' '),
+            'category': cats['modules'],
+            'part_number': pn,
+            'manufacturer': 'other',
+            'description': descr,
+            'price': price,
+            'stock': 200,
+            'lifecycle_status': 'active',
+            'package_type': 'Module',
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 def tool_items(cats):
@@ -400,13 +484,21 @@ def tool_items(cats):
         ('HELPING-HANDS', 'Подставка «третья рука» с лупой и LED.', Decimal('1500.00')),
         ('PCB-VICE', 'Тиски для печатных плат с поворотным зажимом.', Decimal('2200.00')),
     ]
-    return [{
-        'name': pn.replace('-', ' '), 'category': cats['tools'],
-        'part_number': pn, 'manufacturer': 'other',
-        'description': descr, 'price': price, 'stock': 80, 'lifecycle_status': 'active',
-        'package_type': 'Tool',
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': pn.replace('-', ' '),
+            'category': cats['tools'],
+            'part_number': pn,
+            'manufacturer': 'other',
+            'description': descr,
+            'price': price,
+            'stock': 80,
+            'lifecycle_status': 'active',
+            'package_type': 'Tool',
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 def consumable_items(cats):
@@ -442,28 +534,41 @@ def consumable_items(cats):
         ('PCB-CLEANER-200ML', 'Очиститель плат после пайки, 200 мл.', Decimal('580.00')),
         ('SOLDER-TIP-CLEANER', 'Очиститель жала металлическая стружка.', Decimal('320.00')),
     ]
-    return [{
-        'name': pn.replace('-', ' '), 'category': cats['consumables'],
-        'part_number': pn, 'manufacturer': 'other',
-        'description': descr, 'price': price, 'stock': 500, 'lifecycle_status': 'active',
-        'package_type': 'Consumable',
-        'parameters': {'catalog_version': 'v2'},
-    } for pn, descr, price in rows]
+    return [
+        {
+            'name': pn.replace('-', ' '),
+            'category': cats['consumables'],
+            'part_number': pn,
+            'manufacturer': 'other',
+            'description': descr,
+            'price': price,
+            'stock': 500,
+            'lifecycle_status': 'active',
+            'package_type': 'Consumable',
+            'parameters': {'catalog_version': 'v2'},
+        }
+        for pn, descr, price in rows
+    ]
 
 
 # ============================================================================
 # Command
 # ============================================================================
 
+
 class Command(BaseCommand):
-    help = ('Populate catalog with ~300 v2 products: extended radio components, '
-            'Arduino/ESP/RPi modules, professional tools and consumables.')
+    help = (
+        'Populate catalog with ~300 v2 products: extended radio components, '
+        'Arduino/ESP/RPi modules, professional tools and consumables.'
+    )
 
     def add_arguments(self, parser):
-        parser.add_argument('--clear', action='store_true',
-                            help='Remove existing v2 products (parameters.catalog_version=v2) before re-adding.')
-        parser.add_argument('--dry-run', action='store_true',
-                            help='Show summary without writing to DB.')
+        parser.add_argument(
+            '--clear',
+            action='store_true',
+            help='Remove existing v2 products (parameters.catalog_version=v2) before re-adding.',
+        )
+        parser.add_argument('--dry-run', action='store_true', help='Show summary without writing to DB.')
 
     def handle(self, *args, **options):
         # Resolve / create categories
@@ -496,7 +601,9 @@ class Command(BaseCommand):
             count = qs.count()
             if not options['dry_run']:
                 qs.delete()
-            self.stdout.write(self.style.WARNING(f'Removed {count} v2 products{" (dry-run)" if options["dry_run"] else ""}'))
+            self.stdout.write(
+                self.style.WARNING(f'Removed {count} v2 products{" (dry-run)" if options["dry_run"] else ""}')
+            )
 
         # Build all items
         all_items = (
@@ -514,9 +621,12 @@ class Command(BaseCommand):
         )
 
         if options['dry_run']:
-            self.stdout.write(self.style.SUCCESS(f'[dry-run] Would create/update {len(all_items)} v2 products.'))
+            self.stdout.write(
+                self.style.SUCCESS(f'[dry-run] Would create/update {len(all_items)} v2 products.')
+            )
             # Per-category breakdown
             from collections import Counter
+
             counter = Counter(item['category'].slug for item in all_items)
             for slug, n in counter.most_common():
                 self.stdout.write(f'  · {slug}: {n}')
@@ -534,7 +644,9 @@ class Command(BaseCommand):
                 else:
                     updated_count += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f'v2 catalog: {created_count} created · {updated_count} updated · '
-            f'{len(all_items)} total in 11 categories'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'v2 catalog: {created_count} created · {updated_count} updated · '
+                f'{len(all_items)} total in 11 categories'
+            )
+        )

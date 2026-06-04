@@ -16,8 +16,9 @@ from .models import Order, PaymentTransaction
 
 try:
     import stripe
+
     stripe.api_key = settings.STRIPE_SECRET_KEY
-except (ImportError, AttributeError):
+except ImportError, AttributeError:
     stripe = None  # Fallback if stripe not installed
 
 
@@ -36,7 +37,10 @@ def create_payment(request, order_id):
 
     # Check if Stripe is properly configured
     if not stripe or 'demo_mode' in settings.STRIPE_SECRET_KEY.lower():
-        messages.warning(request, '⚠️ Платежная система находится в режиме тестирования. Заказ отмечен как оплаченный без реального платежа.')
+        messages.warning(
+            request,
+            '⚠️ Платежная система находится в режиме тестирования. Заказ отмечен как оплаченный без реального платежа.',
+        )
 
         # Auto-mark as paid for demo purposes
         try:
@@ -46,9 +50,9 @@ def create_payment(request, order_id):
                 order=order,
                 amount=order.total_amount,
                 currency=settings.PAYMENT_CURRENCY,
-                description=f"Order {order.order_number} (DEMO MODE)",
-                transaction_id=f"demo_{order.id}_{timezone.now().timestamp()}",
-                status='succeeded'
+                description=f'Order {order.order_number} (DEMO MODE)',
+                transaction_id=f'demo_{order.id}_{timezone.now().timestamp()}',
+                status='succeeded',
             )
 
         payment.mark_as_succeeded(charge_id='demo_charge')
@@ -63,8 +67,8 @@ def create_payment(request, order_id):
             order=order,
             amount=order.total_amount,
             currency=settings.PAYMENT_CURRENCY,
-            description=f"Order {order.order_number}",
-            transaction_id=f"intent_{order.id}_{timezone.now().timestamp()}"
+            description=f'Order {order.order_number}',
+            transaction_id=f'intent_{order.id}_{timezone.now().timestamp()}',
         )
 
     try:
@@ -76,7 +80,7 @@ def create_payment(request, order_id):
                 'order_id': order.id,
                 'order_number': order.order_number,
             },
-            description=f"Order {order.order_number}",
+            description=f'Order {order.order_number}',
         )
 
         # Update payment transaction with Stripe intent ID
@@ -172,15 +176,14 @@ def stripe_webhook(request):
         return JsonResponse({'error': 'missing_signature_header'}, status=400)
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
+        event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
     except ValueError:
         # Invalid payload (не-JSON или corrupted)
         return JsonResponse({'error': 'invalid_payload'}, status=400)
     except stripe.error.SignatureVerificationError:
         # Подпись не совпала — возможно атака, логируем
         import logging
+
         logging.getLogger('orders.security').warning(
             'Stripe webhook signature mismatch from %s',
             request.META.get('REMOTE_ADDR', 'unknown'),
@@ -189,8 +192,10 @@ def stripe_webhook(request):
     except Exception as exc:
         # Любой другой непредвиденный сбой — логируем как ошибку (не security)
         import logging
+
         logging.getLogger('orders').exception(
-            'Stripe webhook unexpected error: %s', exc,
+            'Stripe webhook unexpected error: %s',
+            exc,
         )
         return JsonResponse({'error': 'webhook_processing_error'}, status=500)
 
@@ -207,7 +212,7 @@ def stripe_webhook(request):
                 if payment.status != 'succeeded':
                     payment.mark_as_succeeded(charge_id=intent['latest_charge'])
 
-            except (Order.DoesNotExist, PaymentTransaction.DoesNotExist):
+            except Order.DoesNotExist, PaymentTransaction.DoesNotExist:
                 pass
 
     # Handle payment_intent.payment_failed
@@ -224,7 +229,7 @@ def stripe_webhook(request):
                     error_msg = intent.get('last_payment_error', {}).get('message', 'Unknown error')
                     payment.mark_as_failed(error_msg)
 
-            except (Order.DoesNotExist, PaymentTransaction.DoesNotExist):
+            except Order.DoesNotExist, PaymentTransaction.DoesNotExist:
                 pass
 
     return JsonResponse({'status': 'success'}, status=200)

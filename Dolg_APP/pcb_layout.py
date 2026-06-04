@@ -93,12 +93,21 @@ def _footprint_size_mm(comp):
     comp_type = (comp.get('type') or '').lower()
     params = comp.get('catalog_parameters') or comp.get('parameters') or {}
     package = (
-        comp.get('package') or comp.get('footprint') or comp.get('catalog_package') or
-        comp.get('package_type') or params.get('package') or params.get('footprint') or
-        params.get('package_type') or ''
+        comp.get('package')
+        or comp.get('footprint')
+        or comp.get('catalog_package')
+        or comp.get('package_type')
+        or params.get('package')
+        or params.get('footprint')
+        or params.get('package_type')
+        or ''
     ).upper()
     body = params.get('body_mm') or comp.get('body_mm') or {}
-    if isinstance(body, dict) and (body.get('w') or body.get('width')) and (body.get('h') or body.get('height')):
+    if (
+        isinstance(body, dict)
+        and (body.get('w') or body.get('width'))
+        and (body.get('h') or body.get('height'))
+    ):
         return (float(body.get('w') or body.get('width')), float(body.get('h') or body.get('height')))
     if any(token in package for token in ('0805', '0603', '1206', '1210', '0402', 'SMD', 'CHIP')):
         if '1206' in package:
@@ -124,7 +133,8 @@ def _footprint_size_mm(comp):
         'led': (5, 5),
         'battery': (18, 12),
         'transistor': (5.2, 4.2),
-        'npn': (5.2, 4.2), 'pnp': (5.2, 4.2),
+        'npn': (5.2, 4.2),
+        'pnp': (5.2, 4.2),
         'switch': (10, 6),
         'ground': (4, 4),
         'node': (2, 2),
@@ -134,6 +144,7 @@ def _footprint_size_mm(comp):
 
 def _pin_count(package, fallback):
     import re
+
     match = re.search(r'(?:DIP|SOIC|SOP|TSSOP|SSOP|QFP|QFN|SOT)-?\s*(\d+)', package or '', re.I)
     return max(2, int(match.group(1))) if match else fallback
 
@@ -151,22 +162,34 @@ def compute_pcb_layout(scheme_data):
     scheme_data = scheme_data or {}
     board_opts = scheme_data.get('board') or {}
     margin_mm = float(board_opts.get('margin_mm') or board_opts.get('marginMm') or PCB_MARGIN_MM)
-    trace_width_mm = float(board_opts.get('trace_width_mm') or board_opts.get('traceWidthMm') or TRACE_WIDTH_MM)
-    clearance_mm = float(board_opts.get('clearance_mm') or board_opts.get('clearanceMm') or TRACE_CLEARANCE_MM)
+    trace_width_mm = float(
+        board_opts.get('trace_width_mm') or board_opts.get('traceWidthMm') or TRACE_WIDTH_MM
+    )
+    clearance_mm = float(
+        board_opts.get('clearance_mm') or board_opts.get('clearanceMm') or TRACE_CLEARANCE_MM
+    )
     grid_mm = float(board_opts.get('grid_mm') or board_opts.get('gridMm') or BOARD_GRID_MM)
-    thickness_mm = float(board_opts.get('thickness_mm') or board_opts.get('thicknessMm') or BOARD_THICKNESS_MM)
+    thickness_mm = float(
+        board_opts.get('thickness_mm') or board_opts.get('thicknessMm') or BOARD_THICKNESS_MM
+    )
     components = scheme_data.get('components', []) or []
     connections = scheme_data.get('connections', []) or []
 
     # Bbox исходной схемы в pixels — чтобы потом сдвинуть в (0,0) с margin.
     if not components:
         return {
-            'pads': [], 'traces': [], 'comps': [], 'vias': [], 'holes': [],
-            'pcb_w_mm': MIN_BOARD_MM, 'pcb_h_mm': MIN_BOARD_MM,
+            'pads': [],
+            'traces': [],
+            'comps': [],
+            'vias': [],
+            'holes': [],
+            'pcb_w_mm': MIN_BOARD_MM,
+            'pcb_h_mm': MIN_BOARD_MM,
             'thickness_mm': thickness_mm,
             'trace_width_mm': trace_width_mm,
             'clearance_mm': clearance_mm,
-            'origin_x_mm': 0, 'origin_y_mm': 0,
+            'origin_x_mm': 0,
+            'origin_y_mm': 0,
         }
 
     min_x, min_y = float('inf'), float('inf')
@@ -207,7 +230,7 @@ def compute_pcb_layout(scheme_data):
         )
 
     comps_out = []
-    pads_by_port = {}     # (comp_id, port_id) → (x_mm, y_mm) — для traces
+    pads_by_port = {}  # (comp_id, port_id) → (x_mm, y_mm) — для traces
     for comp in components:
         cx_px, cy_px = _component_center_px(comp)
         cx_mm, cy_mm = _to_mm(cx_px, cy_px)
@@ -218,20 +241,25 @@ def compute_pcb_layout(scheme_data):
         # шаблон рисовал rect от center'а → коробки уезжали на (w/2, h/2)
         # от своих pads и казалось, что компонент «оторван» от ножек.
         label_text = (comp.get('label') or comp.get('type') or '').strip()
-        comps_out.append({
-            'id': comp.get('id'), 'type': comp.get('type'),
-            'label': label_text,
-            'x_mm': cx_mm, 'y_mm': cy_mm,
-            'w_mm': w_mm, 'h_mm': h_mm,
-            # Готовый rect-bbox для SVG
-            'x_left_mm': round(cx_mm - w_mm / 2, 3),
-            'y_top_mm':  round(cy_mm - h_mm / 2, 3),
-            # Подпись — над компонентом (с отступом 1.2мм от верх. грани).
-            'label_x_mm': cx_mm,
-            'label_y_mm': round(cy_mm - h_mm / 2 - 1.2, 3),
-            'rotation': comp.get('rotation', 0),
-            'side': comp.get('side', 'top'),
-        })
+        comps_out.append(
+            {
+                'id': comp.get('id'),
+                'type': comp.get('type'),
+                'label': label_text,
+                'x_mm': cx_mm,
+                'y_mm': cy_mm,
+                'w_mm': w_mm,
+                'h_mm': h_mm,
+                # Готовый rect-bbox для SVG
+                'x_left_mm': round(cx_mm - w_mm / 2, 3),
+                'y_top_mm': round(cy_mm - h_mm / 2, 3),
+                # Подпись — над компонентом (с отступом 1.2мм от верх. грани).
+                'label_x_mm': cx_mm,
+                'label_y_mm': round(cy_mm - h_mm / 2 - 1.2, 3),
+                'rotation': comp.get('rotation', 0),
+                'side': comp.get('side', 'top'),
+            }
+        )
         # Pads: ports на компоненте; берём их координаты из ports[].x/y
         # (offset относительно центра компонента в editor px).
         ports = comp.get('ports', []) or [{'id': '1', 'x': -20, 'y': 0}, {'id': '2', 'x': 20, 'y': 0}]
@@ -256,8 +284,14 @@ def compute_pcb_layout(scheme_data):
 
     def _endpoint_key(endpoint):
         endpoint = endpoint or {}
-        return (endpoint.get('compId') or endpoint.get('componentId') or endpoint.get('id'),
-                endpoint.get('portId') or endpoint.get('pinId') or endpoint.get('port') or endpoint.get('pin') or '')
+        return (
+            endpoint.get('compId') or endpoint.get('componentId') or endpoint.get('id'),
+            endpoint.get('portId')
+            or endpoint.get('pinId')
+            or endpoint.get('port')
+            or endpoint.get('pin')
+            or '',
+        )
 
     # Traces: HV-routing (2-layer manhattan) + автоматические vias.
     # Классическая схема: H-сегменты идут по TOP, V-сегменты по BOTTOM.
@@ -306,33 +340,39 @@ def compute_pcb_layout(scheme_data):
             # Vias на переходе между слоями — H↔V → нужен via в углу
             if prev_layer is not None and prev_layer != seg_layer:
                 if not _is_via_position(pads_position_set, ax, ay):
-                    vias_out.append({
-                        'x_mm': _round3(ax),
-                        'y_mm': _round3(ay),
-                        'diameter_mm': AUTO_VIA_DIAMETER_MM,
-                        'hole_mm': AUTO_VIA_HOLE_MM,
-                        'auto': True,
-                        'conn_id': conn.get('id'),
-                    })
+                    vias_out.append(
+                        {
+                            'x_mm': _round3(ax),
+                            'y_mm': _round3(ay),
+                            'diameter_mm': AUTO_VIA_DIAMETER_MM,
+                            'hole_mm': AUTO_VIA_HOLE_MM,
+                            'auto': True,
+                            'conn_id': conn.get('id'),
+                        }
+                    )
 
-            traces_out.append({
-                'from': {'x_mm': ax, 'y_mm': ay},
-                'to':   {'x_mm': bx, 'y_mm': by},
-                'conn_id': conn.get('id'),
-                'layer': seg_layer,
-                'width_mm': trace_w,
-            })
+            traces_out.append(
+                {
+                    'from': {'x_mm': ax, 'y_mm': ay},
+                    'to': {'x_mm': bx, 'y_mm': by},
+                    'conn_id': conn.get('id'),
+                    'layer': seg_layer,
+                    'width_mm': trace_w,
+                }
+            )
             prev_layer = seg_layer
 
         # Vias из импортированной схемы (если есть)
         for via in conn.get('vias') or []:
             x_mm, y_mm = _to_mm(via.get('x', 0), via.get('y', 0))
-            vias_out.append({
-                'x_mm': x_mm,
-                'y_mm': y_mm,
-                'diameter_mm': float(via.get('diameter_mm') or via.get('diameterMm') or 1.1),
-                'hole_mm': float(via.get('hole_mm') or via.get('holeMm') or 0.45),
-            })
+            vias_out.append(
+                {
+                    'x_mm': x_mm,
+                    'y_mm': y_mm,
+                    'diameter_mm': float(via.get('diameter_mm') or via.get('diameterMm') or 1.1),
+                    'hole_mm': float(via.get('hole_mm') or via.get('holeMm') or 0.45),
+                }
+            )
 
     holes_out = []
     hole_inset = min(5.0, pcb_w_mm / 8, pcb_h_mm / 8)
@@ -343,17 +383,24 @@ def compute_pcb_layout(scheme_data):
             (hole_inset, pcb_h_mm - hole_inset),
             (pcb_w_mm - hole_inset, pcb_h_mm - hole_inset),
         ):
-            holes_out.append({'x_mm': round(x_mm, 3), 'y_mm': round(y_mm, 3), 'diameter_mm': 3.2, 'kind': 'mount'})
+            holes_out.append(
+                {'x_mm': round(x_mm, 3), 'y_mm': round(y_mm, 3), 'diameter_mm': 3.2, 'kind': 'mount'}
+            )
 
     return {
-        'pads': pads_out, 'traces': traces_out, 'comps': comps_out,
-        'vias': vias_out, 'holes': holes_out,
-        'pcb_w_mm': pcb_w_mm, 'pcb_h_mm': pcb_h_mm,
+        'pads': pads_out,
+        'traces': traces_out,
+        'comps': comps_out,
+        'vias': vias_out,
+        'holes': holes_out,
+        'pcb_w_mm': pcb_w_mm,
+        'pcb_h_mm': pcb_h_mm,
         'thickness_mm': thickness_mm,
         'trace_width_mm': trace_width_mm,
         'clearance_mm': clearance_mm,
         'margin_mm': margin_mm,
-        'origin_x_mm': 0, 'origin_y_mm': 0,
+        'origin_x_mm': 0,
+        'origin_y_mm': 0,
     }
 
 
@@ -367,14 +414,14 @@ def to_gerber_top_copper(layout):
     out = StringIO()
     # Header
     out.write('G04 DOLG PCB Layout — top copper layer*\n')
-    out.write('%FSLAX25Y25*%\n')         # формат координат: 2 целых, 5 дробных
-    out.write('%MOMM*%\n')                # единицы — миллиметры
-    out.write('%LPD*%\n')                 # polarity dark (рисуем медь)
+    out.write('%FSLAX25Y25*%\n')  # формат координат: 2 целых, 5 дробных
+    out.write('%MOMM*%\n')  # единицы — миллиметры
+    out.write('%LPD*%\n')  # polarity dark (рисуем медь)
     # Apertures
-    out.write(f'%ADD10C,{PAD_DIAMETER_MM}*%\n')   # D10 = pad circle
-    out.write(f'%ADD11C,{TRACE_WIDTH_MM}*%\n')    # D11 = trace circle
-    out.write('G75*\n')                   # multi-quadrant arc (на будущее)
-    out.write('G01*\n')                   # linear interpolation
+    out.write(f'%ADD10C,{PAD_DIAMETER_MM}*%\n')  # D10 = pad circle
+    out.write(f'%ADD11C,{TRACE_WIDTH_MM}*%\n')  # D11 = trace circle
+    out.write('G75*\n')  # multi-quadrant arc (на будущее)
+    out.write('G01*\n')  # linear interpolation
 
     def _coord(mm):
         # 2.5: умножаем на 1e5, дописываем ведущие нули если нужно.
@@ -383,7 +430,8 @@ def to_gerber_top_copper(layout):
     # Traces: D11 + G01 + от→до
     out.write('D11*\n')
     for tr in layout['traces']:
-        f = tr['from']; t = tr['to']
+        f = tr['from']
+        t = tr['to']
         out.write(f'X{_coord(f["x_mm"])}Y{_coord(f["y_mm"])}D02*\n')  # move
         out.write(f'X{_coord(t["x_mm"])}Y{_coord(t["y_mm"])}D01*\n')  # draw to
     # Pads: D10 + flash (D03)
@@ -391,7 +439,7 @@ def to_gerber_top_copper(layout):
     for pad in layout['pads']:
         out.write(f'X{_coord(pad["x_mm"])}Y{_coord(pad["y_mm"])}D03*\n')
 
-    out.write('M02*\n')   # End-of-file
+    out.write('M02*\n')  # End-of-file
     return out.getvalue()
 
 
@@ -400,13 +448,13 @@ def to_gerber_drill(layout):
     Минимальная версия: одно сверло, по флешу на каждую pad.
     """
     out = StringIO()
-    out.write('M48\n')                   # начало header'а
-    out.write('METRIC,LZ\n')             # mm + leading zeros
-    out.write('T01C0.80\n')              # tool 1, диаметр 0.8 mm
-    out.write('%\n')                     # конец header
-    out.write('G90\n')                   # absolute mode
-    out.write('M71\n')                   # metric units
-    out.write('T01\n')                   # выбираем tool 1
+    out.write('M48\n')  # начало header'а
+    out.write('METRIC,LZ\n')  # mm + leading zeros
+    out.write('T01C0.80\n')  # tool 1, диаметр 0.8 mm
+    out.write('%\n')  # конец header
+    out.write('G90\n')  # absolute mode
+    out.write('M71\n')  # metric units
+    out.write('T01\n')  # выбираем tool 1
     for pad in layout['pads']:
         # X/Y в мм с точкой; LZ означает «leading zeros», ничего не убираем
         out.write(f'X{pad["x_mm"]:.3f}Y{pad["y_mm"]:.3f}\n')
@@ -414,6 +462,6 @@ def to_gerber_drill(layout):
         out.write(f'X{via["x_mm"]:.3f}Y{via["y_mm"]:.3f}\n')
     for hole in layout.get('holes', []):
         out.write(f'X{hole["x_mm"]:.3f}Y{hole["y_mm"]:.3f}\n')
-    out.write('T00\n')                   # деселект tool
-    out.write('M30\n')                   # end of program
+    out.write('T00\n')  # деселект tool
+    out.write('M30\n')  # end of program
     return out.getvalue()

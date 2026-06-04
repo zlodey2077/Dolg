@@ -19,7 +19,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--user', help='Limit collection to username or numeric user id.')
         parser.add_argument('--limit', type=int, default=100)
-        parser.add_argument('--source', choices=('schemes', 'learning', 'reviews', 'artifacts', 'curated', 'all'), default='schemes')
+        parser.add_argument(
+            '--source',
+            choices=('schemes', 'learning', 'reviews', 'artifacts', 'curated', 'all'),
+            default='schemes',
+        )
         parser.add_argument('--dry-run', action='store_true')
         parser.add_argument('--no-validate', action='store_true')
         parser.add_argument('--json', action='store_true', dest='as_json')
@@ -39,35 +43,45 @@ class Command(BaseCommand):
         source = options['source']
         results = []
         if source in {'schemes', 'all'}:
-            results.append(collect_opt_in_scheme_examples(
-                user=user,
-                limit=options['limit'],
-                validate=validate,
-                dry_run=options['dry_run'],
-            ))
+            results.append(
+                collect_opt_in_scheme_examples(
+                    user=user,
+                    limit=options['limit'],
+                    validate=validate,
+                    dry_run=options['dry_run'],
+                )
+            )
         if source in {'curated', 'all'}:
-            results.append(seed_curated_ai_examples(
-                validate=validate,
-                dry_run=options['dry_run'],
-            ))
+            results.append(
+                seed_curated_ai_examples(
+                    validate=validate,
+                    dry_run=options['dry_run'],
+                )
+            )
         if source in {'learning', 'all'}:
-            results.append(collect_learning_task_examples(
-                limit=options['limit'],
-                validate=validate,
-                dry_run=options['dry_run'],
-            ))
+            results.append(
+                collect_learning_task_examples(
+                    limit=options['limit'],
+                    validate=validate,
+                    dry_run=options['dry_run'],
+                )
+            )
         if source in {'reviews', 'all'}:
-            results.append(collect_review_examples(
-                limit=options['limit'],
-                validate=validate,
-                dry_run=options['dry_run'],
-            ))
+            results.append(
+                collect_review_examples(
+                    limit=options['limit'],
+                    validate=validate,
+                    dry_run=options['dry_run'],
+                )
+            )
         if source in {'artifacts', 'all'}:
-            results.append(collect_artifact_examples(
-                limit=options['limit'],
-                validate=validate,
-                dry_run=options['dry_run'],
-            ))
+            results.append(
+                collect_artifact_examples(
+                    limit=options['limit'],
+                    validate=validate,
+                    dry_run=options['dry_run'],
+                )
+            )
         result = {
             'ok': all(item.get('ok') for item in results),
             'source': source,
@@ -82,11 +96,13 @@ class Command(BaseCommand):
                 self.stdout.write(json.dumps(result, ensure_ascii=True, indent=2))
             return
 
-        self.stdout.write(self.style.SUCCESS(
-            'AI training collection: '
-            f"source={source} "
-            f"scanned={sum(item.get('scanned', 0) for item in results)} "
-            f"skipped={sum(item.get('skipped', 0) for item in results)} "
-            f"created={sum(item.get('created', 0) for item in results)} "
-            f"updated={sum(item.get('updated', 0) for item in results)}"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                'AI training collection: '
+                f'source={source} '
+                f'scanned={sum(item.get("scanned", 0) for item in results)} '
+                f'skipped={sum(item.get("skipped", 0) for item in results)} '
+                f'created={sum(item.get("created", 0) for item in results)} '
+                f'updated={sum(item.get("updated", 0) for item in results)}'
+            )
+        )

@@ -1,4 +1,5 @@
 """Удаляет ViewedProduct старше N дней (default: 90)."""
+
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand

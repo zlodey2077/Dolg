@@ -5,6 +5,7 @@
     python manage.py seed_announcements
     python manage.py seed_announcements --reset   # удалить все перед созданием
 """
+
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -22,25 +23,33 @@ SEED_ANNOUNCEMENTS = [
         '💬 Запущена система чатов',
         'Теперь в DOLG можно обсуждать схемы и компоненты в публичном чате. '
         'Доступно всем зарегистрированным. Pro-юзеры получают Markdown + любые emoji-реакции.',
-        'info', True, None,
+        'info',
+        True,
+        None,
     ),
     (
         '🏢 Enterprise: приватные беседы для команды',
         'В разделе «Беседы» доступны приватные каналы для членов организации. '
         'Поддерживаются @упоминания, threaded-ответы, архив, AJAX-обновление.',
-        'info', True, None,
+        'info',
+        True,
+        None,
     ),
     (
         '🤖 AI-ассистент теперь содержит ML-pipeline',
         'DRC++, рекомендация компонентов и объяснение схемы — теперь как кнопки '
         'в правом нижнем 🤖. Панель тянется за угол, ответы пишутся в чат с историей.',
-        'info', False, None,
+        'info',
+        False,
+        None,
     ),
     (
         '⚠ Тестовый режим: реальные платежи отключены',
         'Подписки Pro и Enterprise сейчас работают в demo-режиме. '
         'Активация — через билинг (mock-Stripe). Реальная оплата появится в production-релизе.',
-        'warning', False, None,
+        'warning',
+        False,
+        None,
     ),
 ]
 
@@ -49,19 +58,17 @@ class Command(BaseCommand):
     help = 'Создаёт seed-объявления для сайдбара информационного канала чата.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--reset', action='store_true',
-                            help='Удалить все Announcement перед созданием.')
-        parser.add_argument('--owner', default='admin',
-                            help='Логин автора объявлений (по умолчанию admin).')
+        parser.add_argument('--reset', action='store_true', help='Удалить все Announcement перед созданием.')
+        parser.add_argument('--owner', default='admin', help='Логин автора объявлений (по умолчанию admin).')
 
     def handle(self, *args, **opts):
         try:
             author = User.objects.get(username=opts['owner'])
         except User.DoesNotExist:
             author = None
-            self.stderr.write(self.style.WARNING(
-                f"Пользователь '{opts['owner']}' не найден — author останется None."
-            ))
+            self.stderr.write(
+                self.style.WARNING(f"Пользователь '{opts['owner']}' не найден — author останется None.")
+            )
 
         if opts['reset']:
             deleted, _ = Announcement.objects.all().delete()
@@ -87,6 +94,6 @@ class Command(BaseCommand):
                 updated += 1
 
         total = Announcement.objects.count()
-        self.stdout.write(self.style.SUCCESS(
-            f'OK: создано {created}, обновлено {updated}. Всего объявлений: {total}.'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f'OK: создано {created}, обновлено {updated}. Всего объявлений: {total}.')
+        )

@@ -26,7 +26,8 @@ class OfficialPhoto:
 
 
 OFFICIAL_PHOTOS = {
-    item.slug: item for item in [
+    item.slug: item
+    for item in [
         OfficialPhoto(
             slug='breadboard-400',
             url='https://cdn-shop.adafruit.com/970x728/64-06.jpg',
@@ -134,12 +135,14 @@ class Command(BaseCommand):
             previous_params = dict(product.parameters or {})
             product.image.name = relative
             params = dict(product.parameters or {})
-            params.update({
-                'image_source': 'verified official/supplier product photo',
-                'image_source_url': spec.url,
-                'image_source_policy': GENERATED_IMAGE_POLICY,
-                'image_verified_from': spec.source_title,
-            })
+            params.update(
+                {
+                    'image_source': 'verified official/supplier product photo',
+                    'image_source_url': spec.url,
+                    'image_source_policy': GENERATED_IMAGE_POLICY,
+                    'image_verified_from': spec.source_title,
+                }
+            )
             product.parameters = params
 
             report = audit_product_image(product, media_root=media_root)
@@ -147,18 +150,16 @@ class Command(BaseCommand):
                 product.image.name = previous_image
                 product.parameters = previous_params
                 skipped += 1
-                self.stdout.write(self.style.WARNING(
-                    f'skip: {slug} failed quality gate {report["errors"]}'
-                ))
+                self.stdout.write(self.style.WARNING(f'skip: {slug} failed quality gate {report["errors"]}'))
                 continue
 
             product.save(update_fields=['image', 'parameters'])
             applied += 1
             self.stdout.write(f'{slug:<28} <- {relative}')
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Official photos checked={checked}, applied={applied}, skipped={skipped}.'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f'Official photos checked={checked}, applied={applied}, skipped={skipped}.')
+        )
 
     def _selected_slugs(self, raw: str | None) -> list[str]:
         if not raw:
@@ -187,12 +188,12 @@ class Command(BaseCommand):
                 shutil.copyfileobj(response, tmp)
                 temp_path = Path(tmp.name)
         try:
-                self._normalize_image(
-                    temp_path,
-                    target,
-                    spec.label,
-                    replace_black_background=spec.replace_black_background,
-                )
+            self._normalize_image(
+                temp_path,
+                target,
+                spec.label,
+                replace_black_background=spec.replace_black_background,
+            )
         finally:
             temp_path.unlink(missing_ok=True)
 
@@ -231,7 +232,9 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFon
     candidates = [
         'C:/Windows/Fonts/arialbd.ttf' if bold else 'C:/Windows/Fonts/arial.ttf',
         'C:/Windows/Fonts/segoeuib.ttf' if bold else 'C:/Windows/Fonts/segoeui.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf' if bold else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+        if bold
+        else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     ]
     for path in candidates:
         if path and Path(path).exists():

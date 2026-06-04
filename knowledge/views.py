@@ -70,16 +70,18 @@ PRODUCT_RULES = [
 
 
 def _article_search_text(article):
-    return ' '.join((
-        article.title,
-        article.slug,
-        article.summary,
-        article.body,
-        article.related_components_note,
-        article.category.name,
-        article.category.slug,
-        article.category.topic,
-    )).lower()
+    return ' '.join(
+        (
+            article.title,
+            article.slug,
+            article.summary,
+            article.body,
+            article.related_components_note,
+            article.category.name,
+            article.category.slug,
+            article.category.topic,
+        )
+    ).lower()
 
 
 def _article_calculators(article):
@@ -118,29 +120,32 @@ def _related_products(article):
         return Product.objects.none()
 
     return (
-        Product.objects
-        .select_related('category')
+        Product.objects.select_related('category')
         .filter(category__slug__in=slugs, stock__gt=0)
         .order_by('category__slug', 'price', 'name')[:6]
     )
 
 
 def index(request):
-    categories = (
-        KnowledgeCategory.objects
-        .prefetch_related(Prefetch(
+    categories = KnowledgeCategory.objects.prefetch_related(
+        Prefetch(
             'articles',
-            queryset=Article.objects.filter(is_published=True).only(
-                'id', 'title', 'slug', 'summary', 'reading_minutes', 'category_id'
-            ).prefetch_related(Prefetch('materials', queryset=PUBLIC_MATERIALS, to_attr='published_materials')),
-        ))
-        .all()
-    )
+            queryset=Article.objects.filter(is_published=True)
+            .only('id', 'title', 'slug', 'summary', 'reading_minutes', 'category_id')
+            .prefetch_related(
+                Prefetch('materials', queryset=PUBLIC_MATERIALS, to_attr='published_materials')
+            ),
+        )
+    ).all()
     total = Article.objects.filter(is_published=True).count()
-    return render(request, 'knowledge/index.html', {
-        'categories': categories,
-        'total_articles': total,
-    })
+    return render(
+        request,
+        'knowledge/index.html',
+        {
+            'categories': categories,
+            'total_articles': total,
+        },
+    )
 
 
 def category_detail(request, slug):
@@ -148,10 +153,14 @@ def category_detail(request, slug):
     articles = category.articles.filter(is_published=True).prefetch_related(
         Prefetch('materials', queryset=PUBLIC_MATERIALS, to_attr='published_materials')
     )
-    return render(request, 'knowledge/category.html', {
-        'category': category,
-        'articles': articles,
-    })
+    return render(
+        request,
+        'knowledge/category.html',
+        {
+            'category': category,
+            'articles': articles,
+        },
+    )
 
 
 def article_detail(request, slug):
@@ -162,23 +171,27 @@ def article_detail(request, slug):
         slug=slug,
         is_published=True,
     )
-    related = (
-        Article.objects
-        .filter(category=article.category, is_published=True)
-        .exclude(pk=article.pk)[:4]
+    related = Article.objects.filter(category=article.category, is_published=True).exclude(pk=article.pk)[:4]
+    return render(
+        request,
+        'knowledge/article.html',
+        {
+            'article': article,
+            'related': related,
+            'calculator_tools': _article_calculators(article),
+            'related_products': _related_products(article),
+        },
     )
-    return render(request, 'knowledge/article.html', {
-        'article': article,
-        'related': related,
-        'calculator_tools': _article_calculators(article),
-        'related_products': _related_products(article),
-    })
 
 
 def engineering_lab(request):
-    return render(request, 'knowledge/engineering_lab.html', {
-        'lab_tools': LAB_TOOLS,
-    })
+    return render(
+        request,
+        'knowledge/engineering_lab.html',
+        {
+            'lab_tools': LAB_TOOLS,
+        },
+    )
 
 
 @require_POST
@@ -187,7 +200,7 @@ def engineering_lab_api(request):
     if request.body:
         try:
             payload = json.loads(request.body.decode('utf-8'))
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except json.JSONDecodeError, UnicodeDecodeError:
             payload = {}
     if not payload:
         payload = request.POST.dict()
@@ -199,25 +212,17 @@ def engineering_lab_api(request):
 
 def learning_index(request):
     lessons_qs = (
-        LearningLesson.objects
-        .filter(is_published=True)
-        .prefetch_related('tasks')
-        .order_by('order', 'title')
+        LearningLesson.objects.filter(is_published=True).prefetch_related('tasks').order_by('order', 'title')
     )
     tracks = list(
-        LearningTrack.objects
-        .filter(is_published=True)
+        LearningTrack.objects.filter(is_published=True)
         .prefetch_related(Prefetch('lessons', queryset=lessons_qs, to_attr='published_lessons'))
         .order_by('order', 'title')
     )
 
     progress_by_lesson = {}
     if request.user.is_authenticated:
-        lesson_ids = [
-            lesson.id
-            for track in tracks
-            for lesson in getattr(track, 'published_lessons', [])
-        ]
+        lesson_ids = [lesson.id for track in tracks for lesson in getattr(track, 'published_lessons', [])]
         progress_by_lesson = {
             item.lesson_id: item
             for item in LearningProgress.objects.filter(user=request.user, lesson_id__in=lesson_ids)
@@ -243,18 +248,20 @@ def learning_index(request):
         total_lessons += track_total
         completed_lessons += track_completed
 
-    return render(request, 'knowledge/learning_index.html', {
-        'tracks': tracks,
-        'total_lessons': total_lessons,
-        'completed_lessons': completed_lessons,
-    })
+    return render(
+        request,
+        'knowledge/learning_index.html',
+        {
+            'tracks': tracks,
+            'total_lessons': total_lessons,
+            'completed_lessons': completed_lessons,
+        },
+    )
 
 
 def learning_lesson_detail(request, slug):
     lesson = get_object_or_404(
-        LearningLesson.objects
-        .select_related('track', 'article', 'demo_project')
-        .prefetch_related('tasks'),
+        LearningLesson.objects.select_related('track', 'article', 'demo_project').prefetch_related('tasks'),
         slug=slug,
         is_published=True,
         track__is_published=True,
@@ -298,12 +305,16 @@ def learning_lesson_detail(request, slug):
             if len(lesson_sources) >= 8:
                 break
 
-    return render(request, 'knowledge/learning_lesson.html', {
-        'lesson': lesson,
-        'tasks': tasks,
-        'progress': progress,
-        'lesson_sources': lesson_sources,
-    })
+    return render(
+        request,
+        'knowledge/learning_lesson.html',
+        {
+            'lesson': lesson,
+            'tasks': tasks,
+            'progress': progress,
+            'lesson_sources': lesson_sources,
+        },
+    )
 
 
 @require_POST
@@ -320,7 +331,7 @@ def learning_task_check(request, slug, task_id):
     if request.body:
         try:
             payload = json.loads(request.body.decode('utf-8'))
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except json.JSONDecodeError, UnicodeDecodeError:
             payload = {}
     if not payload:
         payload = request.POST.dict()
@@ -351,12 +362,14 @@ def learning_task_check(request, slug, task_id):
                 'solved_task_ids': progress.solved_task_ids,
             }
 
-    return JsonResponse({
-        'ok': True,
-        'saved': saved,
-        'correct': bool(result.get('correct')),
-        'score': score,
-        'feedback': result.get('feedback', ''),
-        'details': result.get('details', {}),
-        'progress': progress_payload,
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'saved': saved,
+            'correct': bool(result.get('correct')),
+            'score': score,
+            'feedback': result.get('feedback', ''),
+            'details': result.get('details', {}),
+            'progress': progress_payload,
+        }
+    )

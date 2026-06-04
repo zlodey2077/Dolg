@@ -12,12 +12,19 @@ class Command(BaseCommand):
         parser.add_argument('--size', type=int, default=240)
         parser.add_argument('--epochs', type=int, default=120)
         parser.add_argument('--seed', type=int, default=42)
-        parser.add_argument('--include-curated', action='store_true',
-                            help='Add validated AITrainingExample rows from DB to the training set.')
+        parser.add_argument(
+            '--include-curated',
+            action='store_true',
+            help='Add validated AITrainingExample rows from DB to the training set.',
+        )
         parser.add_argument('--max-curated', type=int, default=200)
-        parser.add_argument('--dataset', type=str, default=None,
-                            help='Path to external dataset JSON file (см. Dolg_APP/ml/dataset/circuits.json '
-                                 'для формата). Items добавляются в extra_schemes как curated data.')
+        parser.add_argument(
+            '--dataset',
+            type=str,
+            default=None,
+            help='Path to external dataset JSON file (см. Dolg_APP/ml/dataset/circuits.json '
+            'для формата). Items добавляются в extra_schemes как curated data.',
+        )
         parser.add_argument('--json', action='store_true', dest='as_json')
 
     def handle(self, *args, **options):
@@ -28,6 +35,7 @@ class Command(BaseCommand):
             extra_schemes = []
             if options['include_curated']:
                 from Dolg_APP.services.ai_training import curated_training_schemes
+
                 extra_schemes.extend(curated_training_schemes(limit=options['max_curated']))
 
             dataset_path = options.get('dataset')
@@ -47,9 +55,7 @@ class Command(BaseCommand):
                     if isinstance(item, dict) and item.get('components'):
                         extra_schemes.append(item)
                         added += 1
-                self.stdout.write(self.style.SUCCESS(
-                    f'Подгружено {added} схем из {path}'
-                ))
+                self.stdout.write(self.style.SUCCESS(f'Подгружено {added} схем из {path}'))
 
             result = train_tiny_model(
                 size=max(30, int(options['size'])),
@@ -63,6 +69,8 @@ class Command(BaseCommand):
         if options['as_json']:
             self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
         else:
-            self.stdout.write(self.style.SUCCESS(
-                f"Trained tiny circuit AI: loss={result['final_loss']} -> {result['model_path']}"
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'Trained tiny circuit AI: loss={result["final_loss"]} -> {result["model_path"]}'
+                )
+            )

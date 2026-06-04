@@ -31,6 +31,7 @@ Phase 2 (after MVP):
     - PWM-driven servos
     - Stepper motors
 """
+
 from __future__ import annotations
 
 # Map of board → pin assignments. Default = Raspberry Pi Pico.
@@ -289,9 +290,13 @@ def _render_main_loop(classified: dict, assignments: dict) -> str:
             var = _var_for(s, 'sensor')
             driver = s.get('driver')
             if driver == 'bme280':
-                lines.append(f'    print(f"Temp: {{{var}.temperature:.1f}}°C, Hum: {{{var}.relative_humidity:.0f}}%, Pres: {{{var}.pressure:.0f}}hPa")')
+                lines.append(
+                    f'    print(f"Temp: {{{var}.temperature:.1f}}°C, Hum: {{{var}.relative_humidity:.0f}}%, Pres: {{{var}.pressure:.0f}}hPa")'
+                )
             elif driver == 'bmp280':
-                lines.append(f'    print(f"Temp: {{{var}.temperature:.1f}}°C, Pres: {{{var}.pressure:.0f}}hPa")')
+                lines.append(
+                    f'    print(f"Temp: {{{var}.temperature:.1f}}°C, Pres: {{{var}.pressure:.0f}}hPa")'
+                )
         lines.append('    time.sleep(2)')
         return '\n'.join(lines)
 
@@ -304,6 +309,7 @@ def _render_main_loop(classified: dict, assignments: dict) -> str:
 def _safe_var(name: str, fallback: str) -> str:
     """Python-safe variable name."""
     import re
+
     s = re.sub(r'[^a-zA-Z0-9_]', '_', name)
     if not s or not s[0].isalpha():
         s = fallback + '_' + s

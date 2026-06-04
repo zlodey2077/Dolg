@@ -10,6 +10,7 @@
 - Mock SSO endpoint
 - API tokens (create / revoke)
 """
+
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -46,7 +47,10 @@ def _make_org_with_owner(slug='acme', owner=None):
     if owner is None:
         owner = _make_user('owner_' + slug)
     org = Organization.objects.create(
-        name=slug.title(), slug=slug, billing_email='b@x.test', owner=owner,
+        name=slug.title(),
+        slug=slug,
+        billing_email='b@x.test',
+        owner=owner,
     )
     OrganizationMember.objects.create(organization=org, user=owner, role='owner')
     return org, owner
@@ -57,7 +61,9 @@ def _activate_enterprise_org(org):
     org.seats_max = max(org.seats_max, 100)
     org.save(update_fields=['plan', 'seats_max'])
     Subscription.objects.create(
-        organization=org, tier='pro', status='active',
+        organization=org,
+        tier='pro',
+        status='active',
         period_end=timezone.now() + timedelta(days=30),
     )
     return org
@@ -76,8 +82,11 @@ class OrganizationModelTests(TestCase):
     def test_invite_lifecycle(self):
         org, owner = _make_org_with_owner('acme2')
         invite = OrganizationInvite.objects.create(
-            organization=org, email='new@x.test', token='abc123',
-            role='engineer', invited_by=owner,
+            organization=org,
+            email='new@x.test',
+            token='abc123',
+            role='engineer',
+            invited_by=owner,
             expires_at=timezone.now() + timedelta(days=7),
         )
         self.assertTrue(invite.is_pending())
@@ -110,8 +119,12 @@ class PermissionsTests(TestCase):
         self.reviewer = _make_user('rev_u')
         self.viewer = _make_user('view_u')
         self.outsider = _make_user('outsider')
-        for u, r in [(self.admin, 'admin'), (self.engineer, 'engineer'),
-                     (self.reviewer, 'reviewer'), (self.viewer, 'viewer')]:
+        for u, r in [
+            (self.admin, 'admin'),
+            (self.engineer, 'engineer'),
+            (self.reviewer, 'reviewer'),
+            (self.viewer, 'viewer'),
+        ]:
             OrganizationMember.objects.create(organization=self.org, user=u, role=r)
 
     def test_owner_can_everything(self):
@@ -147,8 +160,12 @@ class AuditLogTests(TestCase):
     def test_log_creates_entry(self):
         org, owner = _make_org_with_owner('a-log')
         entry = AuditLog.log(
-            actor=owner, action='test.action', organization=org,
-            object_type='Test', object_id=42, payload={'k': 'v'},
+            actor=owner,
+            action='test.action',
+            organization=org,
+            object_type='Test',
+            object_id=42,
+            payload={'k': 'v'},
         )
         self.assertEqual(entry.actor, owner)
         self.assertEqual(entry.action, 'test.action')
@@ -176,9 +193,12 @@ class TeamProjectsTests(TestCase):
     def test_team_project_creation_via_api(self):
         self.client.force_login(self.engineer)
         import json as _j
-        r = self.client.post(reverse('hello:api_project_create'),
-                             data=_j.dumps({'name': 'team-proj', 'organization_slug': 't-proj'}),
-                             content_type='application/json')
+
+        r = self.client.post(
+            reverse('hello:api_project_create'),
+            data=_j.dumps({'name': 'team-proj', 'organization_slug': 't-proj'}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 200, r.content)
         p_data = r.json()['project']
         self.assertEqual(p_data['organization'], 't-proj')
@@ -187,9 +207,12 @@ class TeamProjectsTests(TestCase):
     def test_outsider_cannot_create_team_project(self):
         self.client.force_login(self.outsider)
         import json as _j
-        r = self.client.post(reverse('hello:api_project_create'),
-                             data=_j.dumps({'name': 'x', 'organization_slug': 't-proj'}),
-                             content_type='application/json')
+
+        r = self.client.post(
+            reverse('hello:api_project_create'),
+            data=_j.dumps({'name': 'x', 'organization_slug': 't-proj'}),
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 403)
 
 
@@ -206,14 +229,17 @@ class ApprovalWorkflowTests(TestCase):
         OrganizationMember.objects.create(organization=self.org, user=self.engineer, role='engineer')
         OrganizationMember.objects.create(organization=self.org, user=self.reviewer, role='reviewer')
         self.project = SchematicProject.objects.create(
-            user=self.engineer, organization=self.org, visibility='team',
+            user=self.engineer,
+            organization=self.org,
+            visibility='team',
             name='for-approval',
         )
 
     def test_engineer_submits_for_review(self):
         self.client.force_login(self.engineer)
-        r = self.client.post(reverse('hello:project_submit_for_review',
-                                     kwargs={'org_slug': 'apw', 'pk': self.project.id}))
+        r = self.client.post(
+            reverse('hello:project_submit_for_review', kwargs={'org_slug': 'apw', 'pk': self.project.id})
+        )
         self.assertEqual(r.status_code, 302)
         self.project.refresh_from_db()
         self.assertEqual(self.project.approval_state, 'pending_review')
@@ -222,9 +248,10 @@ class ApprovalWorkflowTests(TestCase):
         self.project.approval_state = 'pending_review'
         self.project.save(update_fields=['approval_state'])
         self.client.force_login(self.reviewer)
-        r = self.client.post(reverse('hello:project_approve',
-                                     kwargs={'org_slug': 'apw', 'pk': self.project.id}),
-                             {'comment': 'looks good'})
+        r = self.client.post(
+            reverse('hello:project_approve', kwargs={'org_slug': 'apw', 'pk': self.project.id}),
+            {'comment': 'looks good'},
+        )
         self.assertEqual(r.status_code, 302)
         self.project.refresh_from_db()
         self.assertEqual(self.project.approval_state, 'approved')
@@ -235,8 +262,9 @@ class ApprovalWorkflowTests(TestCase):
         self.project.approval_state = 'pending_review'
         self.project.save(update_fields=['approval_state'])
         self.client.force_login(self.engineer)
-        r = self.client.post(reverse('hello:project_approve',
-                                     kwargs={'org_slug': 'apw', 'pk': self.project.id}))
+        r = self.client.post(
+            reverse('hello:project_approve', kwargs={'org_slug': 'apw', 'pk': self.project.id})
+        )
         self.assertEqual(r.status_code, 403)
 
 
@@ -251,7 +279,9 @@ class CentralizedBillingTests(TestCase):
 
         # Подписка на org
         Subscription.objects.create(
-            organization=org, tier='pro', status='active',
+            organization=org,
+            tier='pro',
+            status='active',
             period_end=timezone.now() + timedelta(days=30),
         )
 
@@ -284,12 +314,19 @@ class OrgPagesTests(TestCase):
     def test_org_create_via_post(self):
         user = _make_user('cu')
         self.client.force_login(user)
-        r = self.client.post('/orgs/create/', {
-            'name': 'New Org', 'slug': 'new-org',
-            'billing_email': 'b@x.test', 'expected_size': '1-5',
-            'agree_msa': 'on', 'agree_dpa': 'on',
-            'agree_aup': 'on', 'agree_privacy': 'on',
-        })
+        r = self.client.post(
+            '/orgs/create/',
+            {
+                'name': 'New Org',
+                'slug': 'new-org',
+                'billing_email': 'b@x.test',
+                'expected_size': '1-5',
+                'agree_msa': 'on',
+                'agree_dpa': 'on',
+                'agree_aup': 'on',
+                'agree_privacy': 'on',
+            },
+        )
         self.assertEqual(r.status_code, 302)
         org = Organization.objects.get(slug='new-org')
         self.assertEqual(org.owner, user)
@@ -314,10 +351,10 @@ class OrgPagesTests(TestCase):
 class InviteFlowTests(TestCase):
     def test_invite_creates_record_and_sends_email(self):
         from django.core import mail
+
         org, owner = _make_org_with_owner('inv-org')
         self.client.force_login(owner)
-        r = self.client.post('/orgs/inv-org/members/invite/',
-                             {'email': 'newone@x.test', 'role': 'engineer'})
+        r = self.client.post('/orgs/inv-org/members/invite/', {'email': 'newone@x.test', 'role': 'engineer'})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(org.invites.filter(email='newone@x.test').exists())
         self.assertEqual(len(mail.outbox), 1)
@@ -327,8 +364,11 @@ class InviteFlowTests(TestCase):
         org, owner = _make_org_with_owner('inv-org2')
         invitee = _make_user('invitee')
         invite = OrganizationInvite.objects.create(
-            organization=org, email=invitee.email, token='tok123',
-            role='engineer', expires_at=timezone.now() + timedelta(days=7),
+            organization=org,
+            email=invitee.email,
+            token='tok123',
+            role='engineer',
+            expires_at=timezone.now() + timedelta(days=7),
             invited_by=owner,
         )
         self.client.force_login(invitee)
@@ -348,8 +388,7 @@ class ApiTokenTests(TestCase):
         org, owner = _make_org_with_owner('tok-org')
         _activate_enterprise_org(org)
         self.client.force_login(owner)
-        r = self.client.post('/orgs/tok-org/api-tokens/create/',
-                             {'name': 'CI', 'scope': 'projects.read'})
+        r = self.client.post('/orgs/tok-org/api-tokens/create/', {'name': 'CI', 'scope': 'projects.read'})
         self.assertEqual(r.status_code, 302)
         tok = OrganizationApiToken.objects.get(organization=org)
         self.assertTrue(tok.is_active())
@@ -381,9 +420,13 @@ class MockSsoTests(TestCase):
         nonce = self.client.session.get('sso_nonce')
         self.assertIsNotNone(nonce)
         # Callback с тем же nonce
-        r = self.client.post('/sso/sso-org/callback/', {
-            'email': 'sso-user@acme.com', 'nonce': nonce,
-        })
+        r = self.client.post(
+            '/sso/sso-org/callback/',
+            {
+                'email': 'sso-user@acme.com',
+                'nonce': nonce,
+            },
+        )
         self.assertEqual(r.status_code, 302)
         # User создан, в org
         new_user = User.objects.get(email='sso-user@acme.com')

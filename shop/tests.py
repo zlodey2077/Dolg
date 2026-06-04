@@ -1,8 +1,7 @@
 import json
 import tempfile
 from decimal import Decimal
-from io import BytesIO
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
@@ -19,8 +18,7 @@ from .models import Category, Product
 class CategoryModelTest(TestCase):
     def setUp(self):
         self.category = Category.objects.create(
-            name='Smartphones',
-            description='Mobile phones and accessories'
+            name='Smartphones', description='Mobile phones and accessories'
         )
 
     def test_category_creation(self):
@@ -40,7 +38,7 @@ class ProductModelTest(TestCase):
             description='Latest Apple smartphone',
             price=999.99,
             stock=10,
-            manufacturer='apple'
+            manufacturer='apple',
         )
 
     def test_product_creation(self):
@@ -80,12 +78,15 @@ class ProductCardHelperTests(TestCase):
     def test_parameter_preview_does_not_duplicate_repeated_order_keys(self):
         from shop.card_helpers import parameter_preview
 
-        preview = parameter_preview({
-            'type': 'digital oscilloscope',
-            'interface': 'USB/LAN',
-            'channels': '4',
-            'sample_rate': '1 Гвыб/с',
-        }, limit=8)
+        preview = parameter_preview(
+            {
+                'type': 'digital oscilloscope',
+                'interface': 'USB/LAN',
+                'channels': '4',
+                'sample_rate': '1 Гвыб/с',
+            },
+            limit=8,
+        )
 
         keys = [item['key'] for item in preview]
         self.assertEqual(keys.count('interface'), 1)
@@ -298,7 +299,7 @@ class ShopViewsTest(TestCase):
             description='Professional laptop',
             price=1999.99,
             stock=5,
-            manufacturer='apple'
+            manufacturer='apple',
         )
 
     def test_index_view(self):
@@ -319,6 +320,7 @@ class CompareAnalyzerTests(TestCase):
 
     def test_lower_better_recognizes_price_keywords(self):
         from shop.views import _row_compare_kind
+
         # Цена и веса — «меньше = лучше»
         self.assertEqual(_row_compare_kind('Цена'), 'lower')
         self.assertEqual(_row_compare_kind('Цена, ₽'), 'lower')
@@ -330,12 +332,14 @@ class CompareAnalyzerTests(TestCase):
 
     def test_higher_better_default(self):
         from shop.views import _row_compare_kind
+
         # Тактовая, объём — «больше = лучше»
         self.assertEqual(_row_compare_kind('Тактовая частота, ГГц'), 'higher')
         self.assertEqual(_row_compare_kind('RAM, ГБ'), 'higher')
 
     def test_skip_categorical(self):
         from shop.views import _row_compare_kind
+
         # Производитель и категория — не сравниваются
         self.assertEqual(_row_compare_kind('Производитель'), 'skip')
         self.assertEqual(_row_compare_kind('Корпус'), 'skip')
@@ -350,21 +354,42 @@ class CatalogFilterTests(TestCase):
         # slug передаём явно: Product.save() делает slugify без allow_unicode,
         # для кириллицы это даст пустой slug и {% url %} падает в шаблоне.
         Product.objects.create(
-            name='Резистор 1к', slug='resistor-1k', category=cat, description='metal-film',
-            price=5, stock=100, manufacturer='vishay', part_number='MF-1K',
-            lifecycle_status='active', package_type='SMD-0805',
+            name='Резистор 1к',
+            slug='resistor-1k',
+            category=cat,
+            description='metal-film',
+            price=5,
+            stock=100,
+            manufacturer='vishay',
+            part_number='MF-1K',
+            lifecycle_status='active',
+            package_type='SMD-0805',
             parameters={'resistance': '1k', 'power': '0.25 W', 'voltage': '50 V', 'tolerance': '1%'},
         )
         Product.objects.create(
-            name='Резистор 10к', slug='resistor-10k', category=cat, description='precision',
-            price=8, stock=100, manufacturer='yageo', part_number='RC-10K',
-            lifecycle_status='nrnd', package_type='SMD-1206',
+            name='Резистор 10к',
+            slug='resistor-10k',
+            category=cat,
+            description='precision',
+            price=8,
+            stock=100,
+            manufacturer='yageo',
+            part_number='RC-10K',
+            lifecycle_status='nrnd',
+            package_type='SMD-1206',
             parameters={'resistance': '10k', 'power': '0.125 W', 'voltage': '25 V', 'tolerance': '5%'},
         )
         Product.objects.create(
-            name='Резистор устаревший', slug='resistor-obsolete', category=cat, description='legacy',
-            price=2, stock=0, manufacturer='vishay', part_number='OLD-R',
-            lifecycle_status='obsolete', package_type='THT',
+            name='Резистор устаревший',
+            slug='resistor-obsolete',
+            category=cat,
+            description='legacy',
+            price=2,
+            stock=0,
+            manufacturer='vishay',
+            part_number='OLD-R',
+            lifecycle_status='obsolete',
+            package_type='THT',
         )
         self.cat = cat
 
@@ -396,9 +421,7 @@ class CatalogFilterTests(TestCase):
         self.assertNotContains(resp, 'Резистор устаревший')
 
     def test_combined_filters(self):
-        resp = self.client.get(
-            reverse('shop:index') + '?manufacturer=vishay&lifecycle=active'
-        )
+        resp = self.client.get(reverse('shop:index') + '?manufacturer=vishay&lifecycle=active')
         self.assertContains(resp, 'Резистор 1к')
         self.assertNotContains(resp, 'Резистор 10к')
         self.assertNotContains(resp, 'Резистор устаревший')
@@ -443,8 +466,13 @@ class SearchSuggestTests(TestCase):
     def setUp(self):
         cat = Category.objects.create(name='ICs', slug='ics')
         Product.objects.create(
-            name='STM32F103C8T6', category=cat, description='ARM Cortex-M3',
-            price=120, stock=50, manufacturer='st', part_number='STM32F103C8T6',
+            name='STM32F103C8T6',
+            category=cat,
+            description='ARM Cortex-M3',
+            price=120,
+            stock=50,
+            manufacturer='st',
+            part_number='STM32F103C8T6',
         )
 
     def test_returns_empty_for_short_query(self):
@@ -481,6 +509,7 @@ class GlobalSearchAndDemoRouteTests(TestCase):
         )
 
         from knowledge.models import Article, KnowledgeCategory, LearningLesson, LearningTask, LearningTrack
+
         self.kb_category = KnowledgeCategory.objects.create(
             name='Практика',
             slug='practice',
@@ -533,6 +562,7 @@ class GlobalSearchAndDemoRouteTests(TestCase):
         )
 
         from Dolg_APP.models import SchematicProject
+
         user = get_user_model().objects.create_user(username='demo-owner', password='pass')
         self.project = SchematicProject.objects.create(
             user=user,
@@ -729,7 +759,9 @@ class DataIntegrityLegalSourcesTests(TestCase):
         Command()._check_legal_sources(report)
 
         self.assertTrue(report['legal_sources']['task_source_errors'])
-        self.assertTrue(any('learning tasks reference unknown legal sources' in item for item in report['errors']))
+        self.assertTrue(
+            any('learning tasks reference unknown legal sources' in item for item in report['errors'])
+        )
 
 
 class ProductImagePolicyTests(TestCase):
@@ -819,7 +851,10 @@ class ProductImagePolicyTests(TestCase):
         self.product.refresh_from_db()
 
         self.assertEqual(self.product.image.name, 'products/generated/st-lm358dt.png')
-        self.assertEqual(self.product.parameters['image_source'], 'manufacturer image pending; generated technical placeholder')
+        self.assertEqual(
+            self.product.parameters['image_source'],
+            'manufacturer image pending; generated technical placeholder',
+        )
         report = audit_product_image(self.product)
         self.assertTrue(report['ok'], report)
         self.assertEqual(report['source_type'], 'generated')
@@ -917,15 +952,29 @@ class ComponentSearchTests(TestCase):
         self.cat_r = Category.objects.create(name='Резисторы', slug='resistors')
         self.cat_t = Category.objects.create(name='Транзисторы', slug='transistors')
         Product.objects.create(
-            name='Резистор 1к', slug='res-1k', category=self.cat_r, description='1k',
-            price=5, stock=100, manufacturer='vishay', part_number='MF-1K',
-            lifecycle_status='active', package_type='SMD-0805',
+            name='Резистор 1к',
+            slug='res-1k',
+            category=self.cat_r,
+            description='1k',
+            price=5,
+            stock=100,
+            manufacturer='vishay',
+            part_number='MF-1K',
+            lifecycle_status='active',
+            package_type='SMD-0805',
             parameters={'resistance': '1 кОм'},
         )
         Product.objects.create(
-            name='BC547B', slug='bc547b', category=self.cat_t, description='NPN',
-            price=9, stock=20, manufacturer='onsemi', part_number='BC547B',
-            lifecycle_status='active', package_type='TO-92',
+            name='BC547B',
+            slug='bc547b',
+            category=self.cat_t,
+            description='NPN',
+            price=9,
+            stock=20,
+            manufacturer='onsemi',
+            part_number='BC547B',
+            lifecycle_status='active',
+            package_type='TO-92',
             parameters={'type': 'NPN'},
         )
 
@@ -952,31 +1001,63 @@ class BomMatchTests(TestCase):
         self.cat_r = Category.objects.create(name='Резисторы', slug='resistors')
         self.cat_c = Category.objects.create(name='Конденсаторы', slug='capacitors')
         self.cheap = Product.objects.create(
-            name='Резистор 1к', slug='res-1k', category=self.cat_r, description='1k',
-            price=5, stock=100, manufacturer='vishay', part_number='MF-1K',
-            lifecycle_status='active', parameters={'value': '1k'},
+            name='Резистор 1к',
+            slug='res-1k',
+            category=self.cat_r,
+            description='1k',
+            price=5,
+            stock=100,
+            manufacturer='vishay',
+            part_number='MF-1K',
+            lifecycle_status='active',
+            parameters={'value': '1k'},
         )
         self.expensive = Product.objects.create(
-            name='Резистор 10к premium', slug='res-10k', category=self.cat_r, description='precision',
-            price=20, stock=100, manufacturer='vishay', part_number='RC-10K',
+            name='Резистор 10к premium',
+            slug='res-10k',
+            category=self.cat_r,
+            description='precision',
+            price=20,
+            stock=100,
+            manufacturer='vishay',
+            part_number='RC-10K',
             lifecycle_status='active',
         )
         # Out-of-stock — не должен попасть в матч.
         Product.objects.create(
-            name='Резистор out-of-stock', slug='res-oos', category=self.cat_r, description='',
-            price=1, stock=0, manufacturer='vishay', part_number='OOS',
+            name='Резистор out-of-stock',
+            slug='res-oos',
+            category=self.cat_r,
+            description='',
+            price=1,
+            stock=0,
+            manufacturer='vishay',
+            part_number='OOS',
             lifecycle_status='active',
         )
         # obsolete — тоже отфильтрован (только active/nrnd берём).
         Product.objects.create(
-            name='Резистор obsolete', slug='res-obs', category=self.cat_r, description='',
-            price=1, stock=10, manufacturer='vishay', part_number='OBS',
+            name='Резистор obsolete',
+            slug='res-obs',
+            category=self.cat_r,
+            description='',
+            price=1,
+            stock=10,
+            manufacturer='vishay',
+            part_number='OBS',
             lifecycle_status='obsolete',
         )
         self.cap = Product.objects.create(
-            name='Конденсатор 10мкФ', slug='cap-10u', category=self.cat_c, description='',
-            price=12, stock=50, manufacturer='vishay', part_number='C-10U',
-            lifecycle_status='active', parameters={'value': '10u'},
+            name='Конденсатор 10мкФ',
+            slug='cap-10u',
+            category=self.cat_c,
+            description='',
+            price=12,
+            stock=50,
+            manufacturer='vishay',
+            part_number='C-10U',
+            lifecycle_status='active',
+            parameters={'value': '10u'},
         )
 
     def _post_match(self, components):
@@ -996,18 +1077,21 @@ class BomMatchTests(TestCase):
     def test_invalid_json_returns_400(self):
         resp = self.client.post(
             reverse('shop:api_bom_match'),
-            data='not json', content_type='application/json',
+            data='not json',
+            content_type='application/json',
         )
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(resp.json()['ok'])
 
     def test_groups_by_type_and_counts(self):
-        resp = self._post_match([
-            {'id': 0, 'type': 'resistor'},
-            {'id': 1, 'type': 'resistor'},
-            {'id': 2, 'type': 'resistor'},
-            {'id': 3, 'type': 'capacitor'},
-        ])
+        resp = self._post_match(
+            [
+                {'id': 0, 'type': 'resistor'},
+                {'id': 1, 'type': 'resistor'},
+                {'id': 2, 'type': 'resistor'},
+                {'id': 3, 'type': 'capacitor'},
+            ]
+        )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertTrue(data['ok'])
@@ -1024,22 +1108,26 @@ class BomMatchTests(TestCase):
         self.assertNotIn(m['product']['part_number'], ('OOS', 'OBS'))
 
     def test_line_total_and_grand_total(self):
-        resp = self._post_match([
-            {'id': 0, 'type': 'resistor'},
-            {'id': 1, 'type': 'resistor'},
-            {'id': 2, 'type': 'capacitor'},
-        ])
+        resp = self._post_match(
+            [
+                {'id': 0, 'type': 'resistor'},
+                {'id': 1, 'type': 'resistor'},
+                {'id': 2, 'type': 'capacitor'},
+            ]
+        )
         data = resp.json()
         # 2 × 5 (резистор) + 1 × 12 (конд) = 22
         self.assertAlmostEqual(data['grand_total'], 22.0, places=2)
 
     def test_xlsx_export_returns_workbook_with_totals(self):
-        resp = self._post_export_xlsx([
-            {'id': 0, 'type': 'resistor'},
-            {'id': 1, 'type': 'resistor'},
-            {'id': 2, 'type': 'capacitor'},
-            {'id': 3, 'type': 'unknown_part'},
-        ])
+        resp = self._post_export_xlsx(
+            [
+                {'id': 0, 'type': 'resistor'},
+                {'id': 1, 'type': 'resistor'},
+                {'id': 2, 'type': 'capacitor'},
+                {'id': 3, 'type': 'unknown_part'},
+            ]
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(
             resp['Content-Type'],
@@ -1070,10 +1158,12 @@ class BomMatchTests(TestCase):
         self.assertIn('RC-10K', slugs)
 
     def test_explicit_catalog_ref_is_used_before_type_matching(self):
-        resp = self._post_match([
-            {'id': 0, 'type': 'resistor', 'catalog_ref': 'RC-10K'},
-            {'id': 1, 'type': 'resistor', 'catalog_ref': 'RC-10K'},
-        ])
+        resp = self._post_match(
+            [
+                {'id': 0, 'type': 'resistor', 'catalog_ref': 'RC-10K'},
+                {'id': 1, 'type': 'resistor', 'catalog_ref': 'RC-10K'},
+            ]
+        )
         data = resp.json()
         self.assertEqual(len(data['matches']), 1)
         match = data['matches'][0]
@@ -1082,30 +1172,46 @@ class BomMatchTests(TestCase):
         self.assertAlmostEqual(match['line_total'], 40.0, places=2)
 
     def test_bom_warns_about_nominal_mismatch(self):
-        resp = self._post_match([
-            {'id': 0, 'type': 'resistor', 'resistance': 2000, 'catalog_ref': 'MF-1K'},
-        ])
+        resp = self._post_match(
+            [
+                {'id': 0, 'type': 'resistor', 'resistance': 2000, 'catalog_ref': 'MF-1K'},
+            ]
+        )
         match = resp.json()['matches'][0]
         self.assertTrue(any('номинал' in warning for warning in match['warnings']))
 
     def test_bom_warns_about_missing_spice_model(self):
         cat_d = Category.objects.create(name='Диоды', slug='diodes')
         Product.objects.create(
-            name='Диод 1N4148', slug='1n4148', category=cat_d, description='',
-            price=3, stock=100, manufacturer='onsemi', part_number='1N4148',
+            name='Диод 1N4148',
+            slug='1n4148',
+            category=cat_d,
+            description='',
+            price=3,
+            stock=100,
+            manufacturer='onsemi',
+            part_number='1N4148',
             lifecycle_status='active',
         )
-        resp = self._post_match([
-            {'id': 0, 'type': 'diode', 'catalog_ref': '1N4148'},
-        ])
+        resp = self._post_match(
+            [
+                {'id': 0, 'type': 'diode', 'catalog_ref': '1N4148'},
+            ]
+        )
         match = resp.json()['matches'][0]
         self.assertTrue(any('SPICE' in warning for warning in match['warnings']))
 
     def test_npn_component_maps_to_transistor_category(self):
         cat_t = Category.objects.create(name='Транзисторы', slug='transistors')
         Product.objects.create(
-            name='BC547B', slug='bc547b', category=cat_t, description='NPN',
-            price=9, stock=20, manufacturer='onsemi', part_number='BC547B',
+            name='BC547B',
+            slug='bc547b',
+            category=cat_t,
+            description='NPN',
+            price=9,
+            stock=20,
+            manufacturer='onsemi',
+            part_number='BC547B',
             lifecycle_status='active',
         )
         resp = self._post_match([{'id': 0, 'type': 'npn'}])
@@ -1134,9 +1240,15 @@ class BomAddAllTests(TestCase):
     def setUp(self):
         cat = Category.objects.create(name='Резисторы', slug='resistors')
         self.p = Product.objects.create(
-            name='Резистор 1к', slug='r-1k', category=cat,
-            description='', price=5, stock=100, manufacturer='vishay',
-            part_number='MF-1K', lifecycle_status='active',
+            name='Резистор 1к',
+            slug='r-1k',
+            category=cat,
+            description='',
+            price=5,
+            stock=100,
+            manufacturer='vishay',
+            part_number='MF-1K',
+            lifecycle_status='active',
         )
 
     def test_creates_cart_items(self):
@@ -1159,6 +1271,7 @@ class BomAddAllTests(TestCase):
                 content_type='application/json',
             )
         from shop.models import CartItem
+
         items = CartItem.objects.filter(product=self.p)
         self.assertEqual(items.count(), 1)
         self.assertEqual(items.first().quantity, 4)
@@ -1166,10 +1279,14 @@ class BomAddAllTests(TestCase):
     def test_skips_unknown_slug(self):
         resp = self.client.post(
             reverse('shop:api_bom_add_all'),
-            data=json.dumps({'items': [
-                {'slug': 'nonexistent', 'quantity': 1},
-                {'slug': 'r-1k', 'quantity': 1},
-            ]}),
+            data=json.dumps(
+                {
+                    'items': [
+                        {'slug': 'nonexistent', 'quantity': 1},
+                        {'slug': 'r-1k', 'quantity': 1},
+                    ]
+                }
+            ),
             content_type='application/json',
         )
         self.assertEqual(resp.json()['added'], 1)
@@ -1212,11 +1329,13 @@ class BomAddAllTests(TestCase):
         )
         resp = self.client.post(
             reverse('shop:api_bom_add_all'),
-            data=json.dumps({
-                'items': [{'slug': 'r-1k', 'quantity': 2}],
-                'project': {'id': project.id, 'name': 'wrong client name'},
-                'source': 'simulation',
-            }),
+            data=json.dumps(
+                {
+                    'items': [{'slug': 'r-1k', 'quantity': 2}],
+                    'project': {'id': project.id, 'name': 'wrong client name'},
+                    'source': 'simulation',
+                }
+            ),
             content_type='application/json',
         )
 
@@ -1247,12 +1366,24 @@ class CompareToggleTests(TestCase):
     def setUp(self):
         cat = Category.objects.create(name='ICs', slug='ics')
         self.p1 = Product.objects.create(
-            name='STM32', slug='stm32', category=cat, description='',
-            price=120, stock=10, manufacturer='st', part_number='STM32',
+            name='STM32',
+            slug='stm32',
+            category=cat,
+            description='',
+            price=120,
+            stock=10,
+            manufacturer='st',
+            part_number='STM32',
         )
         self.p2 = Product.objects.create(
-            name='ATMega', slug='atmega', category=cat, description='',
-            price=80, stock=10, manufacturer='atmel', part_number='ATMEGA',
+            name='ATMega',
+            slug='atmega',
+            category=cat,
+            description='',
+            price=80,
+            stock=10,
+            manufacturer='atmel',
+            part_number='ATMEGA',
         )
 
     def test_toggle_adds_then_removes(self):

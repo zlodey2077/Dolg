@@ -16,55 +16,35 @@ class Command(BaseCommand):
         Category.objects.all().delete()
 
         # Create categories
-        smartphones = Category.objects.create(
-            name='Смартфоны',
-            description='Мобильные телефоны и аксессуары'
-        )
+        smartphones = Category.objects.create(name='Смартфоны', description='Мобильные телефоны и аксессуары')
         laptops = Category.objects.create(
-            name='Ноутбуки',
-            description='Портативные компьютеры для работы и развлечений'
+            name='Ноутбуки', description='Портативные компьютеры для работы и развлечений'
         )
-        tablets = Category.objects.create(
-            name='Планшеты',
-            description='Планшетные компьютеры и аксессуары'
-        )
+        tablets = Category.objects.create(name='Планшеты', description='Планшетные компьютеры и аксессуары')
         accessories = Category.objects.create(
-            name='Аксессуары',
-            description='Кабели, зарядки, чехлы и другие аксессуары'
+            name='Аксессуары', description='Кабели, зарядки, чехлы и другие аксессуары'
         )
 
         # Component categories
         cpu = Category.objects.create(
-            name='Процессоры (CPU)',
-            description='Процессоры Intel и AMD для персональных компьютеров'
+            name='Процессоры (CPU)', description='Процессоры Intel и AMD для персональных компьютеров'
         )
         gpu = Category.objects.create(
-            name='Видеокарты (GPU)',
-            description='Дискретные видеокарты NVIDIA и AMD'
+            name='Видеокарты (GPU)', description='Дискретные видеокарты NVIDIA и AMD'
         )
-        ram = Category.objects.create(
-            name='ОЗУ (RAM)',
-            description='Модули оперативной памяти DDR4 и DDR5'
-        )
-        ssd = Category.objects.create(
-            name='SSD диски',
-            description='Твердотельные накопители NVMe и SATA'
-        )
+        ram = Category.objects.create(name='ОЗУ (RAM)', description='Модули оперативной памяти DDR4 и DDR5')
+        ssd = Category.objects.create(name='SSD диски', description='Твердотельные накопители NVMe и SATA')
         psu = Category.objects.create(
-            name='Блоки питания',
-            description='Блоки питания различной мощности и типов'
+            name='Блоки питания', description='Блоки питания различной мощности и типов'
         )
         cooling = Category.objects.create(
-            name='Кулеры',
-            description='Системы охлаждения для процессоров и корпусов'
+            name='Кулеры', description='Системы охлаждения для процессоров и корпусов'
         )
         monitors = Category.objects.create(
-            name='Мониторы',
-            description='Мониторы для программирования, творчества и игр'
+            name='Мониторы', description='Мониторы для программирования, творчества и игр'
         )
         motherboards = Category.objects.create(
-            name='Материнские платы',
-            description='Материнские платы различных форм-факторов'
+            name='Материнские платы', description='Материнские платы различных форм-факторов'
         )
 
         # Get media path for images
@@ -80,7 +60,7 @@ class Command(BaseCommand):
                 'price': 119990,
                 'stock': 15,
                 'manufacturer': 'apple',
-                'image_file': 'smartphone.svg'
+                'image_file': 'smartphone.svg',
             },
             {
                 'name': 'Samsung Galaxy S24 Ultra',
@@ -89,7 +69,7 @@ class Command(BaseCommand):
                 'price': 124990,
                 'stock': 12,
                 'manufacturer': 'samsung',
-                'image_file': 'smartphone.svg'
+                'image_file': 'smartphone.svg',
             },
             {
                 'name': 'OnePlus 12',
@@ -98,9 +78,8 @@ class Command(BaseCommand):
                 'price': 54990,
                 'stock': 20,
                 'manufacturer': 'other',
-                'image_file': 'smartphone.svg'
+                'image_file': 'smartphone.svg',
             },
-
             # Laptops
             {
                 'name': 'MacBook Pro 16" M3 Max',
@@ -109,7 +88,7 @@ class Command(BaseCommand):
                 'price': 259990,
                 'stock': 8,
                 'manufacturer': 'apple',
-                'image_file': 'laptop.svg'
+                'image_file': 'laptop.svg',
             },
             {
                 'name': 'ASUS ROG Zephyrus G16',
@@ -118,7 +97,7 @@ class Command(BaseCommand):
                 'price': 349990,
                 'stock': 5,
                 'manufacturer': 'other',
-                'image_file': 'laptop.svg'
+                'image_file': 'laptop.svg',
             },
             {
                 'name': 'Lenovo ThinkPad X1 Carbon',
@@ -127,9 +106,8 @@ class Command(BaseCommand):
                 'price': 149990,
                 'stock': 14,
                 'manufacturer': 'other',
-                'image_file': 'laptop.svg'
+                'image_file': 'laptop.svg',
             },
-
             # Tablets
             {
                 'name': 'iPad Pro 12.9"',
@@ -138,7 +116,7 @@ class Command(BaseCommand):
                 'price': 89990,
                 'stock': 18,
                 'manufacturer': 'apple',
-                'image_file': ''
+                'image_file': '',
             },
             {
                 'name': 'Samsung Galaxy Tab S9 Ultra',
@@ -147,9 +125,8 @@ class Command(BaseCommand):
                 'price': 79990,
                 'stock': 10,
                 'manufacturer': 'samsung',
-                'image_file': ''
+                'image_file': '',
             },
-
             # Accessories
             {
                 'name': 'Apple AirPods Pro (2nd gen)',
@@ -158,7 +135,7 @@ class Command(BaseCommand):
                 'price': 24990,
                 'stock': 50,
                 'manufacturer': 'apple',
-                'image_file': 'headphones.svg'
+                'image_file': 'headphones.svg',
             },
             {
                 'name': 'Samsung 25W Super Fast Charger',
@@ -167,7 +144,7 @@ class Command(BaseCommand):
                 'price': 4990,
                 'stock': 100,
                 'manufacturer': 'samsung',
-                'image_file': ''
+                'image_file': '',
             },
             {
                 'name': 'USB-C кабель Anker 3м',
@@ -176,9 +153,8 @@ class Command(BaseCommand):
                 'price': 1290,
                 'stock': 200,
                 'manufacturer': 'other',
-                'image_file': ''
+                'image_file': '',
             },
-
             # CPUs - Процессоры
             {
                 'name': 'Intel Core i9-14900K',
@@ -187,7 +163,7 @@ class Command(BaseCommand):
                 'price': 79990,
                 'stock': 12,
                 'manufacturer': 'other',
-                'image_file': 'cpu.svg'
+                'image_file': 'cpu.svg',
             },
             {
                 'name': 'AMD Ryzen 9 7950X3D',
@@ -196,7 +172,7 @@ class Command(BaseCommand):
                 'price': 74990,
                 'stock': 10,
                 'manufacturer': 'other',
-                'image_file': 'cpu.svg'
+                'image_file': 'cpu.svg',
             },
             {
                 'name': 'Intel Core i7-14700K',
@@ -205,7 +181,7 @@ class Command(BaseCommand):
                 'price': 54990,
                 'stock': 18,
                 'manufacturer': 'other',
-                'image_file': 'cpu.svg'
+                'image_file': 'cpu.svg',
             },
             {
                 'name': 'AMD Ryzen 5 7600X',
@@ -214,9 +190,8 @@ class Command(BaseCommand):
                 'price': 24990,
                 'stock': 25,
                 'manufacturer': 'other',
-                'image_file': 'cpu.svg'
+                'image_file': 'cpu.svg',
             },
-
             # GPUs - Видеокарты
             {
                 'name': 'NVIDIA RTX 4090',
@@ -225,7 +200,7 @@ class Command(BaseCommand):
                 'price': 199990,
                 'stock': 5,
                 'manufacturer': 'other',
-                'image_file': 'gpu.svg'
+                'image_file': 'gpu.svg',
             },
             {
                 'name': 'NVIDIA RTX 4080 Super',
@@ -234,7 +209,7 @@ class Command(BaseCommand):
                 'price': 149990,
                 'stock': 8,
                 'manufacturer': 'other',
-                'image_file': 'gpu.svg'
+                'image_file': 'gpu.svg',
             },
             {
                 'name': 'AMD Radeon RX 7900 XTX',
@@ -243,7 +218,7 @@ class Command(BaseCommand):
                 'price': 89990,
                 'stock': 10,
                 'manufacturer': 'other',
-                'image_file': 'gpu.svg'
+                'image_file': 'gpu.svg',
             },
             {
                 'name': 'NVIDIA RTX 4070 Ti',
@@ -252,9 +227,8 @@ class Command(BaseCommand):
                 'price': 79990,
                 'stock': 15,
                 'manufacturer': 'other',
-                'image_file': 'gpu.svg'
+                'image_file': 'gpu.svg',
             },
-
             # RAM - Оперативная память
             {
                 'name': 'Kingston Fury Beast DDR5 32GB',
@@ -263,7 +237,7 @@ class Command(BaseCommand):
                 'price': 19990,
                 'stock': 30,
                 'manufacturer': 'other',
-                'image_file': 'ram.svg'
+                'image_file': 'ram.svg',
             },
             {
                 'name': 'Corsair Dominator Platinum DDR5 64GB',
@@ -272,7 +246,7 @@ class Command(BaseCommand):
                 'price': 39990,
                 'stock': 12,
                 'manufacturer': 'other',
-                'image_file': 'ram.svg'
+                'image_file': 'ram.svg',
             },
             {
                 'name': 'G.Skill Trident Z5 DDR5 16GB',
@@ -281,7 +255,7 @@ class Command(BaseCommand):
                 'price': 9990,
                 'stock': 25,
                 'manufacturer': 'other',
-                'image_file': 'ram.svg'
+                'image_file': 'ram.svg',
             },
             {
                 'name': 'Kingston HyperX Fury DDR4 16GB',
@@ -290,9 +264,8 @@ class Command(BaseCommand):
                 'price': 6990,
                 'stock': 40,
                 'manufacturer': 'other',
-                'image_file': 'ram.svg'
+                'image_file': 'ram.svg',
             },
-
             # SSD - Накопители
             {
                 'name': 'Samsung 990 Pro 2TB',
@@ -301,7 +274,7 @@ class Command(BaseCommand):
                 'price': 34990,
                 'stock': 20,
                 'manufacturer': 'samsung',
-                'image_file': 'ssd.svg'
+                'image_file': 'ssd.svg',
             },
             {
                 'name': 'WD Black SN850X 1TB',
@@ -310,7 +283,7 @@ class Command(BaseCommand):
                 'price': 12990,
                 'stock': 18,
                 'manufacturer': 'other',
-                'image_file': 'ssd.svg'
+                'image_file': 'ssd.svg',
             },
             {
                 'name': 'Crucial P5 Plus 500GB',
@@ -319,7 +292,7 @@ class Command(BaseCommand):
                 'price': 7990,
                 'stock': 35,
                 'manufacturer': 'other',
-                'image_file': 'ssd.svg'
+                'image_file': 'ssd.svg',
             },
             {
                 'name': 'Kingston NV2 2TB',
@@ -328,9 +301,8 @@ class Command(BaseCommand):
                 'price': 19990,
                 'stock': 15,
                 'manufacturer': 'other',
-                'image_file': 'ssd.svg'
+                'image_file': 'ssd.svg',
             },
-
             # PSU - Блоки питания
             {
                 'name': 'Corsair HX850 Platinum',
@@ -339,7 +311,7 @@ class Command(BaseCommand):
                 'price': 14990,
                 'stock': 16,
                 'manufacturer': 'other',
-                'image_file': 'psu.svg'
+                'image_file': 'psu.svg',
             },
             {
                 'name': 'EVGA SuperNOVA GT 1000W',
@@ -348,7 +320,7 @@ class Command(BaseCommand):
                 'price': 19990,
                 'stock': 8,
                 'manufacturer': 'other',
-                'image_file': 'psu.svg'
+                'image_file': 'psu.svg',
             },
             {
                 'name': 'Seasonic Focus Plus 750W',
@@ -357,7 +329,7 @@ class Command(BaseCommand):
                 'price': 9990,
                 'stock': 22,
                 'manufacturer': 'other',
-                'image_file': 'psu.svg'
+                'image_file': 'psu.svg',
             },
             {
                 'name': 'Thermaltake Toughpower 650W',
@@ -366,9 +338,8 @@ class Command(BaseCommand):
                 'price': 7490,
                 'stock': 30,
                 'manufacturer': 'other',
-                'image_file': 'psu.svg'
+                'image_file': 'psu.svg',
             },
-
             # CPU Coolers - Кулеры
             {
                 'name': 'Noctua NH-D15 Chromax',
@@ -377,7 +348,7 @@ class Command(BaseCommand):
                 'price': 11990,
                 'stock': 14,
                 'manufacturer': 'other',
-                'image_file': 'cpu_cooler.svg'
+                'image_file': 'cpu_cooler.svg',
             },
             {
                 'name': 'CORSAIR H150i Elite Capellix',
@@ -386,7 +357,7 @@ class Command(BaseCommand):
                 'price': 19990,
                 'stock': 10,
                 'manufacturer': 'other',
-                'image_file': 'cpu_cooler.svg'
+                'image_file': 'cpu_cooler.svg',
             },
             {
                 'name': 'Be quiet! Dark Rock Pro 4',
@@ -395,7 +366,7 @@ class Command(BaseCommand):
                 'price': 9990,
                 'stock': 18,
                 'manufacturer': 'other',
-                'image_file': 'cpu_cooler.svg'
+                'image_file': 'cpu_cooler.svg',
             },
             {
                 'name': 'Arctic Freezer 50 TR',
@@ -404,9 +375,8 @@ class Command(BaseCommand):
                 'price': 5990,
                 'stock': 28,
                 'manufacturer': 'other',
-                'image_file': 'cpu_cooler.svg'
+                'image_file': 'cpu_cooler.svg',
             },
-
             # Monitors - Мониторы
             {
                 'name': 'Samsung M7 Smart Monitor 32"',
@@ -415,7 +385,7 @@ class Command(BaseCommand):
                 'price': 59990,
                 'stock': 7,
                 'manufacturer': 'samsung',
-                'image_file': 'monitor.svg'
+                'image_file': 'monitor.svg',
             },
             {
                 'name': 'LG UltraWide 34" 21:9',
@@ -424,7 +394,7 @@ class Command(BaseCommand):
                 'price': 79990,
                 'stock': 5,
                 'manufacturer': 'other',
-                'image_file': 'monitor.svg'
+                'image_file': 'monitor.svg',
             },
             {
                 'name': 'ASUS ProArt PA278QV',
@@ -433,7 +403,7 @@ class Command(BaseCommand):
                 'price': 34990,
                 'stock': 9,
                 'manufacturer': 'other',
-                'image_file': 'monitor.svg'
+                'image_file': 'monitor.svg',
             },
             {
                 'name': 'MSI Optix G273QF 27"',
@@ -442,9 +412,8 @@ class Command(BaseCommand):
                 'price': 29990,
                 'stock': 12,
                 'manufacturer': 'other',
-                'image_file': 'monitor.svg'
+                'image_file': 'monitor.svg',
             },
-
             # Motherboards - Материнские платы
             {
                 'name': 'ASUS ROG Maximus Z890-E',
@@ -453,7 +422,7 @@ class Command(BaseCommand):
                 'price': 44990,
                 'stock': 8,
                 'manufacturer': 'other',
-                'image_file': 'motherboard.svg'
+                'image_file': 'motherboard.svg',
             },
             {
                 'name': 'MSI MEG X870E-E',
@@ -462,7 +431,7 @@ class Command(BaseCommand):
                 'price': 54990,
                 'stock': 6,
                 'manufacturer': 'other',
-                'image_file': 'motherboard.svg'
+                'image_file': 'motherboard.svg',
             },
             {
                 'name': 'Gigabyte B850 AORUS Master',
@@ -471,7 +440,7 @@ class Command(BaseCommand):
                 'price': 29990,
                 'stock': 14,
                 'manufacturer': 'other',
-                'image_file': 'motherboard.svg'
+                'image_file': 'motherboard.svg',
             },
             {
                 'name': 'MSI PRO B850-PLUS',
@@ -480,9 +449,8 @@ class Command(BaseCommand):
                 'price': 18990,
                 'stock': 20,
                 'manufacturer': 'other',
-                'image_file': 'motherboard.svg'
+                'image_file': 'motherboard.svg',
             },
-
             # Cables - Кабели
             {
                 'name': 'Модульные кабели Corsair',
@@ -491,7 +459,7 @@ class Command(BaseCommand):
                 'price': 3990,
                 'stock': 50,
                 'manufacturer': 'other',
-                'image_file': 'cables.svg'
+                'image_file': 'cables.svg',
             },
             {
                 'name': 'HDMI 2.1 кабель 3М',
@@ -500,7 +468,7 @@ class Command(BaseCommand):
                 'price': 2990,
                 'stock': 80,
                 'manufacturer': 'other',
-                'image_file': ''
+                'image_file': '',
             },
             {
                 'name': 'DisplayPort 1.4 кабель 2М',
@@ -509,7 +477,7 @@ class Command(BaseCommand):
                 'price': 2490,
                 'stock': 60,
                 'manufacturer': 'other',
-                'image_file': ''
+                'image_file': '',
             },
         ]
 
@@ -522,10 +490,8 @@ class Command(BaseCommand):
                 image_path = media_root / image_file
                 if image_path.exists():
                     with open(image_path, 'rb') as f:
-                        product.image.save(f"{product.slug}.svg", File(f), save=True)
+                        product.image.save(f'{product.slug}.svg', File(f), save=True)
                     self.stdout.write(f'  ✓ Добавлена картинка для {product.name}')
 
-        self.stdout.write(
-            self.style.SUCCESS('✓ База данных успешно заполнена примерами товаров!')
-        )
+        self.stdout.write(self.style.SUCCESS('✓ База данных успешно заполнена примерами товаров!'))
         self.stdout.write(f'Создано {len(products)} товаров и 11 категорий')

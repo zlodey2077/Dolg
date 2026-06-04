@@ -58,36 +58,69 @@ class Command(BaseCommand):
     help = 'Импорт открытых datasets схем (HuggingFace / GitHub SPICE) в training base.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--source', choices=sorted(SUPPORTED_SOURCES.keys()), required=True,
-                            help='Источник datasets для импорта.')
-        parser.add_argument('--limit', type=int, default=500,
-                            help='Максимум схем для импорта (default 500). Open Schematics — 84 470 итого.')
-        parser.add_argument('--path', type=str, default=None,
-                            help='Локальный путь (для --source spice_dir).')
-        parser.add_argument('--min-components', type=int, default=3,
-                            help='Минимум компонентов в схеме (фильтр шума).')
-        parser.add_argument('--max-components', type=int, default=50,
-                            help='Максимум компонентов (фильтр гигантских схем).')
-        parser.add_argument('--persist', action='store_true',
-                            help='Сохранить в AITrainingExample модели БД (иначе только в JSON-файл).')
-        parser.add_argument('--dry-run', action='store_true',
-                            help='Показать что бы импортировалось без записи.')
-        parser.add_argument('--progress-cache-key', type=str, default=None,
-                            help='Если указан, команда будет писать live-прогресс в Django cache по этому ключу '
-                                 '(используется admin-страницей /staff/ml-training/ для UI-полоски прогресса).')
-        parser.add_argument('--shards', type=int, default=1,
-                            help='Сколько parquet-шардов скачать из открытого датасета (1..78). '
-                                 'Каждый шард ≈1000-1100 схем, 50-80 МБ. По умолчанию 1 (для быстрой проверки). '
-                                 '--shards 78 = все 84к схем, ~4-6 ГБ диска и 30-60 мин на загрузку.')
+        parser.add_argument(
+            '--source',
+            choices=sorted(SUPPORTED_SOURCES.keys()),
+            required=True,
+            help='Источник datasets для импорта.',
+        )
+        parser.add_argument(
+            '--limit',
+            type=int,
+            default=500,
+            help='Максимум схем для импорта (default 500). Open Schematics — 84 470 итого.',
+        )
+        parser.add_argument('--path', type=str, default=None, help='Локальный путь (для --source spice_dir).')
+        parser.add_argument(
+            '--min-components', type=int, default=3, help='Минимум компонентов в схеме (фильтр шума).'
+        )
+        parser.add_argument(
+            '--max-components', type=int, default=50, help='Максимум компонентов (фильтр гигантских схем).'
+        )
+        parser.add_argument(
+            '--persist',
+            action='store_true',
+            help='Сохранить в AITrainingExample модели БД (иначе только в JSON-файл).',
+        )
+        parser.add_argument(
+            '--dry-run', action='store_true', help='Показать что бы импортировалось без записи.'
+        )
+        parser.add_argument(
+            '--progress-cache-key',
+            type=str,
+            default=None,
+            help='Если указан, команда будет писать live-прогресс в Django cache по этому ключу '
+            '(используется admin-страницей /staff/ml-training/ для UI-полоски прогресса).',
+        )
+        parser.add_argument(
+            '--shards',
+            type=int,
+            default=1,
+            help='Сколько parquet-шардов скачать из открытого датасета (1..78). '
+            'Каждый шард ≈1000-1100 схем, 50-80 МБ. По умолчанию 1 (для быстрой проверки). '
+            '--shards 78 = все 84к схем, ~4-6 ГБ диска и 30-60 мин на загрузку.',
+        )
 
-        parser.add_argument('--local-only', action='store_true',
-                            help='Use only local HuggingFace cache; do not open network.')
-        parser.add_argument('--as-projects', action='store_true',
-                            help='Also create demo SchematicProject rows for accepted imported schemes.')
-        parser.add_argument('--project-min-quality', type=int, default=60,
-                            help='Minimum expert quality score for --as-projects.')
-        parser.add_argument('--download-deadline', type=int, default=120,
-                            help='Maximum seconds for one parquet shard download before skipping it.')
+        parser.add_argument(
+            '--local-only', action='store_true', help='Use only local HuggingFace cache; do not open network.'
+        )
+        parser.add_argument(
+            '--as-projects',
+            action='store_true',
+            help='Also create demo SchematicProject rows for accepted imported schemes.',
+        )
+        parser.add_argument(
+            '--project-min-quality',
+            type=int,
+            default=60,
+            help='Minimum expert quality score for --as-projects.',
+        )
+        parser.add_argument(
+            '--download-deadline',
+            type=int,
+            default=120,
+            help='Maximum seconds for one parquet shard download before skipping it.',
+        )
 
     def handle(self, *args, **opts):
         source = opts['source']
@@ -122,16 +155,20 @@ class Command(BaseCommand):
         }
 
         if opts['dry_run']:
-            self.stdout.write(self.style.WARNING(
-                f'[dry-run] Готово к импорту: {len(schemes)} схем в {out_path} '
-                f'(~{round(len(json.dumps(payload)) / 1024)} КБ JSON).'
-            ))
+            self.stdout.write(
+                self.style.WARNING(
+                    f'[dry-run] Готово к импорту: {len(schemes)} схем в {out_path} '
+                    f'(~{round(len(json.dumps(payload)) / 1024)} КБ JSON).'
+                )
+            )
             return
 
         out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
-        self.stdout.write(self.style.SUCCESS(
-            f'✓ Сохранено: {out_path} ({round(out_path.stat().st_size / 1024)} КБ, {len(schemes)} схем)'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'✓ Сохранено: {out_path} ({round(out_path.stat().st_size / 1024)} КБ, {len(schemes)} схем)'
+            )
+        )
 
         if opts['persist']:
             self._persist_to_db(schemes, source, spec)
@@ -162,21 +199,15 @@ class Command(BaseCommand):
         Один шард ≈ 1000-1100 схем, 50-80 МБ. Этого хватит на limit до ~1000.
         """
         try:
-            from huggingface_hub import hf_hub_download
-            from huggingface_hub.utils import HfHubHTTPError
             import pyarrow.parquet as pq
-        except ImportError:
+        except ImportError as err:
             raise CommandError(
-                'Не установлены huggingface-hub или pyarrow. Запустите:\n'
-                '  pip install -r requirements-ai.txt'
-            )
+                'Не установлены huggingface-hub или pyarrow. Запустите:\n  pip install -r requirements-ai.txt'
+            ) from err
 
         spec = SUPPORTED_SOURCES['open_schematics']
         limit = max(1, int(opts['limit']))
-        self.stdout.write(
-            f'Скачиваю первый parquet-шард с HuggingFace: {spec["hf_id"]} '
-            f'(до {limit} схем)…'
-        )
+        self.stdout.write(f'Скачиваю первый parquet-шард с HuggingFace: {spec["hf_id"]} (до {limit} схем)…')
 
         # Прогресс
         progress_key = opts.get('progress_cache_key')
@@ -184,7 +215,7 @@ class Command(BaseCommand):
         cache_obj = None
         if progress_key:
             try:
-                from django.core.cache import cache as cache_obj  # noqa: F811
+                from django.core.cache import cache as cache_obj
             except Exception:
                 cache_obj = None
 
@@ -204,8 +235,9 @@ class Command(BaseCommand):
                 'server_time': time.time(),
                 'elapsed': round(time.time() - started_at, 1),
                 'message': (
-                    extra.get('message') if extra and 'message' in extra else
-                    f'Обработано {processed} строк, импортировано {len(out)}, пропущено {skipped}'
+                    extra.get('message')
+                    if extra and 'message' in extra
+                    else f'Обработано {processed} строк, импортировано {len(out)}, пропущено {skipped}'
                 ),
             }
             if extra:
@@ -225,14 +257,19 @@ class Command(BaseCommand):
         # HF_TOKEN из env — даёт ×10 rate-limit и стабильную загрузку.
         # Без токена анонимы часто получают 429 или connection hang.
         import os as _os
+
         hf_token = _os.getenv('HF_TOKEN') or _os.getenv('HUGGINGFACE_TOKEN')
         if hf_token:
-            self.stdout.write(f'  HF_TOKEN найден ({len(hf_token)} символов) — использую authenticated загрузку.')
+            self.stdout.write(
+                f'  HF_TOKEN найден ({len(hf_token)} символов) — использую authenticated загрузку.'
+            )
         else:
-            self.stdout.write(self.style.WARNING(
-                '  HF_TOKEN не задан — анонимная загрузка может быть медленной/зависать. '
-                'Получить токен: https://huggingface.co/settings/tokens, добавить в .env как HF_TOKEN=hf_...'
-            ))
+            self.stdout.write(
+                self.style.WARNING(
+                    '  HF_TOKEN не задан — анонимная загрузка может быть медленной/зависать. '
+                    'Получить токен: https://huggingface.co/settings/tokens, добавить в .env как HF_TOKEN=hf_...'
+                )
+            )
         from Dolg_APP.services.cad_import import import_kicad_sexpr
 
         # Авто-детект ключа со схемой: пробуем несколько типичных имён.
@@ -245,7 +282,9 @@ class Command(BaseCommand):
         # загрузки — следим за ним и публикуем «Скачано X МБ из ~Y».
         import threading
         from pathlib import Path as _Path
+
         from huggingface_hub.constants import HF_HUB_CACHE
+
         cache_dir = _Path(HF_HUB_CACHE)
         download_stop = threading.Event()
 
@@ -263,8 +302,7 @@ class Command(BaseCommand):
                             continue
                     if biggest > 0:
                         mb = biggest / (1024 * 1024)
-                        _publish_progress(extra={'message':
-                            f'{label} (скачано {mb:.1f} МБ из ~70 МБ)'})
+                        _publish_progress(extra={'message': f'{label} (скачано {mb:.1f} МБ из ~70 МБ)'})
                 except Exception:
                     pass
                 download_stop.wait(2.0)  # каждые 2 сек
@@ -305,9 +343,9 @@ class Command(BaseCommand):
                 self.stdout.write(f'  cache hit: {local_parquet}')
             elif opts.get('local_only'):
                 download_stop.set()
-                self.stdout.write(self.style.WARNING(
-                    f'  cache miss: {local_parquet}; --local-only не открывает сеть.'
-                ))
+                self.stdout.write(
+                    self.style.WARNING(f'  cache miss: {local_parquet}; --local-only не открывает сеть.')
+                )
                 continue
             else:
                 try:
@@ -321,9 +359,11 @@ class Command(BaseCommand):
                     )
                 except Exception as exc:
                     download_stop.set()
-                    self.stdout.write(self.style.WARNING(
-                        f'  ⚠ шард {shard_idx + 1} не скачан: {type(exc).__name__}: {str(exc)[:180]}'
-                    ))
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f'  ⚠ шард {shard_idx + 1} не скачан: {type(exc).__name__}: {str(exc)[:180]}'
+                        )
+                    )
                     continue
 
             download_stop.set()
@@ -331,18 +371,13 @@ class Command(BaseCommand):
             try:
                 pf = pq.ParquetFile(parquet_path)
             except Exception as exc:
-                self.stdout.write(self.style.WARNING(
-                    f'  ⚠ шард {shard_idx + 1} не открылся: {exc}'
-                ))
+                self.stdout.write(self.style.WARNING(f'  ⚠ шард {shard_idx + 1} не открылся: {exc}'))
                 continue
 
             if shard_idx == 0:
                 column_names = list(pf.schema_arrow.names)
-                self.stdout.write(
-                    f'  parquet: {pf.metadata.num_rows} строк, колонки: {column_names}'
-                )
-            _publish_progress(extra={'message':
-                f'Распаковка шарда {shard_idx + 1}/{shards_to_pull}…'})
+                self.stdout.write(f'  parquet: {pf.metadata.num_rows} строк, колонки: {column_names}')
+            _publish_progress(extra={'message': f'Распаковка шарда {shard_idx + 1}/{shards_to_pull}…'})
 
             for batch in pf.iter_batches(batch_size=64):
                 if len(out) >= limit:
@@ -393,11 +428,14 @@ class Command(BaseCommand):
                     }
                     out.append(scheme_data)
 
-        _publish_progress(state='running', extra={'message':
-            f'Финализация: импортировано {len(out)}, пропущено {skipped}'})
-        self.stdout.write(self.style.SUCCESS(
-            f'OK: импортировано {len(out)} схем (обработано {processed}, пропущено {skipped})'
-        ))
+        _publish_progress(
+            state='running', extra={'message': f'Финализация: импортировано {len(out)}, пропущено {skipped}'}
+        )
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'OK: импортировано {len(out)} схем (обработано {processed}, пропущено {skipped})'
+            )
+        )
         return out
 
     def _download_hf_parquet_requests(
@@ -416,7 +454,7 @@ class Command(BaseCommand):
         except ImportError as exc:
             raise CommandError('requests is required for robust dataset download') from exc
 
-        url = f"https://huggingface.co/datasets/{spec['hf_id']}/resolve/main/{shard_name}"
+        url = f'https://huggingface.co/datasets/{spec["hf_id"]}/resolve/main/{shard_name}'
         headers = {}
         if token:
             headers['Authorization'] = f'Bearer {token}'
@@ -431,7 +469,9 @@ class Command(BaseCommand):
         if progress:
             progress({'stage': 'download', 'message': f'Скачиваю {shard_name} через requests…'})
         started_at = time.time()
-        with requests.get(url, headers=headers, stream=True, timeout=(15, 30), allow_redirects=True) as response:
+        with requests.get(
+            url, headers=headers, stream=True, timeout=(15, 30), allow_redirects=True
+        ) as response:
             response.raise_for_status()
             total = int(response.headers.get('content-length') or 0)
             downloaded = 0
@@ -439,7 +479,9 @@ class Command(BaseCommand):
             with tmp_path.open('wb') as handle:
                 for chunk in response.iter_content(chunk_size=1024 * 1024):
                     if time.time() - started_at > max(10, int(deadline_seconds)):
-                        raise TimeoutError(f'Download deadline exceeded: {deadline_seconds}s for {shard_name}')
+                        raise TimeoutError(
+                            f'Download deadline exceeded: {deadline_seconds}s for {shard_name}'
+                        )
                     if not chunk:
                         continue
                     handle.write(chunk)
@@ -461,11 +503,13 @@ class Command(BaseCommand):
             raise CommandError(f'Downloaded empty shard: {shard_name}')
         tmp_path.replace(target_path)
         if progress:
-            progress({
-                'stage': 'downloaded',
-                'downloaded_mb': round(target_path.stat().st_size / (1024 * 1024), 1),
-                'message': f'Шард сохранен: {target_path.name}',
-            })
+            progress(
+                {
+                    'stage': 'downloaded',
+                    'downloaded_mb': round(target_path.stat().st_size / (1024 * 1024), 1),
+                    'message': f'Шард сохранен: {target_path.name}',
+                }
+            )
         return str(target_path)
 
     def _row_to_scheme_data(self, row, text_keys, json_keys, kicad_parser):
@@ -545,7 +589,7 @@ class Command(BaseCommand):
         limit = max(1, int(opts['limit']))
         out = []
         skipped = 0
-        for f in files[:limit * 2]:
+        for f in files[: limit * 2]:
             if len(out) >= limit:
                 break
             try:
@@ -572,9 +616,9 @@ class Command(BaseCommand):
                 out.append(sd)
             except Exception:
                 skipped += 1
-        self.stdout.write(self.style.SUCCESS(
-            f'✓ Импортировано {len(out)} SPICE-netlists, пропущено {skipped}'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f'✓ Импортировано {len(out)} SPICE-netlists, пропущено {skipped}')
+        )
         return out
 
     # ----- Helpers -------------------------------------------------------
@@ -591,11 +635,10 @@ class Command(BaseCommand):
         try:
             from Dolg_APP.models import AITrainingExample
         except ImportError:
-            self.stdout.write(self.style.WARNING(
-                'AITrainingExample не найден — пропускаю --persist.'
-            ))
+            self.stdout.write(self.style.WARNING('AITrainingExample не найден — пропускаю --persist.'))
             return
         from django.utils import timezone
+
         from Dolg_APP.ml.neural import (
             _detect_teacher_topology,
             _next_component_teacher,
@@ -618,13 +661,15 @@ class Command(BaseCommand):
                     f'компонентов {len(scheme_copy.get("components") or [])}, '
                     f'соединений {len(scheme_copy.get("connections") or [])}.'
                 )
-                target = '\n'.join([
-                    f'topology={topology}',
-                    f'risk_score={risk_score}',
-                    f'next_component={next_component}',
-                    f'dataset_source={source}',
-                    f'license={spec.get("license")}',
-                ])
+                target = '\n'.join(
+                    [
+                        f'topology={topology}',
+                        f'risk_score={risk_score}',
+                        f'next_component={next_component}',
+                        f'dataset_source={source}',
+                        f'license={spec.get("license")}',
+                    ]
+                )
                 features = {
                     'source': 'external_dataset',
                     'evidence_kind': meta.get('evidence_kind') or 'external_curated',
@@ -669,7 +714,9 @@ class Command(BaseCommand):
                     created += 1
             except Exception as exc:
                 self.stdout.write(self.style.WARNING(f'  persist failed: {exc}'))
-        self.stdout.write(self.style.SUCCESS(f'Persisted to AITrainingExample: created={created}, updated={updated}'))
+        self.stdout.write(
+            self.style.SUCCESS(f'Persisted to AITrainingExample: created={created}, updated={updated}')
+        )
         return
 
         created = 0
@@ -677,7 +724,7 @@ class Command(BaseCommand):
             meta = s.get('__training_metadata') or {}
             try:
                 AITrainingExample.objects.update_or_create(
-                    name=f'{source}#{created+1}',
+                    name=f'{source}#{created + 1}',
                     defaults={
                         'features': {
                             'scheme_data': s,
@@ -738,12 +785,12 @@ class Command(BaseCommand):
             safe_source = slugify(source) or 'dataset'
             name = f'AI dataset: {source} #{index}'
             description = (
-                f"Импортировано из датасета {source}. "
-                f"Тип: {score['family']}; сложность: {score['complexity_label']} "
-                f"({score['complexity_score']}/100); качество: {score['quality_label']} "
-                f"({score['quality_score']}/100). "
-                f"Лицензия/атрибуция: {meta.get('license') or spec.get('license')} / "
-                f"{meta.get('attribution') or spec.get('attribution')}"
+                f'Импортировано из датасета {source}. '
+                f'Тип: {score["family"]}; сложность: {score["complexity_label"]} '
+                f'({score["complexity_score"]}/100); качество: {score["quality_label"]} '
+                f'({score["quality_score"]}/100). '
+                f'Лицензия/атрибуция: {meta.get("license") or spec.get("license")} / '
+                f'{meta.get("attribution") or spec.get("attribution")}'
             )
             project, was_created = SchematicProject.all_objects.update_or_create(
                 user=owner,
@@ -752,7 +799,9 @@ class Command(BaseCommand):
                     'description': description,
                     'category': category_map.get(score['family'], 'other'),
                     'status': 'completed',
-                    'difficulty': score['complexity_label'] if score['complexity_label'] in {'basic', 'medium', 'advanced'} else 'basic',
+                    'difficulty': score['complexity_label']
+                    if score['complexity_label'] in {'basic', 'medium', 'advanced'}
+                    else 'basic',
                     'is_demo': True,
                     'visibility': 'public',
                     'approval_state': 'approved',
@@ -774,6 +823,8 @@ class Command(BaseCommand):
             )
             created += int(was_created)
             updated += int(not was_created)
-        self.stdout.write(self.style.SUCCESS(
-            f'Persisted to SchematicProject demos: created={created}, updated={updated}, skipped={skipped}'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Persisted to SchematicProject demos: created={created}, updated={updated}, skipped={skipped}'
+            )
+        )

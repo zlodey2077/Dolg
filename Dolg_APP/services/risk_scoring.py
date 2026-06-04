@@ -10,7 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 
-def assess_fuzzy_project_risk(*, thermal_margin_c=None, bom_risk_count=0, floating_count=0, warning_count=0) -> dict[str, Any]:
+def assess_fuzzy_project_risk(
+    *, thermal_margin_c=None, bom_risk_count=0, floating_count=0, warning_count=0
+) -> dict[str, Any]:
     import numpy as np
     import skfuzzy as fuzz
 

@@ -14,7 +14,6 @@ from shop.services.product_images import (
     VERIFIED_IMAGE_SOURCE,
 )
 
-
 BLOCKED_REAL_PHOTO_SLUGS = {
     # Явно нерелевантные изображения из старого кеша: еда, вода, сломанные
     # экраны, спутниковые/промышленные кадры или фото не того класса товара.
@@ -50,7 +49,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--slug', help='Only process one product slug.')
         parser.add_argument('--dry-run', action='store_true')
-        parser.add_argument('--force', action='store_true', help='Re-copy verified files even if they already exist.')
+        parser.add_argument(
+            '--force', action='store_true', help='Re-copy verified files even if they already exist.'
+        )
 
     def handle(self, *args, **options):
         media_root = Path(settings.MEDIA_ROOT)
@@ -82,21 +83,23 @@ class Command(BaseCommand):
             previous_params = dict(product.parameters or {})
             product.image.name = relative
             params = dict(product.parameters or {})
-            params.update({
-                'image_source': 'verified real product photo',
-                'image_source_url': VERIFIED_IMAGE_SOURCE,
-                'image_source_policy': GENERATED_IMAGE_POLICY,
-                'image_verified_from': candidate.relative_to(media_root).as_posix(),
-            })
+            params.update(
+                {
+                    'image_source': 'verified real product photo',
+                    'image_source_url': VERIFIED_IMAGE_SOURCE,
+                    'image_source_policy': GENERATED_IMAGE_POLICY,
+                    'image_verified_from': candidate.relative_to(media_root).as_posix(),
+                }
+            )
             product.parameters = params
 
             report = audit_product_image(product, media_root=media_root)
             if not report['ok']:
                 product.image.name = previous_image
                 product.parameters = previous_params
-                self.stdout.write(self.style.WARNING(
-                    f'skip: {product.slug} failed quality gate {report["errors"]}'
-                ))
+                self.stdout.write(
+                    self.style.WARNING(f'skip: {product.slug} failed quality gate {report["errors"]}')
+                )
                 skipped += 1
                 continue
 
@@ -104,9 +107,11 @@ class Command(BaseCommand):
             applied += 1
             self.stdout.write(f'{self._safe(product.name)[:42]:<42} <- {relative}')
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Verified real photos checked={checked}, applied={applied}, skipped={skipped}.'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Verified real photos checked={checked}, applied={applied}, skipped={skipped}.'
+            )
+        )
 
     @staticmethod
     def _safe(value: str) -> str:

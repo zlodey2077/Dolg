@@ -8,6 +8,7 @@
 - cancel(user) — auto_renew=False, доступ до конца period_end
 - restore(user) — восстановить auto_renew (если ещё не expired)
 """
+
 from datetime import timedelta
 
 from django.utils import timezone

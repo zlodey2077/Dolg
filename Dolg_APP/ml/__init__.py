@@ -16,6 +16,7 @@ API:
     pipeline.explain_scheme(scheme_data)
     pipeline.recommend_next_component(scheme_data)
 """
+
 import os
 
 from .pipeline import DolgAIPipeline

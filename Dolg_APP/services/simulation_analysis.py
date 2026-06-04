@@ -127,7 +127,9 @@ def _bode_from_rc_lowpass(config):
 
 def _bode_from_points(config):
     frequencies = _as_float_array(config.get('frequencies_hz'), limit=MAX_POINTS)
-    magnitude_db = _as_float_array(config.get('magnitude_db') or config.get('magnitudes_db'), limit=MAX_POINTS)
+    magnitude_db = _as_float_array(
+        config.get('magnitude_db') or config.get('magnitudes_db'), limit=MAX_POINTS
+    )
     phase_deg = _as_float_array(config.get('phase_deg') or config.get('phases_deg'), limit=MAX_POINTS)
 
     if frequencies.size and magnitude_db.size:
@@ -216,14 +218,38 @@ def monte_carlo_tolerance(config):
     try:
         if kind == 'voltage_divider':
             vin = float(config.get('vin') or 5)
-            r1 = _sample_nominal(rng, parse_number(config.get('r1_ohm'), 1000), config.get('r1_tolerance_percent', 5), sample_count, distribution)
-            r2 = _sample_nominal(rng, parse_number(config.get('r2_ohm'), 1000), config.get('r2_tolerance_percent', 5), sample_count, distribution)
+            r1 = _sample_nominal(
+                rng,
+                parse_number(config.get('r1_ohm'), 1000),
+                config.get('r1_tolerance_percent', 5),
+                sample_count,
+                distribution,
+            )
+            r2 = _sample_nominal(
+                rng,
+                parse_number(config.get('r2_ohm'), 1000),
+                config.get('r2_tolerance_percent', 5),
+                sample_count,
+                distribution,
+            )
             values = vin * r2 / np.maximum(r1 + r2, 1e-18)
             metric = 'vout'
             unit = 'V'
         elif kind == 'rc_cutoff':
-            r = _sample_nominal(rng, parse_number(config.get('resistance_ohm'), 10000), config.get('r_tolerance_percent', 5), sample_count, distribution)
-            c = _sample_nominal(rng, parse_number(config.get('capacitance_f'), 1e-7), config.get('c_tolerance_percent', 10), sample_count, distribution)
+            r = _sample_nominal(
+                rng,
+                parse_number(config.get('resistance_ohm'), 10000),
+                config.get('r_tolerance_percent', 5),
+                sample_count,
+                distribution,
+            )
+            c = _sample_nominal(
+                rng,
+                parse_number(config.get('capacitance_f'), 1e-7),
+                config.get('c_tolerance_percent', 10),
+                sample_count,
+                distribution,
+            )
             values = 1.0 / (2 * np.pi * np.maximum(r * c, 1e-24))
             metric = 'cutoff_frequency'
             unit = 'Hz'
@@ -314,12 +340,14 @@ def signal_quality(samples, sample_rate_hz, *, fundamental_hz=None, max_harmonic
         lo = max(0, idx - 1)
         hi = min(amplitudes.size, idx + 2)
         excluded[lo:hi] = True
-        harmonic_rows.append({
-            'order': order,
-            'frequency_hz': float(freqs[idx]),
-            'magnitude': float(amplitudes[idx]),
-            'db_relative': 0.0,
-        })
+        harmonic_rows.append(
+            {
+                'order': order,
+                'frequency_hz': float(freqs[idx]),
+                'magnitude': float(amplitudes[idx]),
+                'db_relative': 0.0,
+            }
+        )
 
     fundamental_mag = harmonic_rows[0]['magnitude'] if harmonic_rows else 0.0
     if fundamental_mag <= 0:
@@ -338,8 +366,8 @@ def signal_quality(samples, sample_rate_hz, *, fundamental_hz=None, max_harmonic
         sinad_db = float(20 * math.log10(fundamental_mag / math.sqrt(distortion_noise)))
         enob = float((sinad_db - 1.76) / 6.02)
 
-    rms = float(np.sqrt(np.mean(values ** 2)))
-    ac_rms = float(np.sqrt(np.mean(ac_values ** 2)))
+    rms = float(np.sqrt(np.mean(values**2)))
+    ac_rms = float(np.sqrt(np.mean(ac_values**2)))
     peak_to_peak = float(np.max(values) - np.min(values))
     crest_factor = float(np.max(np.abs(values)) / rms) if rms > 0 else None
 
@@ -406,11 +434,7 @@ def _series_from_payload(payload):
         return x_values[:length], y_values[:length]
 
     values = (
-        payload.get('values')
-        or payload.get('samples')
-        or result.get('values')
-        or result.get('samples')
-        or []
+        payload.get('values') or payload.get('samples') or result.get('values') or result.get('samples') or []
     )
     y_values = _as_float_array(values)
     if y_values.size == 0:
@@ -418,12 +442,14 @@ def _series_from_payload(payload):
     times = payload.get('times') or result.get('times') or []
     x_values = _as_float_array(times)
     if x_values.size != y_values.size:
-        sample_rate = float(payload.get('sample_rate_hz') or payload.get('sampleRateHz') or result.get('sample_rate_hz') or 0)
+        sample_rate = float(
+            payload.get('sample_rate_hz') or payload.get('sampleRateHz') or result.get('sample_rate_hz') or 0
+        )
         if sample_rate > 0:
             x_values = np.arange(y_values.size) / sample_rate
         else:
             x_values = np.arange(y_values.size)
-    return x_values[:y_values.size], y_values
+    return x_values[: y_values.size], y_values
 
 
 def _nearest_marker(x_values, y_values, marker):
@@ -443,7 +469,9 @@ def _formula_value(expression, variables):
     try:
         import sympy as sp
 
-        allowed = {key: float(value) for key, value in (variables or {}).items() if isinstance(value, (int, float))}
+        allowed = {
+            key: float(value) for key, value in (variables or {}).items() if isinstance(value, (int, float))
+        }
         symbols = {key: sp.Symbol(key) for key in allowed}
         expr = sp.sympify(str(expression), locals=symbols)
         value = float(expr.evalf(subs=allowed))
@@ -471,27 +499,50 @@ def postprocess_simulation(payload):
     unit = payload.get('unit') or payload.get('y_unit') or ''
 
     if y_values.size:
-        metrics.update({
-            'average': float(np.mean(y_values)),
-            'rms': float(np.sqrt(np.mean(y_values ** 2))),
-            'peak_to_peak': float(np.max(y_values) - np.min(y_values)),
-            'minimum': float(np.min(y_values)),
-            'maximum': float(np.max(y_values)),
-        })
-        measurements.extend([
-            {'metric': 'average', 'label': 'Среднее значение', 'value': metrics['average'], 'unit': unit},
-            {'metric': 'rms', 'label': 'RMS', 'value': metrics['rms'], 'unit': unit},
-            {'metric': 'peak_to_peak', 'label': 'Размах peak-to-peak', 'value': metrics['peak_to_peak'], 'unit': unit},
-        ])
+        metrics.update(
+            {
+                'average': float(np.mean(y_values)),
+                'rms': float(np.sqrt(np.mean(y_values**2))),
+                'peak_to_peak': float(np.max(y_values) - np.min(y_values)),
+                'minimum': float(np.min(y_values)),
+                'maximum': float(np.max(y_values)),
+            }
+        )
+        measurements.extend(
+            [
+                {'metric': 'average', 'label': 'Среднее значение', 'value': metrics['average'], 'unit': unit},
+                {'metric': 'rms', 'label': 'RMS', 'value': metrics['rms'], 'unit': unit},
+                {
+                    'metric': 'peak_to_peak',
+                    'label': 'Размах peak-to-peak',
+                    'value': metrics['peak_to_peak'],
+                    'unit': unit,
+                },
+            ]
+        )
 
     voltage = parse_number(payload.get('voltage') or payload.get('voltage_v'), None)
     current = parse_number(payload.get('current') or payload.get('current_a'), None)
     if voltage is not None and current is not None:
         metrics['power_w'] = float(voltage * current)
-        measurements.append({'metric': 'component_power', 'label': 'Мощность элемента', 'value': metrics['power_w'], 'unit': 'W'})
+        measurements.append(
+            {
+                'metric': 'component_power',
+                'label': 'Мощность элемента',
+                'value': metrics['power_w'],
+                'unit': 'W',
+            }
+        )
         if abs(current) > 1e-18:
             metrics['resistance_ohm'] = float(voltage / current)
-            measurements.append({'metric': 'dynamic_resistance', 'label': 'V/I', 'value': metrics['resistance_ohm'], 'unit': 'Ohm'})
+            measurements.append(
+                {
+                    'metric': 'dynamic_resistance',
+                    'label': 'V/I',
+                    'value': metrics['resistance_ohm'],
+                    'unit': 'Ohm',
+                }
+            )
 
     for marker in payload.get('markers') or []:
         if isinstance(marker, dict) and marker.get('x') is not None:
@@ -685,7 +736,7 @@ def parameter_sweep(config):
                 cur_vf = x if parameter == 'vf' else vf
                 cur_r = x if parameter == 'resistance_ohm' else resistance
                 current_a = max(cur_vin - cur_vf, 0) / max(cur_r, 1e-18)
-                y_values.append(current_a * 1000.0 if metric == 'current_ma' else current_a ** 2 * cur_r)
+                y_values.append(current_a * 1000.0 if metric == 'current_ma' else current_a**2 * cur_r)
             unit = 'mA' if metric == 'current_ma' else 'W'
             x_unit = 'V' if parameter in {'vin', 'vf'} else 'Ohm'
 
@@ -709,7 +760,9 @@ def parameter_sweep(config):
     if target_max is not None:
         in_target &= y_values <= target_max
 
-    target_fraction = float(np.mean(in_target)) if (target_min is not None or target_max is not None) else None
+    target_fraction = (
+        float(np.mean(in_target)) if (target_min is not None or target_max is not None) else None
+    )
     if target_fraction is None:
         verdict = 'explore'
         feedback = 'Sweep is ready for visual what-if comparison.'
@@ -725,10 +778,7 @@ def parameter_sweep(config):
 
     best_index = None
     if target_min is not None or target_max is not None:
-        target_center = np.mean([
-            value for value in (target_min, target_max)
-            if value is not None
-        ])
+        target_center = np.mean([value for value in (target_min, target_max) if value is not None])
         best_index = int(np.argmin(np.abs(y_values - target_center)))
 
     fig = Figure(figsize=(6.4, 3.4))
@@ -761,7 +811,8 @@ def parameter_sweep(config):
         'target_fraction': target_fraction,
         'best_point': (
             {'x': float(x_values[best_index]), 'y': float(y_values[best_index])}
-            if best_index is not None else None
+            if best_index is not None
+            else None
         ),
         'verdict': verdict,
         'feedback': feedback,
@@ -812,11 +863,7 @@ def server_side_dc_fallback(scheme_data):
     for comp in components:
         comp_id = str(comp.get('id'))
         ctype = normalize_component_type(comp.get('type'))
-        ports = [
-            endpoint
-            for endpoint in uf.parent
-            if endpoint[0] == comp_id
-        ]
+        ports = [endpoint for endpoint in uf.parent if endpoint[0] == comp_id]
         roots = []
         for endpoint in ports:
             root = uf.find(endpoint)
@@ -912,14 +959,18 @@ def server_side_dc_fallback(scheme_data):
 def simulation_run_stats(runs, *, limit=5):
     records = []
     for run in runs or []:
-        records.append({
-            'id': getattr(run, 'id', None),
-            'analysis_type': getattr(run, 'analysis_type', 'unknown') or 'unknown',
-            'engine': getattr(run, 'engine', '') or '',
-            'elapsed_ms': int(getattr(run, 'elapsed_ms', 0) or 0),
-            'status': getattr(run, 'status', '') or '',
-            'created': getattr(run, 'created_at', None).isoformat() if getattr(run, 'created_at', None) else '',
-        })
+        records.append(
+            {
+                'id': getattr(run, 'id', None),
+                'analysis_type': getattr(run, 'analysis_type', 'unknown') or 'unknown',
+                'engine': getattr(run, 'engine', '') or '',
+                'elapsed_ms': int(getattr(run, 'elapsed_ms', 0) or 0),
+                'status': getattr(run, 'status', '') or '',
+                'created': getattr(run, 'created_at', None).isoformat()
+                if getattr(run, 'created_at', None)
+                else '',
+            }
+        )
     if not records:
         return {
             'ok': True,
@@ -933,7 +984,9 @@ def simulation_run_stats(runs, *, limit=5):
     slowest = frame.sort_values('elapsed_ms', ascending=False).head(limit).to_dict(orient='records')
     grouped = (
         frame.groupby('analysis_type', as_index=False)
-        .agg(runs=('id', 'count'), mean_elapsed_ms=('elapsed_ms', 'mean'), max_elapsed_ms=('elapsed_ms', 'max'))
+        .agg(
+            runs=('id', 'count'), mean_elapsed_ms=('elapsed_ms', 'mean'), max_elapsed_ms=('elapsed_ms', 'max')
+        )
         .sort_values('max_elapsed_ms', ascending=False)
         .to_dict(orient='records')
     )

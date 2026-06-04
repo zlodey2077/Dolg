@@ -18,7 +18,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--limit', type=int, default=20)
         parser.add_argument('--all', action='store_true', help='Process all matching REB products.')
-        parser.add_argument('--missing-only', action='store_true', help='Skip products that already have datasheet_extracted.')
+        parser.add_argument(
+            '--missing-only', action='store_true', help='Skip products that already have datasheet_extracted.'
+        )
         parser.add_argument('--dry-run', action='store_true')
         parser.add_argument('--live-refresh', action='store_true')
         parser.add_argument('--json', action='store_true')
@@ -26,15 +28,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         limit = max(1, options['limit'])
         products_qs = (
-            Product.objects
-            .select_related('category')
+            Product.objects.select_related('category')
             .filter(category__slug__in=Category.REB_SLUGS)
             .exclude(datasheet_url='')
             .order_by('slug')
         )
         if options['missing_only']:
             products_qs = [
-                product for product in products_qs
+                product
+                for product in products_qs
                 if not (product.parameters or {}).get('datasheet_extracted')
             ]
         if options['all']:
@@ -79,10 +81,7 @@ class Command(BaseCommand):
                 'part_number': product.part_number,
                 'source': source,
                 'confidence': record.get('confidence'),
-                'fields_found': [
-                    key for key, value in (record.get('fields') or {}).items()
-                    if value
-                ],
+                'fields_found': [key for key, value in (record.get('fields') or {}).items() if value],
             }
             report['processed'].append(item)
             if not options['dry_run']:
@@ -92,14 +91,16 @@ class Command(BaseCommand):
         if options['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2))
         else:
-            self.stdout.write(self.style.SUCCESS(
-                f"Datasheet intelligence processed: {len(report['processed'])}; "
-                f"dry_run={report['dry_run']}; live_refresh={report['live_refresh']}"
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'Datasheet intelligence processed: {len(report["processed"])}; '
+                    f'dry_run={report["dry_run"]}; live_refresh={report["live_refresh"]}'
+                )
+            )
             for item in report['processed']:
                 self.stdout.write(
-                    f"  - {item['slug']}: {item['source']} confidence={item['confidence']} "
-                    f"fields={', '.join(item['fields_found']) or '-'}"
+                    f'  - {item["slug"]}: {item["source"]} confidence={item["confidence"]} '
+                    f'fields={", ".join(item["fields_found"]) or "-"}'
                 )
             for warning in report['warnings']:
                 self.stdout.write(self.style.WARNING(f'  warning: {warning}'))

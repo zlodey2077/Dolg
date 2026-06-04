@@ -21,6 +21,7 @@
     @require_org_permission('bom.approve', org_arg='org_slug')
     def api_bom_approve(request, org_slug, bom_id): ...
 """
+
 import functools
 
 from django.http import JsonResponse
@@ -28,48 +29,82 @@ from django.http import JsonResponse
 # Базовая матрица прав. Owner получает ВСЁ автоматически (см. user_can).
 ROLE_PERMISSIONS = {
     'owner': {
-        'org.delete', 'org.update', 'org.billing',
-        'org.members.invite', 'org.members.remove', 'org.members.role_change',
-        'project.create', 'project.edit_own', 'project.edit_team', 'project.delete',
-        'project.read',
-        'bom.submit', 'bom.approve', 'bom.reject',
-        'audit.read', 'audit.export',
-        'order.create',
-        'settings.policy',
-        'api.token.create', 'api.token.revoke',
-        'org.chat.read', 'org.chat.write', 'org.chat.create_conversation', 'org.chat.archive',
-        'org.moderation.manage',
-        'catalog.product.create', 'catalog.product.edit', 'catalog.product.delete',
-    },
-    'admin': {
+        'org.delete',
         'org.update',
-        'org.members.invite', 'org.members.remove', 'org.members.role_change',
-        'project.create', 'project.edit_own', 'project.edit_team', 'project.delete',
+        'org.billing',
+        'org.members.invite',
+        'org.members.remove',
+        'org.members.role_change',
+        'project.create',
+        'project.edit_own',
+        'project.edit_team',
+        'project.delete',
         'project.read',
-        'bom.submit', 'bom.approve', 'bom.reject',
-        'audit.read', 'audit.export',
+        'bom.submit',
+        'bom.approve',
+        'bom.reject',
+        'audit.read',
+        'audit.export',
         'order.create',
         'settings.policy',
         'api.token.create',
-        'org.chat.read', 'org.chat.write', 'org.chat.create_conversation', 'org.chat.archive',
+        'api.token.revoke',
+        'org.chat.read',
+        'org.chat.write',
+        'org.chat.create_conversation',
+        'org.chat.archive',
         'org.moderation.manage',
-        'catalog.product.create', 'catalog.product.edit',
+        'catalog.product.create',
+        'catalog.product.edit',
+        'catalog.product.delete',
     },
-    'engineer': {
-        'project.create', 'project.edit_own', 'project.edit_team',
+    'admin': {
+        'org.update',
+        'org.members.invite',
+        'org.members.remove',
+        'org.members.role_change',
+        'project.create',
+        'project.edit_own',
+        'project.edit_team',
+        'project.delete',
         'project.read',
         'bom.submit',
-        'org.chat.read', 'org.chat.write',
+        'bom.approve',
+        'bom.reject',
+        'audit.read',
+        'audit.export',
+        'order.create',
+        'settings.policy',
+        'api.token.create',
+        'org.chat.read',
+        'org.chat.write',
+        'org.chat.create_conversation',
+        'org.chat.archive',
+        'org.moderation.manage',
+        'catalog.product.create',
+        'catalog.product.edit',
+    },
+    'engineer': {
+        'project.create',
+        'project.edit_own',
+        'project.edit_team',
+        'project.read',
+        'bom.submit',
+        'org.chat.read',
+        'org.chat.write',
         'catalog.product.create',  # инженеры могут предлагать товары в каталог
     },
     'reviewer': {
         'project.read',
-        'bom.approve', 'bom.reject',
-        'org.chat.read', 'org.chat.write',
+        'bom.approve',
+        'bom.reject',
+        'org.chat.read',
+        'org.chat.write',
     },
     'moderator': {
         'project.read',
-        'org.chat.read', 'org.chat.write',
+        'org.chat.read',
+        'org.chat.write',
         'org.moderation.manage',
     },
     'viewer': {
@@ -107,7 +142,7 @@ def get_user_role(user, organization) -> str:
     if user is None or not user.is_authenticated or organization is None:
         return ''
     if user.is_staff or user.is_superuser:
-        return 'admin'   # для UI-отображения; user_can даст True всё равно
+        return 'admin'  # для UI-отображения; user_can даст True всё равно
     return organization.get_role(user)
 
 
@@ -122,6 +157,7 @@ def require_org_permission(action: str, org_arg: str = 'org_slug', org_field: st
 
     Если permission deny → 403 JSON (для API) или redirect (для пагов).
     """
+
     def decorator(view):
         @functools.wraps(view)
         def wrapper(request, *args, **kwargs):
@@ -146,7 +182,9 @@ def require_org_permission(action: str, org_arg: str = 'org_slug', org_field: st
             # Инжектим org в request, чтобы view не повторял lookup
             request.organization = org
             return view(request, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -155,6 +193,7 @@ def _deny(request, message: str, status: int = 403):
         return JsonResponse({'ok': False, 'error': 'permission_denied', 'message': message}, status=status)
     # Для HTML — простая 403/404 страница
     from django.http import HttpResponseForbidden, HttpResponseNotFound
+
     if status == 404:
         return HttpResponseNotFound(message)
     return HttpResponseForbidden(message)
@@ -163,6 +202,7 @@ def _deny(request, message: str, status: int = 403):
 # ============================================================
 # Template-tags helpers (импортируются в tier_tags.py)
 # ============================================================
+
 
 def template_user_can(user, organization, action: str) -> bool:
     """Alias для использования из шаблонов через template tag."""

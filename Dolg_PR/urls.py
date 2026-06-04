@@ -14,6 +14,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -22,17 +23,19 @@ from django.views.static import serve
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include("shop.urls", namespace="shop")),  # Shop is main page
-    path('accounts/', include("accounts.urls", namespace="accounts")),
+    path('', include('shop.urls', namespace='shop')),  # Shop is main page
+    path('accounts/', include('accounts.urls', namespace='accounts')),
     # django-allauth: /accounts/google/login/, /accounts/microsoft/login/, /accounts/github/login/
     # ВАЖНО: include('allauth.urls') не должен перекрыть наши accounts.urls —
     # наш include('accounts.urls') стоит ВЫШЕ, allauth добавляет только новые
     # маршруты (social/, /accounts/google/, ...), которых у нас нет.
     path('accounts/', include('allauth.urls')),
-    path('orders/', include("orders.urls", namespace="orders")),
-    path('knowledge/', include("knowledge.urls", namespace="knowledge")),
-    path('', include("moderation.urls", namespace="moderation")),
-    path('', include("Dolg_APP.urls", namespace="hello")),  # Инструменты (/simulation/, /cad/, /projects/) на корне
+    path('orders/', include('orders.urls', namespace='orders')),
+    path('knowledge/', include('knowledge.urls', namespace='knowledge')),
+    path('', include('moderation.urls', namespace='moderation')),
+    path(
+        '', include('Dolg_APP.urls', namespace='hello')
+    ),  # Инструменты (/simulation/, /cad/, /projects/) на корне
 ]
 
 # Prometheus: /metrics/ только если пакет реально подгрузился (см. settings).
@@ -57,6 +60,7 @@ if settings.DEBUG:
         re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     ]
     from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+
     urlpatterns += staticfiles_urlpatterns()
 elif getattr(settings, 'SERVE_MEDIA', False):
     urlpatterns += [

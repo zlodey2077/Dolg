@@ -11,7 +11,9 @@ class Command(BaseCommand):
     help = 'Export validated AITrainingExample rows to JSONL.'
 
     def add_arguments(self, parser):
-        default_path = Path(settings.BASE_DIR) / 'Dolg_APP' / 'ml' / 'dataset' / 'exports' / 'ai_training_dataset.jsonl'
+        default_path = (
+            Path(settings.BASE_DIR) / 'Dolg_APP' / 'ml' / 'dataset' / 'exports' / 'ai_training_dataset.jsonl'
+        )
         parser.add_argument('--output', default=str(default_path))
         parser.add_argument('--include-unvalidated', action='store_true')
         parser.add_argument('--no-scheme-data', action='store_true')
@@ -28,6 +30,4 @@ class Command(BaseCommand):
         if options['as_json']:
             self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
             return
-        self.stdout.write(self.style.SUCCESS(
-            f"Exported {result['count']} AI examples -> {result['path']}"
-        ))
+        self.stdout.write(self.style.SUCCESS(f'Exported {result["count"]} AI examples -> {result["path"]}'))

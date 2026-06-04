@@ -6,6 +6,7 @@
 request.user из session-cookie. Origin-check защищает от подключений с чужого
 домена (CSRF-аналог для WS).
 """
+
 import os
 
 from django.core.asgi import get_asgi_application
@@ -21,9 +22,9 @@ from channels.security.websocket import AllowedHostsOriginValidator
 
 from Dolg_APP.routing import websocket_urlpatterns
 
-application = ProtocolTypeRouter({
-    'http': django_asgi_app,
-    'websocket': AllowedHostsOriginValidator(
-        AuthMiddlewareStack(URLRouter(websocket_urlpatterns))
-    ),
-})
+application = ProtocolTypeRouter(
+    {
+        'http': django_asgi_app,
+        'websocket': AllowedHostsOriginValidator(AuthMiddlewareStack(URLRouter(websocket_urlpatterns))),
+    }
+)

@@ -19,6 +19,7 @@ fastembed/sentence-transformers без изменения API — публичн
 
 Связано с [[plugins-backlog]] (C), [[smart-search-todo]] (Phase 2 «семантика»).
 """
+
 from __future__ import annotations
 
 import json
@@ -41,15 +42,16 @@ _MAPPING_FILE = _INDEX_DIR / 'products.json'
 _STALE_MARKER = _INDEX_DIR / '.stale'
 
 # Lazy-init объекты
-_vectorizer = None    # sklearn TfidfVectorizer
-_matrix = None        # scipy.sparse матрица embeddings [N × V]
-_id_mapping: list[int] = []   # позиция в матрице → Product.id
+_vectorizer = None  # sklearn TfidfVectorizer
+_matrix = None  # scipy.sparse матрица embeddings [N × V]
+_id_mapping: list[int] = []  # позиция в матрице → Product.id
 
 
 def is_semantic_available() -> bool:
     """True если sklearn установлен. Иначе rule-based fallback."""
     try:
         import sklearn  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -104,6 +106,7 @@ def _get_morph():
     _morph_tried = True
     try:
         import pymorphy3
+
         _morph = pymorphy3.MorphAnalyzer()
     except ImportError:
         _morph = None
@@ -123,7 +126,7 @@ def _russian_lemma_analyzer(text):
     import re
 
     morph = _get_morph()
-    tokens = re.findall(r"\b\w+\b", text.lower(), flags=re.UNICODE)
+    tokens = re.findall(r'\b\w+\b', text.lower(), flags=re.UNICODE)
     if morph is None:
         return tokens
     result = []
@@ -199,6 +202,7 @@ def _load_index():
     if not _VECTORIZER_FILE.exists() or not _MATRIX_FILE.exists() or not _MAPPING_FILE.exists():
         return None, None, None
     from scipy import sparse
+
     with _VECTORIZER_FILE.open('rb') as f:
         _vectorizer = pickle.load(f)
     _matrix = sparse.load_npz(_MATRIX_FILE)
@@ -220,7 +224,7 @@ def semantic_top_k(query: str, k: int = 20) -> list[tuple[int, float]]:
     from sklearn.metrics.pairwise import cosine_similarity
 
     query_vec = vectorizer.transform([query])
-    sims = cosine_similarity(query_vec, matrix)[0]   # shape (N,)
+    sims = cosine_similarity(query_vec, matrix)[0]  # shape (N,)
     # Top-k по убыванию similarity, отбрасываем zero-similarity
     import numpy as np
 
@@ -248,7 +252,7 @@ def hybrid_search(query: str, base_qs, k: int = 20) -> list:
 
     semantic = semantic_top_k(query, k=k * 2)
     rule_qs, _ = smart_search(base_qs, query)
-    rule_ids = list(rule_qs.values_list('id', flat=True)[:k * 2])
+    rule_ids = list(rule_qs.values_list('id', flat=True)[: k * 2])
 
     scores: dict[int, float] = {}
     for rank, (pid, _sim) in enumerate(semantic):

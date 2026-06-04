@@ -50,6 +50,7 @@ class Command(BaseCommand):
             'legal_sources_stack': {},
             'artifact_stack': {},
             'moderation_stack': {},
+            'admin_monitoring_stack': {},
             'entitlement_stack': {},
             'neural_stack': {},
             'media_quality': {},
@@ -69,6 +70,7 @@ class Command(BaseCommand):
         self._check_datasheet_intelligence(report)
         self._check_artifact_stack(report)
         self._check_moderation_stack(report)
+        self._check_admin_monitoring_stack(report)
         self._check_entitlement_stack(report)
         self._check_neural_stack(report)
         self._check_urls(report)
@@ -104,8 +106,12 @@ class Command(BaseCommand):
         counts['published_articles'] = Article.objects.filter(is_published=True).count()
         counts['article_materials'] = ArticleMaterial.objects.filter(is_public=True).count()
         counts['learning_tracks'] = LearningTrack.objects.filter(is_published=True).count()
-        counts['learning_lessons'] = LearningLesson.objects.filter(is_published=True, track__is_published=True).count()
-        counts['learning_tasks'] = LearningTask.objects.filter(lesson__is_published=True, lesson__track__is_published=True).count()
+        counts['learning_lessons'] = LearningLesson.objects.filter(
+            is_published=True, track__is_published=True
+        ).count()
+        counts['learning_tasks'] = LearningTask.objects.filter(
+            lesson__is_published=True, lesson__track__is_published=True
+        ).count()
         counts['demo_projects'] = SchematicProject.objects.filter(is_demo=True).count()
         try:
             counts['project_reviews'] = ProjectReview.objects.count()
@@ -173,38 +179,48 @@ class Command(BaseCommand):
             )
 
             fft_result = fft_spectrum([0, 1, 0, -1] * 8, 4)
-            bode_result = bode_plot({
-                'kind': 'rc_lowpass',
-                'resistance_ohm': '10k',
-                'capacitance_f': '100n',
-                'start_hz': 10,
-                'stop_hz': 10000,
-                'points': 24,
-            })
-            monte_carlo_result = monte_carlo_tolerance({
-                'kind': 'voltage_divider',
-                'vin': 5,
-                'r1_ohm': '1k',
-                'r2_ohm': '1k',
-                'samples': 32,
-                'seed': 7,
-            })
+            bode_result = bode_plot(
+                {
+                    'kind': 'rc_lowpass',
+                    'resistance_ohm': '10k',
+                    'capacitance_f': '100n',
+                    'start_hz': 10,
+                    'stop_hz': 10000,
+                    'points': 24,
+                }
+            )
+            monte_carlo_result = monte_carlo_tolerance(
+                {
+                    'kind': 'voltage_divider',
+                    'vin': 5,
+                    'r1_ohm': '1k',
+                    'r2_ohm': '1k',
+                    'samples': 32,
+                    'seed': 7,
+                }
+            )
             signal_quality_result = signal_quality([0, 1, 0, -1] * 8, 4)
-            sweep_result = parameter_sweep({
-                'kind': 'rc_cutoff',
-                'resistance_ohm': '10k',
-                'capacitance_f': '100n',
-                'parameter': 'resistance_ohm',
-                'points': 16,
-            })
+            sweep_result = parameter_sweep(
+                {
+                    'kind': 'rc_cutoff',
+                    'resistance_ohm': '10k',
+                    'capacitance_f': '100n',
+                    'parameter': 'resistance_ohm',
+                    'points': 16,
+                }
+            )
             imported = import_preview('ltspice', 'V1 in 0 DC 5\nR1 in out 1k\nR2 out 0 2k')
             fallback_result = server_side_dc_fallback(imported.get('scheme_data'))
 
             service_checks = {
                 'fft_svg': bool(fft_result.get('ok') and '<svg' in fft_result.get('svg', '')),
                 'bode_svg': bool(bode_result.get('ok') and '<svg' in bode_result.get('svg', '')),
-                'monte_carlo_svg': bool(monte_carlo_result.get('ok') and '<svg' in monte_carlo_result.get('svg', '')),
-                'signal_quality_svg': bool(signal_quality_result.get('ok') and '<svg' in signal_quality_result.get('svg', '')),
+                'monte_carlo_svg': bool(
+                    monte_carlo_result.get('ok') and '<svg' in monte_carlo_result.get('svg', '')
+                ),
+                'signal_quality_svg': bool(
+                    signal_quality_result.get('ok') and '<svg' in signal_quality_result.get('svg', '')
+                ),
                 'parameter_sweep_svg': bool(sweep_result.get('ok') and '<svg' in sweep_result.get('svg', '')),
                 'dc_fallback': bool(
                     imported.get('ok')
@@ -227,30 +243,46 @@ class Command(BaseCommand):
             from Dolg_APP.services.project_review import build_design_review
             from Dolg_APP.services.simulation_analysis import postprocess_simulation, simulation_result_to_csv
 
-            post = postprocess_simulation({
-                'points': [{'x': 0, 'y': 0}, {'x': 1, 'y': 1}, {'x': 2, 'y': 0}],
-                'unit': 'V',
-                'voltage': 5,
-                'current': 0.02,
-                'formulas': ['rms * 2'],
-            })
+            post = postprocess_simulation(
+                {
+                    'points': [{'x': 0, 'y': 0}, {'x': 1, 'y': 1}, {'x': 2, 'y': 0}],
+                    'unit': 'V',
+                    'voltage': 5,
+                    'current': 0.02,
+                    'formulas': ['rms * 2'],
+                }
+            )
             csv_text = simulation_result_to_csv({'nodeVoltages': {'out': 3.3}})
-            review = build_design_review(type('DemoProject', (), {
-                'name': 'demo session',
-                'scheme_data': {
-                    'components': [
-                        {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
-                        {'id': 'r1', 'type': 'resistor', 'rated_power_w': 0.25, 'measured_power_w': 0.3},
-                        {'id': 'gnd', 'type': 'ground'},
-                    ],
-                    'connections': [
-                        {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
-                        {'from': {'compId': 'r1'}, 'to': {'compId': 'gnd'}},
-                    ],
-                },
-            })(), simulation_runs=[], measurements=[])
+            review = build_design_review(
+                type(
+                    'DemoProject',
+                    (),
+                    {
+                        'name': 'demo session',
+                        'scheme_data': {
+                            'components': [
+                                {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
+                                {
+                                    'id': 'r1',
+                                    'type': 'resistor',
+                                    'rated_power_w': 0.25,
+                                    'measured_power_w': 0.3,
+                                },
+                                {'id': 'gnd', 'type': 'ground'},
+                            ],
+                            'connections': [
+                                {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                                {'from': {'compId': 'r1'}, 'to': {'compId': 'gnd'}},
+                            ],
+                        },
+                    },
+                )(),
+                simulation_runs=[],
+                measurements=[],
+            )
             service_checks = {
-                'project_event_model': ProjectEvent._meta.get_field('payload').get_internal_type() == 'JSONField',
+                'project_event_model': ProjectEvent._meta.get_field('payload').get_internal_type()
+                == 'JSONField',
                 'simulation_async_fields': all(
                     hasattr(SimulationRun, name)
                     for name in ('progress_percent', 'message', 'started_at', 'finished_at')
@@ -273,16 +305,36 @@ class Command(BaseCommand):
             from django.contrib.auth.models import Group
             from django.urls import reverse
 
-            from Dolg_APP.models import ChatReply, ChatTopic, Comment, OrgConversationMessage, OrganizationMember
+            from Dolg_APP.models import (
+                ChatReply,
+                ChatTopic,
+                Comment,
+                OrganizationMember,
+                OrgConversationMessage,
+            )
+            from moderation.models import (
+                ModerationAction,
+                ModerationCase,
+                ModerationReport,
+                ModerationRule,
+                UserRestriction,
+            )
             from moderation.permissions import GLOBAL_GROUPS, GLOBAL_ROLE_PERMISSIONS
-            from moderation.models import ModerationAction, ModerationCase, ModerationReport, ModerationRule, UserRestriction
 
             existing_groups = set(Group.objects.filter(name__in=GLOBAL_GROUPS).values_list('name', flat=True))
-            required_models = [ModerationCase, ModerationReport, ModerationAction, UserRestriction, ModerationRule]
+            required_models = [
+                ModerationCase,
+                ModerationReport,
+                ModerationAction,
+                UserRestriction,
+                ModerationRule,
+            ]
             service_checks = {
                 'global_groups': set(GLOBAL_GROUPS).issubset(existing_groups),
-                'role_permissions': 'moderation.action' in GLOBAL_ROLE_PERMISSIONS.get('site_moderator', set()),
-                'org_moderator_role': 'moderator' in {value for value, _label in OrganizationMember.ROLE_CHOICES},
+                'role_permissions': 'moderation.action'
+                in GLOBAL_ROLE_PERMISSIONS.get('site_moderator', set()),
+                'org_moderator_role': 'moderator'
+                in {value for value, _label in OrganizationMember.ROLE_CHOICES},
                 'soft_fields': all(
                     model._meta.get_field('moderation_status')
                     for model in (Comment, ChatTopic, ChatReply, OrgConversationMessage)
@@ -300,6 +352,63 @@ class Command(BaseCommand):
         except Exception as exc:
             stack['service_checks'] = {'ok': False, 'error': str(exc)}
             report['errors'].append(f'moderation stack checks failed: {exc}')
+
+    def _check_admin_monitoring_stack(self, report):
+        stack = report.setdefault('admin_monitoring_stack', {})
+        try:
+            from Dolg_APP.services.ops_metrics import collect_ops_snapshot
+
+            snapshot = collect_ops_snapshot(use_cache=False)
+            required_sections = {
+                'runtime',
+                'catalog',
+                'business',
+                'projects',
+                'ai_ml',
+                'moderation',
+                'security',
+                'health',
+            }
+            stack['psutil'] = {
+                'ok': snapshot.get('runtime', {}).get('process', {}).get('psutil_available', False),
+                'version': version('psutil')
+                if snapshot.get('runtime', {}).get('process', {}).get('psutil_available')
+                else '',
+            }
+            stack['snapshot'] = {
+                'ok': required_sections.issubset(snapshot.keys()),
+                'health_status': snapshot.get('health', {}).get('status'),
+                'alerts': len(snapshot.get('health', {}).get('alerts') or []),
+                'sections': sorted(key for key in required_sections if key in snapshot),
+            }
+            stack['routes'] = {
+                'dashboard': reverse('hello:staff_ops_dashboard'),
+                'snapshot_api': reverse('hello:staff_ops_snapshot_api'),
+            }
+            nginx_conf = Path(settings.BASE_DIR) / 'deploy' / 'nginx.conf'
+            nginx_text = (
+                nginx_conf.read_text(encoding='utf-8', errors='ignore') if nginx_conf.exists() else ''
+            )
+            stack['nginx_metrics_blocked'] = (
+                'location = /metrics' in nginx_text and 'return 403' in nginx_text
+            )
+            checks = {
+                'psutil_available': stack['psutil']['ok'],
+                'snapshot_sections': stack['snapshot']['ok'],
+                'staff_ops_route': stack['routes']['dashboard'] == '/staff/ops/',
+                'staff_ops_api_route': stack['routes']['snapshot_api'] == '/staff/ops/api/snapshot/',
+                'nginx_metrics_blocked': stack['nginx_metrics_blocked'],
+            }
+            stack['service_checks'] = checks
+            for name, passed in checks.items():
+                if not passed:
+                    report['errors'].append(f'admin monitoring stack check failed: {name}')
+        except PackageNotFoundError as exc:
+            stack['service_checks'] = {'ok': False, 'error': str(exc)}
+            report['errors'].append('admin monitoring dependency is missing: install psutil')
+        except Exception as exc:
+            stack['service_checks'] = {'ok': False, 'error': str(exc)}
+            report['errors'].append(f'admin monitoring stack checks failed: {exc}')
 
     def _check_entitlement_stack(self, report):
         stack = report.setdefault('entitlement_stack', {})
@@ -321,7 +430,9 @@ class Command(BaseCommand):
             user = DemoUser()
             checks = {
                 'free_ai_basic': 'ai_chat_basic' in FREE_FEATURES,
-                'pro_scientific': {'pro_fft', 'pro_bode', 'pro_monte_carlo', 'pro_parameter_sweep'}.issubset(PRO_FEATURES),
+                'pro_scientific': {'pro_fft', 'pro_bode', 'pro_monte_carlo', 'pro_parameter_sweep'}.issubset(
+                    PRO_FEATURES
+                ),
                 'enterprise_team_ai': 'enterprise_team_ai_memory' in ENTERPRISE_FEATURES,
                 'free_blocks_pro_fft': not check_feature(user, 'pro_fft').allowed,
                 'matrix_has_unlimited': 'unlimited' in FEATURE_MATRIX,
@@ -340,6 +451,7 @@ class Command(BaseCommand):
         stack = report.setdefault('neural_stack', {})
         try:
             from Dolg_APP.ml.neural import default_model_path, torch_available
+
             stack['torch'] = {
                 'ok': torch_available(),
                 'version': version('torch') if torch_available() else '',
@@ -347,12 +459,18 @@ class Command(BaseCommand):
             model_path = default_model_path()
             stack['tiny_circuit_model'] = {
                 'ok': model_path.exists(),
-                'path': str(model_path.relative_to(settings.BASE_DIR)) if model_path.exists() else str(model_path),
+                'path': str(model_path.relative_to(settings.BASE_DIR))
+                if model_path.exists()
+                else str(model_path),
             }
             if not stack['torch']['ok']:
-                report['warnings'].append('PyTorch neural backend is optional and not installed: pip install -r requirements-ai.txt')
+                report['warnings'].append(
+                    'PyTorch neural backend is optional and not installed: pip install -r requirements-ai.txt'
+                )
             elif not model_path.exists():
-                report['warnings'].append('PyTorch installed, but tiny circuit model is not trained: run train_tiny_circuit_ai')
+                report['warnings'].append(
+                    'PyTorch installed, but tiny circuit model is not trained: run train_tiny_circuit_ai'
+                )
         except Exception as exc:
             stack['ok'] = False
             stack['error'] = str(exc)
@@ -465,7 +583,12 @@ class Command(BaseCommand):
 
             rule_pack = load_rule_pack()
             facts = build_expert_facts(
-                connectivity={'component_count': 3, 'connection_count': 2, 'has_ground': False, 'has_source': True},
+                connectivity={
+                    'component_count': 3,
+                    'connection_count': 2,
+                    'has_ground': False,
+                    'has_source': True,
+                },
                 bom={'missing_catalog': ['R1']},
                 derating={'issues': []},
                 measurements=[],
@@ -475,28 +598,38 @@ class Command(BaseCommand):
             imported = import_preview('ltspice', 'V1 in 0 DC 5\nR1 in out 1k\nR2 out 0 2k\n.ac dec 10 1 1k')
             preview = imported.get('preview') or {}
             divider = solve_design_constraints('voltage_divider', {'vin': 9, 'target_vout': 3})
-            fuzzy = assess_fuzzy_project_risk(thermal_margin_c=10, bom_risk_count=2, floating_count=1, warning_count=3)
-            localized_review = localize_review_report({
-                'status': 'critical',
-                'summary': '2 components, 1 connections, 1 errors, 0 warnings.',
-                'errors': ['Missing GND reference'],
-                'warnings': [],
-                'recommendations': ['Add GND before relying on simulation results.'],
-                'faults': [{'code': 'missing_ground', 'title': 'No ground reference'}],
-                'expert_findings': expert.get('findings', []),
-                'sections': {'expert_system': expert},
-            })
-            metric_rows = build_metric_rows({'components': 3, 'connections': 2, 'topology': 'voltage_divider'})
-            learning_suggestions = learning_suggestions_from_review({
-                'errors': ['missing gnd'],
-                'warnings': [],
-                'recommendations': [],
-                'metrics': {'topology': 'voltage_divider'},
-            })
+            fuzzy = assess_fuzzy_project_risk(
+                thermal_margin_c=10, bom_risk_count=2, floating_count=1, warning_count=3
+            )
+            localized_review = localize_review_report(
+                {
+                    'status': 'critical',
+                    'summary': '2 components, 1 connections, 1 errors, 0 warnings.',
+                    'errors': ['Missing GND reference'],
+                    'warnings': [],
+                    'recommendations': ['Add GND before relying on simulation results.'],
+                    'faults': [{'code': 'missing_ground', 'title': 'No ground reference'}],
+                    'expert_findings': expert.get('findings', []),
+                    'sections': {'expert_system': expert},
+                }
+            )
+            metric_rows = build_metric_rows(
+                {'components': 3, 'connections': 2, 'topology': 'voltage_divider'}
+            )
+            learning_suggestions = learning_suggestions_from_review(
+                {
+                    'errors': ['missing gnd'],
+                    'warnings': [],
+                    'recommendations': [],
+                    'metrics': {'topology': 'voltage_divider'},
+                }
+            )
 
             service_checks = {
                 'rule_pack': bool(rule_pack.get('rules')),
-                'rule_engine_finding': any(item.get('rule_id') == 'erc.missing_ground' for item in expert.get('findings', [])),
+                'rule_engine_finding': any(
+                    item.get('rule_id') == 'erc.missing_ground' for item in expert.get('findings', [])
+                ),
                 'pint_unit_parse': bool(unit.ok and abs(unit.value - 10000) < 1e-9),
                 'lark_import_preview': bool(imported.get('ok') and imported.get('unsupported')),
                 'cad_import_preview_details': bool(
@@ -532,6 +665,7 @@ class Command(BaseCommand):
         stack = report.setdefault('catalog_filter_stack', {})
         try:
             from django.http import QueryDict
+
             from shop.services.catalog_filters import (
                 apply_catalog_filters,
                 build_active_filter_tags,
@@ -545,11 +679,13 @@ class Command(BaseCommand):
                 'parse_10_kohm_ru': abs((parse_catalog_number('10 кОм', 'ohm') or 0) - 10000) < 1e-9,
                 'parse_voltage_range': bool(parse_range_expression('V>=25')),
                 'parse_power_range': bool(parse_range_expression('P 0.125..0.5')),
-                'active_tag_url': 'manufacturer=' not in build_active_filter_tags(
+                'active_tag_url': 'manufacturer='
+                not in build_active_filter_tags(
                     QueryDict('q=10k&manufacturer=vishay&mounting=SMD'),
                     '/',
                 )[1]['remove_url'],
-                'query_preserves_mounting': 'mounting=SMD' in querystring_with(
+                'query_preserves_mounting': 'mounting=SMD'
+                in querystring_with(
                     QueryDict('q=10k&mounting=SMD'),
                     'has_datasheet',
                     '1',
@@ -671,13 +807,17 @@ class Command(BaseCommand):
             dxf_facts = (dxf.get('facts') or {}).get('cad_artifact') or {}
 
             checks = {
-                'pcad_drc_finding': bool(drc_findings and drc_findings[0].get('rule_id') == 'external.pcad.short'),
+                'pcad_drc_finding': bool(
+                    drc_findings and drc_findings[0].get('rule_id') == 'external.pcad.short'
+                ),
                 'pcad_net_components': net_facts.get('component_count') == 2,
                 'dxf_entities': dxf_facts.get('entity_count', 0) >= 2,
                 'dwg_metadata_stub': dwg.get('status') == 'unsupported' and bool(dwg.get('warnings')),
                 'ms14_metadata_stub': ms14.get('status') == 'unsupported' and bool(ms14.get('warnings')),
                 'external_review_evidence': external.get('finding_count') == 1,
-                'learning_by_artifact': bool(learning and learning[0].get('rubric', {}).get('source_rule_id')),
+                'learning_by_artifact': bool(
+                    learning and learning[0].get('rubric', {}).get('source_rule_id')
+                ),
                 'ai_training_examples': bool(training and training[0].get('kind') == 'drc_finding'),
             }
             stack['service_checks'] = checks
@@ -732,15 +872,21 @@ class Command(BaseCommand):
         if broken:
             report['errors'].append(f'битые media-файлы товаров: {len(broken)} ({", ".join(broken[:6])})')
         if forbidden:
-            report['errors'].append(f'товары нарушают no-Wikimedia image policy: {len(forbidden)} ({", ".join(forbidden[:6])})')
+            report['errors'].append(
+                f'товары нарушают no-Wikimedia image policy: {len(forbidden)} ({", ".join(forbidden[:6])})'
+            )
 
         if media_quality['error_count']:
-            sample = ', '.join(f"{item['slug']}:{'/'.join(item['errors'])}" for item in media_quality['errors'][:5])
+            sample = ', '.join(
+                f'{item["slug"]}:{"/".join(item["errors"])}' for item in media_quality['errors'][:5]
+            )
             report['errors'].append(f'media quality gate errors: {media_quality["error_count"]} ({sample})')
         if media_quality['warning_count']:
             report['warnings'].append(f'media quality gate warnings: {media_quality["warning_count"]}')
         if media_quality['perceptual_duplicate_groups']:
-            report['warnings'].append(f'perceptual duplicate product images: {len(media_quality["perceptual_duplicate_groups"])}')
+            report['warnings'].append(
+                f'perceptual duplicate product images: {len(media_quality["perceptual_duplicate_groups"])}'
+            )
 
         if sample_images and not broken:
             static_storage = {
@@ -762,13 +908,11 @@ class Command(BaseCommand):
                             f'media route does not serve product images: {settings.MEDIA_URL}{sample_image} -> HTTP {response.status_code}'
                         )
 
-        duplicates = {
-            image: slugs
-            for image, slugs in image_usage.items()
-            if len(slugs) > 1
-        }
+        duplicates = {image: slugs for image, slugs in image_usage.items() if len(slugs) > 1}
         if duplicates:
-            sample = '; '.join(f'{image}: {", ".join(slugs[:4])}' for image, slugs in list(duplicates.items())[:4])
+            sample = '; '.join(
+                f'{image}: {", ".join(slugs[:4])}' for image, slugs in list(duplicates.items())[:4]
+            )
             report['warnings'].append(f'повторяющиеся фото товаров: {len(duplicates)} ({sample})')
 
     def _check_knowledge_materials(self, report):
@@ -782,7 +926,9 @@ class Command(BaseCommand):
                 if not (Path(settings.MEDIA_ROOT) / rel).exists():
                     broken_local.append(f'{material.title}: {href}')
             elif href.startswith('/') and not self._looks_like_known_internal_route(href):
-                report['warnings'].append(f'подозрительная внутренняя ссылка материала: {material.title} -> {href}')
+                report['warnings'].append(
+                    f'подозрительная внутренняя ссылка материала: {material.title} -> {href}'
+                )
         if broken_local:
             report['errors'].append(f'битые локальные материалы энциклопедии: {len(broken_local)}')
 
@@ -814,9 +960,7 @@ class Command(BaseCommand):
             stack.update(summary)
             stack['material_links'] = material_links
             stack['overview_article'] = overview_exists
-            source_retrieval_ids = [
-                item['id'] for item in find_legal_sources('gnd spice', limit=5)
-            ]
+            source_retrieval_ids = [item['id'] for item in find_legal_sources('gnd spice', limit=5)]
             rule_bibliography_sources = sources_for_rule('erc.missing_ground')
             rule_pack = load_rule_pack()
             rule_source_errors = []
@@ -824,19 +968,27 @@ class Command(BaseCommand):
                 references = rule.get('references') if isinstance(rule.get('references'), dict) else {}
                 missing = validate_source_ids(references.get('source_ids') or [])
                 if missing:
-                    rule_source_errors.append({
-                        'rule_id': rule.get('id'),
-                        'missing_source_ids': missing,
-                    })
+                    rule_source_errors.append(
+                        {
+                            'rule_id': rule.get('id'),
+                            'missing_source_ids': missing,
+                        }
+                    )
             learning_tasks_with_sources = 0
-            for task in LearningTask.objects.filter(lesson__is_published=True, lesson__track__is_published=True):
+            for task in LearningTask.objects.filter(
+                lesson__is_published=True, lesson__track__is_published=True
+            ):
                 rubric = task.rubric if isinstance(task.rubric, dict) else {}
                 if rubric.get('source_ids'):
                     learning_tasks_with_sources += 1
             training_examples_with_sources = 0
             for example in AITrainingExample.objects.all()[:500]:
                 features = example.features if isinstance(example.features, dict) else {}
-                if features.get('source_ids') or features.get('source_topics') or features.get('teacher_rules'):
+                if (
+                    features.get('source_ids')
+                    or features.get('source_topics')
+                    or features.get('teacher_rules')
+                ):
                     training_examples_with_sources += 1
             source_search_results = _legal_source_results('ngspice')
             service_checks = {
@@ -869,7 +1021,9 @@ class Command(BaseCommand):
             if summary['count'] < 12:
                 report['errors'].append(f'legal sources count is too low: {summary["count"]}')
             if summary['missing_topics']:
-                report['errors'].append('legal sources missing topics: ' + ', '.join(summary['missing_topics']))
+                report['errors'].append(
+                    'legal sources missing topics: ' + ', '.join(summary['missing_topics'])
+                )
             if not overview_exists:
                 report['warnings'].append('legal sources overview article is missing: run seed_legal_sources')
             if material_links < summary['count']:
@@ -884,8 +1038,17 @@ class Command(BaseCommand):
 
     def _looks_like_known_internal_route(self, href):
         prefixes = (
-            '/about/', '/demo/', '/search/', '/knowledge/', '/simulation/',
-            '/cad/', '/projects/', '/cart/', '/compare/', '/category/', '/product/',
+            '/about/',
+            '/demo/',
+            '/search/',
+            '/knowledge/',
+            '/simulation/',
+            '/cad/',
+            '/projects/',
+            '/cart/',
+            '/compare/',
+            '/category/',
+            '/product/',
             settings.MEDIA_URL,
             settings.STATIC_URL if settings.STATIC_URL.startswith('/') else f'/{settings.STATIC_URL}',
         )
@@ -982,13 +1145,13 @@ class Command(BaseCommand):
             self.stdout.write(f'  {key}: {value}')
         self.stdout.write('URL smoke:')
         for item in report['urls']:
-            self.stdout.write(f"  {item['status']} {item['url']}")
+            self.stdout.write(f'  {item["status"]} {item["url"]}')
         if report.get('media_quality'):
             media = report['media_quality']
             self.stdout.write(
-                f"Media quality: checked={media.get('checked')} "
-                f"score={media.get('average_score')} "
-                f"errors={media.get('error_count')} warnings={media.get('warning_count')}"
+                f'Media quality: checked={media.get("checked")} '
+                f'score={media.get("average_score")} '
+                f'errors={media.get("error_count")} warnings={media.get("warning_count")}'
             )
         if report.get('scientific_stack'):
             self.stdout.write('Scientific stack:')
@@ -997,7 +1160,7 @@ class Command(BaseCommand):
                     service_status = ', '.join(f'{name}={passed}' for name, passed in value.items())
                     self.stdout.write(f'  service_checks: {service_status}')
                 else:
-                    self.stdout.write(f"  {key}: {value.get('version', 'unknown')} ok={value.get('ok')}")
+                    self.stdout.write(f'  {key}: {value.get("version", "unknown")} ok={value.get("ok")}')
         if report.get('expert_stack'):
             self.stdout.write('Expert stack:')
             for key, value in report['expert_stack'].items():
@@ -1005,7 +1168,7 @@ class Command(BaseCommand):
                     service_status = ', '.join(f'{name}={passed}' for name, passed in value.items())
                     self.stdout.write(f'  service_checks: {service_status}')
                 else:
-                    self.stdout.write(f"  {key}: {value.get('version', 'unknown')} ok={value.get('ok')}")
+                    self.stdout.write(f'  {key}: {value.get("version", "unknown")} ok={value.get("ok")}')
         if report['warnings']:
             self.stdout.write(self.style.WARNING('Warnings:'))
             for item in report['warnings']:

@@ -5,6 +5,7 @@
     python manage.py purge_deleted_projects --days 7
     python manage.py purge_deleted_projects --dry-run      # только подсчёт
 """
+
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
@@ -17,10 +18,12 @@ class Command(BaseCommand):
     help = 'Физически удаляет soft-deleted проекты старше N дней (по умолчанию 30).'
 
     def add_arguments(self, parser):
-        parser.add_argument('--days', type=int, default=30,
-                            help='Возраст в днях, после которого удалять (default: 30).')
-        parser.add_argument('--dry-run', action='store_true',
-                            help='Только показать, что будет удалено, без изменений.')
+        parser.add_argument(
+            '--days', type=int, default=30, help='Возраст в днях, после которого удалять (default: 30).'
+        )
+        parser.add_argument(
+            '--dry-run', action='store_true', help='Только показать, что будет удалено, без изменений.'
+        )
 
     def handle(self, *args, **options):
         days = options['days']
@@ -28,7 +31,8 @@ class Command(BaseCommand):
         cutoff = timezone.now() - timedelta(days=days)
 
         qs = SchematicProject.all_objects.filter(
-            deleted_at__isnull=False, deleted_at__lt=cutoff,
+            deleted_at__isnull=False,
+            deleted_at__lt=cutoff,
         )
         n = qs.count()
 

@@ -1,0 +1,373 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}DOLG Ops Dashboard{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .ops-wrap {
+        max-width: 1240px;
+        margin: 24px auto 42px;
+        padding: 0 20px;
+        color: #e8eef9;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .ops-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 18px;
+    }
+    .ops-head h1 {
+        margin: 0;
+        color: #72ffad;
+        font-size: 28px;
+        line-height: 1.15;
+    }
+    .ops-head p {
+        margin: 6px 0 0;
+        color: #9fb0cc;
+        font-size: 13px;
+    }
+    .ops-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .ops-actions a {
+        display: inline-flex;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(127, 219, 255, .24);
+        color: #bff4ff;
+        background: rgba(127, 219, 255, .08);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 12px;
+    }
+    .ops-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .ops-wide {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+        gap: 14px;
+        margin-top: 14px;
+    }
+    .ops-health {
+        display: grid;
+        grid-template-columns: minmax(230px, .65fr) minmax(0, 1.35fr);
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+    .ops-card {
+        background: linear-gradient(180deg, #1a1f2e, #151a28);
+        border: 1px solid rgba(0, 212, 255, .18);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+    }
+    .ops-card h2 {
+        margin: 0 0 12px;
+        color: #7fdbff;
+        font-size: 16px;
+    }
+    .ops-stat b {
+        display: block;
+        color: #fff;
+        font-size: 28px;
+        line-height: 1.1;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .ops-stat span {
+        display: block;
+        margin-top: 6px;
+        color: #9fb0cc;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+    }
+    .ops-health-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+    .ops-health-status strong {
+        font-size: 32px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    .ops-health-status.ok strong { color: #72ffad; }
+    .ops-health-status.warning strong { color: #ffc450; }
+    .ops-health-status.critical strong { color: #ff8a8a; }
+    .ops-badge {
+        display: inline-flex;
+        width: fit-content;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(127, 219, 255, .10);
+        border: 1px solid rgba(127, 219, 255, .18);
+        color: #9ee8ff;
+        font-weight: 800;
+        font-size: 10px;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .ops-badge.ok,
+    .ops-badge.success {
+        color: #72ffad;
+        border-color: rgba(114, 255, 173, .28);
+        background: rgba(114, 255, 173, .10);
+    }
+    .ops-badge.error,
+    .ops-badge.critical {
+        color: #ff8a8a;
+        border-color: rgba(255, 80, 80, .32);
+        background: rgba(255, 80, 80, .12);
+    }
+    .ops-badge.running {
+        color: #7fdbff;
+        border-color: rgba(127, 219, 255, .30);
+        background: rgba(127, 219, 255, .12);
+    }
+    .ops-badge.warning,
+    .ops-badge.cancelled,
+    .ops-badge.stale {
+        color: #ffc450;
+        border-color: rgba(255, 196, 80, .32);
+        background: rgba(255, 196, 80, .12);
+    }
+    .ops-metric-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 5px 0;
+        border-top: 1px solid rgba(127, 219, 255, .08);
+        font-size: 12px;
+        color: #cbd5e1;
+    }
+    .ops-metric-line:first-child { border-top: 0; }
+    .ops-metric-line strong {
+        color: #fff;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        text-align: right;
+    }
+    .ops-alert {
+        display: grid;
+        grid-template-columns: 86px 1fr;
+        gap: 8px;
+        padding: 8px 0;
+        border-top: 1px solid rgba(127, 219, 255, .10);
+        font-size: 12px;
+        color: #dbeafe;
+    }
+    .ops-alert:first-child { border-top: 0; }
+    .ops-alert small {
+        color: #9fb0cc;
+        display: block;
+        margin-top: 3px;
+    }
+    .ops-table {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 7px 14px;
+        font-size: 12px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .ops-table .k {
+        color: #cbd5e1;
+        overflow-wrap: anywhere;
+    }
+    .ops-table .v {
+        color: #72ffad;
+        font-weight: 800;
+    }
+    .ops-job {
+        display: grid;
+        grid-template-columns: 74px 105px 1fr 66px;
+        gap: 8px;
+        padding: 8px 0;
+        border-top: 1px solid rgba(127, 219, 255, .10);
+        color: #cbd5e1;
+        font-size: 12px;
+        align-items: center;
+    }
+    .ops-job:first-child { border-top: 0; }
+    .ops-code {
+        margin: 0;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, .22);
+        border: 1px solid rgba(127, 219, 255, .14);
+        border-radius: 8px;
+        color: #dbeafe;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 210px;
+        overflow: auto;
+    }
+    @media (max-width: 880px) {
+        .ops-head,
+        .ops-wide,
+        .ops-health { display: block; }
+        .ops-actions { justify-content: flex-start; margin-top: 12px; }
+        .ops-card { margin-bottom: 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ops-wrap">
+    <div class="ops-head">
+        <div>
+            <h1>DOLG Ops Dashboard</h1>
+            <p>Операционный центр: runtime, бизнес-метрики, проектные данные, AI/ML, модерация и качество каталога.</p>
+        </div>
+        <div class="ops-actions">
+            <a href="{% url 'hello:staff_ops_snapshot_api' %}">Snapshot API</a>
+            <a href="{% url 'hello:ml_training_page' %}">ML training</a>
+            <a href="{% url 'hello:ml_dataset_quality_page' %}">Dataset quality</a>
+            <a href="/admin/Dolg_APP/mljob/">MLJob admin</a>
+            <a href="/admin/">Django admin</a>
+        </div>
+    </div>
+
+    {% if ops_snapshot %}
+    <div class="ops-health">
+        <div class="ops-card">
+            <h2>Health</h2>
+            <div class="ops-health-status {{ ops_snapshot.health.status }}">
+                <strong>{{ ops_snapshot.health.status }}</strong>
+                <span class="ops-badge {{ ops_snapshot.health.status }}">{{ ops_snapshot.generated_at }}</span>
+            </div>
+            <div class="ops-metric-line"><span>RSS memory</span><strong>{{ ops_snapshot.runtime.process.rss_mb|default:"-" }} MB</strong></div>
+            <div class="ops-metric-line"><span>CPU</span><strong>{{ ops_snapshot.runtime.process.cpu_percent|default:"-" }}%</strong></div>
+            <div class="ops-metric-line"><span>Threads</span><strong>{{ ops_snapshot.runtime.process.threads|default:"-" }}</strong></div>
+            <div class="ops-metric-line"><span>DB latency</span><strong>{{ ops_snapshot.runtime.db.latency_ms|default:"-" }} ms</strong></div>
+            <div class="ops-metric-line"><span>Cache latency</span><strong>{{ ops_snapshot.runtime.cache.latency_ms|default:"-" }} ms</strong></div>
+        </div>
+        <div class="ops-card">
+            <h2>Active alerts</h2>
+            {% if ops_snapshot.health.alerts %}
+                {% for alert in ops_snapshot.health.alerts %}
+                <div class="ops-alert">
+                    <span class="ops-badge {{ alert.severity }}">{{ alert.severity }}</span>
+                    <span>{{ alert.message }}<small>{{ alert.metric }} · {{ alert.recommendation }}</small></span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>Критических операционных предупреждений нет.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ops-grid">
+        <div class="ops-card">
+            <h2>Runtime</h2>
+            <div class="ops-metric-line"><span>Process status</span><strong>{{ ops_snapshot.runtime.process.status }}</strong></div>
+            <div class="ops-metric-line"><span>Uptime</span><strong>{{ ops_snapshot.runtime.process.uptime_seconds|default:"-" }} s</strong></div>
+            <div class="ops-metric-line"><span>Dataset files</span><strong>{{ ops_snapshot.runtime.storage.datasets.files }}</strong></div>
+            <div class="ops-metric-line"><span>Incomplete downloads</span><strong>{{ ops_snapshot.runtime.storage.datasets.incomplete_files|default:"0" }}</strong></div>
+            <div class="ops-metric-line"><span>Search stale</span><strong>{{ ops_snapshot.runtime.storage.search_index.stale }}</strong></div>
+        </div>
+        <div class="ops-card">
+            <h2>Disk</h2>
+            <div class="ops-metric-line"><span>Project</span><strong>{{ ops_snapshot.runtime.disk.base.used_percent }}%</strong></div>
+            <div class="ops-metric-line"><span>Media</span><strong>{{ ops_snapshot.runtime.disk.media.used_percent }}%</strong></div>
+            <div class="ops-metric-line"><span>Staticfiles</span><strong>{{ ops_snapshot.runtime.disk.staticfiles.used_percent }}%</strong></div>
+            <div class="ops-metric-line"><span>Datasets</span><strong>{{ ops_snapshot.runtime.disk.datasets.used_percent }}%</strong></div>
+        </div>
+        <div class="ops-card">
+            <h2>Business</h2>
+            <div class="ops-metric-line"><span>Users</span><strong>{{ ops_snapshot.business.users_total }}</strong></div>
+            <div class="ops-metric-line"><span>AI requests / period</span><strong>{{ ops_snapshot.business.daily_ai_requests }}</strong></div>
+            <div class="ops-metric-line"><span>Simulations / period</span><strong>{{ ops_snapshot.business.daily_simulations }}</strong></div>
+            <div class="ops-metric-line"><span>Orders</span><strong>{{ ops_snapshot.business.orders_total }}</strong></div>
+            <div class="ops-metric-line"><span>Paid revenue</span><strong>{{ ops_snapshot.business.revenue_paid }} ₽</strong></div>
+        </div>
+        <div class="ops-card">
+            <h2>AI / ML</h2>
+            <div class="ops-metric-line"><span>Graph-ready examples</span><strong>{{ ops_snapshot.ai_ml.graph_ready }}</strong></div>
+            <div class="ops-metric-line"><span>Validation errors</span><strong>{{ ops_snapshot.ai_ml.validation.errors_count }}</strong></div>
+            <div class="ops-metric-line"><span>Active ML jobs</span><strong>{{ ops_snapshot.ai_ml.ml_jobs_active }}</strong></div>
+            <div class="ops-metric-line"><span>Stale ML jobs</span><strong>{{ ops_snapshot.ai_ml.ml_jobs_stale }}</strong></div>
+            <div class="ops-metric-line"><span>Tiny model</span><strong>{{ ops_snapshot.ai_ml.tiny_model.exists }}</strong></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="ops-grid">
+        <div class="ops-card ops-stat"><b>{{ catalog_counts.products }}</b><span>товаров</span></div>
+        <div class="ops-card ops-stat"><b>{{ project_counts.total }}</b><span>проектов</span></div>
+        <div class="ops-card ops-stat"><b>{{ project_counts.reviews }}</b><span>review</span></div>
+        <div class="ops-card ops-stat"><b>{{ ai_counts.examples }}</b><span>AI examples</span></div>
+        <div class="ops-card ops-stat"><b>{{ ai_counts.validated }}</b><span>validated</span></div>
+        <div class="ops-card ops-stat"><b>{{ moderation_counts.cases_open }}</b><span>open moderation</span></div>
+    </div>
+
+    <div class="ops-wide">
+        <div class="ops-card">
+            <h2>Последние MLJob</h2>
+            {% if recent_jobs %}
+                {% for job in recent_jobs %}
+                <div class="ops-job">
+                    <span>#{{ job.id }}</span>
+                    <span class="ops-badge {{ job.status }}">{{ job.status }}</span>
+                    <span>{{ job.job_type }}{% if job.source %} · {{ job.source }}{% endif %}<br><small>{{ job.message|default:"-" }}</small></span>
+                    <strong>{{ job.progress_percent }}%</strong>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>MLJob пока нет.</p>
+            {% endif %}
+        </div>
+
+        <div class="ops-card">
+            <h2>ML counters</h2>
+            <div class="ops-table">
+                {% for key, value in ml_status_counts.items %}
+                    <span class="k">status: {{ key }}</span><span class="v">{{ value }}</span>
+                {% empty %}
+                    <span class="k">jobs</span><span class="v">0</span>
+                {% endfor %}
+                {% for key, value in ml_type_counts.items %}
+                    <span class="k">type: {{ key }}</span><span class="v">{{ value }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="ops-wide">
+        <div class="ops-card">
+            <h2>Data counters</h2>
+            <div class="ops-table">
+                <span class="k">categories</span><span class="v">{{ catalog_counts.categories }}</span>
+                <span class="k">articles</span><span class="v">{{ knowledge_counts.articles }}</span>
+                <span class="k">learning tasks</span><span class="v">{{ knowledge_counts.learning_tasks }}</span>
+                <span class="k">demo projects</span><span class="v">{{ project_counts.demo }}</span>
+                <span class="k">public projects</span><span class="v">{{ project_counts.public }}</span>
+                <span class="k">pending review</span><span class="v">{{ project_counts.pending_review }}</span>
+                <span class="k">project events</span><span class="v">{{ project_counts.events }}</span>
+                <span class="k">AI examples with project</span><span class="v">{{ ai_counts.with_project }}</span>
+                <span class="k">engineering artifacts</span><span class="v">{{ ai_counts.artifacts }}</span>
+                <span class="k">artifact errors</span><span class="v">{{ ai_counts.artifact_errors }}</span>
+                <span class="k">moderation reports</span><span class="v">{{ moderation_counts.reports }}</span>
+                <span class="k">active restrictions</span><span class="v">{{ moderation_counts.restrictions_active }}</span>
+            </div>
+        </div>
+
+        <div class="ops-card">
+            <h2>Live cache snapshot</h2>
+            <pre class="ops-code">training: {{ current_training }}
+
+import: {{ current_import }}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

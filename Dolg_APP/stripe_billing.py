@@ -25,6 +25,7 @@
   4. Прописать webhook-URL в Stripe Dashboard → Developers → Webhooks:
      `https://<domain>/billing/stripe-webhook/`
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -38,6 +39,7 @@ from .models import AuditLog, Subscription
 
 try:
     import stripe
+
     if settings.STRIPE_SECRET_KEY and 'demo_mode' not in settings.STRIPE_SECRET_KEY.lower():
         stripe.api_key = settings.STRIPE_SECRET_KEY
 except ImportError:
@@ -62,6 +64,7 @@ def get_pro_price_id() -> str:
 # Checkout Session — создаём при «Buy Pro» клике
 # ────────────────────────────────────────────────────────────────────────
 
+
 def create_checkout_session(user, request) -> tuple[bool, str, str]:
     """Создаёт Stripe Checkout Session для Pro-подписки.
 
@@ -74,18 +77,21 @@ def create_checkout_session(user, request) -> tuple[bool, str, str]:
 
     sub = get_or_create_subscription(user)
 
-    success_url = request.build_absolute_uri(
-        reverse('hello:billing_checkout_success')
-    ) + '?session_id={CHECKOUT_SESSION_ID}'
+    success_url = (
+        request.build_absolute_uri(reverse('hello:billing_checkout_success'))
+        + '?session_id={CHECKOUT_SESSION_ID}'
+    )
     cancel_url = request.build_absolute_uri(reverse('hello:billing_plans'))
 
     try:
         session_kwargs = {
             'mode': 'subscription',
-            'line_items': [{
-                'price': get_pro_price_id(),
-                'quantity': 1,
-            }],
+            'line_items': [
+                {
+                    'price': get_pro_price_id(),
+                    'quantity': 1,
+                }
+            ],
             'success_url': success_url,
             'cancel_url': cancel_url,
             'client_reference_id': str(user.id),
@@ -110,6 +116,7 @@ def create_checkout_session(user, request) -> tuple[bool, str, str]:
 # Webhook handlers — вызываются из view'а после verify_signature
 # ────────────────────────────────────────────────────────────────────────
 
+
 def handle_checkout_completed(event_data: dict) -> bool:
     """Stripe прислал checkout.session.completed — пользователь оплатил.
 
@@ -122,10 +129,11 @@ def handle_checkout_completed(event_data: dict) -> bool:
         return False
 
     from django.contrib.auth import get_user_model
+
     User = get_user_model()
     try:
         user = User.objects.get(pk=int(user_id))
-    except (User.DoesNotExist, ValueError, TypeError):
+    except User.DoesNotExist, ValueError, TypeError:
         return False
 
     customer_id = session.get('customer') or ''
@@ -157,9 +165,11 @@ def handle_checkout_completed(event_data: dict) -> bool:
     sub.save()
 
     AuditLog.log(
-        actor=user, action='billing.stripe.checkout_completed',
+        actor=user,
+        action='billing.stripe.checkout_completed',
         organization=None,
-        object_type='Subscription', object_id=sub.id,
+        object_type='Subscription',
+        object_id=sub.id,
         payload={'session_id': session.get('id'), 'customer': customer_id, 'subscription': sub_id},
     )
     return True
@@ -178,7 +188,7 @@ def handle_subscription_updated(event_data: dict) -> bool:
     status_map = {
         'active': 'active',
         'trialing': 'trial',
-        'past_due': 'active',     # grace period — доступ остаётся, но Stripe пытается списать
+        'past_due': 'active',  # grace period — доступ остаётся, но Stripe пытается списать
         'canceled': 'cancelled',
         'unpaid': 'expired',
         'incomplete': 'expired',
@@ -224,7 +234,7 @@ def handle_invoice_payment_failed(event_data: dict) -> bool:
         return False
     # Не отключаем сразу — Stripe пытается списать ещё несколько раз.
     # Когда окончательно сорвётся, прилетит customer.subscription.deleted.
-    sub.status = 'active'   # оставляем «active», ожидаем retry или deleted
+    sub.status = 'active'  # оставляем «active», ожидаем retry или deleted
     sub.save(update_fields=['status', 'updated_at'])
     return True
 
@@ -232,6 +242,7 @@ def handle_invoice_payment_failed(event_data: dict) -> bool:
 # ────────────────────────────────────────────────────────────────────────
 # Cancel — отмена на стороне Stripe (отменит auto-renew, доступ до периода)
 # ────────────────────────────────────────────────────────────────────────
+
 
 def cancel_at_period_end(sub: Subscription) -> tuple[bool, str]:
     """Просим Stripe не продлевать подписку. Доступ до текущего period_end сохраняется."""

@@ -10,11 +10,31 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 STOPWORDS = {
-    'and', 'the', 'for', 'with', 'what', 'why', 'how', 'this', 'that',
-    'как', 'что', 'это', 'для', 'или', 'если', 'почему', 'можно', 'нужно',
-    'схема', 'схему', 'схемы', 'проект', 'проверка', 'проверить',
+    'and',
+    'the',
+    'for',
+    'with',
+    'what',
+    'why',
+    'how',
+    'this',
+    'that',
+    'как',
+    'что',
+    'это',
+    'для',
+    'или',
+    'если',
+    'почему',
+    'можно',
+    'нужно',
+    'схема',
+    'схему',
+    'схемы',
+    'проект',
+    'проверка',
+    'проверить',
 }
 
 
@@ -69,7 +89,9 @@ def retrieval_lines(context: dict[str, Any] | None, *, limit: int = 5) -> list[s
     return lines
 
 
-def _query_tokens(message: str, *, intent: str, scheme: dict[str, Any] | None, review: dict[str, Any] | None) -> list[str]:
+def _query_tokens(
+    message: str, *, intent: str, scheme: dict[str, Any] | None, review: dict[str, Any] | None
+) -> list[str]:
     chunks = [message or '', intent or '']
     metrics = (review or {}).get('metrics') or {}
     if metrics.get('topology'):
@@ -82,7 +104,9 @@ def _query_tokens(message: str, *, intent: str, scheme: dict[str, Any] | None, r
         for component in (scheme.get('components') or [])[:20]:
             if not isinstance(component, dict):
                 continue
-            chunks.extend(str(component.get(key) or '') for key in ('type', 'label', 'ref', 'part_number', 'value'))
+            chunks.extend(
+                str(component.get(key) or '') for key in ('type', 'label', 'ref', 'part_number', 'value')
+            )
     text = ' '.join(chunks).lower()
     raw = re.findall(r'[a-zа-я0-9][a-zа-я0-9_+\-.]{1,}', text, flags=re.IGNORECASE)
     tokens = []
@@ -130,7 +154,7 @@ def _snippet(text: str, tokens: list[str], *, length: int = 180) -> str:
     positions = [lowered.find(token) for token in tokens if token in lowered]
     start = min([pos for pos in positions if pos >= 0], default=0)
     start = max(0, start - 40)
-    return text[start:start + length].strip()
+    return text[start : start + length].strip()
 
 
 def _article_items(tokens: list[str]) -> list[dict[str, Any]]:
@@ -157,8 +181,12 @@ def _learning_items(tokens: list[str]) -> list[dict[str, Any]]:
     try:
         from knowledge.models import LearningLesson, LearningTask
 
-        lessons = LearningLesson.objects.filter(is_published=True, track__is_published=True).select_related('track')[:80]
-        tasks = LearningTask.objects.filter(lesson__is_published=True, lesson__track__is_published=True).select_related('lesson')[:120]
+        lessons = LearningLesson.objects.filter(is_published=True, track__is_published=True).select_related(
+            'track'
+        )[:80]
+        tasks = LearningTask.objects.filter(
+            lesson__is_published=True, lesson__track__is_published=True
+        ).select_related('lesson')[:120]
         items = [
             {
                 'source': 'learning',
@@ -222,12 +250,14 @@ def _legal_source_items(tokens: list[str]) -> list[dict[str, Any]]:
                 'title': item['title'],
                 'snippet': item.get('description') or item.get('license_note') or '',
                 'url': item.get('url') or '',
-                'keywords': ' '.join([
-                    item.get('topic') or '',
-                    ' '.join(item.get('keywords') or []),
-                    ' '.join(item.get('rule_ids') or []),
-                    ' '.join(item.get('learning_topics') or []),
-                ]),
+                'keywords': ' '.join(
+                    [
+                        item.get('topic') or '',
+                        ' '.join(item.get('keywords') or []),
+                        ' '.join(item.get('rule_ids') or []),
+                        ' '.join(item.get('learning_topics') or []),
+                    ]
+                ),
                 'score': item.get('score', 0) + 1,
             }
             for item in find_legal_sources(query, limit=3)
@@ -246,7 +276,9 @@ def _artifact_items(project, tokens: list[str]) -> list[dict[str, Any]]:
                 'source': 'artifact',
                 'id': artifact.id,
                 'title': artifact.source_name,
-                'snippet': _snippet(f'{artifact.summary} {artifact.warnings} {artifact.errors} {artifact.facts}', tokens),
+                'snippet': _snippet(
+                    f'{artifact.summary} {artifact.warnings} {artifact.errors} {artifact.facts}', tokens
+                ),
                 'url': '',
                 'keywords': f'{artifact.artifact_type} {artifact.parser} {artifact.status}',
             }
@@ -269,15 +301,19 @@ def _training_items(project, tokens: list[str]) -> list[dict[str, Any]]:
             features = example.features if isinstance(example.features, dict) else {}
             source_ids = ', '.join(features.get('source_ids') or [])
             teacher_rules = ', '.join(features.get('teacher_rules') or [])
-            rows.append({
-                'source': 'training_example',
-                'id': example.id,
-                'title': example.kind,
-                'snippet': _snippet(f'{example.prompt} {example.target} {source_ids} {teacher_rules}', tokens),
-                'url': '',
-                'keywords': f'{example.kind} validated={example.is_validated} {source_ids} {teacher_rules}',
-                'score': 2 if example.is_validated else 0,
-            })
+            rows.append(
+                {
+                    'source': 'training_example',
+                    'id': example.id,
+                    'title': example.kind,
+                    'snippet': _snippet(
+                        f'{example.prompt} {example.target} {source_ids} {teacher_rules}', tokens
+                    ),
+                    'url': '',
+                    'keywords': f'{example.kind} validated={example.is_validated} {source_ids} {teacher_rules}',
+                    'score': 2 if example.is_validated else 0,
+                }
+            )
         return rows
     except Exception:
         return []

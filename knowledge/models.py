@@ -8,12 +8,12 @@ from django.utils.text import slugify
 
 class KnowledgeCategory(models.Model):
     TOPIC_CHOICES = [
-        ('physics',     'Физика и теория'),
-        ('components',  'Компоненты'),
-        ('packages',    'Корпуса и монтаж'),
-        ('pcb',         'Печатные платы'),
-        ('history',     'История электроники'),
-        ('practice',    'Инженерная практика'),
+        ('physics', 'Физика и теория'),
+        ('components', 'Компоненты'),
+        ('packages', 'Корпуса и монтаж'),
+        ('pcb', 'Печатные платы'),
+        ('history', 'История электроники'),
+        ('practice', 'Инженерная практика'),
     ]
 
     name = models.CharField(max_length=80, unique=True)
@@ -42,9 +42,12 @@ class Article(models.Model):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
     summary = models.TextField(max_length=400, help_text='Короткая аннотация для карточки (1–2 предложения)')
-    body = models.TextField(help_text='Основной текст. Поддерживает простую HTML-разметку (p, h3, ul, li, code, img).')
+    body = models.TextField(
+        help_text='Основной текст. Поддерживает простую HTML-разметку (p, h3, ul, li, code, img).'
+    )
     related_components_note = models.CharField(
-        max_length=200, blank=True,
+        max_length=200,
+        blank=True,
         help_text='Опциональная подсказка: какие категории товаров связаны.',
     )
     reading_minutes = models.PositiveSmallIntegerField(default=3)
@@ -122,7 +125,14 @@ class ArticleMaterial(models.Model):
 
     @property
     def is_inline_image(self):
-        return self.material_type in {'image', 'animation'} or self.extension in {'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'}
+        return self.material_type in {'image', 'animation'} or self.extension in {
+            'jpg',
+            'jpeg',
+            'png',
+            'webp',
+            'gif',
+            'svg',
+        }
 
     @property
     def is_video_file(self):
@@ -303,9 +313,7 @@ class LearningProgress(models.Model):
         solved = set(self.solved_task_ids or [])
         solved.add(task_id)
         self.solved_task_ids = sorted(solved)
-        required_ids = set(
-            self.lesson.tasks.filter(is_required=True).values_list('id', flat=True)
-        )
+        required_ids = set(self.lesson.tasks.filter(is_required=True).values_list('id', flat=True))
         if required_ids and required_ids.issubset(set(self.solved_task_ids)):
             self.completed_at = self.completed_at or timezone.now()
         self.save(update_fields=['solved_task_ids', 'completed_at', 'updated_at'])

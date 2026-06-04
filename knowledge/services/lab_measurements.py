@@ -40,12 +40,14 @@ def run_lab_sweep(kind, base_inputs, sweep_param, values, output):
         inputs[sweep_param] = raw_value
         result = calculate_lab(kind, inputs)
         out = (result.get('outputs') or {}).get(output, {})
-        points.append({
-            'input': raw_value,
-            'value': out.get('value'),
-            'status': result.get('status'),
-            'status_label': result.get('status_label'),
-        })
+        points.append(
+            {
+                'input': raw_value,
+                'value': out.get('value'),
+                'status': result.get('status'),
+                'status_label': result.get('status_label'),
+            }
+        )
     numeric = [p['value'] for p in points if isinstance(p.get('value'), (int, float))]
     trend = 'flat'
     if len(numeric) >= 2:

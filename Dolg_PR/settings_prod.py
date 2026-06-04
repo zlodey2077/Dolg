@@ -54,10 +54,10 @@ LOGGING = {
             'propagate': False,
         },
         # Наши приложения дефолтно на INFO.
-        'Dolg_APP':  {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
-        'shop':      {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
-        'accounts':  {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
-        'orders':    {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'Dolg_APP': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'shop': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'accounts': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'orders': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
         'knowledge': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
     },
 }

@@ -45,13 +45,18 @@ def _send_order_confirmation(order, request=None):
 
     try:
         send_mail(
-            subject, body, settings.DEFAULT_FROM_EMAIL, [to_email],
+            subject,
+            body,
+            settings.DEFAULT_FROM_EMAIL,
+            [to_email],
             fail_silently=False,
         )
     except Exception as exc:
         _logger.warning(
             'Не удалось отправить confirmation-email для заказа %s (%s): %s',
-            order.order_number, to_email, exc,
+            order.order_number,
+            to_email,
+            exc,
         )
 
 
@@ -86,7 +91,8 @@ def checkout(request):
     else:
         session_id = _ensure_session_key(request)
         cart_items = CartItem.objects.select_related('product').filter(
-            session_id=session_id, user__isnull=True,
+            session_id=session_id,
+            user__isnull=True,
         )
 
     if not cart_items.exists():
@@ -116,58 +122,66 @@ def checkout(request):
                 return render(request, 'orders/checkout.html', ctx)
             address = get_object_or_404(Address, id=address_id, user=request.user)
             ship = {
-                'shipping_address':     address.address,
-                'shipping_city':        address.city,
+                'shipping_address': address.address,
+                'shipping_city': address.city,
                 'shipping_postal_code': address.postal_code,
-                'shipping_country':     address.country,
+                'shipping_country': address.country,
             }
             guest_fields = {}
         else:
             # Гость: всё руками + валидация обязательных контактов
             guest_email = (request.POST.get('guest_email') or '').strip()
-            guest_name  = (request.POST.get('guest_name')  or '').strip()
+            guest_name = (request.POST.get('guest_name') or '').strip()
             guest_phone = (request.POST.get('guest_phone') or '').strip()
             ship_address = (request.POST.get('shipping_address') or '').strip()
-            ship_city    = (request.POST.get('shipping_city')    or '').strip()
-            ship_postal  = (request.POST.get('shipping_postal_code') or '').strip()
+            ship_city = (request.POST.get('shipping_city') or '').strip()
+            ship_postal = (request.POST.get('shipping_postal_code') or '').strip()
             ship_country = (request.POST.get('shipping_country') or 'Россия').strip()
 
             errors = []
             if '@' not in guest_email or len(guest_email) < 5:
                 errors.append('Укажите корректный email — на него придёт подтверждение заказа')
-            if not guest_name:    errors.append('Укажите имя')
-            if not guest_phone:   errors.append('Укажите телефон')
-            if not ship_address:  errors.append('Укажите адрес доставки')
-            if not ship_city:     errors.append('Укажите город')
+            if not guest_name:
+                errors.append('Укажите имя')
+            if not guest_phone:
+                errors.append('Укажите телефон')
+            if not ship_address:
+                errors.append('Укажите адрес доставки')
+            if not ship_city:
+                errors.append('Укажите город')
             if errors:
                 for e in errors:
                     messages.error(request, e)
                 ctx['guest_form'] = {
-                    'email': guest_email, 'name': guest_name, 'phone': guest_phone,
-                    'address': ship_address, 'city': ship_city,
-                    'postal_code': ship_postal, 'country': ship_country,
+                    'email': guest_email,
+                    'name': guest_name,
+                    'phone': guest_phone,
+                    'address': ship_address,
+                    'city': ship_city,
+                    'postal_code': ship_postal,
+                    'country': ship_country,
                 }
                 return render(request, 'orders/checkout.html', ctx)
 
             ship = {
-                'shipping_address':     ship_address,
-                'shipping_city':        ship_city,
+                'shipping_address': ship_address,
+                'shipping_city': ship_city,
                 'shipping_postal_code': ship_postal,
-                'shipping_country':     ship_country,
+                'shipping_country': ship_country,
             }
             guest_fields = {
                 'guest_email': guest_email,
-                'guest_name':  guest_name,
+                'guest_name': guest_name,
                 'guest_phone': guest_phone,
             }
 
         # === Транзакция: stock-lock + создание Order + декремент stock ===
         from shop.models import Product
+
         with transaction.atomic():
             product_ids = [ci.product_id for ci in cart_items]
             locked_products = {
-                p.id: p for p in
-                Product.objects.select_for_update().filter(id__in=product_ids)
+                p.id: p for p in Product.objects.select_for_update().filter(id__in=product_ids)
             }
             for cart_item in cart_items:
                 p = locked_products.get(cart_item.product_id)
@@ -175,8 +189,7 @@ def checkout(request):
                     available = p.stock if p else 0
                     messages.error(
                         request,
-                        f'Недостаточно товара "{cart_item.product.name}" на складе '
-                        f'(доступно: {available})'
+                        f'Недостаточно товара "{cart_item.product.name}" на складе (доступно: {available})',
                     )
                     return render(request, 'orders/checkout.html', ctx)
 
@@ -194,8 +207,10 @@ def checkout(request):
             for cart_item in cart_items:
                 p = locked_products[cart_item.product_id]
                 OrderItem.objects.create(
-                    order=order, product=p,
-                    quantity=cart_item.quantity, price=p.price,
+                    order=order,
+                    product=p,
+                    quantity=cart_item.quantity,
+                    price=p.price,
                 )
                 p.stock -= cart_item.quantity
                 p.save(update_fields=['stock'])
@@ -222,7 +237,8 @@ def guest_track(request, token):
     """Read-only страница заказа по guest_token. Доступна без аутентификации."""
     order = get_object_or_404(
         Order.objects.select_related('status').prefetch_related('items__product'),
-        guest_token=token, user__isnull=True,
+        guest_token=token,
+        user__isnull=True,
     )
     return render(request, 'orders/guest_track.html', {'order': order})
 
@@ -233,12 +249,8 @@ def order_list(request):
     # {{ order.items.count }} в loop (N+1 SQL) и order.status.* (отдельный SELECT
     # на каждый заказ для FK→Status). На 50 заказах было 50+ лишних запросов.
     from django.db.models import Count
-    orders = (
-        request.user.orders
-        .select_related('status')
-        .annotate(items_count=Count('items'))
-        .all()
-    )
+
+    orders = request.user.orders.select_related('status').annotate(items_count=Count('items')).all()
     context = {'orders': orders}
     return render(request, 'orders/order_list.html', context)
 

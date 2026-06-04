@@ -25,6 +25,7 @@ DB-agnostic — работает и на SQLite (dev), и на Postgres (prod). 
 Связано с [[smart-search-todo]] (memory) — там расписаны 6 вариантов
 и почему мы выбрали этот (rapidfuzz без внешнего сервиса).
 """
+
 from __future__ import annotations
 
 import re
@@ -120,7 +121,8 @@ def smart_search(products: QuerySet, query: str) -> tuple[QuerySet, list[str]]:
         name_lookup[haystack] = pid
     needle = ' '.join(tokens).lower()
     matches = process.extract(
-        needle, name_lookup.keys(),
+        needle,
+        name_lookup.keys(),
         # partial_ratio: ищет лучшую subsequence-similarity. Подходит для
         # «короткая опечатка vs длинный haystack» — WRatio в этом случае
         # даёт ~50 (теряется в шуме), partial_ratio выдаёт реальный score.
@@ -145,15 +147,9 @@ def compute_facets(products: QuerySet) -> dict:
         # Если уже list (после param-filters Python-фильтрации) — считаем в Python
         return _facets_from_list(products)
     return {
-        'manufacturer': _ordered_counts(
-            products.values_list('manufacturer', flat=True)
-        ),
-        'lifecycle': _ordered_counts(
-            products.values_list('lifecycle_status', flat=True)
-        ),
-        'package': _ordered_counts(
-            products.exclude(package_type='').values_list('package_type', flat=True)
-        ),
+        'manufacturer': _ordered_counts(products.values_list('manufacturer', flat=True)),
+        'lifecycle': _ordered_counts(products.values_list('lifecycle_status', flat=True)),
+        'package': _ordered_counts(products.exclude(package_type='').values_list('package_type', flat=True)),
     }
 
 

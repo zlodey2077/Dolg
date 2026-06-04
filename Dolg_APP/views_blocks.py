@@ -12,12 +12,14 @@ Endpoints:
 """
 
 from __future__ import annotations
+
 import json
-from django.http import JsonResponse, Http404
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
+
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .models import FunctionalBlock
 
@@ -48,9 +50,11 @@ def _serialize_block(b: FunctionalBlock, include_schema: bool = False) -> dict:
 @require_GET
 def api_blocks_list(request):
     """Список блоков: свои + public других."""
-    qs = FunctionalBlock.objects.filter(
-        Q(user=request.user) | Q(is_public=True)
-    ).select_related('user').order_by('-updated_at')
+    qs = (
+        FunctionalBlock.objects.filter(Q(user=request.user) | Q(is_public=True))
+        .select_related('user')
+        .order_by('-updated_at')
+    )
 
     category = request.GET.get('category', '').strip()
     if category:
@@ -59,18 +63,18 @@ def api_blocks_list(request):
     blocks = []
     for b in qs[:200]:  # cap
         item = _serialize_block(b)
-        item['is_mine'] = (b.user_id == request.user.id)
+        item['is_mine'] = b.user_id == request.user.id
         item['author'] = b.user.username if not item['is_mine'] else None
         blocks.append(item)
 
-    return JsonResponse({
-        'ok': True,
-        'blocks': blocks,
-        'total': len(blocks),
-        'categories': [
-            {'value': v, 'label': l} for v, l in FunctionalBlock.CATEGORY_CHOICES
-        ],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'blocks': blocks,
+            'total': len(blocks),
+            'categories': [{'value': v, 'label': label} for v, label in FunctionalBlock.CATEGORY_CHOICES],
+        }
+    )
 
 
 @login_required
@@ -107,10 +111,12 @@ def api_blocks_create(request):
         user=request.user,
         is_public=bool(data.get('is_public')),
     )
-    return JsonResponse({
-        'ok': True,
-        'block': _serialize_block(block),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'block': _serialize_block(block),
+        }
+    )
 
 
 @login_required
@@ -122,7 +128,7 @@ def api_blocks_detail(request, block_id: int):
         Q(pk=block_id) & (Q(user=request.user) | Q(is_public=True)),
     )
     item = _serialize_block(block, include_schema=True)
-    item['is_mine'] = (block.user_id == request.user.id)
+    item['is_mine'] = block.user_id == request.user.id
     return JsonResponse({'ok': True, 'block': item})
 
 

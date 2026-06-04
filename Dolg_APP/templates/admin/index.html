@@ -1,0 +1,238 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
+<style>
+  .dolg-admin-ops {
+    margin: 0 0 22px;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 152, 180, .22);
+    background: linear-gradient(180deg, rgba(12, 31, 44, .06), rgba(12, 31, 44, .02));
+  }
+  .dolg-admin-ops-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .dolg-admin-ops h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--primary, #264b5d);
+  }
+  .dolg-admin-ops small {
+    display: block;
+    margin-top: 4px;
+    color: var(--body-quiet-color, #666);
+  }
+  .dolg-admin-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border: 1px solid rgba(0, 0, 0, .12);
+    white-space: nowrap;
+  }
+  .dolg-admin-badge.ok { color: #087a35; background: rgba(8, 122, 53, .10); }
+  .dolg-admin-badge.warning { color: #9a6700; background: rgba(210, 153, 34, .16); }
+  .dolg-admin-badge.critical { color: #b42318; background: rgba(217, 45, 32, .12); }
+  .dolg-admin-ops-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 10px;
+  }
+  .dolg-admin-tile {
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--darkened-bg, #f8f8f8);
+    border: 1px solid var(--hairline-color, #e8e8e8);
+  }
+  .dolg-admin-tile strong {
+    display: block;
+    font-size: 1.45rem;
+    line-height: 1.1;
+    color: var(--body-fg, #222);
+  }
+  .dolg-admin-tile span {
+    display: block;
+    margin-top: 5px;
+    color: var(--body-quiet-color, #666);
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .dolg-admin-ops-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .45fr);
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .dolg-admin-alerts,
+  .dolg-admin-links {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--hairline-color, #e8e8e8);
+    background: var(--body-bg, #fff);
+  }
+  .dolg-admin-alert {
+    display: grid;
+    grid-template-columns: 82px 1fr;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--hairline-color, #e8e8e8);
+  }
+  .dolg-admin-alert:first-child { border-top: 0; }
+  .dolg-admin-alert p {
+    margin: 0;
+    color: var(--body-fg, #222);
+  }
+  .dolg-admin-alert small {
+    margin-top: 2px;
+  }
+  .dolg-admin-links a {
+    display: block;
+    margin: 0 0 7px;
+    font-weight: 700;
+  }
+  @media (max-width: 900px) {
+    .dolg-admin-ops-head,
+    .dolg-admin-ops-bottom { display: block; }
+    .dolg-admin-links { margin-top: 12px; }
+  }
+</style>
+{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <section class="dolg-admin-ops" data-ops-url="{% url 'hello:staff_ops_snapshot_api' %}">
+    <div class="dolg-admin-ops-head">
+      <div>
+        <h2>Операционный мониторинг DOLG</h2>
+        <small>Runtime, данные, ML-пайплайн, каталог, проекты и модерация. Обновлено: <span data-ops-field="generated_at">загрузка...</span></small>
+      </div>
+      <span class="dolg-admin-badge" data-ops-health>loading</span>
+    </div>
+
+    <div class="dolg-admin-ops-grid">
+      <div class="dolg-admin-tile"><strong data-ops-field="runtime.process.rss_mb">-</strong><span>RSS memory, MB</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="runtime.process.cpu_percent">-</strong><span>CPU, %</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="catalog.products">-</strong><span>товаров</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="projects.projects_total">-</strong><span>проектов</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="projects.reviews">-</strong><span>review</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="ai_ml.examples">-</strong><span>AI examples</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="ai_ml.ml_jobs_active">-</strong><span>active ML jobs</span></div>
+      <div class="dolg-admin-tile"><strong data-ops-field="moderation.cases_open">-</strong><span>moderation</span></div>
+    </div>
+
+    <div class="dolg-admin-ops-bottom">
+      <div class="dolg-admin-alerts" data-ops-alerts>
+        <p>Метрики загружаются после открытия админки.</p>
+      </div>
+      <div class="dolg-admin-links">
+        <a href="{% url 'hello:staff_ops_dashboard' %}">Открыть полный Ops Dashboard</a>
+        <a href="{% url 'hello:staff_ops_snapshot_api' %}">JSON snapshot API</a>
+        <a href="{% url 'hello:ml_dataset_quality_page' %}">AI dataset quality</a>
+        <a href="/admin/Dolg_APP/mljob/">MLJob admin</a>
+        <a href="/admin/shop/product/">Каталог товаров</a>
+      </div>
+    </div>
+  </section>
+
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+<script>
+(function () {
+  const root = document.querySelector('.dolg-admin-ops');
+  if (!root) return;
+  const url = root.getAttribute('data-ops-url');
+  const getPath = (obj, path) => path.split('.').reduce((acc, key) => acc && acc[key] !== undefined ? acc[key] : undefined, obj);
+  const setText = (selector, text) => {
+    const el = root.querySelector(selector);
+    if (el) el.textContent = text;
+  };
+  fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(resp => resp.ok ? resp.json() : Promise.reject(new Error('HTTP ' + resp.status)))
+    .then(payload => {
+      const snapshot = payload.snapshot || {};
+      root.querySelectorAll('[data-ops-field]').forEach(el => {
+        const path = el.getAttribute('data-ops-field');
+        const value = getPath(snapshot, path);
+        el.textContent = value === undefined || value === null || value === '' ? '-' : value;
+      });
+      const status = getPath(snapshot, 'health.status') || 'unknown';
+      const badge = root.querySelector('[data-ops-health]');
+      if (badge) {
+        badge.textContent = status;
+        badge.className = 'dolg-admin-badge ' + status;
+      }
+      const alertsBox = root.querySelector('[data-ops-alerts]');
+      const alerts = getPath(snapshot, 'health.alerts') || [];
+      if (alertsBox) {
+        if (!alerts.length) {
+          alertsBox.innerHTML = '<p>Критических операционных предупреждений нет.</p>';
+        } else {
+          alertsBox.innerHTML = alerts.slice(0, 4).map(alert => `
+            <div class="dolg-admin-alert">
+              <span class="dolg-admin-badge ${alert.severity || 'warning'}">${alert.severity || 'warning'}</span>
+              <p>${alert.message || ''}<small>${alert.metric || ''} · ${alert.recommendation || ''}</small></p>
+            </div>
+          `).join('');
+        }
+      }
+    })
+    .catch(err => {
+      setText('[data-ops-health]', 'offline');
+      const badge = root.querySelector('[data-ops-health]');
+      if (badge) badge.className = 'dolg-admin-badge critical';
+      const alertsBox = root.querySelector('[data-ops-alerts]');
+      if (alertsBox) alertsBox.innerHTML = '<p>Не удалось загрузить snapshot: ' + err.message + '</p>';
+    });
+})();
+</script>
+{% endblock %}
+
+{% block sidebar %}
+<div id="content-related">
+    <div class="module" id="recent-actions-module">
+        <h2>{% translate 'Recent actions' %}</h2>
+        <h3>{% translate 'My actions' %}</h3>
+            {% load log %}
+            {% get_admin_log 10 as admin_log for_user user %}
+            {% if not admin_log %}
+            <p>{% translate 'None available' %}</p>
+            {% else %}
+            <ul class="actionlist">
+            {% for entry in admin_log %}
+            <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+                <span class="visually-hidden">{% if entry.is_addition %}{% translate 'Added:' %}{% elif entry.is_change %}{% translate 'Changed:' %}{% elif entry.is_deletion %}{% translate 'Deleted:' %}{% endif %}</span>
+                {% if entry.is_deletion or not entry.get_admin_url %}
+                    {{ entry.object_repr }}
+                {% else %}
+                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                {% endif %}
+                <br>
+                {% if entry.content_type %}
+                    <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
+                {% else %}
+                    <span class="mini quiet">{% translate 'Unknown content' %}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+            </ul>
+            {% endif %}
+    </div>
+</div>
+{% endblock %}

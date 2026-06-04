@@ -23,14 +23,15 @@ Phase 2 (post-defense):
     - Net priorities (power → signal → GND last)
     - Diagonal moves (8-связность) для коротких трасс
 """
+
 from __future__ import annotations
 
 import heapq
 
 GRID_STEP_MM = 0.5
-TURN_PENALTY = 3.0           # штраф за поворот (cells)
-COMP_CLEARANCE_MM = 1.0      # отступ от bbox компонента до возможной трассы
-TRACE_CLEARANCE_CELLS = 1    # клеток между параллельными трассами
+TURN_PENALTY = 3.0  # штраф за поворот (cells)
+COMP_CLEARANCE_MM = 1.0  # отступ от bbox компонента до возможной трассы
+TRACE_CLEARANCE_CELLS = 1  # клеток между параллельными трассами
 MAX_ASTAR_EXPANSIONS = 250_000  # safety cap: не зависнуть на сложных схемах
 
 
@@ -97,8 +98,9 @@ def astar(
     open_heap: list[tuple[float, int, tuple[int, int], tuple[int, int] | None]] = []
     heapq.heappush(open_heap, (0.0, 0, start_cell, None))
     g_score: dict[tuple[tuple[int, int], tuple[int, int] | None], float] = {(start_cell, None): 0}
-    came_from: dict[tuple[tuple[int, int], tuple[int, int] | None],
-                    tuple[tuple[int, int], tuple[int, int] | None]] = {}
+    came_from: dict[
+        tuple[tuple[int, int], tuple[int, int] | None], tuple[tuple[int, int], tuple[int, int] | None]
+    ] = {}
     expansions = 0
 
     while open_heap:
@@ -155,8 +157,7 @@ def _endpoint_key(endpoint: dict | None) -> tuple:
     endpoint = endpoint or {}
     return (
         endpoint.get('compId') or endpoint.get('componentId') or endpoint.get('id'),
-        endpoint.get('portId') or endpoint.get('pinId')
-        or endpoint.get('port') or endpoint.get('pin') or '',
+        endpoint.get('portId') or endpoint.get('pinId') or endpoint.get('port') or endpoint.get('pin') or '',
     )
 
 
@@ -219,16 +220,18 @@ def autoroute_layout(
         for i in range(1, len(simplified)):
             ax, ay = _cell_to_world(simplified[i - 1][0], simplified[i - 1][1], step_mm)
             bx, by = _cell_to_world(simplified[i][0], simplified[i][1], step_mm)
-            new_traces.append({
-                'from': {'x_mm': ax, 'y_mm': ay},
-                'to': {'x_mm': bx, 'y_mm': by},
-                'conn_id': conn.get('id'),
-                'layer': 'top',
-                'width_mm': float(conn.get('width_mm') or conn.get('widthMm') or trace_width),
-                'astar': True,
-            })
+            new_traces.append(
+                {
+                    'from': {'x_mm': ax, 'y_mm': ay},
+                    'to': {'x_mm': bx, 'y_mm': by},
+                    'conn_id': conn.get('id'),
+                    'layer': 'top',
+                    'width_mm': float(conn.get('width_mm') or conn.get('widthMm') or trace_width),
+                    'astar': True,
+                }
+            )
         # Lock-down: клетки этой трассы становятся obstacles + clearance
-        for (cx, cy) in path:
+        for cx, cy in path:
             for dx in range(-TRACE_CLEARANCE_CELLS, TRACE_CLEARANCE_CELLS + 1):
                 for dy in range(-TRACE_CLEARANCE_CELLS, TRACE_CLEARANCE_CELLS + 1):
                     occupied.add((cx + dx, cy + dy))
@@ -250,13 +253,14 @@ def autoroute_layout(
 
     out_layout = dict(layout)
     out_layout['traces'] = new_traces
-    out_layout['vias'] = []   # Phase 1 — single layer, без vias
+    out_layout['vias'] = []  # Phase 1 — single layer, без vias
     out_layout['autoroute_stats'] = {
         'routed': routed,
         'failed': len(failed),
         'unreachable': failed,
         'avg_length_mm': round(sum(routed_lengths_mm) / len(routed_lengths_mm), 2)
-        if routed_lengths_mm else 0,
+        if routed_lengths_mm
+        else 0,
         'total_length_mm': round(sum(routed_lengths_mm), 2),
         'cells_per_mm': round(1.0 / step_mm, 2),
         'grid_w': grid_w,

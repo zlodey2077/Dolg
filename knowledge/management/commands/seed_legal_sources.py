@@ -3,9 +3,15 @@ import json
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from knowledge.models import Article, ArticleMaterial, KnowledgeCategory, LearningLesson, LearningTask, LearningTrack
+from knowledge.models import (
+    Article,
+    ArticleMaterial,
+    KnowledgeCategory,
+    LearningLesson,
+    LearningTask,
+    LearningTrack,
+)
 from knowledge.services.legal_sources import load_legal_sources, summarize_legal_sources
-
 
 OVERVIEW_TITLE = 'Открытые источники и документация DOLG'
 OVERVIEW_SLUG = 'otkrytye-istochniki-i-dokumentatsiya-dolg'
@@ -36,7 +42,11 @@ SOURCE_LEARNING_TRACK = {
                         'expected_value': 5,
                         'unit': 'мА',
                         'tolerance_abs': 0.05,
-                        'source_ids': ['all_about_circuits_textbook', 'openstax_university_physics_2', 'sympy_docs'],
+                        'source_ids': [
+                            'all_about_circuits_textbook',
+                            'openstax_university_physics_2',
+                            'sympy_docs',
+                        ],
                         'source_topic': 'ohm',
                         'teacher_rule': 'formula.ohm_law',
                     },
@@ -50,7 +60,11 @@ SOURCE_LEARNING_TRACK = {
                         'expected_value': 2.94,
                         'unit': 'В',
                         'tolerance_abs': 0.08,
-                        'source_ids': ['all_about_circuits_textbook', 'openstax_university_physics_2', 'z3_guide'],
+                        'source_ids': [
+                            'all_about_circuits_textbook',
+                            'openstax_university_physics_2',
+                            'z3_guide',
+                        ],
                         'source_topic': 'divider',
                         'teacher_rule': 'topology.divider_without_output',
                     },
@@ -64,7 +78,11 @@ SOURCE_LEARNING_TRACK = {
                         'expected_value': 159.15,
                         'unit': 'Гц',
                         'tolerance_percent': 2,
-                        'source_ids': ['all_about_circuits_textbook', 'openstax_university_physics_2', 'ngspice_docs'],
+                        'source_ids': [
+                            'all_about_circuits_textbook',
+                            'openstax_university_physics_2',
+                            'ngspice_docs',
+                        ],
                         'source_topic': 'rc',
                         'teacher_rule': 'simulation.no_saved_measurements',
                     },
@@ -211,10 +229,7 @@ def _overview_body(sources):
         blocks.append(f'<h3>{topic}</h3>')
         blocks.append('<ul>')
         for item in sorted(grouped[topic], key=lambda row: row['order']):
-            blocks.append(
-                f'<li><a href="{item["url"]}">{item["title"]}</a> — '
-                f'{item["description"]}</li>'
-            )
+            blocks.append(f'<li><a href="{item["url"]}">{item["title"]}</a> — {item["description"]}</li>')
         blocks.append('</ul>')
     return '\n'.join(blocks)
 
@@ -382,14 +397,16 @@ class Command(BaseCommand):
         if as_json:
             self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
             return
-        self.stdout.write(self.style.SUCCESS(
-            f'OK: источников {result["sources"]["count"]}, '
-            f'создано материалов {result["materials_created"]}, '
-            f'обновлено {result["materials_updated"]}'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'OK: источников {result["sources"]["count"]}, '
+                f'создано материалов {result["materials_created"]}, '
+                f'обновлено {result["materials_updated"]}'
+            )
+        )
         if result['overview_article']:
             self.stdout.write(f'Обзорная статья: {result["overview_article"]}')
         if result['missing_article_slugs']:
-            self.stdout.write(self.style.WARNING(
-                'Не найдены статьи: ' + ', '.join(result['missing_article_slugs'])
-            ))
+            self.stdout.write(
+                self.style.WARNING('Не найдены статьи: ' + ', '.join(result['missing_article_slugs']))
+            )

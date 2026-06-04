@@ -9,17 +9,19 @@
     такой текст утечёт на страницу как plain-text. Используем валидатор из
     scripts/check_django_comments.py (тот же regex).
 """
+
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
 from django.conf import settings
-from django.core.checks import Warning as DjangoWarning, register
+from django.core.checks import Warning as DjangoWarning
+from django.core.checks import register
 
 # Тот же regex, что в scripts/check_django_comments.py — держим источник
 # истины в одном месте. Если нужно — вынесем в shared helper.
-_MULTI_LINE_COMMENT_RE = re.compile(r"\{#(?:(?!#\}).)*?\n(?:(?!#\}).)*?#\}", re.DOTALL)
+_MULTI_LINE_COMMENT_RE = re.compile(r'\{#(?:(?!#\}).)*?\n(?:(?!#\}).)*?#\}', re.DOTALL)
 _SKIP_DIRS = ('.venv', 'site-packages', 'htmlcov', 'node_modules', 'release/', 'backups/')
 
 
@@ -43,7 +45,7 @@ def check_multi_line_django_comments(app_configs, **kwargs):
         except Exception:
             continue
         for match in _MULTI_LINE_COMMENT_RE.finditer(text):
-            line_no = text[:match.start()].count('\n') + 1
+            line_no = text[: match.start()].count('\n') + 1
             snippet = match.group(0)[:60].replace('\n', ' / ')
             problems.append(f'{rel}:{line_no}  {snippet}')
 

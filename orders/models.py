@@ -37,6 +37,7 @@ class OrderStatus(models.Model):
     @classmethod
     def get(cls, name):
         return cls.objects.get_or_create(name=name)[0]
+
     description = models.TextField(blank=True)
 
     class Meta:
@@ -61,8 +62,11 @@ class Order(models.Model):
     # хранятся в guest_* полях ниже. Гость может потом отследить заказ по
     # guest_token-у (UUID в URL /orders/track/<token>/).
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='orders',
-        null=True, blank=True,
+        User,
+        on_delete=models.CASCADE,
+        related_name='orders',
+        null=True,
+        blank=True,
     )
     status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True)
 
@@ -70,11 +74,11 @@ class Order(models.Model):
     # Заполняются ТОЛЬКО если user is null. Email обязателен — на него уйдёт
     # подтверждение и фискальный чек по 54-ФЗ.
     guest_email = models.EmailField(blank=True, default='')
-    guest_name  = models.CharField(max_length=120, blank=True, default='')
-    guest_phone = models.CharField(max_length=30,  blank=True, default='')
+    guest_name = models.CharField(max_length=120, blank=True, default='')
+    guest_phone = models.CharField(max_length=30, blank=True, default='')
     # Токен для отслеживания заказа гостем — UUID, передаётся в URL и в email.
     # 32 символа hex без дефисов — безопасно для URL и read-only-доступа.
-    guest_token = models.CharField(max_length=32,  blank=True, default='', db_index=True)
+    guest_token = models.CharField(max_length=32, blank=True, default='', db_index=True)
 
     # Shipping info
     shipping_address = models.CharField(max_length=300)
@@ -85,8 +89,9 @@ class Order(models.Model):
     # Payment info
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='card')
     is_paid = models.BooleanField(default=False)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0,
-                                       validators=PRICE_VALIDATORS)
+    total_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0, validators=PRICE_VALIDATORS
+    )
 
     # Notes
     notes = models.TextField(blank=True)
@@ -100,11 +105,11 @@ class Order(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Заказ {self.order_number}"
+        return f'Заказ {self.order_number}'
 
     def save(self, *args, **kwargs):
         if not self.order_number:
-            self.order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+            self.order_number = f'ORD-{uuid.uuid4().hex[:8].upper()}'
         # Guest-токен генерим только для гостевых заказов и только при создании.
         if self.user_id is None and not self.guest_token:
             self.guest_token = uuid.uuid4().hex
@@ -121,7 +126,11 @@ class Order(models.Model):
 
     @property
     def contact_name(self):
-        return self.guest_name if self.is_guest else (self.user.get_full_name() or self.user.username if self.user else '')
+        return (
+            self.guest_name
+            if self.is_guest
+            else (self.user.get_full_name() or self.user.username if self.user else '')
+        )
 
     def calculate_total(self):
         return sum(item.get_total_price() for item in self.items.all())
@@ -139,7 +148,7 @@ class OrderItem(models.Model):
 
     def __str__(self):
         product_name = self.product.name if self.product else 'Удалённый товар'
-        return f"{product_name} x {self.quantity}"
+        return f'{product_name} x {self.quantity}'
 
     def get_total_price(self):
         return self.price * self.quantity
@@ -172,7 +181,7 @@ class Shipment(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Отправка {self.tracking_number}"
+        return f'Отправка {self.tracking_number}'
 
 
 class PaymentTransaction(models.Model):
@@ -220,11 +229,12 @@ class PaymentTransaction(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Платеж {self.transaction_id} - {self.get_status_display()}"
+        return f'Платеж {self.transaction_id} - {self.get_status_display()}'
 
     def mark_as_succeeded(self, charge_id=None):
         """Mark transaction as successfully paid"""
         from django.utils import timezone
+
         self.status = 'succeeded'
         self.paid_at = timezone.now()
         if charge_id:

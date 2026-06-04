@@ -45,9 +45,11 @@ def validate_scheme_data(scheme_data):
         catalog_ref = (component.get('catalog_ref') or component.get('part_number') or '').strip()
         product = None
         if catalog_ref:
-            product = Product.objects.filter(
-                Q(part_number__iexact=catalog_ref) | Q(slug__iexact=catalog_ref)
-            ).select_related('category').first()
+            product = (
+                Product.objects.filter(Q(part_number__iexact=catalog_ref) | Q(slug__iexact=catalog_ref))
+                .select_related('category')
+                .first()
+            )
             if not product:
                 warnings.append(f'Компонент #{component["id"]}: товар каталога "{catalog_ref}" не найден')
             else:
@@ -92,8 +94,11 @@ def validate_scheme_data(scheme_data):
         warnings.append('В схеме нет источника питания')
 
     unconnected = [
-        c.get('id') for c in components
-        if isinstance(c, dict) and c.get('type') not in {'ground', 'node'} and c.get('id') not in used_component_ids
+        c.get('id')
+        for c in components
+        if isinstance(c, dict)
+        and c.get('type') not in {'ground', 'node'}
+        and c.get('id') not in used_component_ids
     ]
     if unconnected:
         warnings.append(f'Есть компоненты без соединений: {", ".join(map(str, unconnected[:8]))}')

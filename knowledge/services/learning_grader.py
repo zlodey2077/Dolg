@@ -32,6 +32,7 @@ TYPE_ALIASES = {
     'zener': 'diode',
 }
 
+
 def _result(correct, feedback, score=None, details=None):
     return {
         'correct': bool(correct),
@@ -129,7 +130,9 @@ def grade_task(task, payload):
         return grade_circuit_task(task, payload.get('scheme_data') if isinstance(payload, dict) else payload)
     if kind == 'simulation_measure':
         scheme_data = payload.get('scheme_data', {}) if isinstance(payload, dict) else {}
-        simulation_result = payload.get('simulation_result', payload) if isinstance(payload, dict) else payload
+        simulation_result = (
+            payload.get('simulation_result', payload) if isinstance(payload, dict) else payload
+        )
         return grade_simulation_task(task, scheme_data, simulation_result)
     return _result(False, 'Неизвестный тип задания.', details={'task_type': kind})
 
@@ -161,12 +164,12 @@ def grade_math_task(task, answer):
         if lab_config:
             try:
                 rubric['expected_value'] = lab_expected_value(lab_config)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return _result(False, 'Лабораторный расчет задания настроен некорректно.')
         elif formula_config:
             try:
                 rubric['expected_value'] = formula_expected_value(formula_config)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return _result(False, 'Формула задания настроена некорректно.')
         else:
             return _result(False, 'В задании не задано ожидаемое значение.')
@@ -194,7 +197,9 @@ def grade_math_task(task, answer):
             f'(допуск ±{tolerance:g}).',
             details=details,
         )
-    return _result(False, f'Пока не сходится: {value:g} {expected_unit} вне допустимого диапазона.', details=details)
+    return _result(
+        False, f'Пока не сходится: {value:g} {expected_unit} вне допустимого диапазона.', details=details
+    )
 
 
 def grade_circuit_task(task, scheme_data):
@@ -240,7 +245,9 @@ def grade_circuit_task(task, scheme_data):
         if current < minimum:
             failures.append(f'Нужно добавить {component_type}: минимум {minimum}, сейчас {current}.')
         if maximum is not None and current > int(maximum):
-            failures.append(f'Слишком много компонентов {component_type}: максимум {maximum}, сейчас {current}.')
+            failures.append(
+                f'Слишком много компонентов {component_type}: максимум {maximum}, сейчас {current}.'
+            )
 
     if rubric.get('require_ground') and counts.get('ground', 0) < 1:
         failures.append('В схеме должен быть GND.')
@@ -351,7 +358,7 @@ def grade_simulation_task(task, scheme_data, simulation_result):
         if lab_config:
             try:
                 rubric['expected_value'] = lab_expected_value(lab_config)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return _result(False, 'Лабораторный расчет измерения настроен некорректно.')
     measurement = evaluate_measurement(metric, value, rubric)
 

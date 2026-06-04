@@ -110,10 +110,7 @@ def _component_value(component, *names):
 
 def _component_catalog_ref(component):
     return (
-        component.get('catalog_slug')
-        or component.get('catalog_ref')
-        or component.get('part_number')
-        or ''
+        component.get('catalog_slug') or component.get('catalog_ref') or component.get('part_number') or ''
     ).strip()
 
 
@@ -166,8 +163,7 @@ def build_connectivity_metrics(scheme_data):
     unconnected = [
         _component_label(c)
         for c in components
-        if normalize_component_type(c.get('type')) not in {'ground', 'node'}
-        and c.get('id') not in used_ids
+        if normalize_component_type(c.get('type')) not in {'ground', 'node'} and c.get('id') not in used_ids
     ]
 
     metrics = {
@@ -179,20 +175,22 @@ def build_connectivity_metrics(scheme_data):
         'unconnected': unconnected,
         'single_pin_nodes': [node for node, degree in net_degree.items() if degree == 1],
     }
-    metrics.update({
-        'graph_ok': graph_analysis.get('ok', True),
-        'graph_errors': graph_analysis.get('errors', []),
-        'graph_warnings': graph_analysis.get('warnings', []),
-        'connected_components_count': graph_metrics.get('connected_components_count', 0),
-        'is_connected': graph_metrics.get('is_connected', True),
-        'isolated_components': graph_metrics.get('isolated_components', []),
-        'floating_components': graph_metrics.get('floating_components', []),
-        'paths_to_ground': graph_metrics.get('paths_to_ground', {}),
-        'cycle_count': graph_metrics.get('cycle_count', 0),
-        'topology': graph_metrics.get('topology', 'generic'),
-        'has_output_node': graph_metrics.get('has_output_node', False),
-        'output_nodes': graph_metrics.get('output_nodes', []),
-    })
+    metrics.update(
+        {
+            'graph_ok': graph_analysis.get('ok', True),
+            'graph_errors': graph_analysis.get('errors', []),
+            'graph_warnings': graph_analysis.get('warnings', []),
+            'connected_components_count': graph_metrics.get('connected_components_count', 0),
+            'is_connected': graph_metrics.get('is_connected', True),
+            'isolated_components': graph_metrics.get('isolated_components', []),
+            'floating_components': graph_metrics.get('floating_components', []),
+            'paths_to_ground': graph_metrics.get('paths_to_ground', {}),
+            'cycle_count': graph_metrics.get('cycle_count', 0),
+            'topology': graph_metrics.get('topology', 'generic'),
+            'has_output_node': graph_metrics.get('has_output_node', False),
+            'output_nodes': graph_metrics.get('output_nodes', []),
+        }
+    )
     return metrics
 
 
@@ -208,49 +206,58 @@ def evaluate_bom_risks(scheme_data):
         product = None
         if catalog_ref:
             product = (
-                Product.objects
-                .select_related('category')
+                Product.objects.select_related('category')
                 .filter(Q(part_number__iexact=catalog_ref) | Q(slug__iexact=catalog_ref))
                 .first()
             )
             if not product:
-                risks.append({
-                    'level': 'warning',
-                    'component': _component_label(component),
-                    'message': f'товар не найден в каталоге: {catalog_ref}',
-                })
+                risks.append(
+                    {
+                        'level': 'warning',
+                        'component': _component_label(component),
+                        'message': f'товар не найден в каталоге: {catalog_ref}',
+                    }
+                )
                 missing_catalog.append(catalog_ref)
             else:
                 matched.append(product.part_number or product.slug)
                 expected_category = COMPONENT_TO_CATEGORY.get(ctype)
                 if expected_category and product.category.slug != expected_category:
-                    risks.append({
-                        'level': 'warning',
-                        'component': _component_label(component),
-                        'message': f'категория не совпадает: ожидалась «{expected_category}», получена «{product.category.slug}»',
-                    })
+                    risks.append(
+                        {
+                            'level': 'warning',
+                            'component': _component_label(component),
+                            'message': f'категория не совпадает: ожидалась «{expected_category}», получена «{product.category.slug}»',
+                        }
+                    )
                 for warning in (
                     nominal_mismatch_warning(component, product),
                     missing_spice_model_warning(component, product),
                 ):
                     if warning:
-                        risks.append({
-                            'level': 'warning',
-                            'component': _component_label(component),
-                            'message': warning,
-                        })
+                        risks.append(
+                            {
+                                'level': 'warning',
+                                'component': _component_label(component),
+                                'message': warning,
+                            }
+                        )
                 if product.lifecycle_status in {'eol', 'obsolete'}:
-                    risks.append({
-                        'level': 'risk',
-                        'component': _component_label(component),
-                        'message': f'lifecycle status is {product.lifecycle_status}',
-                    })
+                    risks.append(
+                        {
+                            'level': 'risk',
+                            'component': _component_label(component),
+                            'message': f'lifecycle status is {product.lifecycle_status}',
+                        }
+                    )
                 if product.stock <= 0:
-                    risks.append({
-                        'level': 'risk',
-                        'component': _component_label(component),
-                        'message': 'catalog item is out of stock',
-                    })
+                    risks.append(
+                        {
+                            'level': 'risk',
+                            'component': _component_label(component),
+                            'message': 'catalog item is out of stock',
+                        }
+                    )
         elif ctype not in {'ground', 'node'}:
             missing_catalog.append(_component_label(component))
 
@@ -305,8 +312,7 @@ def _product_for_component(component):
     if not catalog_ref:
         return None
     return (
-        Product.objects
-        .select_related('category')
+        Product.objects.select_related('category')
         .filter(Q(part_number__iexact=catalog_ref) | Q(slug__iexact=catalog_ref))
         .first()
     )
@@ -330,22 +336,42 @@ def _component_limits(component, product=None):
     def pick(*keys, expected_unit=''):
         values = []
         for key in keys:
-            values.extend([
-                component.get(key),
-                component_params.get(key),
-                params.get(key) if isinstance(params, dict) else None,
-            ])
+            values.extend(
+                [
+                    component.get(key),
+                    component_params.get(key),
+                    params.get(key) if isinstance(params, dict) else None,
+                ]
+            )
         return _max_limit_from_values(*values, expected_unit=expected_unit)
 
     return {
-        'voltage_v': pick('max_voltage_v', 'max_voltage', 'voltage', 'supply_voltage', 'vds', 'vceo', 'vrrm', expected_unit='V')
-                     or _max_limit_from_values(product_text_abs, expected_unit='V'),
-        'current_a': pick('max_current_a', 'max_current', 'current', 'id', 'ic', 'if', 'output_current', expected_unit='A')
-                     or _max_limit_from_values(product_text_abs, expected_unit='A'),
+        'voltage_v': pick(
+            'max_voltage_v',
+            'max_voltage',
+            'voltage',
+            'supply_voltage',
+            'vds',
+            'vceo',
+            'vrrm',
+            expected_unit='V',
+        )
+        or _max_limit_from_values(product_text_abs, expected_unit='V'),
+        'current_a': pick(
+            'max_current_a', 'max_current', 'current', 'id', 'ic', 'if', 'output_current', expected_unit='A'
+        )
+        or _max_limit_from_values(product_text_abs, expected_unit='A'),
         'power_w': pick('max_power_w', 'rated_power_w', 'tdp_w', 'power', 'max_power', expected_unit='W')
-                   or _max_limit_from_values(product_text_abs, product_text_thermal, expected_unit='W'),
-        'temperature_c': pick('max_junction_c', 'max_temperature_c', 'max_temp', 'temperature', 'junction_temperature', expected_unit='C')
-                         or _max_limit_from_values(product_text_thermal, expected_unit='C'),
+        or _max_limit_from_values(product_text_abs, product_text_thermal, expected_unit='W'),
+        'temperature_c': pick(
+            'max_junction_c',
+            'max_temperature_c',
+            'max_temp',
+            'temperature',
+            'junction_temperature',
+            expected_unit='C',
+        )
+        or _max_limit_from_values(product_text_thermal, expected_unit='C'),
     }
 
 
@@ -394,10 +420,20 @@ def evaluate_validity_guard(scheme_data, measurements=None):
         metrics['known_limits'] += sum(1 for value in limits.values() if value)
         label = _component_label(component)
         checks = [
-            ('component_voltage', 'voltage_v', ('component_voltage', 'voltage', 'dc_voltage', 'node_voltage'), 'В'),
+            (
+                'component_voltage',
+                'voltage_v',
+                ('component_voltage', 'voltage', 'dc_voltage', 'node_voltage'),
+                'В',
+            ),
             ('branch_current', 'current_a', ('branch_current', 'component_current', 'current'), 'А'),
             ('component_power', 'power_w', ('component_power', 'power_w', 'power'), 'Вт'),
-            ('junction_temperature', 'temperature_c', ('junction_temperature', 'temperature_c', 'temperature'), '°C'),
+            (
+                'junction_temperature',
+                'temperature_c',
+                ('junction_temperature', 'temperature_c', 'temperature'),
+                '°C',
+            ),
         ]
         for metric, limit_key, aliases, unit_label in checks:
             limit = limits.get(limit_key)
@@ -412,20 +448,24 @@ def evaluate_validity_guard(scheme_data, measurements=None):
             level = 'critical' if ratio >= 1 else 'risk' if ratio >= 0.9 else 'warning'
             if level in {'critical', 'risk'}:
                 metrics['out_of_range'] += 1
-            issues.append({
-                'level': level,
-                'component': label,
-                'metric': metric,
-                'value': float(measured),
-                'limit': float(limit),
-                'ratio': round(ratio, 3),
-                'message': (
-                    f'Результат {metric}={float(measured):g} {unit_label} для {label} '
-                    f'близок к пределу или выходит за область применимости модели '
-                    f'({float(limit):g} {unit_label}).'
-                ),
-                'source': 'datasheet_extracted' if product and (product.parameters or {}).get('datasheet_extracted') else 'product_parameters',
-            })
+            issues.append(
+                {
+                    'level': level,
+                    'component': label,
+                    'metric': metric,
+                    'value': float(measured),
+                    'limit': float(limit),
+                    'ratio': round(ratio, 3),
+                    'message': (
+                        f'Результат {metric}={float(measured):g} {unit_label} для {label} '
+                        f'близок к пределу или выходит за область применимости модели '
+                        f'({float(limit):g} {unit_label}).'
+                    ),
+                    'source': 'datasheet_extracted'
+                    if product and (product.parameters or {}).get('datasheet_extracted')
+                    else 'product_parameters',
+                }
+            )
     return {'issues': issues, 'metrics': metrics}
 
 
@@ -473,7 +513,9 @@ def evaluate_derating(scheme_data, simulation_runs=None, measurements=None):
         )
         measured_power = parse_number(_component_value(component, 'measured_power_w', 'power_w'), None)
         if measured_power is None:
-            measured_power, _ = _simulation_metric(simulation_runs, 'component_power', str(component.get('id')))
+            measured_power, _ = _simulation_metric(
+                simulation_runs, 'component_power', str(component.get('id'))
+            )
         if measured_power is None and 'component_power' in measurement_by_metric:
             measured_power = measurement_by_metric['component_power'].value
 
@@ -489,19 +531,25 @@ def evaluate_derating(scheme_data, simulation_runs=None, measurements=None):
                 level = 'warning'
             else:
                 continue
-            issues.append({
-                'level': level,
-                'component': label,
-                'message': f'power derating {measured_power:g} W / {power_limit:g} W ({ratio:.0%})',
-                'metric': 'component_power',
-                'value': measured_power,
-                'limit': power_limit,
-            })
+            issues.append(
+                {
+                    'level': level,
+                    'component': label,
+                    'message': f'power derating {measured_power:g} W / {power_limit:g} W ({ratio:.0%})',
+                    'metric': 'component_power',
+                    'value': measured_power,
+                    'limit': power_limit,
+                }
+            )
 
         max_temp = parse_number(_component_value(component, 'max_junction_c', 'max_temperature_c'), None)
-        measured_temp = parse_number(_component_value(component, 'junction_temperature_c', 'temperature_c'), None)
+        measured_temp = parse_number(
+            _component_value(component, 'junction_temperature_c', 'temperature_c'), None
+        )
         if measured_temp is None:
-            measured_temp, _ = _simulation_metric(simulation_runs, 'junction_temperature', str(component.get('id')))
+            measured_temp, _ = _simulation_metric(
+                simulation_runs, 'junction_temperature', str(component.get('id'))
+            )
         if measured_temp is None and 'junction_temperature' in measurement_by_metric:
             measured_temp = measurement_by_metric['junction_temperature'].value
         if max_temp and measured_temp is not None:
@@ -514,14 +562,16 @@ def evaluate_derating(scheme_data, simulation_runs=None, measurements=None):
                 metrics['thermal_risks'] += 1
             else:
                 continue
-            issues.append({
-                'level': level,
-                'component': label,
-                'message': f'thermal margin {margin:g} C',
-                'metric': 'junction_temperature',
-                'value': measured_temp,
-                'limit': max_temp,
-            })
+            issues.append(
+                {
+                    'level': level,
+                    'component': label,
+                    'message': f'thermal margin {margin:g} C',
+                    'metric': 'junction_temperature',
+                    'value': measured_temp,
+                    'limit': max_temp,
+                }
+            )
 
     return {'issues': issues, 'metrics': metrics}
 
@@ -579,12 +629,14 @@ def detect_faults(scheme_data, validation, connectivity, derating):
         faults.append(FAULT_LIBRARY[4])
 
     for error in validation.get('errors') or []:
-        faults.append({
-            'code': 'drc_error',
-            'title': 'Ошибка DRC',
-            'symptom': error,
-            'recommendation': 'Устраните ошибку DRC перед симуляцией или экспортом.',
-        })
+        faults.append(
+            {
+                'code': 'drc_error',
+                'title': 'Ошибка DRC',
+                'symptom': error,
+                'recommendation': 'Устраните ошибку DRC перед симуляцией или экспортом.',
+            }
+        )
 
     return faults
 
@@ -607,7 +659,9 @@ def collect_measurement_metrics(simulation_runs=None, measurements=None):
     return metrics
 
 
-def compare_measurement(metric, value, expected_value=None, tolerance_abs=None, tolerance_percent=None, unit=''):
+def compare_measurement(
+    metric, value, expected_value=None, tolerance_abs=None, tolerance_percent=None, unit=''
+):
     rubric = {'metric': metric, 'unit': unit}
     if expected_value is not None:
         rubric['expected_value'] = expected_value
@@ -656,20 +710,26 @@ def evaluate_reliability_margin(scheme_data):
         if isinstance(component, dict):
             if component.get('measured_power_w') and component.get('rated_power_w'):
                 try:
-                    ratio = float(component.get('measured_power_w')) / max(float(component.get('rated_power_w')), 1e-12)
+                    ratio = float(component.get('measured_power_w')) / max(
+                        float(component.get('rated_power_w')), 1e-12
+                    )
                     if ratio >= 0.8:
                         stress += 0.8
                     elif ratio >= 0.5:
                         stress += 0.3
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     pass
         contribution = rate * stress
         total += contribution
-        items.append({
-            'component': component.get('id') or component.get('ref') or ctype if isinstance(component, dict) else ctype,
-            'type': ctype,
-            'failure_rate_per_hour': contribution,
-        })
+        items.append(
+            {
+                'component': component.get('id') or component.get('ref') or ctype
+                if isinstance(component, dict)
+                else ctype,
+                'type': ctype,
+                'failure_rate_per_hour': contribution,
+            }
+        )
     mtbf = (1.0 / total) if total > 0 else None
     probability_1000h = math.exp(-total * 1000) if total > 0 else 1.0
     return {
@@ -699,11 +759,27 @@ def evaluate_manufacturing_readiness(scheme_data):
         if not isinstance(component, dict):
             continue
         cid = component.get('id') or component.get('ref') or component.get('type') or 'component'
-        has_datasheet = bool(component.get('datasheet_url') or component.get('datasheet') or component.get('product_datasheet_url'))
-        has_package = bool(component.get('package') or component.get('footprint') or component.get('case') or component.get('mounting'))
-        has_model = bool(component.get('spice_model') or component.get('model') or component.get('has_spice_model'))
-        has_footprint = bool(component.get('footprint') or component.get('cad_model') or component.get('has_cad_model'))
-        has_ratings = any(key in component for key in ('rated_power_w', 'max_voltage_v', 'max_current_a', 'temperature_max_c'))
+        has_datasheet = bool(
+            component.get('datasheet_url')
+            or component.get('datasheet')
+            or component.get('product_datasheet_url')
+        )
+        has_package = bool(
+            component.get('package')
+            or component.get('footprint')
+            or component.get('case')
+            or component.get('mounting')
+        )
+        has_model = bool(
+            component.get('spice_model') or component.get('model') or component.get('has_spice_model')
+        )
+        has_footprint = bool(
+            component.get('footprint') or component.get('cad_model') or component.get('has_cad_model')
+        )
+        has_ratings = any(
+            key in component
+            for key in ('rated_power_w', 'max_voltage_v', 'max_current_a', 'temperature_max_c')
+        )
         has_bom = bool(component.get('product_id') or component.get('sku') or component.get('part_number'))
         for key, ok in [
             ('has_datasheet', has_datasheet),
@@ -716,18 +792,20 @@ def evaluate_manufacturing_readiness(scheme_data):
             if ok:
                 checks[key] += 1
         if not all((has_package, has_ratings, has_bom)):
-            missing.append({
-                'component': cid,
-                'missing': [
-                    label
-                    for label, ok in [
-                        ('package', has_package),
-                        ('ratings', has_ratings),
-                        ('bom_binding', has_bom),
-                    ]
-                    if not ok
-                ],
-            })
+            missing.append(
+                {
+                    'component': cid,
+                    'missing': [
+                        label
+                        for label, ok in [
+                            ('package', has_package),
+                            ('ratings', has_ratings),
+                            ('bom_binding', has_bom),
+                        ]
+                        if not ok
+                    ],
+                }
+            )
     total = len([item for item in components if isinstance(item, dict)])
     score = 100 if total == 0 else round(sum(checks.values()) * 100 / max(total * len(checks), 1))
     return {
@@ -738,7 +816,9 @@ def evaluate_manufacturing_readiness(scheme_data):
     }
 
 
-def build_design_review(project, *, simulation_runs=None, measurements=None, import_summary=None, artifact_reports=None):
+def build_design_review(
+    project, *, simulation_runs=None, measurements=None, import_summary=None, artifact_reports=None
+):
     scheme_data = project.scheme_data if project is not None else {}
     if artifact_reports is None:
         artifact_reports = artifact_reports_from_project(project)
@@ -772,10 +852,10 @@ def build_design_review(project, *, simulation_runs=None, measurements=None, imp
     for item in bom['risks']:
         if item['level'] == 'risk':
             risk_count += 1
-        warnings.append(f"{item['component']}: {item['message']}")
+        warnings.append(f'{item["component"]}: {item["message"]}')
 
     for issue in derating['issues']:
-        message = f"{issue['component']}: {issue['message']}"
+        message = f'{issue["component"]}: {issue["message"]}'
         if issue['level'] == 'critical':
             errors.append(message)
             critical_count += 1
@@ -797,7 +877,7 @@ def build_design_review(project, *, simulation_runs=None, measurements=None, imp
             warnings.append(message)
 
     for finding in external_cad.get('findings') or []:
-        message = f"{finding.get('source_name') or 'artifact'}: {finding.get('title') or finding.get('raw') or finding.get('rule_id')}"
+        message = f'{finding.get("source_name") or "artifact"}: {finding.get("title") or finding.get("raw") or finding.get("rule_id")}'
         if finding.get('severity') in {'critical', 'error'}:
             errors.append(message)
             if finding.get('severity') == 'critical':
@@ -809,7 +889,7 @@ def build_design_review(project, *, simulation_runs=None, measurements=None, imp
         warnings.append('Manufacturing readiness: some components miss package, ratings or BOM binding.')
 
     for fault in faults:
-        recommendations.append(f"{fault['title']}: {fault['recommendation']}")
+        recommendations.append(f'{fault["title"]}: {fault["recommendation"]}')
 
     if not simulation_runs:
         recommendations.append('Run at least one DC/AC/TRAN simulation and save the result.')
@@ -820,15 +900,21 @@ def build_design_review(project, *, simulation_runs=None, measurements=None, imp
     if connectivity.get('floating_components'):
         recommendations.append('Connect floating schematic fragments to the main reference path.')
     if connectivity.get('topology') in {'voltage_divider', 'rc_network', 'led_indicator'}:
-        recommendations.append(f"Detected topology: {connectivity['topology']}; use matching lab checks for expected values.")
+        recommendations.append(
+            f'Detected topology: {connectivity["topology"]}; use matching lab checks for expected values.'
+        )
     if import_summary:
         recommendations.append('Review unsupported import items before saving the imported project.')
     if external_cad.get('finding_count'):
         recommendations.append('Review imported CAD DRC/ERC findings before relying on this project session.')
     if manufacturing.get('missing'):
-        recommendations.append('Complete assembly readiness: package, ratings, footprint/model and BOM binding.')
+        recommendations.append(
+            'Complete assembly readiness: package, ratings, footprint/model and BOM binding.'
+        )
     if validity['issues']:
-        recommendations.append('Проверьте datasheet/rating limits: часть результатов близка к предельным режимам или вне области применимости модели.')
+        recommendations.append(
+            'Проверьте datasheet/rating limits: часть результатов близка к предельным режимам или вне области применимости модели.'
+        )
 
     expert_facts = build_expert_facts(
         connectivity=connectivity,
@@ -867,18 +953,72 @@ def build_design_review(project, *, simulation_runs=None, measurements=None, imp
         ('errors', -len(errors) * 20, 'Ошибки', len(errors)),
         ('warnings', -len(warnings) * 6, 'Предупреждения', len(warnings)),
         ('derating', -risk_count * 8, 'Риски деретинга', risk_count),
-        ('validity', -len([item for item in validity.get('issues') or [] if item.get('level') in {'risk', 'critical'}]) * 8, 'Выход за пределы модели', len([item for item in validity.get('issues') or [] if item.get('level') in {'risk', 'critical'}])),
-        ('expert_risk', -len([item for item in expert.get('findings') or [] if item.get('severity') in {'risk', 'critical'}]) * 5, 'Критичные экспертные выводы', len([item for item in expert.get('findings') or [] if item.get('severity') in {'risk', 'critical'}])),
-        ('external_cad', -len([item for item in external_cad.get('findings') or [] if item.get('severity') in {'critical', 'error'}]) * 10, 'Импорт CAD/ERC', len([item for item in external_cad.get('findings') or [] if item.get('severity') in {'critical', 'error'}])),
-        ('manufacturing', -len(manufacturing.get('missing') or []) * 2, 'Пробелы готовности к сборке', len(manufacturing.get('missing') or [])),
-        ('unconnected', -len(connectivity['unconnected']) * 3, 'Несоединённые компоненты', len(connectivity['unconnected'])),
+        (
+            'validity',
+            -len([item for item in validity.get('issues') or [] if item.get('level') in {'risk', 'critical'}])
+            * 8,
+            'Выход за пределы модели',
+            len([item for item in validity.get('issues') or [] if item.get('level') in {'risk', 'critical'}]),
+        ),
+        (
+            'expert_risk',
+            -len(
+                [
+                    item
+                    for item in expert.get('findings') or []
+                    if item.get('severity') in {'risk', 'critical'}
+                ]
+            )
+            * 5,
+            'Критичные экспертные выводы',
+            len(
+                [
+                    item
+                    for item in expert.get('findings') or []
+                    if item.get('severity') in {'risk', 'critical'}
+                ]
+            ),
+        ),
+        (
+            'external_cad',
+            -len(
+                [
+                    item
+                    for item in external_cad.get('findings') or []
+                    if item.get('severity') in {'critical', 'error'}
+                ]
+            )
+            * 10,
+            'Импорт CAD/ERC',
+            len(
+                [
+                    item
+                    for item in external_cad.get('findings') or []
+                    if item.get('severity') in {'critical', 'error'}
+                ]
+            ),
+        ),
+        (
+            'manufacturing',
+            -len(manufacturing.get('missing') or []) * 2,
+            'Пробелы готовности к сборке',
+            len(manufacturing.get('missing') or []),
+        ),
+        (
+            'unconnected',
+            -len(connectivity['unconnected']) * 3,
+            'Несоединённые компоненты',
+            len(connectivity['unconnected']),
+        ),
     ]
     score_breakdown = [
         {'key': key, 'delta': delta, 'label': label, 'count': count}
         for key, delta, label, count in breakdown_components
         if delta < 0
     ]
-    score = 100 + sum(item['delta'] for item in score_breakdown if isinstance(item.get('delta'), (int, float)))
+    score = 100 + sum(
+        item['delta'] for item in score_breakdown if isinstance(item.get('delta'), (int, float))
+    )
     if not score_breakdown:
         score = 100
     score = max(0, min(100, score))
@@ -902,9 +1042,9 @@ def build_design_review(project, *, simulation_runs=None, measurements=None, imp
     }
 
     summary = (
-        f"{connectivity['component_count']} components, "
-        f"{connectivity['connection_count']} connections, "
-        f"{len(errors)} errors, {len(warnings)} warnings."
+        f'{connectivity["component_count"]} components, '
+        f'{connectivity["connection_count"]} connections, '
+        f'{len(errors)} errors, {len(warnings)} warnings.'
     )
 
     report = {

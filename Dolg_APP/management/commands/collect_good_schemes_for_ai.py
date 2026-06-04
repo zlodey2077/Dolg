@@ -32,8 +32,10 @@ class Command(BaseCommand):
         if options['as_json']:
             self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
             return
-        self.stdout.write(self.style.SUCCESS(
-            f"Scanned {result['scanned']}; promoted {result['promoted']}; "
-            f"updated {result['updated']}; skipped privacy {result['skipped_privacy']}; "
-            f"skipped quality {result['skipped_quality']}."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Scanned {result["scanned"]}; promoted {result["promoted"]}; '
+                f'updated {result["updated"]}; skipped privacy {result["skipped_privacy"]}; '
+                f'skipped quality {result["skipped_quality"]}.'
+            )
+        )

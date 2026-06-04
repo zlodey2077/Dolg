@@ -27,6 +27,7 @@ Phase 2 (post-defense):
     - Histogram + Pareto plot в UI
     - Worst-case + sensitivity analysis
 """
+
 from __future__ import annotations
 
 import logging
@@ -38,9 +39,9 @@ logger = logging.getLogger(__name__)
 
 # Толеранс по умолчанию (1σ) — стандарт E96 (1%), E24 (5%), E12 (10%).
 DEFAULT_TOLERANCE = 0.05
-MAX_ITERATIONS = 5000      # safety cap (~1 сек @ 50 nodes)
+MAX_ITERATIONS = 5000  # safety cap (~1 сек @ 50 nodes)
 MIN_ITERATIONS = 10
-GMIN = 1e-12               # против сингулярности «плавающих» узлов
+GMIN = 1e-12  # против сингулярности «плавающих» узлов
 DIODE_DROP = 0.7
 LED_DROP = 2.0
 
@@ -96,10 +97,14 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
     for conn in connections:
         f = conn.get('from') or {}
         t = conn.get('to') or {}
-        fk = (f.get('compId') or f.get('componentId') or f.get('id'),
-              f.get('portId') or f.get('pinId') or f.get('port') or '1')
-        tk = (t.get('compId') or t.get('componentId') or t.get('id'),
-              t.get('portId') or t.get('pinId') or t.get('port') or '1')
+        fk = (
+            f.get('compId') or f.get('componentId') or f.get('id'),
+            f.get('portId') or f.get('pinId') or f.get('port') or '1',
+        )
+        tk = (
+            t.get('compId') or t.get('componentId') or t.get('id'),
+            t.get('portId') or t.get('pinId') or t.get('port') or '1',
+        )
         if fk in port_ids and tk in port_ids:
             union(fk, tk)
 
@@ -108,7 +113,7 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
     for c in components:
         if (c.get('type') or '').lower() == 'ground':
             cid = c.get('id')
-            for p in (c.get('ports') or [{'id': '1'}]):
+            for p in c.get('ports') or [{'id': '1'}]:
                 k = (cid, p.get('id') or '1')
                 if ground_key is None:
                     ground_key = k
@@ -143,30 +148,72 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
 
         if ctype == 'resistor':
             value = float(c.get('resistance') or c.get('value') or 1000)
-            elements.append({'id': cid, 'type': 'R', 'nodes': [n1, n2],
-                             'value': max(value, 1e-3), 'label': f'R{cid}',
-                             'tolerable': True})
+            elements.append(
+                {
+                    'id': cid,
+                    'type': 'R',
+                    'nodes': [n1, n2],
+                    'value': max(value, 1e-3),
+                    'label': f'R{cid}',
+                    'tolerable': True,
+                }
+            )
         elif ctype == 'capacitor':
-            elements.append({'id': cid, 'type': 'C', 'nodes': [n1, n2],
-                             'value': float(c.get('capacitance') or 1e-6),
-                             'label': f'C{cid}', 'tolerable': False})
+            elements.append(
+                {
+                    'id': cid,
+                    'type': 'C',
+                    'nodes': [n1, n2],
+                    'value': float(c.get('capacitance') or 1e-6),
+                    'label': f'C{cid}',
+                    'tolerable': False,
+                }
+            )
         elif ctype == 'inductor':
-            elements.append({'id': cid, 'type': 'L', 'nodes': [n1, n2],
-                             'value': float(c.get('inductance') or 1e-3),
-                             'label': f'L{cid}', 'tolerable': False})
+            elements.append(
+                {
+                    'id': cid,
+                    'type': 'L',
+                    'nodes': [n1, n2],
+                    'value': float(c.get('inductance') or 1e-3),
+                    'label': f'L{cid}',
+                    'tolerable': False,
+                }
+            )
         elif ctype == 'battery':
             value = float(c.get('voltage') or 9.0)
-            elements.append({'id': cid, 'type': 'V', 'nodes': [n1, n2],
-                             'value': value, 'label': f'V{cid}',
-                             'tolerable': True})
+            elements.append(
+                {
+                    'id': cid,
+                    'type': 'V',
+                    'nodes': [n1, n2],
+                    'value': value,
+                    'label': f'V{cid}',
+                    'tolerable': True,
+                }
+            )
         elif ctype == 'diode':
-            elements.append({'id': cid, 'type': 'D', 'nodes': [n1, n2],
-                             'value': DIODE_DROP, 'label': f'D{cid}',
-                             'tolerable': False})
+            elements.append(
+                {
+                    'id': cid,
+                    'type': 'D',
+                    'nodes': [n1, n2],
+                    'value': DIODE_DROP,
+                    'label': f'D{cid}',
+                    'tolerable': False,
+                }
+            )
         elif ctype == 'led':
-            elements.append({'id': cid, 'type': 'D', 'nodes': [n1, n2],
-                             'value': LED_DROP, 'label': f'LED{cid}',
-                             'tolerable': False})
+            elements.append(
+                {
+                    'id': cid,
+                    'type': 'D',
+                    'nodes': [n1, n2],
+                    'value': LED_DROP,
+                    'label': f'LED{cid}',
+                    'tolerable': False,
+                }
+            )
 
     return {'n_nodes': n_nodes, 'elements': elements}
 
@@ -178,7 +225,7 @@ def solve_dc(circuit: dict, *, caps_open: bool = True, inds_short: bool = True) 
     Зеркало JS `simulation-engine.js::buildMNA_DC` + `solveLinear`, но через
     numpy.linalg.solve (LAPACK).
     """
-    node_count = circuit['n_nodes'] - 1   # минус ground
+    node_count = circuit['n_nodes'] - 1  # минус ground
     if node_count <= 0:
         return {'voltages': {0: 0.0}, 'currents': {}}
 
@@ -278,8 +325,13 @@ def run_monte_carlo(
     base_circuit = scheme_to_circuit(scheme_data)
     if not base_circuit['elements']:
         return {
-            'iterations': 0, 'elapsed_ms': 0.0, 'tolerance': tolerance,
-            'success': 0, 'failed': 0, 'nodes': {}, 'currents': {},
+            'iterations': 0,
+            'elapsed_ms': 0.0,
+            'tolerance': tolerance,
+            'success': 0,
+            'failed': 0,
+            'nodes': {},
+            'currents': {},
             'errors': ['scheme has no simulatable components'],
         }
 
@@ -303,8 +355,7 @@ def run_monte_carlo(
 
         # Локальный circuit
         local_elements = [
-            {**e, 'value': float(new_values[i])}
-            for i, e in enumerate(base_circuit['elements'])
+            {**e, 'value': float(new_values[i])} for i, e in enumerate(base_circuit['elements'])
         ]
         local_circuit = {'n_nodes': base_circuit['n_nodes'], 'elements': local_elements}
 
@@ -326,8 +377,7 @@ def run_monte_carlo(
 
     def _stats(samples: list[float]) -> dict:
         if not samples:
-            return {'mean': 0, 'std': 0, 'min': 0, 'max': 0,
-                    'p05': 0, 'p50': 0, 'p95': 0, 'n': 0}
+            return {'mean': 0, 'std': 0, 'min': 0, 'max': 0, 'p05': 0, 'p50': 0, 'p95': 0, 'n': 0}
         arr = np.asarray(samples, dtype=np.float64)
         return {
             'mean': float(arr.mean()),
@@ -347,10 +397,8 @@ def run_monte_carlo(
         'tolerance': tolerance,
         'success': success,
         'failed': failed,
-        'nodes': {str(node): _stats(samples)
-                  for node, samples in sorted(node_samples.items())},
-        'currents': {vid: _stats(samples)
-                     for vid, samples in current_samples.items()},
+        'nodes': {str(node): _stats(samples) for node, samples in sorted(node_samples.items())},
+        'currents': {vid: _stats(samples) for vid, samples in current_samples.items()},
         'errors': errors,
         'algorithm': 'NumPy MNA + Gaussian Monte Carlo (DC)',
     }

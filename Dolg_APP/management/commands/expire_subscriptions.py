@@ -11,6 +11,7 @@
   (если auto_renew=True — оставляем активным; в production здесь Stripe webhook
    продлевает period_end автоматически).
 """
+
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils import timezone
@@ -31,10 +32,7 @@ class Command(BaseCommand):
         qs = Subscription.objects.filter(
             period_end__lt=now,
             tier='pro',
-        ).filter(
-            Q(status__in=['trial', 'cancelled']) |
-            Q(status='active', auto_renew=False)
-        )
+        ).filter(Q(status__in=['trial', 'cancelled']) | Q(status='active', auto_renew=False))
 
         n = qs.count()
         if dry_run:

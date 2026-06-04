@@ -79,7 +79,7 @@ def _parse_voltage(component: dict) -> float | None:
             continue
         try:
             return float(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     return None
 
@@ -396,10 +396,14 @@ def detect_connectivity_extras(scheme_data: Any, uf: _UnionFind | None = None) -
     for c in conns:
         f = c.get('from') or {}
         t = c.get('to') or {}
-        key = tuple(sorted([
-            (f.get('compId'), f.get('portId')),
-            (t.get('compId'), t.get('portId')),
-        ]))
+        key = tuple(
+            sorted(
+                [
+                    (f.get('compId'), f.get('portId')),
+                    (t.get('compId'), t.get('portId')),
+                ]
+            )
+        )
         if key in pairs:
             dups += 1
         else:
@@ -506,10 +510,13 @@ def detect_power_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[
     # Остальные placeholder'ы
     evidence['opposing_sources_count'] = 0
     evidence['active_components_without_decoupling'] = 0
-    evidence['has_source_gnd_short'] = bool(batteries) and ground_set and any(
-        uf.find(_port_key(b['id'], '+')) in ground_set
-        and uf.find(_port_key(b['id'], '-')) in ground_set
-        for b in batteries
+    evidence['has_source_gnd_short'] = (
+        bool(batteries)
+        and ground_set
+        and any(
+            uf.find(_port_key(b['id'], '+')) in ground_set and uf.find(_port_key(b['id'], '-')) in ground_set
+            for b in batteries
+        )
     )
     evidence['short_circuit_path'] = 1 if evidence['has_source_gnd_short'] else 0
     evidence['has_ac_source'] = False
@@ -649,7 +656,8 @@ def detect_simulation_extras(scheme_data: Any, uf: _UnionFind | None = None) -> 
     evidence['tran_step_ratio'] = 0
     evidence['ac_sweep_decades'] = 5
     evidence['unrealistic_value_count'] = sum(
-        1 for c in comps.values()
+        1
+        for c in comps.values()
         if (c.get('type') or '').lower() == 'resistor' and float(c.get('resistance') or 1) <= 0
     )
     evidence['tran_no_ic'] = False
@@ -680,7 +688,8 @@ def detect_bom_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[st
 
     # bom.active_components_without_spice
     active_no_spice = sum(
-        1 for c in comps.values()
+        1
+        for c in comps.values()
         if (c.get('type') or '').lower() in ('npn', 'pnp', 'diode', 'led')
         and not (c.get('spice_model') or '').strip()
     )
@@ -694,17 +703,36 @@ def detect_bom_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[st
     evidence['cost_dominant_share'] = 0
     # Compliance / signal / layout — внешние данные нужны
     for k in [
-        'non_rohs_components', 'emc_filter_present', 'high_voltage_creepage_violations',
-        'external_connector_count', 'ce_protection_count', 'has_power_input',
-        'high_speed_unterminated', 'clock_no_damping', 'long_unbuffered_traces',
-        'parallel_high_speed_pairs', 'simultaneous_switching_outputs', 'high_speed_stubs',
-        'long_clock_line_count', 'trace_width_violations', 'clearance_violations',
-        'small_via_count', 'small_smd_pad_count', 'silkscreen_overlap_count',
-        'mounting_holes_count', 'has_ground_pour', 'ai_pattern_matches',
-        'ai_anomaly_score', 'crossing_count', 'explicit_node_count',
-        'min_wire_spacing_px', 'min_segment_length_px',
+        'non_rohs_components',
+        'emc_filter_present',
+        'high_voltage_creepage_violations',
+        'external_connector_count',
+        'ce_protection_count',
+        'has_power_input',
+        'high_speed_unterminated',
+        'clock_no_damping',
+        'long_unbuffered_traces',
+        'parallel_high_speed_pairs',
+        'simultaneous_switching_outputs',
+        'high_speed_stubs',
+        'long_clock_line_count',
+        'trace_width_violations',
+        'clearance_violations',
+        'small_via_count',
+        'small_smd_pad_count',
+        'silkscreen_overlap_count',
+        'mounting_holes_count',
+        'has_ground_pour',
+        'ai_pattern_matches',
+        'ai_anomaly_score',
+        'crossing_count',
+        'explicit_node_count',
+        'min_wire_spacing_px',
+        'min_segment_length_px',
     ]:
         if k not in evidence:
-            evidence[k] = 0 if 'count' in k or k.endswith('_violations') else False if k.startswith('has_') else 0
+            evidence[k] = (
+                0 if 'count' in k or k.endswith('_violations') else False if k.startswith('has_') else 0
+            )
 
     return evidence

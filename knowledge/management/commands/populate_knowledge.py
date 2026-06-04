@@ -4,6 +4,7 @@
     python manage.py populate_knowledge           # добавить если нет
     python manage.py populate_knowledge --reset   # полностью перезалить
 """
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -17,12 +18,18 @@ from knowledge.models import (
 )
 
 CATEGORIES = [
-    ('physics',    'Физика и теория',     '🧮', 'Законы, формулы и принципы работы электрических цепей.',          10),
-    ('components', 'Электронные компоненты', '⚡', 'Резисторы, конденсаторы, диоды, транзисторы и микросхемы.',    20),
-    ('packages',   'Корпуса и монтаж',    '📦', 'DIP, SOIC, QFP и другие типы корпусов; THT vs SMD.',              30),
-    ('pcb',        'Печатные платы',      '🟢', 'Структура PCB, проектирование, производство.',                    40),
-    ('history',    'История электроники', '📜', 'От ламп и первых транзисторов до современных процессоров.',       50),
-    ('practice',   'Инженерная практика', '🔧', 'Правила пайки, маркировка, чтение datasheet и схем ГОСТ.',        60),
+    ('physics', 'Физика и теория', '🧮', 'Законы, формулы и принципы работы электрических цепей.', 10),
+    (
+        'components',
+        'Электронные компоненты',
+        '⚡',
+        'Резисторы, конденсаторы, диоды, транзисторы и микросхемы.',
+        20,
+    ),
+    ('packages', 'Корпуса и монтаж', '📦', 'DIP, SOIC, QFP и другие типы корпусов; THT vs SMD.', 30),
+    ('pcb', 'Печатные платы', '🟢', 'Структура PCB, проектирование, производство.', 40),
+    ('history', 'История электроники', '📜', 'От ламп и первых транзисторов до современных процессоров.', 50),
+    ('practice', 'Инженерная практика', '🔧', 'Правила пайки, маркировка, чтение datasheet и схем ГОСТ.', 60),
 ]
 
 
@@ -95,7 +102,6 @@ ARTICLES = [
 узловых уравнений и находит потенциалы узлов и токи в ветвях.</p>
 """,
     },
-
     # ---------- Компоненты ----------
     {
         'topic': 'components',
@@ -207,7 +213,6 @@ IRFZ44N (низкое сопротивление, десятки ампер), IR
 и интегральных схем.</p>
 """,
     },
-
     # ---------- Корпуса ----------
     {
         'topic': 'packages',
@@ -242,7 +247,6 @@ IRFZ44N (низкое сопротивление, десятки ампер), IR
 Для ручной пайки разумный предел — SOIC/TQFP с шагом от 0.5 мм; BGA дома не паяют.</p>
 """,
     },
-
     # ---------- PCB ----------
     {
         'topic': 'pcb',
@@ -284,7 +288,6 @@ IRFZ44N (низкое сопротивление, десятки ампер), IR
 не проходит сертификацию по электромагнитной совместимости (ЭМС).</p>
 """,
     },
-
     # ---------- История ----------
     {
         'topic': 'history',
@@ -326,7 +329,6 @@ IRFZ44N (низкое сопротивление, десятки ампер), IR
 архитектуру x86, доминирующую до сих пор.</p>
 """,
     },
-
     # ---------- Практика ----------
     {
         'topic': 'practice',
@@ -876,7 +878,7 @@ def default_inline_material_for_topic(topic):
         if material.get('material_type') in {'image', 'animation', 'video'}:
             return {
                 **material,
-                'title': f"Визуальный материал: {material['title']}",
+                'title': f'Визуальный материал: {material["title"]}',
                 'order': 90,
             }
     return {
@@ -951,9 +953,30 @@ LEARNING_TRACKS = [
                             'require_drc_ok': True,
                             'min_connections': 3,
                             'nominal_ranges': [
-                                {'type': 'battery', 'field': 'voltage', 'min': 8.5, 'max': 9.5, 'unit': 'В', 'label': 'источник 9 В'},
-                                {'type': 'resistor', 'field': 'resistance', 'min': 6500, 'max': 7100, 'unit': 'Ом', 'label': 'верхний резистор около 6.8 кОм'},
-                                {'type': 'resistor', 'field': 'resistance', 'min': 3000, 'max': 3400, 'unit': 'Ом', 'label': 'нижний резистор около 3.2 кОм'},
+                                {
+                                    'type': 'battery',
+                                    'field': 'voltage',
+                                    'min': 8.5,
+                                    'max': 9.5,
+                                    'unit': 'В',
+                                    'label': 'источник 9 В',
+                                },
+                                {
+                                    'type': 'resistor',
+                                    'field': 'resistance',
+                                    'min': 6500,
+                                    'max': 7100,
+                                    'unit': 'Ом',
+                                    'label': 'верхний резистор около 6.8 кОм',
+                                },
+                                {
+                                    'type': 'resistor',
+                                    'field': 'resistance',
+                                    'min': 3000,
+                                    'max': 3400,
+                                    'unit': 'Ом',
+                                    'label': 'нижний резистор около 3.2 кОм',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1006,8 +1029,22 @@ LEARNING_TRACKS = [
                             'require_drc_ok': True,
                             'min_connections': 3,
                             'nominal_ranges': [
-                                {'type': 'resistor', 'field': 'resistance', 'min': 900, 'max': 1100, 'unit': 'Ом', 'label': 'резистор 1 кОм'},
-                                {'type': 'capacitor', 'field': 'capacitance', 'min': 90e-9, 'max': 110e-9, 'unit': 'Ф', 'label': 'конденсатор 100 нФ'},
+                                {
+                                    'type': 'resistor',
+                                    'field': 'resistance',
+                                    'min': 900,
+                                    'max': 1100,
+                                    'unit': 'Ом',
+                                    'label': 'резистор 1 кОм',
+                                },
+                                {
+                                    'type': 'capacitor',
+                                    'field': 'capacitance',
+                                    'min': 90e-9,
+                                    'max': 110e-9,
+                                    'unit': 'Ф',
+                                    'label': 'конденсатор 100 нФ',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1058,8 +1095,22 @@ LEARNING_TRACKS = [
                             'require_drc_ok': True,
                             'min_connections': 3,
                             'nominal_ranges': [
-                                {'type': 'battery', 'field': 'voltage', 'min': 4.5, 'max': 5.5, 'unit': 'В', 'label': 'источник 5 В'},
-                                {'type': 'resistor', 'field': 'resistance', 'min': 200, 'max': 240, 'unit': 'Ом', 'label': 'резистор около 220 Ом'},
+                                {
+                                    'type': 'battery',
+                                    'field': 'voltage',
+                                    'min': 4.5,
+                                    'max': 5.5,
+                                    'unit': 'В',
+                                    'label': 'источник 5 В',
+                                },
+                                {
+                                    'type': 'resistor',
+                                    'field': 'resistance',
+                                    'min': 200,
+                                    'max': 240,
+                                    'unit': 'Ом',
+                                    'label': 'резистор около 220 Ом',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1119,7 +1170,13 @@ LEARNING_TRACKS = [
                             'tolerance_percent': 5,
                             'lab': {
                                 'kind': 'transistor_switch',
-                                'inputs': {'supply_voltage': 5, 'load_voltage': 2, 'load_current_ma': 20, 'input_voltage': 5, 'forced_beta': 10},
+                                'inputs': {
+                                    'supply_voltage': 5,
+                                    'load_voltage': 2,
+                                    'load_current_ma': 20,
+                                    'input_voltage': 5,
+                                    'forced_beta': 10,
+                                },
                                 'output': 'base_resistor_ohm',
                             },
                         },
@@ -1130,13 +1187,33 @@ LEARNING_TRACKS = [
                         'title': 'Соберите NPN-ключ',
                         'prompt': 'Соберите источник 5 В, NPN-транзистор, LED/нагрузку, резистор базы, резистор нагрузки и GND.',
                         'rubric': {
-                            'required_types': {'battery': 1, 'transistor': 1, 'resistor': 2, 'led': 1, 'ground': 1},
+                            'required_types': {
+                                'battery': 1,
+                                'transistor': 1,
+                                'resistor': 2,
+                                'led': 1,
+                                'ground': 1,
+                            },
                             'require_ground': True,
                             'require_source': True,
                             'min_connections': 4,
                             'nominal_ranges': [
-                                {'type': 'battery', 'field': 'voltage', 'min': 4.5, 'max': 5.5, 'unit': 'В', 'label': 'источник 5 В'},
-                                {'type': 'resistor', 'field': 'resistance', 'min': 1800, 'max': 2400, 'unit': 'Ом', 'label': 'базовый резистор около 2.2 кОм'},
+                                {
+                                    'type': 'battery',
+                                    'field': 'voltage',
+                                    'min': 4.5,
+                                    'max': 5.5,
+                                    'unit': 'В',
+                                    'label': 'источник 5 В',
+                                },
+                                {
+                                    'type': 'resistor',
+                                    'field': 'resistance',
+                                    'min': 1800,
+                                    'max': 2400,
+                                    'unit': 'Ом',
+                                    'label': 'базовый резистор около 2.2 кОм',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1179,7 +1256,13 @@ LEARNING_TRACKS = [
                             'tolerance_abs': 0.08,
                             'lab': {
                                 'kind': 'linear_regulator',
-                                'inputs': {'vin': 12, 'vout': 5, 'load_current_ma': 250, 'theta_ja': 50, 'ambient_c': 25},
+                                'inputs': {
+                                    'vin': 12,
+                                    'vout': 5,
+                                    'load_current_ma': 250,
+                                    'theta_ja': 50,
+                                    'ambient_c': 25,
+                                },
                                 'output': 'power_w',
                             },
                         },
@@ -1190,12 +1273,24 @@ LEARNING_TRACKS = [
                         'title': 'Соберите узел 12 В → 5 В',
                         'prompt': 'Соберите источник, стабилизатор 7805, входной/выходной конденсаторы, нагрузку и GND.',
                         'rubric': {
-                            'required_types': {'battery': 1, 'regulator': 1, 'capacitor': 2, 'resistor': 1, 'ground': 1},
+                            'required_types': {
+                                'battery': 1,
+                                'regulator': 1,
+                                'capacitor': 2,
+                                'resistor': 1,
+                                'ground': 1,
+                            },
                             'require_ground': True,
                             'require_source': True,
                             'min_connections': 5,
                             'required_properties': [
-                                {'type': 'regulator', 'field': 'part_number', 'op': 'contains', 'values': ['7805', 'l7805'], 'label': 'стабилизатор 7805'},
+                                {
+                                    'type': 'regulator',
+                                    'field': 'part_number',
+                                    'op': 'contains',
+                                    'values': ['7805', 'l7805'],
+                                    'label': 'стабилизатор 7805',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1249,12 +1344,24 @@ LEARNING_TRACKS = [
                         'title': 'Соберите астабильный NE555',
                         'prompt': 'Соберите IC NE555, два резистора, конденсатор, питание и GND.',
                         'rubric': {
-                            'required_types': {'ic': 1, 'resistor': 2, 'capacitor': 1, 'battery': 1, 'ground': 1},
+                            'required_types': {
+                                'ic': 1,
+                                'resistor': 2,
+                                'capacitor': 1,
+                                'battery': 1,
+                                'ground': 1,
+                            },
                             'require_ground': True,
                             'require_source': True,
                             'min_connections': 5,
                             'required_properties': [
-                                {'type': 'ic', 'field': 'part_number', 'op': 'contains', 'values': ['555', 'ne555'], 'label': 'IC NE555'},
+                                {
+                                    'type': 'ic',
+                                    'field': 'part_number',
+                                    'op': 'contains',
+                                    'values': ['555', 'ne555'],
+                                    'label': 'IC NE555',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1311,13 +1418,33 @@ LEARNING_TRACKS = [
                         'title': 'Соберите RC-антидребезг',
                         'prompt': 'Соберите кнопку, подтягивающий резистор, конденсатор на землю, источник и GND.',
                         'rubric': {
-                            'required_types': {'button': 1, 'resistor': 1, 'capacitor': 1, 'battery': 1, 'ground': 1},
+                            'required_types': {
+                                'button': 1,
+                                'resistor': 1,
+                                'capacitor': 1,
+                                'battery': 1,
+                                'ground': 1,
+                            },
                             'require_ground': True,
                             'require_source': True,
                             'min_connections': 4,
                             'nominal_ranges': [
-                                {'type': 'resistor', 'field': 'resistance', 'min': 9000, 'max': 11000, 'unit': 'Ом', 'label': 'подтяжка 10 кОм'},
-                                {'type': 'capacitor', 'field': 'capacitance', 'min': 90e-9, 'max': 110e-9, 'unit': 'Ф', 'label': 'конденсатор 100 нФ'},
+                                {
+                                    'type': 'resistor',
+                                    'field': 'resistance',
+                                    'min': 9000,
+                                    'max': 11000,
+                                    'unit': 'Ом',
+                                    'label': 'подтяжка 10 кОм',
+                                },
+                                {
+                                    'type': 'capacitor',
+                                    'field': 'capacitance',
+                                    'min': 90e-9,
+                                    'max': 110e-9,
+                                    'unit': 'Ф',
+                                    'label': 'конденсатор 100 нФ',
+                                },
                             ],
                         },
                         'order': 20,
@@ -1346,7 +1473,12 @@ LEARNING_TRACKS = [
                             'tolerance_abs': 2,
                             'lab': {
                                 'kind': 'thermal_margin',
-                                'inputs': {'power_w': 1.5, 'theta_ja': 50, 'ambient_c': 25, 'max_junction_c': 125},
+                                'inputs': {
+                                    'power_w': 1.5,
+                                    'theta_ja': 50,
+                                    'ambient_c': 25,
+                                    'max_junction_c': 125,
+                                },
                                 'output': 'junction_temperature_c',
                             },
                         },
@@ -1457,7 +1589,9 @@ class Command(BaseCommand):
     help = 'Наполняет энциклопедию начальным набором категорий и статей.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--reset', action='store_true', help='Удалить существующие статьи и категории перед загрузкой.')
+        parser.add_argument(
+            '--reset', action='store_true', help='Удалить существующие статьи и категории перед загрузкой.'
+        )
 
     @transaction.atomic
     def handle(self, *args, **opts):
@@ -1581,7 +1715,9 @@ class Command(BaseCommand):
 
         total = Article.objects.count()
         materials_total = ArticleMaterial.objects.count()
-        self.stdout.write(self.style.SUCCESS(
-            f'OK: категорий {len(CATEGORIES)}, статей в базе {total}, материалов {materials_total}, '
-            f'уроков {lesson_count}, заданий {task_count} (создано статей: {created_count})'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'OK: категорий {len(CATEGORIES)}, статей в базе {total}, материалов {materials_total}, '
+                f'уроков {lesson_count}, заданий {task_count} (создано статей: {created_count})'
+            )
+        )

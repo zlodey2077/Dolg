@@ -40,7 +40,9 @@ def is_forbidden_image_path(value: Any) -> bool:
     text = _image_name(value).lower().replace('\\', '/').strip()
     if not text:
         return False
-    return text.startswith(FORBIDDEN_IMAGE_PREFIXES) or any(token in text for token in FORBIDDEN_IMAGE_HOST_TOKENS)
+    return text.startswith(FORBIDDEN_IMAGE_PREFIXES) or any(
+        token in text for token in FORBIDDEN_IMAGE_HOST_TOKENS
+    )
 
 
 def is_generated_product_image(value: Any) -> bool:
@@ -92,11 +94,17 @@ def generate_product_image(product, *, force: bool = False) -> GeneratedProductI
     return GeneratedProductImage(relative_path=relative_path, absolute_path=absolute_path)
 
 
-def choose_product_image(product, *, force_generated: bool = False, force: bool = False) -> GeneratedProductImage:
+def choose_product_image(
+    product, *, force_generated: bool = False, force: bool = False
+) -> GeneratedProductImage:
     if not force_generated:
         local_asset = find_local_product_asset(product)
         if local_asset:
-            source = VERIFIED_IMAGE_SOURCE if local_asset.startswith(f'{VERIFIED_IMAGE_DIR}/') else LOCAL_PRODUCT_IMAGE_SOURCE
+            source = (
+                VERIFIED_IMAGE_SOURCE
+                if local_asset.startswith(f'{VERIFIED_IMAGE_DIR}/')
+                else LOCAL_PRODUCT_IMAGE_SOURCE
+            )
             return GeneratedProductImage(
                 relative_path=local_asset,
                 absolute_path=Path(settings.MEDIA_ROOT) / local_asset,
@@ -141,9 +149,7 @@ def apply_product_image_policy(product, *, force: bool = False, force_generated:
         params.update(
             {
                 'image_source': (
-                    'verified real product photo'
-                    if is_verified_photo else
-                    'local product raster asset'
+                    'verified real product photo' if is_verified_photo else 'local product raster asset'
                 ),
                 'image_source_url': selected.source,
                 'image_source_policy': selected.policy,
@@ -206,7 +212,9 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFon
     candidates = [
         'C:/Windows/Fonts/arialbd.ttf' if bold else 'C:/Windows/Fonts/arial.ttf',
         'C:/Windows/Fonts/segoeuib.ttf' if bold else 'C:/Windows/Fonts/segoeui.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf' if bold else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+        if bold
+        else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     ]
     for path in candidates:
         if path and Path(path).exists():
@@ -221,7 +229,9 @@ FONT_TINY = lambda: _font(18)
 FONT_MONO = lambda: _font(24, bold=True)
 
 
-def _draw_background(draw: ImageDraw.ImageDraw, width: int, height: int, accent: tuple[int, int, int]) -> None:
+def _draw_background(
+    draw: ImageDraw.ImageDraw, width: int, height: int, accent: tuple[int, int, int]
+) -> None:
     for y in range(height):
         blend = y / height
         color = (
@@ -242,7 +252,9 @@ def _draw_background(draw: ImageDraw.ImageDraw, width: int, height: int, accent:
     draw.line((52, height - 72, width - 52, height - 72), fill=_mix(accent, (30, 55, 80), 0.5), width=4)
 
 
-def _draw_identity_marks(draw: ImageDraw.ImageDraw, product, accent: tuple[int, int, int], width: int, height: int) -> None:
+def _draw_identity_marks(
+    draw: ImageDraw.ImageDraw, product, accent: tuple[int, int, int], width: int, height: int
+) -> None:
     """Subtle non-text fingerprint so generated UGO images are not duplicates."""
     seed = f'{product.slug}|{product.part_number}|{product.name}|{product.package_type}'
     digest = hashlib.sha256(seed.encode('utf-8', errors='ignore')).digest()
@@ -266,7 +278,9 @@ def _draw_identity_marks(draw: ImageDraw.ImageDraw, product, accent: tuple[int, 
         draw.line((x, y, x + 12 + (byte % 10), y), fill=color, width=2)
 
 
-def _draw_category_art(draw: ImageDraw.ImageDraw, product, cat: str, accent: tuple[int, int, int], width: int, height: int) -> None:
+def _draw_category_art(
+    draw: ImageDraw.ImageDraw, product, cat: str, accent: tuple[int, int, int], width: int, height: int
+) -> None:
     art_box = (78, 70, width - 78, height - 88)
     dispatch = {
         'resistors': _draw_resistor,
@@ -293,7 +307,9 @@ def _draw_category_art(draw: ImageDraw.ImageDraw, product, cat: str, accent: tup
     dispatch.get(cat, _draw_generic_board)(draw, art_box, product, accent)
 
 
-def _draw_labels(draw: ImageDraw.ImageDraw, product, accent: tuple[int, int, int], width: int, height: int) -> None:
+def _draw_labels(
+    draw: ImageDraw.ImageDraw, product, accent: tuple[int, int, int], width: int, height: int
+) -> None:
     return None
 
 
@@ -328,7 +344,9 @@ def _rect_center(box: tuple[int, int, int, int], w: int, h: int) -> tuple[int, i
     return (cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2)
 
 
-def _draw_pin_row(draw, start_x: int, y: int, count: int, pitch: int, direction: int, color: tuple[int, int, int]) -> None:
+def _draw_pin_row(
+    draw, start_x: int, y: int, count: int, pitch: int, direction: int, color: tuple[int, int, int]
+) -> None:
     for i in range(count):
         x = start_x + i * pitch
         draw.rounded_rectangle((x, y, x + 12, y + direction * 42), radius=4, fill=color)
@@ -342,7 +360,9 @@ def _draw_ic(draw, box, product, accent):
     _draw_pin_row(draw, x1 + 28, y2 - 8, 8, 36, 1, pin_color)
     draw.rounded_rectangle(body, radius=22, fill=(18, 25, 34), outline=accent, width=5)
     draw.ellipse((x1 + 22, y1 + 22, x1 + 44, y1 + 44), fill=accent)
-    draw.arc((x1 + 54, y1 + 66, x1 + 120, y1 + 132), 180, 360, fill=_mix(accent, (230, 245, 255), 0.65), width=5)
+    draw.arc(
+        (x1 + 54, y1 + 66, x1 + 120, y1 + 132), 180, 360, fill=_mix(accent, (230, 245, 255), 0.65), width=5
+    )
 
 
 def _draw_resistor(draw, box, product, accent):
@@ -361,7 +381,9 @@ def _draw_capacitor(draw, box, product, accent):
     x1, y1, x2, y2 = _rect_center(box, 430, 180)
     is_electro = 'electro' in str(product.description).lower() or 'uf' in str(product.parameters).lower()
     if is_electro:
-        draw.rounded_rectangle((x1 + 120, y1 - 20, x2 - 120, y2 + 45), radius=28, fill=(28, 46, 60), outline=accent, width=5)
+        draw.rounded_rectangle(
+            (x1 + 120, y1 - 20, x2 - 120, y2 + 45), radius=28, fill=(28, 46, 60), outline=accent, width=5
+        )
         draw.rectangle((x1 + 146, y1 - 18, x1 + 175, y2 + 44), fill=(226, 232, 238))
         draw.text((x1 + 194, y1 + 40), '+', fill=accent, font=FONT_TITLE())
         draw.line((x1 + 60, y2 + 45, x1 + 60, y2 + 104), fill=(215, 224, 225), width=8)
@@ -392,7 +414,12 @@ def _draw_diode(draw, box, product, accent):
     mid_y = (y1 + y2) // 2
     draw.line((x1 - 75, mid_y, x2 + 75, mid_y), fill=(210, 220, 222), width=8)
     if 'LED' in (product.part_number + product.name).upper():
-        draw.ellipse((x1 + 170, y1 - 50, x1 + 350, y2 + 50), fill=_mix(accent, (255, 255, 255), 0.34), outline=accent, width=5)
+        draw.ellipse(
+            (x1 + 170, y1 - 50, x1 + 350, y2 + 50),
+            fill=_mix(accent, (255, 255, 255), 0.34),
+            outline=accent,
+            width=5,
+        )
         draw.line((x1 + 382, y1 - 42, x1 + 424, y1 - 84), fill=accent, width=6)
         draw.line((x1 + 428, y1 - 12, x1 + 470, y1 - 54), fill=accent, width=6)
     else:
@@ -443,7 +470,9 @@ def _draw_gpu(draw, box, product, accent):
     draw.rounded_rectangle((x1, y1, x2, y2), radius=24, fill=(26, 56, 61), outline=accent, width=5)
     draw.rectangle((x1 - 44, y1 + 70, x1, y1 + 136), fill=(209, 180, 74))
     for cx in (x1 + 180, x1 + 370):
-        draw.ellipse((cx - 68, y1 + 42, cx + 68, y1 + 178), fill=(15, 21, 29), outline=(185, 205, 211), width=5)
+        draw.ellipse(
+            (cx - 68, y1 + 42, cx + 68, y1 + 178), fill=(15, 21, 29), outline=(185, 205, 211), width=5
+        )
         for angle in range(0, 360, 60):
             px = cx + math.cos(math.radians(angle)) * 48
             py = y1 + 110 + math.sin(math.radians(angle)) * 48
@@ -500,7 +529,9 @@ def _draw_monitor(draw, box, product, accent):
     draw.rounded_rectangle((x1 + 30, y1 + 28, x2 - 30, y2 - 44), radius=14, fill=(33, 73, 101))
     draw.line((x1 + 180, y2 + 4, x2 - 180, y2 + 4), fill=(204, 217, 222), width=12)
     draw.line(((x1 + x2) // 2, y2, (x1 + x2) // 2, y2 + 72), fill=(204, 217, 222), width=12)
-    draw.rounded_rectangle(((x1 + x2) // 2 - 86, y2 + 68, (x1 + x2) // 2 + 86, y2 + 86), radius=8, fill=(204, 217, 222))
+    draw.rounded_rectangle(
+        ((x1 + x2) // 2 - 86, y2 + 68, (x1 + x2) // 2 + 86, y2 + 86), radius=8, fill=(204, 217, 222)
+    )
 
 
 def _draw_motherboard(draw, box, product, accent):
@@ -508,7 +539,9 @@ def _draw_motherboard(draw, box, product, accent):
     draw.rounded_rectangle((x1, y1, x2, y2), radius=28, fill=(20, 79, 68), outline=accent, width=5)
     draw.rounded_rectangle((x1 + 42, y1 + 40, x1 + 150, y1 + 148), radius=12, fill=(72, 91, 94))
     for i in range(4):
-        draw.rounded_rectangle((x1 + 190, y1 + 42 + i * 35, x2 - 34, y1 + 64 + i * 35), radius=6, fill=(18, 29, 37))
+        draw.rounded_rectangle(
+            (x1 + 190, y1 + 42 + i * 35, x2 - 34, y1 + 64 + i * 35), radius=6, fill=(18, 29, 37)
+        )
     for i in range(3):
         draw.rectangle((x1 + 55, y2 - 94 + i * 30, x2 - 50, y2 - 78 + i * 30), fill=(203, 215, 220))
 
@@ -522,9 +555,13 @@ def _draw_phone(draw, box, product, accent):
 
 def _draw_laptop(draw, box, product, accent):
     x1, y1, x2, y2 = _rect_center(box, 520, 260)
-    draw.rounded_rectangle((x1 + 48, y1, x2 - 48, y2 - 74), radius=22, fill=(11, 18, 30), outline=accent, width=6)
+    draw.rounded_rectangle(
+        (x1 + 48, y1, x2 - 48, y2 - 74), radius=22, fill=(11, 18, 30), outline=accent, width=6
+    )
     draw.rounded_rectangle((x1 + 82, y1 + 28, x2 - 82, y2 - 104), radius=12, fill=(31, 70, 95))
-    draw.polygon([(x1, y2 - 58), (x2, y2 - 58), (x2 - 46, y2), (x1 + 46, y2)], fill=(190, 202, 207), outline=accent)
+    draw.polygon(
+        [(x1, y2 - 58), (x2, y2 - 58), (x2 - 46, y2), (x1 + 46, y2)], fill=(190, 202, 207), outline=accent
+    )
 
 
 def _draw_tablet(draw, box, product, accent):
@@ -538,8 +575,12 @@ def _draw_accessory(draw, box, product, accent):
     if 'hdmi' in text or 'displayport' in text or 'usb' in text:
         x1, y1, x2, y2 = _rect_center(box, 520, 190)
         draw.arc((x1, y1, x2, y2 + 120), 185, 355, fill=(204, 216, 220), width=16)
-        draw.rounded_rectangle((x1 + 22, y1 + 86, x1 + 132, y1 + 148), radius=16, fill=(32, 44, 52), outline=accent, width=4)
-        draw.rounded_rectangle((x2 - 132, y1 + 86, x2 - 22, y1 + 148), radius=16, fill=(32, 44, 52), outline=accent, width=4)
+        draw.rounded_rectangle(
+            (x1 + 22, y1 + 86, x1 + 132, y1 + 148), radius=16, fill=(32, 44, 52), outline=accent, width=4
+        )
+        draw.rounded_rectangle(
+            (x2 - 132, y1 + 86, x2 - 22, y1 + 148), radius=16, fill=(32, 44, 52), outline=accent, width=4
+        )
     else:
         _draw_generic_board(draw, box, product, accent)
 

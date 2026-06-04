@@ -83,8 +83,8 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Processed {summary['processed']} artifacts; saved={saved_count}; "
-                    f"training_examples={training_count}"
+                    f'Processed {summary["processed"]} artifacts; saved={saved_count}; '
+                    f'training_examples={training_count}'
                 )
             )
 

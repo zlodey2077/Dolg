@@ -49,7 +49,20 @@ def _is_directive(line, prefix=''):
 # without ``unsupported`` complaints. Anything else falls back to QNPN/QPNP but
 # users get an explicit preview warning so the silent substitution is
 # documented at import time.
-_KNOWN_BJT_MODELS = {'qnpn', 'qpnp', 'q2n2222', 'q2n2907', 'q2n3904', 'q2n3906', 'qbc547', 'qbc557', 'd_npn', 'd_pnp', 'npn', 'pnp'}
+_KNOWN_BJT_MODELS = {
+    'qnpn',
+    'qpnp',
+    'q2n2222',
+    'q2n2907',
+    'q2n3904',
+    'q2n3906',
+    'qbc547',
+    'qbc557',
+    'd_npn',
+    'd_pnp',
+    'npn',
+    'pnp',
+}
 
 
 def _spice_component_type(ref):
@@ -85,10 +98,12 @@ def _is_ground(node_name):
 
 
 def _connect_to_node(connections, ref, pin, node_id):
-    connections.append({
-        'from': {'compId': ref, 'portId': str(pin)},
-        'to': {'compId': node_id, 'portId': 'a'},
-    })
+    connections.append(
+        {
+            'from': {'compId': ref, 'portId': str(pin)},
+            'to': {'compId': node_id, 'portId': 'a'},
+        }
+    )
 
 
 def _build_scheme(parsed_components, net_map, unsupported):
@@ -238,7 +253,10 @@ def import_kicad_sexpr(source):
     parsed = []
     net_map = {}
     unsupported = []
-    comp_re = re.compile(r'\(symbol\s+"?([^"\s)]+)"?.*?\(property\s+"?Reference"?\s+"?([^"\s)]+)"?\).*?\(property\s+"?Value"?\s+"?([^")]+)"?\)', re.S)
+    comp_re = re.compile(
+        r'\(symbol\s+"?([^"\s)]+)"?.*?\(property\s+"?Reference"?\s+"?([^"\s)]+)"?\).*?\(property\s+"?Value"?\s+"?([^")]+)"?\)',
+        re.S,
+    )
     for idx, match in enumerate(comp_re.finditer(source or ''), start=1):
         lib_name, ref, value = match.groups()
         ctype = normalize_component_type(lib_name.split(':')[-1])
@@ -324,13 +342,15 @@ def build_import_preview_details(result):
             type_counts[comp_type] = type_counts.get(comp_type, 0) + 1
             continue
         type_counts[comp_type] = type_counts.get(comp_type, 0) + 1
-        electrical_components.append({
-            'id': item.get('id'),
-            'ref': label,
-            'type': comp_type,
-            'value': _component_value(item),
-            'catalog_ref': item.get('catalog_ref') or item.get('part_number') or '',
-        })
+        electrical_components.append(
+            {
+                'id': item.get('id'),
+                'ref': label,
+                'type': comp_type,
+                'value': _component_value(item),
+                'catalog_ref': item.get('catalog_ref') or item.get('part_number') or '',
+            }
+        )
 
     unique_nodes = []
     for node in nodes:
@@ -338,7 +358,8 @@ def build_import_preview_details(result):
             unique_nodes.append(node)
 
     analysis_directives = [
-        line for line in unsupported
+        line
+        for line in unsupported
         if any(_is_directive(line, prefix) for prefix in ('.ac', '.tran', '.op', '.dc'))
     ]
     unsupported_elements = [line for line in unsupported if line not in analysis_directives]
@@ -349,7 +370,9 @@ def build_import_preview_details(result):
     if unsupported_elements:
         warnings.append('Часть элементов CAD/SPICE не поддерживается текущим импортёром.')
     if analysis_directives:
-        warnings.append('Директивы анализа сохранены как предупреждения; запустите симуляцию DOLG после сохранения.')
+        warnings.append(
+            'Директивы анализа сохранены как предупреждения; запустите симуляцию DOLG после сохранения.'
+        )
 
     return {
         'components': electrical_components,

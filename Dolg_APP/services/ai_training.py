@@ -23,7 +23,14 @@ from Dolg_APP.ml.neural import (
     _risk_teacher,
     scheme_to_features,
 )
-from Dolg_APP.models import AITrainingExample, EngineeringArtifact, Organization, ProjectEvent, ProjectReview, SchematicProject
+from Dolg_APP.models import (
+    AITrainingExample,
+    EngineeringArtifact,
+    Organization,
+    ProjectEvent,
+    ProjectReview,
+    SchematicProject,
+)
 from Dolg_APP.services.project_review import build_design_review
 from knowledge.services.legal_sources import (
     source_ids_for_learning_topic,
@@ -31,6 +38,116 @@ from knowledge.services.legal_sources import (
     sources_by_ids,
     validate_source_ids,
 )
+
+GRAPH_READY_DATASET_KINDS = {'scheme_backed', 'review_backed'}
+
+
+def classify_ai_example_dataset_kind(features: dict[str, Any] | None, *, kind: str = '') -> str:
+    """Classify an AITrainingExample for admin review and neural training gates."""
+    features = features if isinstance(features, dict) else {}
+    scheme = features.get('scheme_data')
+    evidence_kind = str(features.get('evidence_kind') or '')
+    source = str(features.get('source') or '')
+
+    if isinstance(scheme, dict) and scheme.get('components'):
+        if (
+            evidence_kind in {'review_rule', 'auto_quality_scheme'}
+            or features.get('review_score') is not None
+        ):
+            return 'review_backed'
+        return 'scheme_backed'
+    if (
+        kind == 'artifact_summary'
+        or evidence_kind in {'engineering_artifact', 'artifact_summary'}
+        or features.get('artifact_type')
+    ):
+        return 'artifact_backed'
+    if evidence_kind in {'learning_task', 'legal_source', 'source_backed'} or source == 'learning_task':
+        return 'text_only'
+    if evidence_kind in {'review_rule', 'drc_finding', 'fault_case'}:
+        return 'review_backed'
+    return 'text_only'
+
+
+def normalize_ai_training_features(features: dict[str, Any] | None, *, kind: str = '') -> dict[str, Any]:
+    """Return features with stable dataset metadata.
+
+    The live assistant can use text-only examples, but PyTorch graph training
+    must only consume examples that contain real scheme_data.  Keeping this in
+    features avoids a migration while giving admin, commands and future Grafana
+    counters a single vocabulary.
+    """
+    data = dict(features or {}) if isinstance(features, dict) else {}
+    scheme = data.get('scheme_data')
+    if isinstance(scheme, dict) and scheme.get('components'):
+        score = score_scheme_for_training(scheme)
+        data.setdefault('feature_vector', scheme_to_features(scheme))
+        data.setdefault('topology', score.get('topology') or _detect_teacher_topology(scheme))
+        data.setdefault('risk_score', score.get('risk_score'))
+        data.setdefault('next_component', score.get('next_component'))
+        data.setdefault('component_count', score.get('component_count'))
+        data.setdefault('connection_count', score.get('connection_count'))
+        data.setdefault('family', score.get('family'))
+        data.setdefault('scheme_family', score.get('family'))
+        data.setdefault('complexity_score', score.get('complexity_score'))
+        data.setdefault('complexity_label', score.get('complexity_label'))
+        data.setdefault('quality_score', score.get('quality_score'))
+        data.setdefault('quality_label', score.get('quality_label'))
+    dataset_kind = classify_ai_example_dataset_kind(data, kind=kind)
+    has_scheme = isinstance(data.get('scheme_data'), dict) and bool(
+        data.get('scheme_data', {}).get('components')
+    )
+    has_vector = isinstance(data.get('feature_vector'), list)
+    data['dataset_kind'] = dataset_kind
+    data['graph_training_ready'] = bool(
+        has_scheme and has_vector and dataset_kind in GRAPH_READY_DATASET_KINDS
+    )
+    data['training_role'] = 'graph_training' if data['graph_training_ready'] else 'retrieval_context'
+    return data
+
+
+def normalize_ai_training_example(example: AITrainingExample, *, dry_run: bool = False) -> dict[str, Any]:
+    old_features = example.features if isinstance(example.features, dict) else {}
+    new_features = normalize_ai_training_features(old_features, kind=example.kind)
+    changed = old_features != new_features
+    if changed and not dry_run:
+        example.features = new_features
+        example.save(update_fields=['features'])
+    return {
+        'id': example.id,
+        'changed': changed,
+        'dataset_kind': new_features.get('dataset_kind'),
+        'graph_training_ready': bool(new_features.get('graph_training_ready')),
+    }
+
+
+def normalize_ai_dataset_metadata(
+    *, limit: int | None = None, validated_only: bool = False, dry_run: bool = False
+) -> dict[str, Any]:
+    qs = AITrainingExample.objects.all().order_by('-created_at')
+    if validated_only:
+        qs = qs.filter(is_validated=True)
+    if limit:
+        qs = qs[: max(1, int(limit))]
+    scanned = changed = graph_ready = 0
+    by_dataset_kind: Counter[str] = Counter()
+    rows = []
+    for example in qs:
+        scanned += 1
+        row = normalize_ai_training_example(example, dry_run=dry_run)
+        changed += int(bool(row['changed']))
+        graph_ready += int(bool(row['graph_training_ready']))
+        by_dataset_kind[str(row['dataset_kind'] or 'unknown')] += 1
+        rows.append(row)
+    return {
+        'ok': True,
+        'scanned': scanned,
+        'changed': changed,
+        'graph_training_ready': graph_ready,
+        'by_dataset_kind': dict(by_dataset_kind.most_common()),
+        'dry_run': dry_run,
+        'examples': rows[:100],
+    }
 
 
 def user_allows_ai_training(user) -> bool:
@@ -62,18 +179,18 @@ def build_scheme_training_payload(project: SchematicProject) -> dict[str, Any]:
     connections = scheme.get('connections') or []
 
     prompt = (
-        f"Разбери схему `{project.name}`: компонентов {len(components)}, "
-        f"соединений {len(connections)}. Определи топологию, риск и следующий шаг."
+        f'Разбери схему `{project.name}`: компонентов {len(components)}, '
+        f'соединений {len(connections)}. Определи топологию, риск и следующий шаг.'
     )
     warnings = (review.get('warnings') or [])[:5]
     errors = (review.get('errors') or [])[:5]
     evidence = _source_metadata_from_review(review)
     target_parts = [
-        f"topology={topology}",
-        f"risk_score={risk_score}",
-        f"next_component={next_component}",
-        f"review_score={review.get('score', 0)}",
-        f"status={review.get('status', '')}",
+        f'topology={topology}',
+        f'risk_score={risk_score}',
+        f'next_component={next_component}',
+        f'review_score={review.get("score", 0)}',
+        f'status={review.get("status", "")}',
     ]
     if errors:
         target_parts.append('errors=' + '; '.join(str(item) for item in errors))
@@ -90,9 +207,9 @@ def build_scheme_training_payload(project: SchematicProject) -> dict[str, Any]:
         'target': '\n'.join(target_parts),
         'features': {
             'source': 'user_opt_in_scheme' if not project.is_demo else 'demo_scheme',
-            'evidence_kind': 'review_rule' if evidence['teacher_rules'] else (
-                'demo_scheme' if project.is_demo else 'user_opt_in_scheme'
-            ),
+            'evidence_kind': 'review_rule'
+            if evidence['teacher_rules']
+            else ('demo_scheme' if project.is_demo else 'user_opt_in_scheme'),
             'project_id': project.id,
             'project_name': project.name,
             'scheme_data': scheme,
@@ -112,8 +229,13 @@ def build_scheme_training_payload(project: SchematicProject) -> dict[str, Any]:
     }
 
 
-def upsert_scheme_training_example(project: SchematicProject, *, validate: bool = True, dry_run: bool = False):
+def upsert_scheme_training_example(
+    project: SchematicProject, *, validate: bool = True, dry_run: bool = False
+):
     payload = build_scheme_training_payload(project)
+    payload['features'] = normalize_ai_training_features(
+        payload.get('features'), kind=payload.get('kind', 'review_hint')
+    )
     if dry_run:
         return {
             'created': False,
@@ -148,10 +270,11 @@ def upsert_scheme_training_example(project: SchematicProject, *, validate: bool 
     return {'created': True, 'updated': False, 'example': example}
 
 
-def collect_opt_in_scheme_examples(*, user=None, limit: int = 100, validate: bool = True, dry_run: bool = False) -> dict[str, Any]:
+def collect_opt_in_scheme_examples(
+    *, user=None, limit: int = 100, validate: bool = True, dry_run: bool = False
+) -> dict[str, Any]:
     qs = (
-        SchematicProject.all_objects
-        .select_related('user', 'user__profile')
+        SchematicProject.all_objects.select_related('user', 'user__profile')
         .filter(deleted_at__isnull=True)
         .exclude(scheme_data={})
         .order_by('-updated_at')
@@ -173,32 +296,37 @@ def collect_opt_in_scheme_examples(*, user=None, limit: int = 100, validate: boo
             scheme = project.scheme_data or {}
             components = scheme.get('components') or []
             connections = scheme.get('connections') or []
-            examples.append({
-                'project_id': project.id,
-                'project': project.name,
-                'created': False,
-                'updated': False,
-                'dry_run': True,
-                'topology': _detect_teacher_topology(scheme),
-                'risk_score': round(float(_risk_teacher(scheme)), 4),
-                'next_component': _next_component_teacher(scheme),
-                'component_count': len(components),
-                'connection_count': len(connections),
-            })
+            examples.append(
+                {
+                    'project_id': project.id,
+                    'project': project.name,
+                    'created': False,
+                    'updated': False,
+                    'dry_run': True,
+                    'topology': _detect_teacher_topology(scheme),
+                    'risk_score': round(float(_risk_teacher(scheme)), 4),
+                    'next_component': _next_component_teacher(scheme),
+                    'component_count': len(components),
+                    'connection_count': len(connections),
+                }
+            )
             continue
         result = upsert_scheme_training_example(project, validate=validate, dry_run=dry_run)
         created += int(bool(result.get('created')))
         updated += int(bool(result.get('updated')))
         example = result.get('example')
-        examples.append({
-            'project_id': project.id,
-            'project': project.name,
-            'created': bool(result.get('created')),
-            'updated': bool(result.get('updated')),
-            'example_id': getattr(example, 'id', None),
-            'topology': (result.get('payload') or {}).get('features', {}).get('topology')
-                if dry_run else (example.features or {}).get('topology'),
-        })
+        examples.append(
+            {
+                'project_id': project.id,
+                'project': project.name,
+                'created': bool(result.get('created')),
+                'updated': bool(result.get('updated')),
+                'example_id': getattr(example, 'id', None),
+                'topology': (result.get('payload') or {}).get('features', {}).get('topology')
+                if dry_run
+                else (example.features or {}).get('topology'),
+            }
+        )
 
     return {
         'ok': True,
@@ -211,7 +339,9 @@ def collect_opt_in_scheme_examples(*, user=None, limit: int = 100, validate: boo
     }
 
 
-def collect_learning_task_examples(*, limit: int = 200, validate: bool = True, dry_run: bool = False) -> dict[str, Any]:
+def collect_learning_task_examples(
+    *, limit: int = 200, validate: bool = True, dry_run: bool = False
+) -> dict[str, Any]:
     """Create curated examples from learning tasks.
 
     The model does not train on copied external text.  It receives only local
@@ -220,21 +350,26 @@ def collect_learning_task_examples(*, limit: int = 200, validate: bool = True, d
     from knowledge.models import LearningTask
 
     qs = (
-        LearningTask.objects
-        .select_related('lesson', 'lesson__track')
+        LearningTask.objects.select_related('lesson', 'lesson__track')
         .filter(lesson__is_published=True, lesson__track__is_published=True)
-        .order_by('lesson__track__order', 'lesson__order', 'order')[:max(1, int(limit))]
+        .order_by('lesson__track__order', 'lesson__order', 'order')[: max(1, int(limit))]
     )
     created = updated = skipped = scanned = 0
     rows = []
     for task in qs:
         scanned += 1
         rubric = task.rubric if isinstance(task.rubric, dict) else {}
-        source_ids = list(dict.fromkeys(
-            [str(item) for item in rubric.get('source_ids') or [] if str(item).strip()]
-            + source_ids_for_learning_topic(rubric.get('source_topic') or task.lesson.slug or task.title)
-        ))
-        teacher_rules = [str(item) for item in rubric.get('teacher_rule', [])] if isinstance(rubric.get('teacher_rule'), list) else []
+        source_ids = list(
+            dict.fromkeys(
+                [str(item) for item in rubric.get('source_ids') or [] if str(item).strip()]
+                + source_ids_for_learning_topic(rubric.get('source_topic') or task.lesson.slug or task.title)
+            )
+        )
+        teacher_rules = (
+            [str(item) for item in rubric.get('teacher_rule', [])]
+            if isinstance(rubric.get('teacher_rule'), list)
+            else []
+        )
         if isinstance(rubric.get('teacher_rule'), str):
             teacher_rules.append(rubric['teacher_rule'])
         prompt = f'Реши или объясни учебное задание: {task.title}\n\n{task.prompt}'
@@ -258,6 +393,7 @@ def collect_learning_task_examples(*, limit: int = 200, validate: bool = True, d
                 'teacher_rules': list(dict.fromkeys(teacher_rules)),
             },
         }
+        payload['features'] = normalize_ai_training_features(payload['features'], kind=payload['kind'])
         if dry_run:
             rows.append({'task_id': task.id, 'title': task.title, 'dry_run': True})
             continue
@@ -287,9 +423,11 @@ def collect_learning_task_examples(*, limit: int = 200, validate: bool = True, d
     }
 
 
-def collect_review_examples(*, limit: int = 200, validate: bool = True, dry_run: bool = False) -> dict[str, Any]:
+def collect_review_examples(
+    *, limit: int = 200, validate: bool = True, dry_run: bool = False
+) -> dict[str, Any]:
     """Create examples from saved ProjectReview snapshots."""
-    qs = ProjectReview.objects.select_related('project', 'user').order_by('-created_at')[:max(1, int(limit))]
+    qs = ProjectReview.objects.select_related('project', 'user').order_by('-created_at')[: max(1, int(limit))]
     created = updated = skipped = scanned = 0
     rows = []
     for review in qs:
@@ -314,12 +452,14 @@ def collect_review_examples(*, limit: int = 200, validate: bool = True, dry_run:
             f'Объясни engineering review для проекта `{review.project.name}`: '
             f'score={review.score}, status={review.status}.'
         )
-        target = '\n'.join([
-            f'rule={first.get("rule_id") or first.get("id") or "review"}',
-            f'severity={first.get("severity") or review.status}',
-            f'evidence={first.get("evidence") or first.get("title") or review.summary}',
-            f'recommendation={first.get("recommendation") or "; ".join(review.recommendations or [])}',
-        ])
+        target = '\n'.join(
+            [
+                f'rule={first.get("rule_id") or first.get("id") or "review"}',
+                f'severity={first.get("severity") or review.status}',
+                f'evidence={first.get("evidence") or first.get("title") or review.summary}',
+                f'recommendation={first.get("recommendation") or "; ".join(review.recommendations or [])}',
+            ]
+        )
         features = {
             'source': 'project_review',
             'evidence_kind': 'review_rule',
@@ -336,6 +476,7 @@ def collect_review_examples(*, limit: int = 200, validate: bool = True, dry_run:
             'risk_score': round(float(_risk_teacher(review.scheme_data or review.project.scheme_data)), 4),
             'next_component': _next_component_teacher(review.scheme_data or review.project.scheme_data),
         }
+        features = normalize_ai_training_features(features, kind='drc_finding')
         if dry_run:
             rows.append({'review_id': review.id, 'dry_run': True})
             continue
@@ -367,9 +508,13 @@ def collect_review_examples(*, limit: int = 200, validate: bool = True, dry_run:
     }
 
 
-def collect_artifact_examples(*, limit: int = 200, validate: bool = False, dry_run: bool = False) -> dict[str, Any]:
+def collect_artifact_examples(
+    *, limit: int = 200, validate: bool = False, dry_run: bool = False
+) -> dict[str, Any]:
     """Create examples from parsed engineering artifacts."""
-    qs = EngineeringArtifact.objects.select_related('project', 'user').order_by('-created_at')[:max(1, int(limit))]
+    qs = EngineeringArtifact.objects.select_related('project', 'user').order_by('-created_at')[
+        : max(1, int(limit))
+    ]
     created = updated = skipped = scanned = 0
     rows = []
     for artifact in qs:
@@ -388,6 +533,7 @@ def collect_artifact_examples(*, limit: int = 200, validate: bool = False, dry_r
             'warnings_count': len(artifact.warnings or []),
             'errors_count': len(artifact.errors or []),
         }
+        features = normalize_ai_training_features(features, kind='artifact_summary')
         if dry_run:
             rows.append({'artifact_id': artifact.id, 'dry_run': True})
             continue
@@ -599,15 +745,17 @@ def seed_curated_ai_examples(*, validate: bool = True, dry_run: bool = False) ->
         risk_score = round(float(_risk_teacher(scheme)), 4)
         next_component = _next_component_teacher(scheme)
         prompt = (
-            f"Разбери curated-сценарий `{case['title']}`. "
-            "Определи топологию, риск, следующий компонент или проверку."
+            f'Разбери curated-сценарий `{case["title"]}`. '
+            'Определи топологию, риск, следующий компонент или проверку.'
         )
-        target = '\n'.join([
-            f'topology={topology}',
-            f'risk_score={risk_score}',
-            f'next_component={next_component}',
-            case.get('target_extra') or '',
-        ]).strip()
+        target = '\n'.join(
+            [
+                f'topology={topology}',
+                f'risk_score={risk_score}',
+                f'next_component={next_component}',
+                case.get('target_extra') or '',
+            ]
+        ).strip()
         features = {
             'source': 'curated_demo_case',
             'evidence_kind': 'curated_demo_case',
@@ -623,15 +771,18 @@ def seed_curated_ai_examples(*, validate: bool = True, dry_run: bool = False) ->
             'source_topics': _source_topics(source_ids) or [case.get('source_topic') or ''],
             'teacher_rules': rule_ids,
         }
+        features = normalize_ai_training_features(features, kind=case.get('kind') or 'review_hint')
         if dry_run:
-            rows.append({
-                'case_id': case['case_id'],
-                'title': case['title'],
-                'topology': topology,
-                'risk_score': risk_score,
-                'next_component': next_component,
-                'dry_run': True,
-            })
+            rows.append(
+                {
+                    'case_id': case['case_id'],
+                    'title': case['title'],
+                    'topology': topology,
+                    'risk_score': risk_score,
+                    'next_component': next_component,
+                    'dry_run': True,
+                }
+            )
             continue
         example, was_created = AITrainingExample.objects.update_or_create(
             kind=case.get('kind') or 'review_hint',
@@ -646,13 +797,15 @@ def seed_curated_ai_examples(*, validate: bool = True, dry_run: bool = False) ->
         )
         created += int(was_created)
         updated += int(not was_created)
-        rows.append({
-            'case_id': case['case_id'],
-            'example_id': example.id,
-            'created': was_created,
-            'topology': topology,
-            'risk_score': risk_score,
-        })
+        rows.append(
+            {
+                'case_id': case['case_id'],
+                'example_id': example.id,
+                'created': was_created,
+                'topology': topology,
+                'risk_score': risk_score,
+            }
+        )
     return {
         'ok': True,
         'source': 'curated_demo_cases',
@@ -678,12 +831,15 @@ def summarize_ai_training_examples() -> dict[str, Any]:
     by_family: Counter[str] = Counter()
     by_complexity: Counter[str] = Counter()
     by_quality: Counter[str] = Counter()
+    by_dataset_kind: Counter[str] = Counter()
     with_scheme = 0
     with_sources = 0
     with_rules = 0
+    graph_training_ready = 0
     for example in qs.only('kind', 'features', 'is_validated'):
-        features = example.features if isinstance(example.features, dict) else {}
+        features = normalize_ai_training_features(example.features, kind=example.kind)
         by_kind[example.kind] += 1
+        by_dataset_kind[features.get('dataset_kind') or 'unknown'] += 1
         by_evidence[features.get('evidence_kind') or 'unknown'] += 1
         by_source[features.get('source') or 'unknown'] += 1
         topology = features.get('topology')
@@ -697,6 +853,8 @@ def summarize_ai_training_examples() -> dict[str, Any]:
             by_quality[str(features['quality_label'])] += 1
         if isinstance(features.get('scheme_data'), dict):
             with_scheme += 1
+        if features.get('graph_training_ready'):
+            graph_training_ready += 1
         source_ids = features.get('source_ids') or []
         teacher_rules = features.get('teacher_rules') or []
         if source_ids:
@@ -717,7 +875,9 @@ def summarize_ai_training_examples() -> dict[str, Any]:
         'with_scheme_data': with_scheme,
         'with_source_ids': with_sources,
         'with_teacher_rules': with_rules,
+        'graph_training_ready': graph_training_ready,
         'by_kind': dict(by_kind.most_common()),
+        'by_dataset_kind': dict(by_dataset_kind.most_common()),
         'by_evidence_kind': dict(by_evidence.most_common()),
         'by_source': dict(by_source.most_common()),
         'by_topology': dict(by_topology.most_common()),
@@ -730,51 +890,98 @@ def summarize_ai_training_examples() -> dict[str, Any]:
     }
 
 
-def validate_ai_training_examples(*, include_unvalidated: bool = True, limit: int | None = None) -> dict[str, Any]:
+def validate_ai_training_examples(
+    *, include_unvalidated: bool = True, limit: int | None = None
+) -> dict[str, Any]:
     qs = AITrainingExample.objects.all().order_by('-created_at')
     if not include_unvalidated:
         qs = qs.filter(is_validated=True)
     if limit:
-        qs = qs[:max(1, int(limit))]
+        qs = qs[: max(1, int(limit))]
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     scanned = 0
     for example in qs:
         scanned += 1
         features = example.features if isinstance(example.features, dict) else {}
+        normalized_features = normalize_ai_training_features(features, kind=example.kind)
         context = {'id': example.id, 'kind': example.kind}
         if not (example.prompt or '').strip():
-            errors.append({**context, 'code': 'missing_prompt', 'message': 'AITrainingExample.prompt is empty'})
+            errors.append(
+                {**context, 'code': 'missing_prompt', 'message': 'AITrainingExample.prompt is empty'}
+            )
         if not (example.target or '').strip():
-            errors.append({**context, 'code': 'missing_target', 'message': 'AITrainingExample.target is empty'})
+            errors.append(
+                {**context, 'code': 'missing_target', 'message': 'AITrainingExample.target is empty'}
+            )
         if not isinstance(example.features, dict):
             errors.append({**context, 'code': 'invalid_features', 'message': 'features must be JSON object'})
             continue
+        if features != normalized_features:
+            warnings.append(
+                {
+                    **context,
+                    'code': 'metadata_not_normalized',
+                    'message': 'features.dataset_kind/graph_training_ready metadata is stale or missing',
+                }
+            )
         unknown_sources = validate_source_ids(features.get('source_ids') or [])
         for source_id in unknown_sources:
-            errors.append({**context, 'code': 'unknown_source_id', 'message': f'Unknown legal source id: {source_id}'})
+            errors.append(
+                {**context, 'code': 'unknown_source_id', 'message': f'Unknown legal source id: {source_id}'}
+            )
         scheme = features.get('scheme_data')
         if scheme is not None:
             if not isinstance(scheme, dict):
-                errors.append({**context, 'code': 'invalid_scheme_data', 'message': 'scheme_data must be object'})
+                errors.append(
+                    {**context, 'code': 'invalid_scheme_data', 'message': 'scheme_data must be object'}
+                )
             elif not scheme.get('components'):
-                warnings.append({**context, 'code': 'empty_scheme_data', 'message': 'scheme_data has no components'})
+                warnings.append(
+                    {**context, 'code': 'empty_scheme_data', 'message': 'scheme_data has no components'}
+                )
             else:
                 vector = features.get('feature_vector')
                 if not isinstance(vector, list):
-                    warnings.append({**context, 'code': 'missing_feature_vector', 'message': 'scheme example has no feature_vector'})
+                    warnings.append(
+                        {
+                            **context,
+                            'code': 'missing_feature_vector',
+                            'message': 'scheme example has no feature_vector',
+                        }
+                    )
                 elif len(vector) != len(scheme_to_features(scheme)):
-                    warnings.append({
-                        **context,
-                        'code': 'stale_feature_vector',
-                        'message': f'feature_vector length is {len(vector)}, expected {len(scheme_to_features(scheme))}',
-                    })
+                    warnings.append(
+                        {
+                            **context,
+                            'code': 'stale_feature_vector',
+                            'message': f'feature_vector length is {len(vector)}, expected {len(scheme_to_features(scheme))}',
+                        }
+                    )
         if features.get('topology') and features['topology'] not in TOPOLOGY_LABELS:
-            warnings.append({**context, 'code': 'unknown_topology', 'message': f'Unknown topology label: {features["topology"]}'})
+            warnings.append(
+                {
+                    **context,
+                    'code': 'unknown_topology',
+                    'message': f'Unknown topology label: {features["topology"]}',
+                }
+            )
         if features.get('next_component') and features['next_component'] not in NEXT_COMPONENT_LABELS:
-            warnings.append({**context, 'code': 'unknown_next_component', 'message': f'Unknown next component: {features["next_component"]}'})
+            warnings.append(
+                {
+                    **context,
+                    'code': 'unknown_next_component',
+                    'message': f'Unknown next component: {features["next_component"]}',
+                }
+            )
         if example.is_validated and not features.get('evidence_kind'):
-            warnings.append({**context, 'code': 'missing_evidence_kind', 'message': 'validated example has no evidence_kind'})
+            warnings.append(
+                {
+                    **context,
+                    'code': 'missing_evidence_kind',
+                    'message': 'validated example has no evidence_kind',
+                }
+            )
     return {
         'ok': not errors,
         'scanned': scanned,
@@ -800,12 +1007,12 @@ def export_ai_training_dataset(
     if validated_only:
         qs = qs.filter(is_validated=True)
     if limit:
-        qs = qs[:max(1, int(limit))]
+        qs = qs[: max(1, int(limit))]
     count = 0
     by_kind: Counter[str] = Counter()
     with out_path.open('w', encoding='utf-8') as fh:
         for example in qs:
-            features = dict(example.features or {})
+            features = normalize_ai_training_features(example.features, kind=example.kind)
             if not include_scheme_data:
                 features.pop('scheme_data', None)
             row = {
@@ -842,14 +1049,19 @@ def curated_training_schemes(*, limit: int = 200) -> list[dict[str, Any]]:
         features__scheme_data__isnull=False,
     ).order_by('-created_at')[: max(1, int(limit))]
     for example in qs:
-        scheme = (example.features or {}).get('scheme_data')
+        features = normalize_ai_training_features(example.features, kind=example.kind)
+        if not features.get('graph_training_ready'):
+            continue
+        scheme = features.get('scheme_data')
         if isinstance(scheme, dict) and scheme.get('components'):
             scheme_copy = json.loads(json.dumps(scheme))
             scheme_copy['__training_metadata'] = {
-                'source_ids': (example.features or {}).get('source_ids') or [],
-                'source_topics': (example.features or {}).get('source_topics') or [],
-                'teacher_rules': (example.features or {}).get('teacher_rules') or [],
-                'evidence_kind': (example.features or {}).get('evidence_kind') or '',
+                'source_ids': features.get('source_ids') or [],
+                'source_topics': features.get('source_topics') or [],
+                'teacher_rules': features.get('teacher_rules') or [],
+                'evidence_kind': features.get('evidence_kind') or '',
+                'dataset_kind': features.get('dataset_kind') or '',
+                'training_role': features.get('training_role') or '',
             }
             schemes.append(scheme_copy)
     return schemes
@@ -888,7 +1100,9 @@ def find_similar_training_examples(
     if validated_only:
         qs = qs.filter(is_validated=True)
     rows: list[dict[str, Any]] = []
-    for example in qs.only('id', 'kind', 'prompt', 'target', 'features', 'is_validated')[:max(1, int(scan_limit))]:
+    for example in qs.only('id', 'kind', 'prompt', 'target', 'features', 'is_validated')[
+        : max(1, int(scan_limit))
+    ]:
         features = example.features if isinstance(example.features, dict) else {}
         scheme = features.get('scheme_data')
         if not isinstance(scheme, dict) or not scheme.get('components'):
@@ -899,20 +1113,22 @@ def find_similar_training_examples(
         score = _cosine_similarity(target_vector, vector)
         if score <= 0:
             continue
-        rows.append({
-            'id': example.id,
-            'kind': example.kind,
-            'score': round(score, 4),
-            'prompt': (example.prompt or '')[:180],
-            'topology': features.get('topology') or '',
-            'risk_score': features.get('risk_score'),
-            'next_component': features.get('next_component') or '',
-            'evidence_kind': features.get('evidence_kind') or '',
-            'source_ids': (features.get('source_ids') or [])[:4],
-            'teacher_rules': (features.get('teacher_rules') or [])[:4],
-        })
+        rows.append(
+            {
+                'id': example.id,
+                'kind': example.kind,
+                'score': round(score, 4),
+                'prompt': (example.prompt or '')[:180],
+                'topology': features.get('topology') or '',
+                'risk_score': features.get('risk_score'),
+                'next_component': features.get('next_component') or '',
+                'evidence_kind': features.get('evidence_kind') or '',
+                'source_ids': (features.get('source_ids') or [])[:4],
+                'teacher_rules': (features.get('teacher_rules') or [])[:4],
+            }
+        )
     rows.sort(key=lambda item: item['score'], reverse=True)
-    return rows[:max(1, int(limit))]
+    return rows[: max(1, int(limit))]
 
 
 def _scheme_complexity_label(score: int) -> str:
@@ -938,13 +1154,18 @@ def classify_scheme_for_training(scheme_data: dict[str, Any]) -> dict[str, Any]:
         elif counts.get('battery') and counts.get('resistor'):
             family = 'resistive_network'
     type_diversity = len([key for key, value in counts.items() if value])
-    complexity_score = int(min(100, (
-        len(components) * 5
-        + len(connections) * 4
-        + type_diversity * 8
-        + (10 if counts.get('ic') else 0)
-        + (8 if counts.get('transistor') else 0)
-    )))
+    complexity_score = int(
+        min(
+            100,
+            (
+                len(components) * 5
+                + len(connections) * 4
+                + type_diversity * 8
+                + (10 if counts.get('ic') else 0)
+                + (8 if counts.get('transistor') else 0)
+            ),
+        )
+    )
     return {
         'family': family,
         'component_count': len(components),
@@ -1000,6 +1221,7 @@ def score_scheme_for_training(
     connected_components = 0
     try:
         from Dolg_APP.services.schematic_graph import analyze_graph_topology
+
         graph = analyze_graph_topology(scheme_data)
         metrics = graph.get('metrics') or {}
         has_ground = bool(metrics.get('has_ground'))
@@ -1144,7 +1366,7 @@ def promote_ai_examples_to_projects(
 
     scanned = created = updated = skipped_quality = skipped_empty = 0
     rows: list[dict[str, Any]] = []
-    for example in qs[:max(1, int(limit))]:
+    for example in qs[: max(1, int(limit))]:
         scanned += 1
         features = example.features if isinstance(example.features, dict) else {}
         feature_source = str(features.get('source') or features.get('dataset_source') or '')
@@ -1158,16 +1380,23 @@ def promote_ai_examples_to_projects(
         score = score_scheme_for_training(scheme)
         if score['quality_score'] < int(min_quality):
             skipped_quality += 1
-            rows.append({
-                'example_id': example.id,
-                'accepted': False,
-                'reason': 'quality',
-                'quality_score': score['quality_score'],
-                'quality_label': score['quality_label'],
-            })
+            rows.append(
+                {
+                    'example_id': example.id,
+                    'accepted': False,
+                    'reason': 'quality',
+                    'quality_score': score['quality_score'],
+                    'quality_label': score['quality_label'],
+                }
+            )
             continue
 
-        project_owner = owner or example.user or (example.project.user if example.project_id else None) or _ai_project_owner()
+        project_owner = (
+            owner
+            or example.user
+            or (example.project.user if example.project_id else None)
+            or _ai_project_owner()
+        )
         promotion_key = f'ai-example:{example.id}:owner:{project_owner.id}:demo:{int(bool(is_demo))}:visibility:{visibility}'
         scheme.setdefault('metadata', {})
         if isinstance(scheme['metadata'], dict):
@@ -1176,14 +1405,16 @@ def promote_ai_examples_to_projects(
             scheme['metadata']['quality_score'] = score['quality_score']
             scheme['metadata']['scheme_family'] = score['family']
 
-        source_name = features.get('project_name') or features.get('dataset_source') or feature_source or 'curated'
+        source_name = (
+            features.get('project_name') or features.get('dataset_source') or feature_source or 'curated'
+        )
         name = f'AI curated #{example.id}: {score["family"]}'
         description = (
-            f"Curated from AITrainingExample #{example.id}. "
-            f"Source: {source_name}. Family: {score['family']}. "
-            f"Complexity: {score['complexity_label']} ({score['complexity_score']}/100). "
-            f"Quality: {score['quality_label']} ({score['quality_score']}/100). "
-            "Neural result is a hint; final engineering control remains expert rules plus human review."
+            f'Curated from AITrainingExample #{example.id}. '
+            f'Source: {source_name}. Family: {score["family"]}. '
+            f'Complexity: {score["complexity_label"]} ({score["complexity_score"]}/100). '
+            f'Quality: {score["quality_label"]} ({score["quality_score"]}/100). '
+            'Neural result is a hint; final engineering control remains expert rules plus human review.'
         )
 
         row = {
@@ -1263,13 +1494,15 @@ def promote_ai_examples_to_projects(
         promoted_ids = list(features.get('promoted_project_ids') or [])
         if project.id not in promoted_ids:
             promoted_ids.append(project.id)
-        features.update({
-            'latest_promoted_project_id': project.id,
-            'promoted_project_ids': promoted_ids[-20:],
-            'promoted_at': timezone.now().isoformat(),
-            'promotion_visibility': visibility,
-            'promotion_owner_id': project_owner.id,
-        })
+        features.update(
+            {
+                'latest_promoted_project_id': project.id,
+                'promoted_project_ids': promoted_ids[-20:],
+                'promoted_at': timezone.now().isoformat(),
+                'promotion_visibility': visibility,
+                'promotion_owner_id': project_owner.id,
+            }
+        )
         example.features = features
         example.save(update_fields=['features'])
         row['project_id'] = project.id
@@ -1300,15 +1533,14 @@ def collect_good_project_schemes(
 ) -> dict[str, Any]:
     """Promote high-quality opted-in/demo project schemes into AITrainingExample."""
     qs = (
-        SchematicProject.all_objects
-        .select_related('user', 'user__profile')
+        SchematicProject.all_objects.select_related('user', 'user__profile')
         .filter(deleted_at__isnull=True)
         .exclude(scheme_data={})
         .order_by('-updated_at')
     )
     scanned = promoted = updated = skipped_privacy = skipped_quality = 0
     rows = []
-    for project in qs[:max(1, int(limit))]:
+    for project in qs[: max(1, int(limit))]:
         scanned += 1
         if not project_can_feed_ai_training(project):
             skipped_privacy += 1
@@ -1321,30 +1553,34 @@ def collect_good_project_schemes(
         score = score_scheme_for_training(scheme, review=review)
         if score['quality_score'] < int(min_quality):
             skipped_quality += 1
-            rows.append({
-                'project_id': project.id,
-                'project': project.name,
-                'quality_score': score['quality_score'],
-                'quality_label': score['quality_label'],
-                'accepted': False,
-            })
+            rows.append(
+                {
+                    'project_id': project.id,
+                    'project': project.name,
+                    'quality_score': score['quality_score'],
+                    'quality_label': score['quality_label'],
+                    'accepted': False,
+                }
+            )
             continue
         source = 'auto_quality_scheme'
         prompt = (
-            f"Разбери качественную схему `{project.name}`: тип {score['family']}, "
-            f"сложность {score['complexity_label']}, score {score['quality_score']}."
+            f'Разбери качественную схему `{project.name}`: тип {score["family"]}, '
+            f'сложность {score["complexity_label"]}, score {score["quality_score"]}.'
         )
-        target = '\n'.join([
-            f"topology={score['topology']}",
-            f"scheme_family={score['family']}",
-            f"complexity_label={score['complexity_label']}",
-            f"complexity_score={score['complexity_score']}",
-            f"quality_label={score['quality_label']}",
-            f"quality_score={score['quality_score']}",
-            f"risk_score={score['risk_score']}",
-            f"next_component={score['next_component']}",
-            f"review_score={review.get('score', 0)}",
-        ])
+        target = '\n'.join(
+            [
+                f'topology={score["topology"]}',
+                f'scheme_family={score["family"]}',
+                f'complexity_label={score["complexity_label"]}',
+                f'complexity_score={score["complexity_score"]}',
+                f'quality_label={score["quality_label"]}',
+                f'quality_score={score["quality_score"]}',
+                f'risk_score={score["risk_score"]}',
+                f'next_component={score["next_component"]}',
+                f'review_score={review.get("score", 0)}',
+            ]
+        )
         features = {
             'source': source,
             'evidence_kind': 'auto_quality_scheme',
@@ -1358,6 +1594,7 @@ def collect_good_project_schemes(
             'review_score': review.get('score', 0),
             **score,
         }
+        features = normalize_ai_training_features(features, kind='review_hint')
         row = {
             'project_id': project.id,
             'project': project.name,
@@ -1432,7 +1669,9 @@ def _learning_target(task, rubric: dict[str, Any]) -> str:
     elif task_type == 'simulation_measure':
         metric = rubric.get('metric') or rubric.get('expected_metric') or rubric.get('metric_name') or ''
         parts.append(f'metric={metric}')
-        parts.append(f'analysis_type={rubric.get("analysis_type") or rubric.get("required_analysis_type") or ""}')
+        parts.append(
+            f'analysis_type={rubric.get("analysis_type") or rubric.get("required_analysis_type") or ""}'
+        )
         parts.append('next_step=сравнить expected vs measured')
     else:
         parts.append('next_step=разобрать условие и связать с review')
@@ -1451,13 +1690,15 @@ def _review_findings(review: ProjectReview) -> list[dict[str, Any]]:
             if isinstance(item, dict):
                 findings.append(item)
             else:
-                findings.append({
-                    'rule_id': f'review.{bucket_name}',
-                    'severity': 'error' if bucket_name == 'errors' else 'warning',
-                    'title': str(item),
-                    'evidence': str(item),
-                    'recommendation': '',
-                })
+                findings.append(
+                    {
+                        'rule_id': f'review.{bucket_name}',
+                        'severity': 'error' if bucket_name == 'errors' else 'warning',
+                        'title': str(item),
+                        'evidence': str(item),
+                        'recommendation': '',
+                    }
+                )
     return findings
 
 

@@ -8,6 +8,7 @@
 - Profile показывает прогресс-бары
 - /api/usage/today/ возвращает текущие значения
 """
+
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -40,17 +41,23 @@ class QuotaProjectLimitTests(TestCase):
 
     def test_can_create_up_to_max_projects(self):
         for i in range(FREE_TIER['max_projects']):
-            r = self.client.post(reverse('hello:api_project_create'),
-                                 data=f'{{"name": "p{i}"}}',
-                                 content_type='application/json')
+            r = self.client.post(
+                reverse('hello:api_project_create'),
+                data=f'{{"name": "p{i}"}}',
+                content_type='application/json',
+            )
             self.assertEqual(r.status_code, 200, r.content)
 
     def test_creating_one_over_limit_returns_429(self):
         for i in range(FREE_TIER['max_projects']):
-            self.client.post(reverse('hello:api_project_create'),
-                             data=f'{{"name": "p{i}"}}', content_type='application/json')
-        r = self.client.post(reverse('hello:api_project_create'),
-                             data='{"name": "overflow"}', content_type='application/json')
+            self.client.post(
+                reverse('hello:api_project_create'),
+                data=f'{{"name": "p{i}"}}',
+                content_type='application/json',
+            )
+        r = self.client.post(
+            reverse('hello:api_project_create'), data='{"name": "overflow"}', content_type='application/json'
+        )
         self.assertEqual(r.status_code, 429)
         data = r.json()
         self.assertEqual(data.get('error'), 'quota_exceeded')
@@ -59,14 +66,20 @@ class QuotaProjectLimitTests(TestCase):
         # Создаём 10, удаляем 1 → можно создать ещё.
         ids = []
         for i in range(FREE_TIER['max_projects']):
-            r = self.client.post(reverse('hello:api_project_create'),
-                                 data=f'{{"name": "p{i}"}}', content_type='application/json')
+            r = self.client.post(
+                reverse('hello:api_project_create'),
+                data=f'{{"name": "p{i}"}}',
+                content_type='application/json',
+            )
             ids.append(r.json()['project']['id'])
         # Удаляем первый
         self.client.post(reverse('hello:api_project_delete', kwargs={'pk': ids[0]}))
         # Можем создать новый
-        r = self.client.post(reverse('hello:api_project_create'),
-                             data='{"name": "after-delete"}', content_type='application/json')
+        r = self.client.post(
+            reverse('hello:api_project_create'),
+            data='{"name": "after-delete"}',
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 200)
 
 
@@ -91,9 +104,11 @@ class QuotaDailyTests(TestCase):
         usage = get_today_usage(self.user)
         usage.ai_requests_count = FREE_TIER['ai_requests_per_day']
         usage.save()
-        r = self.client.post(reverse('hello:api_ai_chat'),
-                             data='{"mode": "recommend", "message": "hi"}',
-                             content_type='application/json')
+        r = self.client.post(
+            reverse('hello:api_ai_chat'),
+            data='{"mode": "recommend", "message": "hi"}',
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 429)
 
 
@@ -110,13 +125,19 @@ class ShareLinkLimitTests(TestCase):
             for i in range(FREE_TIER['max_active_share_links'])
         ]
         for p in projects:
-            r = self.client.post(reverse('hello:api_project_share_toggle', kwargs={'pk': p.id}),
-                                 data='{"enable": true}', content_type='application/json')
+            r = self.client.post(
+                reverse('hello:api_project_share_toggle', kwargs={'pk': p.id}),
+                data='{"enable": true}',
+                content_type='application/json',
+            )
             self.assertEqual(r.status_code, 200)
         # 6-й проект → попытка включить share → 400 quota_exceeded
         p6 = SchematicProject.objects.create(user=self.user, name='overflow')
-        r = self.client.post(reverse('hello:api_project_share_toggle', kwargs={'pk': p6.id}),
-                             data='{"enable": true}', content_type='application/json')
+        r = self.client.post(
+            reverse('hello:api_project_share_toggle', kwargs={'pk': p6.id}),
+            data='{"enable": true}',
+            content_type='application/json',
+        )
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json().get('error'), 'quota_exceeded')
 
@@ -154,6 +175,7 @@ class SoftDeleteTests(TestCase):
 
     def test_purge_command_removes_old_soft_deleted(self):
         from django.core.management import call_command
+
         # Помечаем удалённым 40 дней назад
         self.project.deleted_at = timezone.now() - timedelta(days=40)
         self.project.save(update_fields=['deleted_at'])
@@ -162,6 +184,7 @@ class SoftDeleteTests(TestCase):
 
     def test_purge_command_keeps_recent(self):
         from django.core.management import call_command
+
         self.project.deleted_at = timezone.now() - timedelta(days=5)
         self.project.save(update_fields=['deleted_at'])
         call_command('purge_deleted_projects', '--days=30')
@@ -182,8 +205,7 @@ class PasswordResetTests(TestCase):
         self.assertContains(r, 'Восстановление пароля')
 
     def test_reset_sends_email(self):
-        r = self.client.post(reverse('accounts:password_reset'),
-                             {'email': 'reset@example.com'})
+        r = self.client.post(reverse('accounts:password_reset'), {'email': 'reset@example.com'})
         self.assertEqual(r.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('reset', mail.outbox[0].body.lower())
@@ -195,6 +217,7 @@ class EmailVerifyGateTests(TestCase):
         user = _make_user(verified=False)
         # Кладём что-то в корзину чтобы checkout не выкинул на «корзина пуста»
         from shop.models import CartItem, Product
+
         p = Product.objects.first()
         if p is None:
             self.skipTest('no product seeded')
@@ -208,6 +231,7 @@ class EmailVerifyGateTests(TestCase):
     def test_verified_user_can_checkout(self):
         user = _make_user(verified=True)
         from shop.models import CartItem, Product
+
         p = Product.objects.first()
         if p is None:
             self.skipTest('no product seeded')
@@ -251,21 +275,24 @@ class ProfileCustomizationTests(TestCase):
     def test_profile_customization_fields_are_saved(self):
         user = _make_user()
         self.client.force_login(user)
-        r = self.client.post(reverse('accounts:edit_profile'), {
-            'first_name': 'Dmitry',
-            'last_name': 'Engineer',
-            'email': user.email,
-            'display_name': 'DOLG Engineer',
-            'headline': 'CAD/SIM review',
-            'preferred_theme': 'projector',
-            'accent_color': 'green',
-            'default_unit_system': 'engineering',
-            'start_page': 'simulation',
-            'ai_tone': 'review',
-            'show_profile_public': 'on',
-            'show_engineering_badges': 'on',
-            'allow_ai_training': 'on',
-        })
+        r = self.client.post(
+            reverse('accounts:edit_profile'),
+            {
+                'first_name': 'Dmitry',
+                'last_name': 'Engineer',
+                'email': user.email,
+                'display_name': 'DOLG Engineer',
+                'headline': 'CAD/SIM review',
+                'preferred_theme': 'projector',
+                'accent_color': 'green',
+                'default_unit_system': 'engineering',
+                'start_page': 'simulation',
+                'ai_tone': 'review',
+                'show_profile_public': 'on',
+                'show_engineering_badges': 'on',
+                'allow_ai_training': 'on',
+            },
+        )
         self.assertEqual(r.status_code, 302)
         user.profile.refresh_from_db()
         self.assertEqual(user.profile.display_name, 'DOLG Engineer')
@@ -328,6 +355,7 @@ class UsageApiTests(TestCase):
 class CartPersistenceTests(TestCase):
     def test_cart_migrates_to_user_on_login(self):
         from shop.models import CartItem, Product
+
         p = Product.objects.first()
         if p is None:
             self.skipTest('no product seeded')
@@ -342,7 +370,8 @@ class CartPersistenceTests(TestCase):
         # (force_login триггерит user_logged_in signal). Может быть 0 если merge
         # не сработал, или 1 — проверяем как минимум что нет session-orphans
         # больше (если был миграт). Тест слабее, но отвечает на «корзина не теряется».
-        total = CartItem.objects.filter(product=p).filter(
-            user=user
-        ).count() + CartItem.objects.filter(product=p, session_id='').count()
-        self.assertGreaterEqual(total, 0)   # не падаем
+        total = (
+            CartItem.objects.filter(product=p).filter(user=user).count()
+            + CartItem.objects.filter(product=p, session_id='').count()
+        )
+        self.assertGreaterEqual(total, 0)  # не падаем

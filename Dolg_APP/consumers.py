@@ -8,6 +8,7 @@
 Каждый client-side WS — получает только новые сообщения комнаты, в которую
 подписался. Polling-endpoints оставлены как fallback (если WS не подключился).
 """
+
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
@@ -23,6 +24,7 @@ PROJECT_GROUP = 'project-{project_id}'
 # ────────────────────────────────────────────────────────────────────────
 # Public Q&A
 # ────────────────────────────────────────────────────────────────────────
+
 
 class ChatTopicConsumer(AsyncJsonWebsocketConsumer):
     """Подписка на новые reply'и одного публичного топика.
@@ -70,6 +72,7 @@ class ChatTopicConsumer(AsyncJsonWebsocketConsumer):
 # Org приватные беседы (Enterprise)
 # ────────────────────────────────────────────────────────────────────────
 
+
 class OrgConversationConsumer(AsyncJsonWebsocketConsumer):
     """Подписка на новые сообщения приватного канала команды.
 
@@ -82,22 +85,24 @@ class OrgConversationConsumer(AsyncJsonWebsocketConsumer):
         self.conv_id = self.scope['url_route']['kwargs']['conv_id']
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
-            await self.close(code=4001)   # 4001 = unauthorized
+            await self.close(code=4001)  # 4001 = unauthorized
             return
 
         allowed = await self._check_access(user, self.org_slug, self.conv_id)
         if not allowed:
-            await self.close(code=4003)   # 4003 = forbidden / not found
+            await self.close(code=4003)  # 4003 = forbidden / not found
             return
 
         self.group_name = ORG_CONV_GROUP.format(conv_id=self.conv_id)
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
-        await self.send_json({
-            'type': 'connected',
-            'org_slug': self.org_slug,
-            'conv_id': self.conv_id,
-        })
+        await self.send_json(
+            {
+                'type': 'connected',
+                'org_slug': self.org_slug,
+                'conv_id': self.conv_id,
+            }
+        )
 
     async def disconnect(self, code):
         group = getattr(self, 'group_name', None)
@@ -116,7 +121,8 @@ class OrgConversationConsumer(AsyncJsonWebsocketConsumer):
     def _check_access(self, user, org_slug, conv_id):
         try:
             conv = OrgConversation.objects.select_related('organization').get(
-                pk=conv_id, organization__slug=org_slug,
+                pk=conv_id,
+                organization__slug=org_slug,
             )
         except OrgConversation.DoesNotExist:
             return False
@@ -126,6 +132,7 @@ class OrgConversationConsumer(AsyncJsonWebsocketConsumer):
 # ────────────────────────────────────────────────────────────────────────
 # Project session events
 # ────────────────────────────────────────────────────────────────────────
+
 
 class ProjectConsumer(AsyncJsonWebsocketConsumer):
     """Push-канал одного сеанса проектирования.
@@ -170,15 +177,14 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
         if project.is_demo or project.user_id == user.id or project.visibility == 'public':
             return True
         return bool(
-            project.visibility == 'team'
-            and project.organization_id
-            and project.organization.has_member(user)
+            project.visibility == 'team' and project.organization_id and project.organization.has_member(user)
         )
 
 
 # ────────────────────────────────────────────────────────────────────────
 # Helpers для view'ев (вызывается из HTTP-views через async_to_sync)
 # ────────────────────────────────────────────────────────────────────────
+
 
 def serialize_reply_for_ws(reply: ChatReply, *, is_pro_viewer: bool) -> dict:
     """Сериализация ChatReply для WS-broadcast'а. Эквивалент _reply_to_dict

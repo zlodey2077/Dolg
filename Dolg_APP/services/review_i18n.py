@@ -52,11 +52,13 @@ METRIC_LABELS_RU = {
     'validity_issues': 'Выход за пределы модели',
 }
 
-METRIC_LABELS_RU.update({
-    'external_cad_findings': 'Внешние CAD-проверки',
-    'readiness_missing': 'Пробелы готовности к сборке',
-    'mtbf_hours': 'MTBF, часов',
-})
+METRIC_LABELS_RU.update(
+    {
+        'external_cad_findings': 'Внешние CAD-проверки',
+        'readiness_missing': 'Пробелы готовности к сборке',
+        'mtbf_hours': 'MTBF, часов',
+    }
+)
 
 METRIC_ORDER = (
     'components',
@@ -273,25 +275,27 @@ EXACT_TRANSLATIONS = {
     ),
 }
 
-EXACT_TRANSLATIONS.update({
-    'Manufacturing readiness: some components miss package, ratings or BOM binding.': (
-        'Готовность к сборке: у части компонентов не хватает корпуса, предельных режимов или связи с BOM.'
-    ),
-    'Review imported CAD DRC/ERC findings before relying on this project session.': (
-        'Проверьте импортированные DRC/ERC-замечания CAD перед использованием сеанса проектирования.'
-    ),
-    'Complete assembly readiness: package, ratings, footprint/model and BOM binding.': (
-        'Закройте готовность к сборке: корпус, предельные режимы, footprint/model и связь с BOM.'
-    ),
-    'Short circuit between nets': 'Короткое замыкание между сетями',
-    'Element or trace outside board outline': 'Элемент или дорожка вне границы платы',
-    'Net connected to uncommitted pin': 'Сеть подключена к неподтвержденному выводу',
-    'Imported DRC finding': 'Импортированное замечание DRC',
-    'Separate the shorted nets and rerun DRC.': 'Разведите замкнутые сети и повторно запустите DRC.',
-    'Move the element or route inside the board outline.': 'Переместите элемент или трассу внутрь контура платы.',
-    'Check the symbol pin mapping and commit/connect the pin.': 'Проверьте соответствие выводов символа и подключите вывод.',
-    'Inspect imported CAD evidence before release.': 'Проверьте evidence из импортированного CAD перед выпуском.',
-})
+EXACT_TRANSLATIONS.update(
+    {
+        'Manufacturing readiness: some components miss package, ratings or BOM binding.': (
+            'Готовность к сборке: у части компонентов не хватает корпуса, предельных режимов или связи с BOM.'
+        ),
+        'Review imported CAD DRC/ERC findings before relying on this project session.': (
+            'Проверьте импортированные DRC/ERC-замечания CAD перед использованием сеанса проектирования.'
+        ),
+        'Complete assembly readiness: package, ratings, footprint/model and BOM binding.': (
+            'Закройте готовность к сборке: корпус, предельные режимы, footprint/model и связь с BOM.'
+        ),
+        'Short circuit between nets': 'Короткое замыкание между сетями',
+        'Element or trace outside board outline': 'Элемент или дорожка вне границы платы',
+        'Net connected to uncommitted pin': 'Сеть подключена к неподтвержденному выводу',
+        'Imported DRC finding': 'Импортированное замечание DRC',
+        'Separate the shorted nets and rerun DRC.': 'Разведите замкнутые сети и повторно запустите DRC.',
+        'Move the element or route inside the board outline.': 'Переместите элемент или трассу внутрь контура платы.',
+        'Check the symbol pin mapping and commit/connect the pin.': 'Проверьте соответствие выводов символа и подключите вывод.',
+        'Inspect imported CAD evidence before release.': 'Проверьте evidence из импортированного CAD перед выпуском.',
+    }
+)
 
 
 def status_label_ru(status: str) -> str:
@@ -345,11 +349,13 @@ def build_metric_rows(metrics: dict[str, Any]) -> list[dict[str, str]]:
     ordered_keys = [key for key in METRIC_ORDER if key in metrics]
     ordered_keys.extend(key for key in metrics.keys() if key not in ordered_keys)
     for key in ordered_keys:
-        rows.append({
-            'key': key,
-            'label': metric_label_ru(key),
-            'value': format_metric_value(key, metrics.get(key)),
-        })
+        rows.append(
+            {
+                'key': key,
+                'label': metric_label_ru(key),
+                'value': format_metric_value(key, metrics.get(key)),
+            }
+        )
     return rows
 
 
@@ -387,20 +393,22 @@ def build_measurement_rows(sections: dict[str, Any]) -> list[dict[str, str]]:
                             base = abs(float(expected)) or 1.0
                             ratio = abs(delta) / base
                             row['status'] = 'норма' if ratio <= tol else 'ошибка'
-                        except (TypeError, ValueError):
+                        except TypeError, ValueError:
                             pass
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     pass
             if tolerance is not None:
                 row['tolerance'] = f'{_format_scalar(tolerance)}'
             rows.append(row)
         else:
-            rows.append({
-                'metric': str(metric),
-                'label': measurement_label_ru(metric),
-                'value': _format_scalar(payload),
-                'status': 'из симуляции',
-            })
+            rows.append(
+                {
+                    'metric': str(metric),
+                    'label': measurement_label_ru(metric),
+                    'value': _format_scalar(payload),
+                    'status': 'из симуляции',
+                }
+            )
     return rows
 
 
@@ -466,8 +474,7 @@ def translate_review_text(value: Any) -> Any:
     if match:
         components, connections, errors, warnings = match.groups()
         return (
-            f'{components} компонентов, {connections} соединений, '
-            f'{errors} ошибок, {warnings} предупреждений.'
+            f'{components} компонентов, {connections} соединений, {errors} ошибок, {warnings} предупреждений.'
         )
 
     return value
@@ -543,7 +550,10 @@ def _dedup_messages(messages):
 
 _SEMANTIC_CORE_PATTERNS = (
     ('missing_ground', re.compile(r'нет\s+опорного\s+узла\s+gnd|gnd:\s+симулятор|нет\s+gnd', re.IGNORECASE)),
-    ('missing_source', re.compile(r'нет\s+источника\s+питания|нет\s+источника\s+питания\s+или\s+сигнала', re.IGNORECASE)),
+    (
+        'missing_source',
+        re.compile(r'нет\s+источника\s+питания|нет\s+источника\s+питания\s+или\s+сигнала', re.IGNORECASE),
+    ),
     ('unconnected', re.compile(r'компоненты\s+без\s+соединений|компонент\s+не\s+подключен', re.IGNORECASE)),
     ('floating', re.compile(r'плавающие\s+фрагменты', re.IGNORECASE)),
 )
@@ -564,7 +574,9 @@ def localize_review_report(report: dict[str, Any]) -> dict[str, Any]:
     localized['summary'] = translate_review_text(localized.get('summary', ''))
     localized['errors'] = _dedup_messages(translate_review_text(localized.get('errors') or []))
     localized['warnings'] = _dedup_messages(translate_review_text(localized.get('warnings') or []))
-    localized['recommendations'] = _dedup_messages(translate_review_text(localized.get('recommendations') or []))
+    localized['recommendations'] = _dedup_messages(
+        translate_review_text(localized.get('recommendations') or [])
+    )
     localized['faults'] = [translate_fault(item) for item in localized.get('faults') or []]
     localized['expert_findings'] = [
         translate_finding(item) for item in localized.get('expert_findings') or []

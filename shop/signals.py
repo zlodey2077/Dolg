@@ -9,6 +9,7 @@ admin при изменениях должен вручную запустить
 Помеченный stale индекс используется как есть — это даёт graceful degradation
 вместо downtime.
 """
+
 import logging
 
 from django.contrib.auth.signals import user_logged_in
@@ -46,7 +47,7 @@ def merge_session_cart_on_login(sender, request, user, **kwargs):
         else:
             # Перепривязываем session-item на user
             session_item.user = user
-            session_item.session_id = ''   # больше не нужен
+            session_item.session_id = ''  # больше не нужен
             session_item.save(update_fields=['user', 'session_id'])
 
 
@@ -55,6 +56,7 @@ def _mark_search_index_stale_path():
     from pathlib import Path
 
     from django.conf import settings
+
     return Path(settings.MEDIA_ROOT) / 'search' / '.stale'
 
 
@@ -73,7 +75,7 @@ def mark_search_index_stale_on_save(sender, instance, **kwargs):
         path = _mark_search_index_stale_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
-    except Exception as e:   # pragma: no cover — best-effort
+    except Exception as e:  # pragma: no cover — best-effort
         logger.warning('Failed to mark search index stale: %s', e)
 
 

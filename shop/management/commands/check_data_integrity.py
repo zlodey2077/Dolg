@@ -8,8 +8,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.test import Client, override_settings
 
 from Dolg_APP.models import SchematicProject
-from shop import card_helpers
 from knowledge.models import Article, ArticleMaterial, LearningTask
+from shop import card_helpers
 from shop.models import Category, Product
 from shop.services.catalog_filters import CATALOG_FILTERS
 from shop.services.media_quality import audit_catalog_media_quality
@@ -20,8 +20,16 @@ from shop.services.product_images import (
 )
 
 BAD_COMMONS_TITLE_WORDS = (
-    'zombie', 'food', 'soup', 'noodle', 'server room', 'cable closet',
-    'wire screens', 'portrait', 'meeting', 'magazine',
+    'zombie',
+    'food',
+    'soup',
+    'noodle',
+    'server room',
+    'cable closet',
+    'wire screens',
+    'portrait',
+    'meeting',
+    'magazine',
 )
 
 FORBIDDEN_LEGAL_SOURCE_URL_PARTS = (
@@ -151,23 +159,31 @@ class Command(BaseCommand):
                     suspicious_commons.append(product.slug)
 
             image_source = str((product.parameters or {}).get('image_source_url', '')).lower()
-            if image_source and image_source != GENERATED_IMAGE_SOURCE and is_forbidden_image_path(image_source):
+            if (
+                image_source
+                and image_source != GENERATED_IMAGE_SOURCE
+                and is_forbidden_image_path(image_source)
+            ):
                 forbidden_images.append(f'{product.slug}: {image_source}')
 
             if product.is_reb():
                 params = product.parameters or {}
                 required = REQUIRED_REB_KEYS.get(product.category.slug, set())
-                missing = sorted(key for key in required if key not in params and not getattr(product, key, None))
+                missing = sorted(
+                    key for key in required if key not in params and not getattr(product, key, None)
+                )
                 if not product.part_number or not product.package_type or missing:
-                    invalid_reb.append({
-                        'slug': product.slug,
-                        'category': product.category.slug,
-                        'missing': [
-                            *([] if product.part_number else ['part_number']),
-                            *([] if product.package_type else ['package_type']),
-                            *missing,
-                        ],
-                    })
+                    invalid_reb.append(
+                        {
+                            'slug': product.slug,
+                            'category': product.category.slug,
+                            'missing': [
+                                *([] if product.part_number else ['part_number']),
+                                *([] if product.package_type else ['package_type']),
+                                *missing,
+                            ],
+                        }
+                    )
                 if not product.datasheet_url:
                     missing_datasheets.append(product.slug)
                 if product.datasheet_url and not params.get('datasheet_extracted'):
@@ -182,12 +198,8 @@ class Command(BaseCommand):
                     if self._looks_like_unitless_engineering_value(key, value):
                         suspicious_parameters.append(f'{product.slug}.{key}={value}')
 
-        duplicate_field_images = {
-            image: slugs for image, slugs in seen_names.items() if len(slugs) > 1
-        }
-        duplicate_file_hashes = {
-            digest: refs for digest, refs in seen_hashes.items() if len(refs) > 1
-        }
+        duplicate_field_images = {image: slugs for image, slugs in seen_names.items() if len(slugs) > 1}
+        duplicate_file_hashes = {digest: refs for digest, refs in seen_hashes.items() if len(refs) > 1}
         chip_filter_coverage = self._check_chip_filter_coverage()
 
         catalog = report['catalog']
@@ -217,37 +229,53 @@ class Command(BaseCommand):
         if broken_images:
             report['errors'].append(f'битые изображения товаров: {len(broken_images)}')
         if forbidden_images:
-            report['errors'].append(f'запрещенные Wikimedia/Commons изображения товаров: {len(forbidden_images)}')
+            report['errors'].append(
+                f'запрещенные Wikimedia/Commons изображения товаров: {len(forbidden_images)}'
+            )
         if media_quality['error_count']:
             report['errors'].append(f'media quality gate errors: {media_quality["error_count"]}')
         if media_quality['warning_count']:
             report['warnings'].append(f'media quality gate warnings: {media_quality["warning_count"]}')
         if media_quality['perceptual_duplicate_groups']:
-            report['warnings'].append(f'perceptual duplicate product images: {len(media_quality["perceptual_duplicate_groups"])}')
+            report['warnings'].append(
+                f'perceptual duplicate product images: {len(media_quality["perceptual_duplicate_groups"])}'
+            )
         if missing_images:
             report['warnings'].append(f'товары без изображения: {len(missing_images)}')
         if svg_images:
             report['warnings'].append(f'товары с SVG вместо фото: {len(svg_images)}')
         if duplicate_field_images:
-            report['warnings'].append(f'один и тот же image привязан к нескольким товарам: {len(duplicate_field_images)}')
+            report['warnings'].append(
+                f'один и тот же image привязан к нескольким товарам: {len(duplicate_field_images)}'
+            )
         if duplicate_file_hashes:
-            report['warnings'].append(f'визуальные дубли файлов товаров по hash: {len(duplicate_file_hashes)}')
+            report['warnings'].append(
+                f'визуальные дубли файлов товаров по hash: {len(duplicate_file_hashes)}'
+            )
         if suspicious_commons:
             report['warnings'].append(f'подозрительные Commons-метаданные товаров: {len(suspicious_commons)}')
         if non_policy_images:
-            report['warnings'].append(f'товары вне media-policy локальный asset/generated: {len(non_policy_images)}')
+            report['warnings'].append(
+                f'товары вне media-policy локальный asset/generated: {len(non_policy_images)}'
+            )
         if invalid_reb:
             report['warnings'].append(f'РЭБ-товары с неполными инженерными полями: {len(invalid_reb)}')
         if missing_datasheets:
             report['warnings'].append(f'РЭБ-товары без datasheet_url: {len(missing_datasheets)}')
         if missing_datasheet_extracted:
-            report['warnings'].append(f'REB products without datasheet_extracted: {len(missing_datasheet_extracted)}')
+            report['warnings'].append(
+                f'REB products without datasheet_extracted: {len(missing_datasheet_extracted)}'
+            )
         if suspicious_parameters:
-            report['warnings'].append(f'suspicious unitless engineering parameters: {len(suspicious_parameters)}')
+            report['warnings'].append(
+                f'suspicious unitless engineering parameters: {len(suspicious_parameters)}'
+            )
         if invalid_lifecycle:
             report['errors'].append(f'invalid lifecycle_status values: {len(invalid_lifecycle)}')
         if chip_filter_coverage['missing_backend_filters']:
-            report['errors'].append(f'clickable chip filters without backend support: {chip_filter_coverage["missing_backend_filters"]}')
+            report['errors'].append(
+                f'clickable chip filters without backend support: {chip_filter_coverage["missing_backend_filters"]}'
+            )
         if invalid_values:
             report['errors'].append(f'товары с отрицательной ценой/остатком: {len(invalid_values)}')
 
@@ -264,10 +292,23 @@ class Command(BaseCommand):
     def _has_rating_limit(params):
         params = params or {}
         direct_keys = {
-            'max_voltage_v', 'max_voltage', 'voltage', 'supply_voltage',
-            'max_current_a', 'max_current', 'current', 'output_current',
-            'max_power_w', 'rated_power_w', 'tdp_w', 'power', 'max_power',
-            'max_junction_c', 'max_temperature_c', 'max_temp', 'temperature',
+            'max_voltage_v',
+            'max_voltage',
+            'voltage',
+            'supply_voltage',
+            'max_current_a',
+            'max_current',
+            'current',
+            'output_current',
+            'max_power_w',
+            'rated_power_w',
+            'tdp_w',
+            'power',
+            'max_power',
+            'max_junction_c',
+            'max_temperature_c',
+            'max_temp',
+            'temperature',
         }
         if any(key in params and params.get(key) not in (None, '') for key in direct_keys):
             return True
@@ -275,25 +316,38 @@ class Command(BaseCommand):
         fields = record.get('fields') if isinstance(record, dict) else {}
         if not isinstance(fields, dict):
             return False
-        return any(fields.get(key) for key in (
-            'absolute_maximum_ratings',
-            'recommended_operating_conditions',
-            'thermal_data',
-        ))
+        return any(
+            fields.get(key)
+            for key in (
+                'absolute_maximum_ratings',
+                'recommended_operating_conditions',
+                'thermal_data',
+            )
+        )
 
     @staticmethod
     def _looks_like_unitless_engineering_value(key, value):
         key = str(key).lower()
         unit_sensitive = {
-            'resistance', 'capacitance', 'inductance', 'voltage',
-            'supply_voltage', 'power', 'wattage', 'current',
+            'resistance',
+            'capacitance',
+            'inductance',
+            'voltage',
+            'supply_voltage',
+            'power',
+            'wattage',
+            'current',
         }
         if key not in unit_sensitive:
             return False
         return bool(re.fullmatch(r'[-+]?\d+(?:[.,]\d+)?', str(value).strip()))
 
     def _check_knowledge(self, report):
-        articles = Article.objects.select_related('category').prefetch_related('materials').order_by('category__slug', 'slug')
+        articles = (
+            Article.objects.select_related('category')
+            .prefetch_related('materials')
+            .order_by('category__slug', 'slug')
+        )
         materials = ArticleMaterial.objects.select_related('article').filter(is_public=True)
         report['counts']['published_articles'] = articles.filter(is_published=True).count()
         report['counts']['article_materials'] = materials.count()
@@ -336,7 +390,9 @@ class Command(BaseCommand):
         if broken_local_files:
             report['errors'].append(f'битые файлы материалов энциклопедии: {len(broken_local_files)}')
         if broken_internal_links:
-            report['warnings'].append(f'подозрительные/битые внутренние ссылки энциклопедии: {len(broken_internal_links)}')
+            report['warnings'].append(
+                f'подозрительные/битые внутренние ссылки энциклопедии: {len(broken_internal_links)}'
+            )
         if no_materials:
             report['warnings'].append(f'статьи без дополнительных материалов: {len(no_materials)}')
         if no_inline_media:
@@ -393,11 +449,15 @@ class Command(BaseCommand):
                 port_id = endpoint.get('portId')
                 comp = by_id.get(comp_id)
                 if not comp:
-                    result['errors'].append(f'соединение {index}: {side} указывает на отсутствующий компонент {comp_id}')
+                    result['errors'].append(
+                        f'соединение {index}: {side} указывает на отсутствующий компонент {comp_id}'
+                    )
                     continue
                 ports = {p.get('id') for p in comp.get('ports', [])}
                 if port_id not in ports:
-                    result['errors'].append(f'соединение {index}: порт {port_id} отсутствует у компонента {comp_id}')
+                    result['errors'].append(
+                        f'соединение {index}: порт {port_id} отсутствует у компонента {comp_id}'
+                    )
             for point in conn.get('waypoints') or []:
                 if 'x' not in point or 'y' not in point:
                     result['errors'].append(f'соединение {index}: waypoint без координат')
@@ -442,14 +502,16 @@ class Command(BaseCommand):
                 forbidden_urls.append(f'{source_id}: {url}')
 
         rule_source_errors = []
-        for rule in (load_rule_pack().get('rules') or []):
+        for rule in load_rule_pack().get('rules') or []:
             references = rule.get('references') if isinstance(rule.get('references'), dict) else {}
             missing = validate_source_ids(references.get('source_ids') or [])
             if missing:
-                rule_source_errors.append({
-                    'rule_id': rule.get('id'),
-                    'missing_source_ids': missing,
-                })
+                rule_source_errors.append(
+                    {
+                        'rule_id': rule.get('id'),
+                        'missing_source_ids': missing,
+                    }
+                )
 
         task_source_errors = []
         tasks_with_sources = 0
@@ -462,11 +524,13 @@ class Command(BaseCommand):
                 tasks_with_sources += 1
             missing = validate_source_ids(source_ids)
             if missing:
-                task_source_errors.append({
-                    'task_id': task.id,
-                    'title': task.title,
-                    'missing_source_ids': missing,
-                })
+                task_source_errors.append(
+                    {
+                        'task_id': task.id,
+                        'title': task.title,
+                        'missing_source_ids': missing,
+                    }
+                )
 
         training_source_errors = []
         training_examples_with_sources = 0
@@ -479,36 +543,48 @@ class Command(BaseCommand):
                 training_examples_with_sources += 1
             missing = validate_source_ids(source_ids)
             if missing:
-                training_source_errors.append({
-                    'example_id': example.id,
-                    'kind': example.kind,
-                    'missing_source_ids': missing,
-                })
+                training_source_errors.append(
+                    {
+                        'example_id': example.id,
+                        'kind': example.kind,
+                        'missing_source_ids': missing,
+                    }
+                )
 
-        legal.update({
-            'count': len(sources),
-            'invalid_urls': invalid_urls,
-            'forbidden_urls': forbidden_urls,
-            'duplicate_ids': duplicate_ids,
-            'rule_source_errors': rule_source_errors,
-            'task_source_errors': task_source_errors,
-            'training_source_errors': training_source_errors,
-            'tasks_with_sources': tasks_with_sources,
-            'training_examples_with_sources': training_examples_with_sources,
-        })
+        legal.update(
+            {
+                'count': len(sources),
+                'invalid_urls': invalid_urls,
+                'forbidden_urls': forbidden_urls,
+                'duplicate_ids': duplicate_ids,
+                'rule_source_errors': rule_source_errors,
+                'task_source_errors': task_source_errors,
+                'training_source_errors': training_source_errors,
+                'tasks_with_sources': tasks_with_sources,
+                'training_examples_with_sources': training_examples_with_sources,
+            }
+        )
 
         if invalid_urls:
             report['errors'].append(f'legal source urls must be https: {len(invalid_urls)}')
         if forbidden_urls:
-            report['errors'].append(f'legal source urls include forbidden archive/download sources: {len(forbidden_urls)}')
+            report['errors'].append(
+                f'legal source urls include forbidden archive/download sources: {len(forbidden_urls)}'
+            )
         if duplicate_ids:
             report['errors'].append(f'duplicate legal source ids: {len(duplicate_ids)}')
         if rule_source_errors:
-            report['errors'].append(f'expert rules reference unknown legal sources: {len(rule_source_errors)}')
+            report['errors'].append(
+                f'expert rules reference unknown legal sources: {len(rule_source_errors)}'
+            )
         if task_source_errors:
-            report['errors'].append(f'learning tasks reference unknown legal sources: {len(task_source_errors)}')
+            report['errors'].append(
+                f'learning tasks reference unknown legal sources: {len(task_source_errors)}'
+            )
         if training_source_errors:
-            report['errors'].append(f'AI training examples reference unknown legal sources: {len(training_source_errors)}')
+            report['errors'].append(
+                f'AI training examples reference unknown legal sources: {len(training_source_errors)}'
+            )
 
     def _check_internal_links(self, hrefs):
         if not hrefs:
@@ -543,7 +619,7 @@ class Command(BaseCommand):
             return []
         return [
             match
-            for match in re.findall(r'''(?:href|src)=["']([^"']+)["']''', html, flags=re.IGNORECASE)
+            for match in re.findall(r"""(?:href|src)=["']([^"']+)["']""", html, flags=re.IGNORECASE)
             if match.startswith('/')
         ]
 
@@ -562,7 +638,7 @@ class Command(BaseCommand):
     def _as_float(value):
         try:
             return float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0.0
 
     def _print_human(self, report):

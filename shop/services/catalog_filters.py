@@ -13,7 +13,6 @@ from Dolg_APP.services.engineering_units import parse_engineering_quantity
 from shop.models import Product
 from shop.smart_search import parse_query_tokens
 
-
 ENGINEERING_FILTERS = {
     'nominal': ('value', 'resistance', 'capacitance', 'inductance', 'capacity'),
     'power': ('power', 'wattage', 'tdp', 'tdp_rated'),
@@ -24,10 +23,31 @@ ENGINEERING_FILTERS = {
     'pins': ('pins', 'pin_count', 'contact_count'),
     'pitch': ('pitch',),
     'frequency': ('frequency', 'base_clock', 'boost_clock', 'refresh_rate', 'bandwidth'),
-    'capacity': ('capacity', 'ram', 'storage', 'vram', 'battery', 'battery_earbuds', 'battery_case', 'cache_l3'),
+    'capacity': (
+        'capacity',
+        'ram',
+        'storage',
+        'vram',
+        'battery',
+        'battery_earbuds',
+        'battery_case',
+        'cache_l3',
+    ),
     'display': ('screen_size', 'resolution', 'panel', 'display', 'hdr'),
     'platform': ('socket', 'chipset', 'chipset_support', 'chip', 'cpu', 'gpu', 'gpu_chip', 'process'),
-    'connectivity': ('connectivity', 'network', 'outputs', 'inputs', 'power_conn', 'm2_slots', 'pcie', 'ram_slots', 'charging', 'os', 'codec'),
+    'connectivity': (
+        'connectivity',
+        'network',
+        'outputs',
+        'inputs',
+        'power_conn',
+        'm2_slots',
+        'pcie',
+        'ram_slots',
+        'charging',
+        'os',
+        'codec',
+    ),
     'form_factor': ('form_factor',),
     'interface': ('interface',),
     'dielectric': ('dielectric',),
@@ -37,7 +57,14 @@ ENGINEERING_FILTERS = {
     'size': ('length', 'width', 'diameter', 'size', 'board_size', 'hole_count', 'points', 'power_rails'),
     'wire': ('gauge', 'section', 'color'),
     'configuration': ('configuration', 'orientation', 'gender'),
-    'temperature_range': ('temperature_range', 'operating_temp', 'max_temp', 'temp_max', 'min_temp', 'melting_point'),
+    'temperature_range': (
+        'temperature_range',
+        'operating_temp',
+        'max_temp',
+        'temp_max',
+        'min_temp',
+        'melting_point',
+    ),
     'compatibility': ('compatibility',),
     'mode': ('mode', 'signal'),
     'safety': ('safety',),
@@ -213,8 +240,11 @@ def apply_catalog_filters(products, params) -> tuple[list[Product], str]:
         items = [product for product in items if bool((product.parameters or {}).get('spice_model'))]
     if truthy(active.get('has_cad_model')):
         items = [
-            product for product in items
-            if bool((product.parameters or {}).get('cad_model_url') or (product.parameters or {}).get('cad_model'))
+            product
+            for product in items
+            if bool(
+                (product.parameters or {}).get('cad_model_url') or (product.parameters or {}).get('cad_model')
+            )
         ]
 
     for name in ENGINEERING_FILTERS:
@@ -302,7 +332,9 @@ def parse_catalog_number(raw, expected_unit: str = '') -> float | None:
     return parsed.value if parsed.ok else None
 
 
-def build_active_filter_tags(params, base_url: str, manufacturer_choices=None, lifecycle_choices=None) -> list[dict]:
+def build_active_filter_tags(
+    params, base_url: str, manufacturer_choices=None, lifecycle_choices=None
+) -> list[dict]:
     active = clean_params(params)
     tags = []
     manufacturer_choices = manufacturer_choices or {}
@@ -318,24 +350,22 @@ def build_active_filter_tags(params, base_url: str, manufacturer_choices=None, l
             display = lifecycle_choices.get(value, value)
         elif key in {'in_stock', 'has_datasheet', 'has_spice_model', 'has_cad_model'}:
             display = 'yes'
-        tags.append({
-            'key': key,
-            'label': FILTER_LABELS.get(key, key),
-            'value': value,
-            'display': display,
-            'remove_url': f'{base_url}{querystring_without(params, key, leading_question=True)}',
-        })
+        tags.append(
+            {
+                'key': key,
+                'label': FILTER_LABELS.get(key, key),
+                'value': value,
+                'display': display,
+                'remove_url': f'{base_url}{querystring_without(params, key, leading_question=True)}',
+            }
+        )
     return tags
 
 
 def hidden_filter_inputs(params, exclude: Iterable[str] = ('q', 'page')) -> list[dict]:
     exclude = set(exclude)
     active = clean_params(params)
-    return [
-        {'name': key, 'value': value}
-        for key, value in active.items()
-        if key not in exclude
-    ]
+    return [{'name': key, 'value': value} for key, value in active.items() if key not in exclude]
 
 
 def querystring_without(params, key: str, leading_question: bool = False) -> str:
@@ -383,8 +413,20 @@ def compute_catalog_facets(products) -> dict[str, list[tuple[str, int]]]:
         'lifecycle': _ordered_counts(product.lifecycle_status for product in items),
         'package': _ordered_counts(product.package_type for product in items),
         'has_datasheet': [('1', sum(1 for product in items if product.datasheet_url))],
-        'has_spice_model': [('1', sum(1 for product in items if (product.parameters or {}).get('spice_model')))],
-        'has_cad_model': [('1', sum(1 for product in items if (product.parameters or {}).get('cad_model_url') or (product.parameters or {}).get('cad_model')))],
+        'has_spice_model': [
+            ('1', sum(1 for product in items if (product.parameters or {}).get('spice_model')))
+        ],
+        'has_cad_model': [
+            (
+                '1',
+                sum(
+                    1
+                    for product in items
+                    if (product.parameters or {}).get('cad_model_url')
+                    or (product.parameters or {}).get('cad_model')
+                ),
+            )
+        ],
     }
 
 
@@ -404,7 +446,9 @@ def _search_products(products: list[Product], query: str) -> list[Product]:
     text_tokens = []
     for token in tokens:
         expression = parse_range_expression(token)
-        if expression and (token[:1].upper() in RANGE_PREFIXES or any(op in token for op in ('<', '>', '..'))):
+        if expression and (
+            token[:1].upper() in RANGE_PREFIXES or any(op in token for op in ('<', '>', '..'))
+        ):
             range_tokens.append(expression)
         else:
             text_tokens.append(token.lower())
@@ -412,13 +456,15 @@ def _search_products(products: list[Product], query: str) -> list[Product]:
     result = products
     for expression in range_tokens:
         result = [
-            product for product in result
+            product
+            for product in result
             if matches_engineering_filter(product, expression.filter_name, _expression_to_raw(expression))
         ]
 
     if text_tokens:
         strict = [
-            product for product in result
+            product
+            for product in result
             if all(token in _product_search_text(product) for token in text_tokens)
         ]
         if strict:
@@ -543,7 +589,7 @@ def _to_float(value) -> float | None:
         return None
     try:
         return float(str(value).replace(',', '.'))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

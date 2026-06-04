@@ -11,16 +11,16 @@ import hashlib
 import json
 from collections import Counter
 
-from .project_review import build_design_review
+from .ai_retrieval import build_retrieval_context
+from .ai_retrieval import retrieval_lines as ai_retrieval_lines
 from .artifact_learning import artifact_training_summary, learning_suggestions_from_artifacts
-from .ai_retrieval import build_retrieval_context, retrieval_lines as ai_retrieval_lines
+from .project_review import build_design_review
 from .review_i18n import (
     build_measurement_rows,
     topology_label_ru,
     translate_finding,
     translate_review_text,
 )
-
 
 TYPE_LABELS_RU = {
     'battery': 'источник',
@@ -62,11 +62,32 @@ KEYWORD_INTENTS = (
     ('gnd', ('gnd', 'ground', 'земл', 'ноль', 'опорн')),
     ('demo_script', ('защит', 'презентац', 'демо', 'показать комиссии', 'как рассказать')),
     ('create_task', ('создай задание', 'сделай задание', 'учебное задание', 'задание из ошибки')),
-    ('why_failed', ('почему не проходит', 'почему падает', 'почему ошибка', 'не проходит', 'failed', 'fail', '500')),
-    ('measurement', (
-        'измер', 'осцилл', 'мультим', 'probe', 'пробник', 'expected', 'measured',
-        'напряж', 'ток ветв', 'branch_current', 'rms', 'частот', 'duty', 'dc', 'ac', 'tran', 'симуляц',
-    )),
+    (
+        'why_failed',
+        ('почему не проходит', 'почему падает', 'почему ошибка', 'не проходит', 'failed', 'fail', '500'),
+    ),
+    (
+        'measurement',
+        (
+            'измер',
+            'осцилл',
+            'мультим',
+            'probe',
+            'пробник',
+            'expected',
+            'measured',
+            'напряж',
+            'ток ветв',
+            'branch_current',
+            'rms',
+            'частот',
+            'duty',
+            'dc',
+            'ac',
+            'tran',
+            'симуляц',
+        ),
+    ),
     ('formula', ('формул', 'рассчитай', 'расчет', 'посчитай', 'ом', 'ohm', 'rc cutoff', 'ne555')),
     ('compare', ('сравни', 'лучше', 'хуже', 'вариант', 'альтернатив', 'vs', 'или')),
     ('thermal', ('перегрев', 'тепл', 'температ', 'запас', 'мощност', 'power', 'thermal')),
@@ -220,16 +241,25 @@ OPENINGS = {
 }
 
 FOLLOWUP_MARKERS = (
-    'а почему', 'почему?', 'почему это', 'а если', 'и что', 'что дальше',
-    'дальше', 'подробнее', 'расскажи подробнее', 'как исправить', 'что с этим делать',
+    'а почему',
+    'почему?',
+    'почему это',
+    'а если',
+    'и что',
+    'что дальше',
+    'дальше',
+    'подробнее',
+    'расскажи подробнее',
+    'как исправить',
+    'что с этим делать',
 )
 
 
 def _line_items(title, items, empty, *, limit=6):
     if not items:
-        return f"**{title}:** {empty}"
-    body = "\n".join(f"- {item}" for item in items[:limit])
-    return f"**{title}:**\n{body}"
+        return f'**{title}:** {empty}'
+    body = '\n'.join(f'- {item}' for item in items[:limit])
+    return f'**{title}:**\n{body}'
 
 
 def _stable_choice(options, seed):
@@ -263,7 +293,7 @@ def _estimate_tokens(value):
     if isinstance(value, (dict, list, tuple)):
         try:
             text = json.dumps(value, ensure_ascii=False, sort_keys=True)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             text = repr(value)
     else:
         text = str(value)
@@ -286,7 +316,9 @@ def _estimated_usage(message, reply, review, scheme_data, retrieval_context=None
         'recommendations': (review.get('recommendations') or [])[:8],
         'metrics': review.get('metrics') or {},
         'components': (scheme_data.get('components') or [])[:20] if isinstance(scheme_data, dict) else [],
-        'connections_count': len(scheme_data.get('connections') or []) if isinstance(scheme_data, dict) else 0,
+        'connections_count': len(scheme_data.get('connections') or [])
+        if isinstance(scheme_data, dict)
+        else 0,
         'retrieval': {
             'sources': (retrieval_context or {}).get('sources') or [],
             'items': ((retrieval_context or {}).get('items') or [])[:4],
@@ -314,6 +346,7 @@ def _deep_hint_for_scheme(scheme_data):
         prediction = advisor.predict(scheme_data)
         try:
             from Dolg_APP.services.ai_training import find_similar_training_examples
+
             prediction['similar_cases'] = find_similar_training_examples(scheme_data, limit=3)
         except Exception:
             prediction['similar_cases'] = []
@@ -330,28 +363,25 @@ def _deep_hint_section(deep_hint):
     topology_confidence = float(deep_hint.get('topology_confidence') or 0)
     risk_score = float(deep_hint.get('risk_score') or 0)
     lines = [
-        f"топология: {deep_hint.get('topology')} ({topology_confidence:.2f})",
-        f"риск: {deep_hint.get('risk_label')} / {risk_score:.2f}",
+        f'топология: {deep_hint.get("topology")} ({topology_confidence:.2f})',
+        f'риск: {deep_hint.get("risk_label")} / {risk_score:.2f}',
     ]
     baseline = deep_hint.get('expert_baseline') or {}
     if baseline:
         lines.append(
-            f"expert baseline: {baseline.get('topology')} / "
-            f"{baseline.get('risk_label')} / next={baseline.get('next_component')}"
+            f'expert baseline: {baseline.get("topology")} / '
+            f'{baseline.get("risk_label")} / next={baseline.get("next_component")}'
         )
     if deep_hint.get('agreement_score') is not None:
         lines.append(
-            f"baseline agreement: {float(deep_hint.get('agreement_score') or 0):.2f}, "
-            f"policy={deep_hint.get('confidence_policy')}"
+            f'baseline agreement: {float(deep_hint.get("agreement_score") or 0):.2f}, '
+            f'policy={deep_hint.get("confidence_policy")}'
         )
     next_components = deep_hint.get('next_components') or []
     if next_components:
         best = next_components[0]
         confidence = float(best.get('confidence') or 0)
-        lines.append(
-            f"следующий шаг: {best.get('component_type')} "
-            f"({confidence:.2f})"
-        )
+        lines.append(f'следующий шаг: {best.get("component_type")} ({confidence:.2f})')
     if deep_hint.get('evidence_sources'):
         lines.append('источники примеров: ' + ', '.join(deep_hint['evidence_sources'][:4]))
     lines.append('нейронка дает подсказку, окончательный вывод остается за expert review и человеком')
@@ -359,8 +389,8 @@ def _deep_hint_section(deep_hint):
     if similar:
         case = similar[0]
         lines.append(
-            f"similar case #{case.get('id')}: "
-            f"{case.get('evidence_kind') or case.get('kind')} ({float(case.get('score') or 0):.2f})"
+            f'similar case #{case.get("id")}: '
+            f'{case.get("evidence_kind") or case.get("kind")} ({float(case.get("score") or 0):.2f})'
         )
     return _line_items('PyTorch deep-hint', lines, '', limit=8)
 
@@ -435,7 +465,8 @@ def _context_sources_for_intent(intent, review):
 
 def _legal_source_items_from_retrieval(retrieval_context):
     return [
-        item for item in ((retrieval_context or {}).get('items') or [])
+        item
+        for item in ((retrieval_context or {}).get('items') or [])
         if item.get('source') == 'legal_source'
     ]
 
@@ -560,8 +591,16 @@ def _detect_intent(text, mode, *, history=None, session_summary='', last_intent=
                     return intent
     if mode == 'recommend':
         explicit_measurement = (
-            'измер', 'осцилл', 'мультим', 'probe', 'пробник',
-            'expected', 'measured', 'rms', 'duty', 'симуляц',
+            'измер',
+            'осцилл',
+            'мультим',
+            'probe',
+            'пробник',
+            'expected',
+            'measured',
+            'rms',
+            'duty',
+            'симуляц',
         )
         for intent, keywords in KEYWORD_INTENTS:
             if intent == 'measurement':
@@ -596,17 +635,17 @@ def _opening(intent, message, score, status):
 def _graph_summary(connectivity):
     topology = connectivity.get('topology', 'generic')
     return (
-        f"Топология: {topology_label_ru(topology)}; "
-        f"связных частей: {connectivity.get('connected_components_count', 0)}; "
-        f"плавающих фрагментов: {len(connectivity.get('floating_components') or [])}; "
-        f"циклов: {connectivity.get('cycle_count', 0)}."
+        f'Топология: {topology_label_ru(topology)}; '
+        f'связных частей: {connectivity.get("connected_components_count", 0)}; '
+        f'плавающих фрагментов: {len(connectivity.get("floating_components") or [])}; '
+        f'циклов: {connectivity.get("cycle_count", 0)}.'
     )
 
 
 def _passport_lines(scheme_data, connectivity):
     inventory = _scheme_inventory(scheme_data, connectivity)
     lines = [
-        f"компоненты: {inventory['component_count']}; соединения: {inventory['connection_count']}",
+        f'компоненты: {inventory["component_count"]}; соединения: {inventory["connection_count"]}',
     ]
     if inventory['counts']:
         lines.append('состав: ' + ', '.join(inventory['counts']))
@@ -627,9 +666,9 @@ def _expert_lines(review):
         severity = translated.get('severity_label') or translated.get('severity') or 'info'
         title = translated.get('title') or rule_id
         recommendation = translated.get('recommendation') or ''
-        line = f"{rule_id} [{severity}]: {title}"
+        line = f'{rule_id} [{severity}]: {title}'
         if recommendation:
-            line += f" -> {recommendation}"
+            line += f' -> {recommendation}'
         lines.append(line)
     return lines
 
@@ -663,11 +702,8 @@ def _derating_lines(review):
 
 def _measurement_lines(review):
     rows = build_measurement_rows(review.get('sections') or {})
-    lines = [
-        f"{row.get('label')}: {row.get('value')} - {row.get('status')}"
-        for row in rows[:8]
-    ]
-    latest = ((review.get('sections') or {}).get('latest_simulation') or {})
+    lines = [f'{row.get("label")}: {row.get("value")} - {row.get("status")}' for row in rows[:8]]
+    latest = (review.get('sections') or {}).get('latest_simulation') or {}
     if not lines and latest:
         analyses = ', '.join(str(key).upper() for key in latest.keys())
         lines.append(f'есть сохраненные результаты симуляции: {analyses}')
@@ -723,8 +759,8 @@ def _gnd_lines(connectivity):
 def _bom_lines(review, catalog):
     bom = (review.get('sections') or {}).get('bom') or {}
     lines = [
-        f"связано с каталогом: {bom.get('matched_count', 0)}",
-        f"без связи с каталогом: {bom.get('missing_catalog_count', 0)}",
+        f'связано с каталогом: {bom.get("matched_count", 0)}',
+        f'без связи с каталогом: {bom.get("missing_catalog_count", 0)}',
     ]
     for item in (bom.get('risks') or [])[:6]:
         component = item.get('component') or 'component'
@@ -742,7 +778,7 @@ def _import_lines(review):
     if not import_summary:
         return lines
     if import_summary.get('format'):
-        lines.append(f"формат: {import_summary.get('format')}")
+        lines.append(f'формат: {import_summary.get("format")}')
     unsupported = import_summary.get('unsupported') or import_summary.get('unsupported_items') or []
     warnings = import_summary.get('warnings') or []
     if unsupported:
@@ -758,23 +794,23 @@ def _artifact_lines(review):
     lines = []
     if external:
         lines.append(
-            f"artifacts: {external.get('artifact_count', 0)}, "
-            f"CAD findings: {external.get('finding_count', 0)}, "
-            f"unsupported: {external.get('unsupported_count', 0)}"
+            f'artifacts: {external.get("artifact_count", 0)}, '
+            f'CAD findings: {external.get("finding_count", 0)}, '
+            f'unsupported: {external.get("unsupported_count", 0)}'
         )
         for item in (external.get('findings') or [])[:5]:
             title = translate_review_text(item.get('title') or item.get('rule_id') or 'finding')
             source = item.get('source_name') or 'artifact'
             recommendation = translate_review_text(item.get('recommendation') or '')
-            line = f"{source}: {title}"
+            line = f'{source}: {title}'
             if recommendation:
-                line += f" -> {recommendation}"
+                line += f' -> {recommendation}'
             lines.append(line)
     if training.get('artifact_count'):
         lines.append(
-            f"AI memory corpus: {training.get('artifact_count')} artifacts, "
-            f"{training.get('check_findings')} check findings, "
-            f"{training.get('fault_cases')} fault cases."
+            f'AI memory corpus: {training.get("artifact_count")} artifacts, '
+            f'{training.get("check_findings")} check findings, '
+            f'{training.get("fault_cases")} fault cases.'
         )
     return lines
 
@@ -782,7 +818,7 @@ def _artifact_lines(review):
 def _artifact_learning_lines(review):
     suggestions = learning_suggestions_from_artifacts((review.get('sections') or {}).get('artifacts') or [])
     return [
-        f"{item.get('task_type')}: {item.get('title')} ({item.get('rubric', {}).get('source_artifact', '')})"
+        f'{item.get("task_type")}: {item.get("title")} ({item.get("rubric", {}).get("source_artifact", "")})'
         for item in suggestions[:5]
     ]
 
@@ -804,7 +840,12 @@ def _quick_actions(intent, connectivity):
             ('Floating-фрагменты', 'Проверь floating-фрагменты и пути до GND', 'explain', 'prompt'),
         ],
         'measurement': [
-            ('Что измерить?', 'Что измерить дальше и как сравнить expected vs measured?', 'explain', 'prompt'),
+            (
+                'Что измерить?',
+                'Что измерить дальше и как сравнить expected vs measured?',
+                'explain',
+                'prompt',
+            ),
             ('Vout', 'Как проверить Vout и допуск измерения?', 'explain', 'prompt'),
             ('AC/TRAN', 'Какие AC/TRAN метрики стоит сохранить?', 'explain', 'prompt'),
         ],
@@ -876,11 +917,20 @@ def _quick_actions(intent, connectivity):
     }
     actions = list(base.get(intent) or base['overview'])
     if connectivity.get('topology') == 'voltage_divider':
-        actions.append(('Измерить Vout делителя', 'Как измерить Vout делителя и сравнить с расчетом?', 'explain', 'prompt'))
+        actions.append(
+            (
+                'Измерить Vout делителя',
+                'Как измерить Vout делителя и сравнить с расчетом?',
+                'explain',
+                'prompt',
+            )
+        )
     elif connectivity.get('topology') == 'rc_network':
         actions.append(('Найти -3 дБ точку', 'Как найти -3 дБ точку RC-цепи?', 'explain', 'prompt'))
     elif connectivity.get('topology') == 'led_indicator':
-        actions.append(('Измерить ток LED', 'Как измерить ток LED и проверить резистор?', 'explain', 'prompt'))
+        actions.append(
+            ('Измерить ток LED', 'Как измерить ток LED и проверить резистор?', 'explain', 'prompt')
+        )
 
     # Prompt-actions (reask AI) — старый формат с tuple, поддерживается фронтом.
     prompt_actions = [
@@ -899,12 +949,27 @@ def _skill_manifest(intent):
     skills = [
         ('diagnose_scheme', 'Найти ошибку', 'Проверить DRC/ERC, GND, связи и findings', 'fix_plan'),
         ('explain_review', 'Объяснить review', 'Пояснить rule_id, evidence и recommendation', 'why_failed'),
-        ('suggest_measurement', 'Что измерить', 'Подобрать следующую метрику expected vs measured', 'measurement'),
+        (
+            'suggest_measurement',
+            'Что измерить',
+            'Подобрать следующую метрику expected vs measured',
+            'measurement',
+        ),
         ('choose_nominal', 'Подобрать номинал', 'Использовать формулы, ограничения и BOM', 'recommend'),
         ('compare_variants', 'Сравнить варианты', 'Сравнить электрический результат, запас и BOM', 'compare'),
-        ('learning_task_from_error', 'Сделать задание', 'Собрать практическое задание из ошибки', 'create_task'),
+        (
+            'learning_task_from_error',
+            'Сделать задание',
+            'Собрать практическое задание из ошибки',
+            'create_task',
+        ),
         ('artifact_summary', 'Разобрать артефакт', 'Объяснить импортированный отчет или CAD-файл', 'import'),
-        ('defense_demo_script', 'Речь для защиты', 'Собрать демонстрационный рассказ по схеме', 'demo_script'),
+        (
+            'defense_demo_script',
+            'Речь для защиты',
+            'Собрать демонстрационный рассказ по схеме',
+            'demo_script',
+        ),
     ]
     return [
         {
@@ -939,8 +1004,7 @@ def _tool_actions_for_intent(intent, connectivity):
 
     # GND intent или явно нет GND → предложить добавить GND.
     if intent == 'gnd' or not has_ground:
-        act = build_tool_action('scheme.add_component', {'type': 'ground'},
-                                override_label='Добавить GND')
+        act = build_tool_action('scheme.add_component', {'type': 'ground'}, override_label='Добавить GND')
         if act:
             out.append(act)
 
@@ -951,20 +1015,21 @@ def _tool_actions_for_intent(intent, connectivity):
             if act:
                 out.append(act)
         if topology == 'rc_network' or intent == 'thermal':
-            act = build_tool_action('simulation.run_tran', {'duration_ms': 50},
-                                    override_label='📈 Запустить TRAN 50 мс')
+            act = build_tool_action(
+                'simulation.run_tran', {'duration_ms': 50}, override_label='📈 Запустить TRAN 50 мс'
+            )
             if act:
                 out.append(act)
         if intent == 'thermal':
-            act = build_tool_action('view.toggle_thermal_3d',
-                                    override_label='🌡 Тепловая карта в 3D')
+            act = build_tool_action('view.toggle_thermal_3d', override_label='🌡 Тепловая карта в 3D')
             if act:
                 out.append(act)
 
     # Если RC/LC топология → AC анализ
     if topology in {'rc_network', 'lc_tank'} and intent in {'formula', 'measurement', 'scheme_overview'}:
-        act = build_tool_action('simulation.run_ac', {'f_start': 10, 'f_stop': 1000000},
-                                override_label='📊 АЧХ (10 Гц … 1 МГц)')
+        act = build_tool_action(
+            'simulation.run_ac', {'f_start': 10, 'f_stop': 1000000}, override_label='📊 АЧХ (10 Гц … 1 МГц)'
+        )
         if act:
             out.append(act)
 
@@ -1037,15 +1102,21 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
         failure_lines.extend(warnings[:4])
         failure_lines.extend(_expert_lines(review)[:4])
         if not failure_lines:
-            failure_lines = ['Явной причины падения в review нет: проверьте входные данные запроса, GND и сохраненные результаты симуляции.']
+            failure_lines = [
+                'Явной причины падения в review нет: проверьте входные данные запроса, GND и сохраненные результаты симуляции.'
+            ]
         sections = [
             *common_head,
             _line_items('Почему может не проходить', failure_lines, 'Критичных причин не найдено.'),
-            _line_items('План проверки', [
-                'сначала исправить DRC/ERC ошибки',
-                'проверить GND, источник и floating-фрагменты',
-                'после этого запустить DC и сохранить expected vs measured',
-            ], 'Начните с review.'),
+            _line_items(
+                'План проверки',
+                [
+                    'сначала исправить DRC/ERC ошибки',
+                    'проверить GND, источник и floating-фрагменты',
+                    'после этого запустить DC и сохранить expected vs measured',
+                ],
+                'Начните с review.',
+            ),
         ]
     elif intent == 'gnd':
         sections = [
@@ -1058,28 +1129,42 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
         sections = [
             *common_head,
             _line_items('Сохраненные измерения', _measurement_lines(review), 'Измерений пока нет.'),
-            _line_items('Что измерить дальше', _measurement_plan(connectivity), 'Начните с DC-напряжений узлов.'),
+            _line_items(
+                'Что измерить дальше', _measurement_plan(connectivity), 'Начните с DC-напряжений узлов.'
+            ),
             _line_items('Предупреждения', warnings, 'Предупреждений по review нет.'),
         ]
     elif intent == 'thermal':
         sections = [
             *common_head,
-            _line_items('Запас по мощности и температуре', _derating_lines(review), 'По доступным данным перегрузки не обнаружены.'),
-            _line_items('Что проверить', [
-                'сравнить мощность элемента с допустимой мощностью корпуса',
-                'для стабилизатора оценить падение напряжения и рассеиваемую мощность',
-                'если запас меньше 30%, выбрать номинал/корпус с запасом',
-            ], 'Derating-данных недостаточно.'),
+            _line_items(
+                'Запас по мощности и температуре',
+                _derating_lines(review),
+                'По доступным данным перегрузки не обнаружены.',
+            ),
+            _line_items(
+                'Что проверить',
+                [
+                    'сравнить мощность элемента с допустимой мощностью корпуса',
+                    'для стабилизатора оценить падение напряжения и рассеиваемую мощность',
+                    'если запас меньше 30%, выбрать номинал/корпус с запасом',
+                ],
+                'Derating-данных недостаточно.',
+            ),
         ]
     elif intent == 'bom':
         sections = [
             *common_head,
             _line_items('BOM и каталог', _bom_lines(review, catalog), 'BOM-риски не найдены.'),
-            _line_items('Следующие действия', [
-                'связать элементы схемы с товарами каталога',
-                'проверить datasheet, SPICE/CAD flags и lifecycle',
-                'после review экспортировать BOM или сформировать заказ',
-            ], 'BOM можно собирать после связи компонентов.'),
+            _line_items(
+                'Следующие действия',
+                [
+                    'связать элементы схемы с товарами каталога',
+                    'проверить datasheet, SPICE/CAD flags и lifecycle',
+                    'после review экспортировать BOM или сформировать заказ',
+                ],
+                'BOM можно собирать после связи компонентов.',
+            ),
         ]
     elif intent in {'learning', 'create_task'}:
         learning_plan = []
@@ -1095,7 +1180,9 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
         sections = [
             *common_head,
             _line_items('Идея учебного задания', learning_plan, 'Ошибок для задания не найдено.'),
-            _line_items('Что проверять', _measurement_plan(connectivity), 'Проверить расчет, схему и измерение.'),
+            _line_items(
+                'Что проверять', _measurement_plan(connectivity), 'Проверить расчет, схему и измерение.'
+            ),
         ]
     elif intent == 'formula':
         topology = connectivity.get('topology')
@@ -1122,61 +1209,85 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
         sections = [
             *common_head,
             _line_items('Формула', formula_lines, 'Недостаточно данных для выбора формулы.'),
-            _line_items('Что сверить', _measurement_plan(connectivity), 'Сначала сохраните расчетное expected value.'),
+            _line_items(
+                'Что сверить', _measurement_plan(connectivity), 'Сначала сохраните расчетное expected value.'
+            ),
         ]
     elif intent == 'compare':
         sections = [
             *common_head,
-            _line_items('Как сравнивать варианты', [
-                'электрический результат: напряжение, ток, частота или мощность',
-                'инженерный запас: мощность, температура, напряжение, ток',
-                'BOM: наличие, lifecycle, datasheet, SPICE/CAD-модель',
-                'демо-критерий: вариант должен проходить review и иметь понятное измерение',
-            ], 'Нужно минимум два варианта.'),
+            _line_items(
+                'Как сравнивать варианты',
+                [
+                    'электрический результат: напряжение, ток, частота или мощность',
+                    'инженерный запас: мощность, температура, напряжение, ток',
+                    'BOM: наличие, lifecycle, datasheet, SPICE/CAD-модель',
+                    'демо-критерий: вариант должен проходить review и иметь понятное измерение',
+                ],
+                'Нужно минимум два варианта.',
+            ),
             _line_items('Риски текущего варианта', warnings + errors, 'Явных рисков текущего варианта нет.'),
         ]
     elif intent == 'demo_script':
         sections = [
             *common_head,
-            _line_items('Как рассказать на защите', [
-                'сначала назвать функцию схемы и топологию',
-                'затем показать GND/источник и ключевые элементы',
-                'после этого открыть измерение expected vs measured',
-                'в конце показать review: score, ошибки, рекомендации и BOM',
-            ], 'Сценарий зависит от выбранной схемы.'),
-            _line_items('Вопросы комиссии', [
-                'почему выбран такой номинал',
-                'что будет при изменении нагрузки',
-                'как проверяется GND и корректность симуляции',
-                'какой запас по мощности и температуре',
-            ], 'Можно подготовить вопросы после выбора схемы.'),
+            _line_items(
+                'Как рассказать на защите',
+                [
+                    'сначала назвать функцию схемы и топологию',
+                    'затем показать GND/источник и ключевые элементы',
+                    'после этого открыть измерение expected vs measured',
+                    'в конце показать review: score, ошибки, рекомендации и BOM',
+                ],
+                'Сценарий зависит от выбранной схемы.',
+            ),
+            _line_items(
+                'Вопросы комиссии',
+                [
+                    'почему выбран такой номинал',
+                    'что будет при изменении нагрузки',
+                    'как проверяется GND и корректность симуляции',
+                    'какой запас по мощности и температуре',
+                ],
+                'Можно подготовить вопросы после выбора схемы.',
+            ),
         ]
     elif intent == 'import':
         sections = [
             *common_head,
             _line_items('Import preview', _import_lines(review), 'Этот проект не содержит import-summary.'),
-            _line_items('После импорта', [
-                'сохранить unsupported элементы как warnings, а не терять их',
-                'нормализовать схему во внутренний scheme_data',
-                'запустить Engineering Review и связать компоненты с BOM',
-            ], 'Запустите review после импорта.'),
+            _line_items(
+                'После импорта',
+                [
+                    'сохранить unsupported элементы как warnings, а не терять их',
+                    'нормализовать схему во внутренний scheme_data',
+                    'запустить Engineering Review и связать компоненты с BOM',
+                ],
+                'Запустите review после импорта.',
+            ),
         ]
     elif intent == 'recommend':
         sections = [
             *common_head,
             _line_items('Что выбрать или проверить', recs, 'Явных рисков выбора не найдено.'),
-            _line_items('Ограничения перед подбором', [
-                'задать входное и выходное напряжение или ток нагрузки',
-                'проверить мощность и температурный запас',
-                'сверить корпус, наличие, datasheet и SPICE/CAD-модель',
-            ], 'Нужны целевые параметры.'),
+            _line_items(
+                'Ограничения перед подбором',
+                [
+                    'задать входное и выходное напряжение или ток нагрузки',
+                    'проверить мощность и температурный запас',
+                    'сверить корпус, наличие, datasheet и SPICE/CAD-модель',
+                ],
+                'Нужны целевые параметры.',
+            ),
         ]
     else:
         sections = [
             *common_head,
             _line_items('Экспертный след', expert_lines, 'Экспертные правила не нашли отдельного риска.'),
             _line_items('Ошибки', errors, 'Критичных DRC/ERC-ошибок нет.'),
-            _line_items('Возможные неисправности', _fault_lines(review), 'Типовой сценарий неисправности не найден.'),
+            _line_items(
+                'Возможные неисправности', _fault_lines(review), 'Типовой сценарий неисправности не найден.'
+            ),
             _line_items('Следующие действия', recs, 'Сохраните симуляцию и сравните измерения.'),
         ]
 
@@ -1185,17 +1296,21 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     if evidence:
         sections.append(_line_items('Опираюсь на', evidence, 'Доступен только review текущего проекта.'))
     if retrieval:
-        sections.append(_line_items('База DOLG по теме', retrieval, 'Подходящих материалов в локальной базе пока нет.'))
+        sections.append(
+            _line_items('База DOLG по теме', retrieval, 'Подходящих материалов в локальной базе пока нет.')
+        )
 
     artifact_lines = _artifact_lines(review)
     if artifact_lines:
-        sections.append(_line_items('Инженерные артефакты', artifact_lines, 'Артефактов в контексте пока нет.'))
+        sections.append(
+            _line_items('Инженерные артефакты', artifact_lines, 'Артефактов в контексте пока нет.')
+        )
     if intent in {'learning', 'create_task'}:
         artifact_tasks = _artifact_learning_lines(review)
         if artifact_tasks:
             sections.append(_line_items('Задания из артефактов', artifact_tasks, ''))
 
-    return "\n\n".join(str(item) for item in sections if item)
+    return '\n\n'.join(str(item) for item in sections if item)
 
 
 def build_rule_based_reply(
@@ -1225,11 +1340,15 @@ def build_rule_based_reply(
             review = build_design_review(
                 project,
                 simulation_runs=list(project.simulation_runs.all()[:5]),
-                measurements=list(project.measurements.all()[:20]) if hasattr(project, 'measurements') else [],
+                measurements=list(project.measurements.all()[:20])
+                if hasattr(project, 'measurements')
+                else [],
             )
         else:
+
             class _InlineProject:
                 pass
+
             inline_project = _InlineProject()
             inline_project.scheme_data = scheme_data
             review = build_design_review(inline_project, simulation_runs=[], measurements=[])
@@ -1249,8 +1368,12 @@ def build_rule_based_reply(
         review=review,
         limit=6,
     )
-    reply_seed = f'{raw_message}|history={len(history_tail)}|last={last_intent or ""}|summary={session_summary[-120:]}'
-    reply = _compose_reply(intent, reply_seed, review, scheme_data, catalog, retrieval_context=retrieval_context)
+    reply_seed = (
+        f'{raw_message}|history={len(history_tail)}|last={last_intent or ""}|summary={session_summary[-120:]}'
+    )
+    reply = _compose_reply(
+        intent, reply_seed, review, scheme_data, catalog, retrieval_context=retrieval_context
+    )
     deep_hint = _deep_hint_for_scheme(scheme_data) if include_deep_hint else None
     deep_section = _deep_hint_section(deep_hint)
     if deep_section:
@@ -1289,7 +1412,9 @@ def build_rule_based_reply(
     }
 
 
-def build_ai_scheme_context(project=None, scheme=None, measurements=None, simulation_runs=None, include_deep_hint=False):
+def build_ai_scheme_context(
+    project=None, scheme=None, measurements=None, simulation_runs=None, include_deep_hint=False
+):
     """Build compact context card data for the AI panel."""
     scheme_data = _as_scheme_data(project=project, scheme=scheme)
     if project is not None:
@@ -1299,8 +1424,10 @@ def build_ai_scheme_context(project=None, scheme=None, measurements=None, simula
             simulation_runs = list(project.simulation_runs.all()[:5])
 
     if project is None:
+
         class _InlineProject:
             pass
+
         inline_project = _InlineProject()
         inline_project.scheme_data = scheme_data
         project_for_review = inline_project
@@ -1335,7 +1462,11 @@ def build_ai_scheme_context(project=None, scheme=None, measurements=None, simula
         'external_cad_findings': external_cad.get('finding_count', 0),
         'fault_cases': artifact_memory.get('fault_cases', 0),
     }
-    deep_hint = _deep_hint_for_scheme(scheme_data) if include_deep_hint else {'available': False, 'reason': 'not_requested'}
+    deep_hint = (
+        _deep_hint_for_scheme(scheme_data)
+        if include_deep_hint
+        else {'available': False, 'reason': 'not_requested'}
+    )
     return {
         'summary': review.get('summary', ''),
         'topology': connectivity.get('topology', 'generic'),

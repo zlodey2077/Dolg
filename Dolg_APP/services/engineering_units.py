@@ -141,17 +141,25 @@ def canonical_unit(unit: str | None) -> str:
     return UNIT_ALIASES.get(raw, raw)
 
 
-def parse_engineering_quantity(value: Any, expected_unit: str = '', default: float | None = None) -> ParsedQuantity:
+def parse_engineering_quantity(
+    value: Any, expected_unit: str = '', default: float | None = None
+) -> ParsedQuantity:
     if value is None or isinstance(value, bool):
         if default is None:
-            return ParsedQuantity(False, None, canonical_unit(expected_unit), source=str(value), error='empty value')
-        return ParsedQuantity(True, float(default), canonical_unit(expected_unit), source=str(value), warning='default used')
+            return ParsedQuantity(
+                False, None, canonical_unit(expected_unit), source=str(value), error='empty value'
+            )
+        return ParsedQuantity(
+            True, float(default), canonical_unit(expected_unit), source=str(value), warning='default used'
+        )
 
     if isinstance(value, (int, float)):
         number = float(value)
         if math.isfinite(number):
             return ParsedQuantity(True, number, canonical_unit(expected_unit), source=str(value))
-        return ParsedQuantity(False, default, canonical_unit(expected_unit), source=str(value), error='not finite')
+        return ParsedQuantity(
+            False, default, canonical_unit(expected_unit), source=str(value), error='not finite'
+        )
 
     text = str(value).strip()
     if not text:
@@ -165,10 +173,14 @@ def parse_engineering_quantity(value: Any, expected_unit: str = '', default: flo
     if parsed.ok:
         return parsed
 
-    return ParsedQuantity(False, default, canonical_unit(expected_unit), source=text, error=parsed.error or 'not a number')
+    return ParsedQuantity(
+        False, default, canonical_unit(expected_unit), source=text, error=parsed.error or 'not a number'
+    )
 
 
-def parse_engineering_number(value: Any, default: float | None = None, expected_unit: str = '') -> float | None:
+def parse_engineering_number(
+    value: Any, default: float | None = None, expected_unit: str = ''
+) -> float | None:
     parsed = parse_engineering_quantity(value, expected_unit=expected_unit, default=default)
     return parsed.value if parsed.ok else default
 
@@ -183,7 +195,9 @@ def _parse_suffix_value(text: str, expected_unit: str = '') -> ParsedQuantity:
     compact = compact.replace('µ', 'u').replace('ω', 'ohm').replace('Ω', 'ohm')
     match = re.fullmatch(r'([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)([\w°О©Ωа-яА-Я]*)', compact)
     if not match:
-        return ParsedQuantity(False, None, canonical_unit(expected_unit), source=text, error='suffix parser miss')
+        return ParsedQuantity(
+            False, None, canonical_unit(expected_unit), source=text, error='suffix parser miss'
+        )
 
     number = float(match.group(1))
     suffix = match.group(2) or ''
@@ -199,7 +213,7 @@ def _parse_suffix_value(text: str, expected_unit: str = '') -> ParsedQuantity:
         else:
             for prefix in sorted(PREFIX_FACTORS, key=len, reverse=True):
                 if token.startswith(prefix):
-                    rest = token[len(prefix):]
+                    rest = token[len(prefix) :]
                     if not rest:
                         factor = PREFIX_FACTORS[prefix]
                         unit = expected

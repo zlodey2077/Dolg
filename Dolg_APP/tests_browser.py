@@ -19,6 +19,7 @@ class ImportReviewLearningBrowserSmoke(StaticLiveServerTestCase):
         super().setUpClass()
         try:
             from playwright.sync_api import sync_playwright
+
             cls._playwright = sync_playwright().start()
             cls.browser = cls._playwright.chromium.launch(headless=True)
         except Exception as exc:  # pragma: no cover - depends on local browser install
@@ -64,11 +65,13 @@ class ImportReviewLearningBrowserSmoke(StaticLiveServerTestCase):
         for name in (settings.SESSION_COOKIE_NAME, settings.CSRF_COOKIE_NAME):
             morsel = self.client.cookies.get(name)
             if morsel:
-                cookies.append({
-                    'name': name,
-                    'value': morsel.value,
-                    'url': self.live_server_url,
-                })
+                cookies.append(
+                    {
+                        'name': name,
+                        'value': morsel.value,
+                        'url': self.live_server_url,
+                    }
+                )
         context.add_cookies(cookies)
         return context
 

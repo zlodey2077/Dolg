@@ -9,6 +9,7 @@
 
 Используется FAST_TESTS=1 для пропуска миграций (см. settings.IS_TESTING).
 """
+
 import json
 import math
 import os
@@ -22,6 +23,12 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
+from Dolg_APP.ml.neural import (
+    FEATURE_DIM,
+    compare_prediction_to_teacher,
+    scheme_to_features,
+    teacher_baseline,
+)
 from Dolg_APP.models import (
     AITrainingExample,
     EngineeringArtifact,
@@ -39,8 +46,8 @@ from Dolg_APP.services.engineering_units import parse_engineering_quantity
 from Dolg_APP.services.expert_rules import build_expert_facts, evaluate_expert_rules, load_rule_pack
 from Dolg_APP.services.learning_by_review import learning_suggestions_from_review
 from Dolg_APP.services.project_review import build_design_review
-from Dolg_APP.services.rule_ai import build_ai_scheme_context, build_rule_based_reply
 from Dolg_APP.services.risk_scoring import assess_fuzzy_project_risk
+from Dolg_APP.services.rule_ai import build_ai_scheme_context, build_rule_based_reply
 from Dolg_APP.services.schematic_graph import analyze_graph_topology
 from Dolg_APP.services.simulation_analysis import (
     bode_plot,
@@ -52,7 +59,6 @@ from Dolg_APP.services.simulation_analysis import (
     signal_quality,
     simulation_result_to_csv,
 )
-from Dolg_APP.ml.neural import FEATURE_DIM, compare_prediction_to_teacher, scheme_to_features, teacher_baseline
 from knowledge.models import LearningLesson, LearningTrack
 
 User = get_user_model()
@@ -148,8 +154,7 @@ class ProjectsCreateUpdateTests(TestCase):
     def test_create_project_via_api(self):
         resp = self.client.post(
             '/projects/api/create/',
-            data=json.dumps({'name': 'Test scheme', 'category': 'led',
-                             'scheme_data': {'components': []}}),
+            data=json.dumps({'name': 'Test scheme', 'category': 'led', 'scheme_data': {'components': []}}),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)
@@ -180,8 +185,8 @@ class PCBLayoutTests(TestCase):
         return {
             'components': [
                 {'id': 1, 'type': 'resistor', 'x': 100, 'y': 100, 'rotation': 0},
-                {'id': 2, 'type': 'led',      'x': 300, 'y': 100, 'rotation': 0},
-                {'id': 3, 'type': 'battery',  'x': 200, 'y': 300, 'rotation': 0},
+                {'id': 2, 'type': 'led', 'x': 300, 'y': 100, 'rotation': 0},
+                {'id': 3, 'type': 'battery', 'x': 200, 'y': 300, 'rotation': 0},
             ],
             'connections': [
                 {'from': {'compId': 1, 'portId': 'b'}, 'to': {'compId': 2, 'portId': 'a'}},
@@ -230,12 +235,15 @@ class DemoProjectsCommandTests(TestCase):
     def test_command_runs_without_errors(self):
         User.objects.create_superuser('admin', 'a@x', 'pwd')
         from io import StringIO
+
         call_command('populate_demo_projects', '--owner=admin', stdout=StringIO())
 
     def test_command_creates_expected_count(self):
         from Dolg_APP.management.commands.populate_demo_projects import DEMO_PROJECTS
+
         User.objects.create_superuser('admin', 'a@x', 'pwd')
         from io import StringIO
+
         call_command('populate_demo_projects', '--owner=admin', stdout=StringIO())
         n = SchematicProject.objects.filter(is_demo=True).count()
         self.assertEqual(n, len(DEMO_PROJECTS))
@@ -243,6 +251,7 @@ class DemoProjectsCommandTests(TestCase):
     def test_demo_projects_have_schemes(self):
         User.objects.create_superuser('admin', 'a@x', 'pwd')
         from io import StringIO
+
         call_command('populate_demo_projects', '--owner=admin', stdout=StringIO())
         for proj in SchematicProject.objects.filter(is_demo=True):
             self.assertTrue(proj.scheme_data, f'Empty scheme in {proj.name}')
@@ -251,6 +260,7 @@ class DemoProjectsCommandTests(TestCase):
     def test_idempotent_second_run(self):
         User.objects.create_superuser('admin', 'a@x', 'pwd')
         from io import StringIO
+
         call_command('populate_demo_projects', '--owner=admin', stdout=StringIO())
         first_count = SchematicProject.objects.filter(is_demo=True).count()
         call_command('populate_demo_projects', '--owner=admin', stdout=StringIO())
@@ -265,6 +275,7 @@ class ProdSettingsCheckTests(TestCase):
         from io import StringIO
 
         from django.test import override_settings
+
         # Django test runner ставит DEBUG=False по умолчанию (mimics prod).
         # Принудительно ставим True — проверяем dev-branch команды.
         with override_settings(DEBUG=True):
@@ -277,6 +288,7 @@ class ProdSettingsCheckTests(TestCase):
         from io import StringIO
 
         from django.test import override_settings
+
         # При SKIP_PROD_CHECKS=1 команда не sys.exit — удобно тестировать.
         os.environ['SKIP_PROD_CHECKS'] = '1'
         try:
@@ -297,13 +309,12 @@ class SimulationRunModelTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user('u', 'u@x', 'pw')
-        self.project = SchematicProject.objects.create(
-            user=self.user, name='proj', scheme_data={}
-        )
+        self.project = SchematicProject.objects.create(user=self.user, name='proj', scheme_data={})
 
     def test_create_simulation_run(self):
         run = SimulationRun.objects.create(
-            project=self.project, user=self.user,
+            project=self.project,
+            user=self.user,
             analysis_type='dc',
             elapsed_ms=42,
             result_summary={'V1': 5.0, 'I1': 0.001},
@@ -378,15 +389,17 @@ class ProjectSessionTests(TestCase):
     def test_simulation_save_postprocess_and_csv_export_are_session_events(self):
         save_response = self.client.post(
             reverse('hello:api_project_save_simulation', args=[self.project.id]),
-            data=json.dumps({
-                'analysis_type': 'tran',
-                'engine': 'browser-ngspice',
-                'elapsed_ms': 12,
-                'result': {
-                    'points': [{'x': 0, 'y': 0}, {'x': 0.001, 'y': 1}, {'x': 0.002, 'y': 0}],
-                    'sample_rate_hz': 1000,
-                },
-            }),
+            data=json.dumps(
+                {
+                    'analysis_type': 'tran',
+                    'engine': 'browser-ngspice',
+                    'elapsed_ms': 12,
+                    'result': {
+                        'points': [{'x': 0, 'y': 0}, {'x': 0.001, 'y': 1}, {'x': 0.002, 'y': 0}],
+                        'sample_rate_hz': 1000,
+                    },
+                }
+            ),
             content_type='application/json',
         )
         self.assertEqual(save_response.status_code, 200)
@@ -394,19 +407,23 @@ class ProjectSessionTests(TestCase):
 
         post_response = self.client.post(
             reverse('hello:api_project_simulation_postprocess', args=[self.project.id]),
-            data=json.dumps({
-                'run_id': run_id,
-                'operations': ['fft'],
-                'unit': 'V',
-                'formulas': ['rms * 2'],
-            }),
+            data=json.dumps(
+                {
+                    'run_id': run_id,
+                    'operations': ['fft'],
+                    'unit': 'V',
+                    'formulas': ['rms * 2'],
+                }
+            ),
             content_type='application/json',
         )
         self.assertEqual(post_response.status_code, 200)
         post_data = post_response.json()
         self.assertTrue(post_data['ok'])
         self.assertGreaterEqual(len(post_data['measurements']), 3)
-        self.assertEqual(ProjectMeasurement.objects.filter(project=self.project, source='postprocess').count(), 3)
+        self.assertEqual(
+            ProjectMeasurement.objects.filter(project=self.project, source='postprocess').count(), 3
+        )
 
         csv_response = self.client.get(
             reverse('hello:api_project_simulation_export_csv', args=[self.project.id, run_id])
@@ -461,15 +478,18 @@ class EngineeringReviewTests(TestCase):
         )
 
     def test_build_design_review_detects_missing_ground_fault(self):
-        project = SchematicProject(name='No GND', scheme_data={
-            'components': [
-                {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
-                {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
-            ],
-            'connections': [
-                {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
-            ],
-        })
+        project = SchematicProject(
+            name='No GND',
+            scheme_data={
+                'components': [
+                    {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
+                    {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
+                ],
+                'connections': [
+                    {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                ],
+            },
+        )
 
         review = build_design_review(project, simulation_runs=[], measurements=[])
 
@@ -477,17 +497,27 @@ class EngineeringReviewTests(TestCase):
         self.assertTrue(any(item['code'] == 'missing_ground' for item in review['faults']))
 
     def test_design_validity_guard_warns_when_rating_is_exceeded(self):
-        project = SchematicProject(name='Overloaded resistor', scheme_data={
-            'components': [
-                {'id': 'v1', 'type': 'battery', 'voltage': '12V'},
-                {'id': 'r1', 'type': 'resistor', 'label': 'R1', 'resistance': '100', 'rated_power_w': 0.25, 'measured_power_w': 0.4},
-                {'id': 'gnd', 'type': 'ground', 'label': 'GND'},
-            ],
-            'connections': [
-                {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
-                {'from': {'compId': 'r1'}, 'to': {'compId': 'gnd'}},
-            ],
-        })
+        project = SchematicProject(
+            name='Overloaded resistor',
+            scheme_data={
+                'components': [
+                    {'id': 'v1', 'type': 'battery', 'voltage': '12V'},
+                    {
+                        'id': 'r1',
+                        'type': 'resistor',
+                        'label': 'R1',
+                        'resistance': '100',
+                        'rated_power_w': 0.25,
+                        'measured_power_w': 0.4,
+                    },
+                    {'id': 'gnd', 'type': 'ground', 'label': 'GND'},
+                ],
+                'connections': [
+                    {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                    {'from': {'compId': 'r1'}, 'to': {'compId': 'gnd'}},
+                ],
+            },
+        )
 
         review = build_design_review(project, simulation_runs=[], measurements=[])
 
@@ -497,15 +527,18 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('validity_issues', review['metrics'])
 
     def test_design_review_user_messages_are_localized_to_russian(self):
-        project = SchematicProject(name='No GND localized', scheme_data={
-            'components': [
-                {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
-                {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
-            ],
-            'connections': [
-                {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
-            ],
-        })
+        project = SchematicProject(
+            name='No GND localized',
+            scheme_data={
+                'components': [
+                    {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
+                    {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
+                ],
+                'connections': [
+                    {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                ],
+            },
+        )
 
         review = build_design_review(project, simulation_runs=[], measurements=[])
         combined = ' '.join(review['errors'] + review['warnings'] + review['recommendations'])
@@ -602,14 +635,16 @@ class EngineeringReviewTests(TestCase):
     def test_measurement_api_saves_expected_vs_measured_status(self):
         response = self.client.post(
             reverse('hello:api_project_measurement_create', args=[self.project.id]),
-            data=json.dumps({
-                'metric': 'node_voltage',
-                'label': 'Vout',
-                'value': 3.02,
-                'expected_value': 3.0,
-                'tolerance_abs': 0.1,
-                'unit': 'V',
-            }),
+            data=json.dumps(
+                {
+                    'metric': 'node_voltage',
+                    'label': 'Vout',
+                    'value': 3.02,
+                    'expected_value': 3.0,
+                    'tolerance_abs': 0.1,
+                    'unit': 'V',
+                }
+            ),
             content_type='application/json',
         )
 
@@ -634,12 +669,14 @@ class EngineeringReviewTests(TestCase):
         self._seed_diagnostics_lesson()
         response = self.client.post(
             reverse('hello:api_cad_import_preview'),
-            data=json.dumps({
-                'format': 'ltspice',
-                'source': 'V1 in 0 DC 5\nR1 in 0 1k',
-                'save_project': True,
-                'name': 'Imported divider',
-            }),
+            data=json.dumps(
+                {
+                    'format': 'ltspice',
+                    'source': 'V1 in 0 DC 5\nR1 in 0 1k',
+                    'save_project': True,
+                    'name': 'Imported divider',
+                }
+            ),
             content_type='application/json',
         )
 
@@ -656,11 +693,13 @@ class EngineeringReviewTests(TestCase):
     def test_ai_chat_uses_self_hosted_rule_engine_without_external_key(self):
         response = self.client.post(
             reverse('hello:api_ai_chat'),
-            data=json.dumps({
-                'mode': 'explain',
-                'message': 'explain errors and give fix plan',
-                'project_id': self.project.id,
-            }),
+            data=json.dumps(
+                {
+                    'mode': 'explain',
+                    'message': 'explain errors and give fix plan',
+                    'project_id': self.project.id,
+                }
+            ),
             content_type='application/json',
         )
 
@@ -682,18 +721,17 @@ class EngineeringReviewTests(TestCase):
 
     @override_settings(ANTHROPIC_API_KEY='')
     def test_ai_chat_recommend_without_project_does_not_500(self):
-        history = [
-            {'role': 'user', 'content': f'old question {i}'}
-            for i in range(25)
-        ]
+        history = [{'role': 'user', 'content': f'old question {i}'} for i in range(25)]
         response = self.client.post(
             reverse('hello:api_ai_chat'),
-            data=json.dumps({
-                'mode': 'recommend',
-                'message': 'Делитель напряжения 12В->5В, ток 10мА',
-                'history': history,
-                'session_summary': 'Последний intent: recommend',
-            }),
+            data=json.dumps(
+                {
+                    'mode': 'recommend',
+                    'message': 'Делитель напряжения 12В->5В, ток 10мА',
+                    'history': history,
+                    'session_summary': 'Последний intent: recommend',
+                }
+            ),
             content_type='application/json',
         )
 
@@ -814,7 +852,9 @@ class EngineeringReviewTests(TestCase):
             status='ok',
         )
 
-        result = build_rule_based_reply('что измерить и как сравнить expected vs measured?', mode='explain', project=self.project)
+        result = build_rule_based_reply(
+            'что измерить и как сравнить expected vs measured?', mode='explain', project=self.project
+        )
 
         self.assertEqual(result['intent'], 'measurement')
         self.assertIn('Сохраненные измерения', result['reply'])
@@ -879,15 +919,18 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('paths_to_ground', review['sections']['connectivity'])
 
     def test_review_includes_expert_findings_with_evidence(self):
-        project = SchematicProject(name='Expert no gnd', scheme_data={
-            'components': [
-                {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
-                {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
-            ],
-            'connections': [
-                {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
-            ],
-        })
+        project = SchematicProject(
+            name='Expert no gnd',
+            scheme_data={
+                'components': [
+                    {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
+                    {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
+                ],
+                'connections': [
+                    {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                ],
+            },
+        )
 
         review = build_design_review(project, simulation_runs=[], measurements=[])
         finding = review['expert_findings'][0]
@@ -901,13 +944,13 @@ class EngineeringReviewTests(TestCase):
 class LightweightLibraryIntegrationTests(TestCase):
     def test_importing_views_does_not_eager_load_scientific_stack(self):
         script = (
-            "import os, sys; "
+            'import os, sys; '
             "os.environ.setdefault('DJANGO_SETTINGS_MODULE','Dolg_PR.settings'); "
-            "import django; django.setup(); "
-            "import Dolg_APP.views; "
+            'import django; django.setup(); '
+            'import Dolg_APP.views; '
             "bad=[m for m in ('matplotlib','scipy','pandas','z3','skfuzzy','rule_engine','pint','lark') if m in sys.modules]; "
             "print(','.join(bad)); "
-            "raise SystemExit(1 if bad else 0)"
+            'raise SystemExit(1 if bad else 0)'
         )
         env = os.environ.copy()
         env['DEBUG'] = 'True'
@@ -925,13 +968,13 @@ class LightweightLibraryIntegrationTests(TestCase):
 
     def test_importing_views_does_not_eager_load_torch(self):
         script = (
-            "import os, sys; "
+            'import os, sys; '
             "os.environ.setdefault('DJANGO_SETTINGS_MODULE','Dolg_PR.settings'); "
-            "import django; django.setup(); "
-            "import Dolg_APP.views; "
+            'import django; django.setup(); '
+            'import Dolg_APP.views; '
             "bad='torch' in sys.modules; "
-            "print(bad); "
-            "raise SystemExit(1 if bad else 0)"
+            'print(bad); '
+            'raise SystemExit(1 if bad else 0)'
         )
         env = os.environ.copy()
         env['DEBUG'] = 'True'
@@ -948,17 +991,19 @@ class LightweightLibraryIntegrationTests(TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_neural_scheme_features_are_fixed_size(self):
-        features = scheme_to_features({
-            'components': [
-                {'id': 'v1', 'type': 'battery'},
-                {'id': 'r1', 'type': 'resistor'},
-                {'id': 'gnd', 'type': 'ground'},
-            ],
-            'connections': [
-                {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
-                {'from': {'compId': 'r1'}, 'to': {'compId': 'gnd'}},
-            ],
-        })
+        features = scheme_to_features(
+            {
+                'components': [
+                    {'id': 'v1', 'type': 'battery'},
+                    {'id': 'r1', 'type': 'resistor'},
+                    {'id': 'gnd', 'type': 'ground'},
+                ],
+                'connections': [
+                    {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                    {'from': {'compId': 'r1'}, 'to': {'compId': 'gnd'}},
+                ],
+            }
+        )
 
         self.assertEqual(len(features), FEATURE_DIM)
         self.assertTrue(all(isinstance(item, float) for item in features))
@@ -1170,18 +1215,19 @@ class ArtifactIngestionTests(TestCase):
         self.assertEqual(context['facts']['external_cad_findings'], 1)
         self.assertTrue(learning)
         self.assertEqual(training[0]['kind'], 'drc_finding')
-        self.assertTrue(ProjectEvent.objects.filter(project=self.project, event_type='artifact_ingested').exists())
+        self.assertTrue(
+            ProjectEvent.objects.filter(project=self.project, event_type='artifact_ingested').exists()
+        )
 
     def test_pcad_net_and_closed_binary_stubs_are_normalized(self):
         from Dolg_APP.services.artifact_ingestion import parse_artifact
 
-        net = parse_artifact(self._write_artifact(
-            '.net',
-            '[\nR1\n0805\n10k\n]\n'
-            '[\nC1\n0603\n100n\n]\n'
-            '(\nVCC\nR1-1\nC1-1\n)\n'
-            '(\nGND\nR1-2\nC1-2\n)\n',
-        ))
+        net = parse_artifact(
+            self._write_artifact(
+                '.net',
+                '[\nR1\n0805\n10k\n]\n[\nC1\n0603\n100n\n]\n(\nVCC\nR1-1\nC1-1\n)\n(\nGND\nR1-2\nC1-2\n)\n',
+            )
+        )
         dwg = parse_artifact(self._write_artifact('.dwg', b'AC1027 demo dwg metadata only', binary=True))
         ms14 = parse_artifact(self._write_artifact('.ms14', b'Multisim 14 demo payload', binary=True))
 
@@ -1280,26 +1326,30 @@ class SimulationAnalysisLibraryTests(TestCase):
         self.assertIn('<svg', result['svg'])
 
     def test_bode_service_generates_rc_plot(self):
-        result = bode_plot({
-            'kind': 'rc_lowpass',
-            'resistance_ohm': '10k',
-            'capacitance_f': '100n',
-            'start_hz': 10,
-            'stop_hz': 10000,
-        })
+        result = bode_plot(
+            {
+                'kind': 'rc_lowpass',
+                'resistance_ohm': '10k',
+                'capacitance_f': '100n',
+                'start_hz': 10,
+                'stop_hz': 10000,
+            }
+        )
 
         self.assertTrue(result['ok'])
         self.assertIsNotNone(result['cutoff_frequency_hz'])
         self.assertIn('<svg', result['svg'])
 
     def test_monte_carlo_voltage_divider_returns_statistics(self):
-        result = monte_carlo_tolerance({
-            'kind': 'voltage_divider',
-            'vin': 9,
-            'r1_ohm': '1k',
-            'r2_ohm': '2k',
-            'samples': 250,
-        })
+        result = monte_carlo_tolerance(
+            {
+                'kind': 'voltage_divider',
+                'vin': 9,
+                'r1_ohm': '1k',
+                'r2_ohm': '2k',
+                'samples': 250,
+            }
+        )
 
         self.assertTrue(result['ok'])
         self.assertAlmostEqual(result['mean'], 6, delta=0.4)
@@ -1307,8 +1357,7 @@ class SimulationAnalysisLibraryTests(TestCase):
 
     def test_signal_quality_returns_distortion_metrics(self):
         samples = [
-            math.sin(2 * math.pi * 50 * i / 1000)
-            + 0.05 * math.sin(2 * math.pi * 150 * i / 1000)
+            math.sin(2 * math.pi * 50 * i / 1000) + 0.05 * math.sin(2 * math.pi * 150 * i / 1000)
             for i in range(1000)
         ]
         result = signal_quality(samples, 1000)
@@ -1320,18 +1369,20 @@ class SimulationAnalysisLibraryTests(TestCase):
         self.assertIn('<svg', result['svg'])
 
     def test_parameter_sweep_voltage_divider_returns_svg_and_target(self):
-        result = parameter_sweep({
-            'kind': 'voltage_divider',
-            'vin': 9,
-            'r1_ohm': '1k',
-            'r2_ohm': '1k',
-            'parameter': 'r2_ohm',
-            'start': 500,
-            'stop': 3000,
-            'target_min': 5.5,
-            'target_max': 7.0,
-            'points': 40,
-        })
+        result = parameter_sweep(
+            {
+                'kind': 'voltage_divider',
+                'vin': 9,
+                'r1_ohm': '1k',
+                'r2_ohm': '1k',
+                'parameter': 'r2_ohm',
+                'start': 500,
+                'stop': 3000,
+                'target_min': 5.5,
+                'target_max': 7.0,
+                'points': 40,
+            }
+        )
 
         self.assertTrue(result['ok'])
         self.assertEqual(result['metric'], 'vout')
@@ -1346,14 +1397,16 @@ class SimulationAnalysisLibraryTests(TestCase):
         self.assertAlmostEqual(result['nodeVoltages']['out'], 10 / 3, delta=0.05)
 
     def test_postprocess_simulation_returns_measurements_markers_and_formulas(self):
-        result = postprocess_simulation({
-            'points': [{'x': 0, 'y': 0}, {'x': 1, 'y': 3}, {'x': 2, 'y': -3}],
-            'unit': 'V',
-            'markers': [{'x': 1.2, 'label': 'near peak'}],
-            'formulas': ['rms * 2'],
-            'voltage': 5,
-            'current': 0.02,
-        })
+        result = postprocess_simulation(
+            {
+                'points': [{'x': 0, 'y': 0}, {'x': 1, 'y': 3}, {'x': 2, 'y': -3}],
+                'unit': 'V',
+                'markers': [{'x': 1.2, 'label': 'near peak'}],
+                'formulas': ['rms * 2'],
+                'voltage': 5,
+                'current': 0.02,
+            }
+        )
 
         self.assertTrue(result['ok'])
         self.assertEqual(result['points_count'], 3)
@@ -1439,12 +1492,14 @@ class SimulationAnalysisLibraryTests(TestCase):
 
         response = self.client.post(
             reverse('hello:api_simulation_parameter_sweep'),
-            data=json.dumps({
-                'kind': 'rc_cutoff',
-                'resistance_ohm': '10k',
-                'capacitance_f': '100n',
-                'parameter': 'resistance_ohm',
-            }),
+            data=json.dumps(
+                {
+                    'kind': 'rc_cutoff',
+                    'resistance_ohm': '10k',
+                    'capacitance_f': '100n',
+                    'parameter': 'resistance_ohm',
+                }
+            ),
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
@@ -1505,14 +1560,16 @@ class SimulationAnalysisLibraryTests(TestCase):
 
         response = self.client.post(
             reverse('hello:api_project_measurement_create', args=[project.id]),
-            data=json.dumps({
-                'metric': 'dominant_frequency',
-                'label': 'FFT peak V(out)',
-                'value': 50,
-                'unit': 'Hz',
-                'source': 'pro_fft',
-                'result': {'peak_magnitude': 0.9, 'sample_count': 1000},
-            }),
+            data=json.dumps(
+                {
+                    'metric': 'dominant_frequency',
+                    'label': 'FFT peak V(out)',
+                    'value': 50,
+                    'unit': 'Hz',
+                    'source': 'pro_fft',
+                    'result': {'peak_magnitude': 0.9, 'sample_count': 1000},
+                }
+            ),
             content_type='application/json',
         )
 
@@ -1540,7 +1597,9 @@ class ShareTokenTests(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user('owner', 'o@x', 'pw')
         self.proj = SchematicProject.objects.create(
-            user=self.owner, name='Shared', scheme_data={'components': []},
+            user=self.owner,
+            name='Shared',
+            scheme_data={'components': []},
         )
 
     def test_share_toggle_generates_token(self):
@@ -1555,11 +1614,9 @@ class ShareTokenTests(TestCase):
         self.proj.share_token = 'abc123def456'
         self.proj.save()
         # Read-only страница доступна без логина.
-        resp = self.client.get(reverse('hello:shared_scheme',
-                                       kwargs={'token': self.proj.share_token}))
+        resp = self.client.get(reverse('hello:shared_scheme', kwargs={'token': self.proj.share_token}))
         self.assertEqual(resp.status_code, 200)
 
     def test_invalid_share_token_404(self):
-        resp = self.client.get(reverse('hello:shared_scheme',
-                                       kwargs={'token': 'invalidtoken123'}))
+        resp = self.client.get(reverse('hello:shared_scheme', kwargs={'token': 'invalidtoken123'}))
         self.assertEqual(resp.status_code, 404)

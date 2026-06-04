@@ -21,8 +21,9 @@ class OrderItemInline(admin.TabularInline):
 
     def line_total(self, obj):
         if obj.pk:
-            return f"{obj.get_total_price()} ₽"
+            return f'{obj.get_total_price()} ₽'
         return '—'
+
     line_total.short_description = 'Сумма'
 
 
@@ -79,19 +80,13 @@ class OrderAdmin(admin.ModelAdmin):
     change_list_template = 'admin/orders/order/change_list.html'
 
     fieldsets = (
-        ('Информация о заказе', {
-            'fields': ('order_number', 'user', 'status', 'created_at', 'updated_at')
-        }),
-        ('Адрес доставки', {
-            'fields': ('shipping_address', 'shipping_city', 'shipping_postal_code', 'shipping_country')
-        }),
-        ('Финансы', {
-            'fields': ('total_amount', 'payment_method', 'is_paid')
-        }),
-        ('Комментарии', {
-            'fields': ('notes',),
-            'classes': ('collapse',)
-        }),
+        ('Информация о заказе', {'fields': ('order_number', 'user', 'status', 'created_at', 'updated_at')}),
+        (
+            'Адрес доставки',
+            {'fields': ('shipping_address', 'shipping_city', 'shipping_postal_code', 'shipping_country')},
+        ),
+        ('Финансы', {'fields': ('total_amount', 'payment_method', 'is_paid')}),
+        ('Комментарии', {'fields': ('notes',), 'classes': ('collapse',)}),
     )
 
     def get_queryset(self, request):
@@ -99,6 +94,7 @@ class OrderAdmin(admin.ModelAdmin):
 
     def items_count(self, obj):
         return getattr(obj, '_items_count', obj.items.count())
+
     items_count.short_description = 'Позиций'
 
     def changelist_view(self, request, extra_context=None):
@@ -129,7 +125,8 @@ class OrderItemAdmin(admin.ModelAdmin):
     list_select_related = ('order', 'product')
 
     def line_total(self, obj):
-        return f"{obj.get_total_price()} ₽"
+        return f'{obj.get_total_price()} ₽'
+
     line_total.short_description = 'Сумма'
 
 
@@ -165,15 +162,15 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     def status_badge(self, obj):
         colors = {
             'succeeded': '#28a745',
-            'failed':    '#dc3545',
-            'pending':   '#6c757d',
-            'processing':'#17a2b8',
+            'failed': '#dc3545',
+            'pending': '#6c757d',
+            'processing': '#17a2b8',
             'cancelled': '#999',
-            'refunded':  '#ffc107',
+            'refunded': '#ffc107',
         }
         color = colors.get(obj.status, '#6c757d')
         return format_html(
-            '<span style="color:{}; font-weight:600;">●</span> {}',
-            color, obj.get_status_display()
+            '<span style="color:{}; font-weight:600;">●</span> {}', color, obj.get_status_display()
         )
+
     status_badge.short_description = 'Статус'

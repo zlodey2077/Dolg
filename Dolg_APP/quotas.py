@@ -17,6 +17,7 @@
 
     allowed, reason = check_quota(user, 'simulations')   # ручная проверка
 """
+
 import functools
 from datetime import datetime, time
 
@@ -59,6 +60,7 @@ UNLIMITED = {k: None for k in FREE_TIER}
 
 # ── Tier-detection ─────────────────────────────────────────────────────────
 
+
 def get_user_tier(user) -> str:
     from .services.entitlements import get_effective_plan
 
@@ -99,11 +101,14 @@ def get_user_tier(user) -> str:
     # 2) Подписка любой org куда user входит (Enterprise)
     try:
         from .models import OrganizationMember
+
         org_ids = OrganizationMember.objects.filter(
-            user=user, deactivated_at__isnull=True,
+            user=user,
+            deactivated_at__isnull=True,
         ).values_list('organization_id', flat=True)
         if org_ids:
             from .models import Subscription
+
             org_subs = Subscription.objects.filter(organization_id__in=org_ids)
             for s in org_subs:
                 if s.is_pro_active():
@@ -118,9 +123,9 @@ def get_user_tier(user) -> str:
 def get_tier_config(user) -> dict:
     tier = get_user_tier(user)
     return {
-        'guest':     FREE_TIER,        # для guest пока те же лимиты — middleware блокирует раньше
-        'free':      FREE_TIER,
-        'pro':       PRO_TIER,
+        'guest': FREE_TIER,  # для guest пока те же лимиты — middleware блокирует раньше
+        'free': FREE_TIER,
+        'pro': PRO_TIER,
         'unlimited': UNLIMITED,
     }[tier]
 
@@ -132,10 +137,12 @@ def get_limit(user, key: str):
 
 # ── Live-проверки ──────────────────────────────────────────────────────────
 
+
 def get_today_usage(user):
     """Атомарно возвращает DailyUsage за сегодня. Lazy-import чтобы избежать
     circular-import (models импортирует quotas в декораторах)."""
     from .models import DailyUsage
+
     return DailyUsage.get_today(user)
 
 
@@ -168,16 +175,20 @@ def check_project_limit(user) -> tuple[bool, str]:
     if limit is None:
         return True, ''
     from .models import SchematicProject
+
     # Учитываем только не-soft-deleted
     qs = SchematicProject.objects.filter(user=user)
     try:
-        qs = qs.filter(deleted_at__isnull=True)   # после миграции этапа 3
+        qs = qs.filter(deleted_at__isnull=True)  # после миграции этапа 3
     except Exception:
         pass
     current = qs.count()
     if current >= limit:
-        return False, f'Достигнут лимит {limit} проектов для tier «{get_user_tier(user)}». ' \
-                      f'Удалите старый или повысьте tier.'
+        return (
+            False,
+            f'Достигнут лимит {limit} проектов для tier «{get_user_tier(user)}». '
+            f'Удалите старый или повысьте tier.',
+        )
     return True, ''
 
 
@@ -187,14 +198,15 @@ def check_active_share_links(user) -> tuple[bool, str]:
     if limit is None:
         return True, ''
     from .models import SchematicProject
+
     current = SchematicProject.objects.filter(user=user).exclude(share_token='').count()
     if current >= limit:
-        return False, f'Активных share-link\'ов уже {current} из {limit}. ' \
-                      f'Деактивируйте старый.'
+        return False, f"Активных share-link'ов уже {current} из {limit}. Деактивируйте старый."
     return True, ''
 
 
 # ── Helpers для frontend ───────────────────────────────────────────────────
+
 
 def usage_summary(user) -> dict:
     """Возвращает JSON-сериализуемый summary для UI-баннеров и /api/usage/today/."""
@@ -214,10 +226,12 @@ def usage_summary(user) -> dict:
         }
     usage = get_today_usage(user)
     from .models import SchematicProject
-    projects_count = SchematicProject.objects.filter(user=user).filter(
-        deleted_at__isnull=True
-    ).count() if hasattr(SchematicProject, 'deleted_at') else \
-        SchematicProject.objects.filter(user=user).count()
+
+    projects_count = (
+        SchematicProject.objects.filter(user=user).filter(deleted_at__isnull=True).count()
+        if hasattr(SchematicProject, 'deleted_at')
+        else SchematicProject.objects.filter(user=user).count()
+    )
     active_shares = SchematicProject.objects.filter(user=user).exclude(share_token='').count()
     return {
         'tier': tier,
@@ -239,23 +253,29 @@ def _next_midnight_iso() -> str:
     """ISO-таймстамп следующей полуночи в TZ сервера (для UI «сбросится в…»)."""
     now = timezone.localtime()
     tomorrow = (now + timezone.timedelta(days=1)).date()
-    midnight = timezone.make_aware(datetime.combine(tomorrow, time.min)) \
-        if timezone.is_naive(datetime.combine(tomorrow, time.min)) \
+    midnight = (
+        timezone.make_aware(datetime.combine(tomorrow, time.min))
+        if timezone.is_naive(datetime.combine(tomorrow, time.min))
         else datetime.combine(tomorrow, time.min)
+    )
     return midnight.isoformat()
 
 
 # ── Декораторы для view'ов ─────────────────────────────────────────────────
 
+
 def _quota_error_response(message: str, limit, action: str):
-    return JsonResponse({
-        'ok': False,
-        'error': 'quota_exceeded',
-        'action': action,
-        'limit': limit,
-        'message': message,
-        'resets_at': _next_midnight_iso(),
-    }, status=429)
+    return JsonResponse(
+        {
+            'ok': False,
+            'error': 'quota_exceeded',
+            'action': action,
+            'limit': limit,
+            'message': message,
+            'resets_at': _next_midnight_iso(),
+        },
+        status=429,
+    )
 
 
 def enforce_daily_quota(action: str):
@@ -267,6 +287,7 @@ def enforce_daily_quota(action: str):
     «съедают» лимит, как у big-tech API. Если хотим иначе — переписать
     на context manager.
     """
+
     def decorator(view):
         @functools.wraps(view)
         def wrapper(request, *args, **kwargs):
@@ -277,12 +298,15 @@ def enforce_daily_quota(action: str):
                     return _quota_error_response(reason, limit, action)
                 increment_daily(request.user, action)
             return view(request, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 def enforce_project_limit(view):
     """Декоратор на api_project_create — блокирует если уже max_projects."""
+
     @functools.wraps(view)
     def wrapper(request, *args, **kwargs):
         if request.user.is_authenticated:
@@ -291,4 +315,5 @@ def enforce_project_limit(view):
                 limit = get_limit(request.user, 'max_projects')
                 return _quota_error_response(reason, limit, 'create_project')
         return view(request, *args, **kwargs)
+
     return wrapper

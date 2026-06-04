@@ -7,7 +7,9 @@ from typing import Any
 from .artifact_ingestion import learning_tasks_from_artifact
 
 
-def learning_suggestions_from_artifacts(artifact_reports: list[dict[str, Any]] | None, *, limit: int = 6) -> list[dict[str, Any]]:
+def learning_suggestions_from_artifacts(
+    artifact_reports: list[dict[str, Any]] | None, *, limit: int = 6
+) -> list[dict[str, Any]]:
     suggestions = []
     for report in artifact_reports or []:
         for task in learning_tasks_from_artifact(report, limit=limit):

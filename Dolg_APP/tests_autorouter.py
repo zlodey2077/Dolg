@@ -1,4 +1,5 @@
 """Tests for Block C1: A* PCB autorouter."""
+
 from __future__ import annotations
 
 import pytest
@@ -21,8 +22,7 @@ def _layout_two_pads_with_obstacle():
             {'comp_id': 'B', 'port_id': '1', 'x_mm': 45.0, 'y_mm': 25.0},
         ],
         'comps': [
-            {'id': 'OBST', 'x_left_mm': 20.0, 'y_top_mm': 22.0,
-             'w_mm': 10.0, 'h_mm': 6.0},
+            {'id': 'OBST', 'x_left_mm': 20.0, 'y_top_mm': 22.0, 'w_mm': 10.0, 'h_mm': 6.0},
         ],
     }
 
@@ -30,11 +30,13 @@ def _layout_two_pads_with_obstacle():
 def test_routes_around_obstacle_when_possible():
     """A* должен обогнуть препятствие и не идти прямо через него."""
     layout = _layout_two_pads_with_obstacle()
-    connections = [{
-        'id': 'net1',
-        'from': {'compId': 'A', 'portId': '1'},
-        'to':   {'compId': 'B', 'portId': '1'},
-    }]
+    connections = [
+        {
+            'id': 'net1',
+            'from': {'compId': 'A', 'portId': '1'},
+            'to': {'compId': 'B', 'portId': '1'},
+        }
+    ]
     out = autoroute_layout(layout, connections)
     assert out['autoroute_stats']['routed'] == 1
     assert out['autoroute_stats']['failed'] == 0
@@ -48,8 +50,9 @@ def test_routes_around_obstacle_when_possible():
             x = tr[end]['x_mm']
             y = tr[end]['y_mm']
             # Точка строго внутри bbox (без clearance) — не должно быть
-            assert not (20.1 < x < 29.9 and 22.1 < y < 27.9), \
+            assert not (20.1 < x < 29.9 and 22.1 < y < 27.9), (
                 f'Trace endpoint {x},{y} crossed obstacle interior'
+            )
 
 
 def test_no_connections_yields_empty_traces():
@@ -62,7 +65,9 @@ def test_no_connections_yields_empty_traces():
 def test_unreachable_pad_marked_failed():
     """Если pad окружён препятствиями со всех сторон — failed += 1, не падаем."""
     layout = {
-        'pcb_w_mm': 20.0, 'pcb_h_mm': 20.0, 'trace_width_mm': 0.5,
+        'pcb_w_mm': 20.0,
+        'pcb_h_mm': 20.0,
+        'trace_width_mm': 0.5,
         'pads': [
             {'comp_id': 'A', 'port_id': '1', 'x_mm': 10.0, 'y_mm': 10.0},
             {'comp_id': 'B', 'port_id': '1', 'x_mm': 17.0, 'y_mm': 17.0},
@@ -75,9 +80,9 @@ def test_unreachable_pad_marked_failed():
             {'id': 'W4', 'x_left_mm': 13.0, 'y_top_mm': 7.0, 'w_mm': 1.0, 'h_mm': 6.0},
         ],
     }
-    connections = [{'id': 'blocked',
-                    'from': {'compId': 'A', 'portId': '1'},
-                    'to':   {'compId': 'B', 'portId': '1'}}]
+    connections = [
+        {'id': 'blocked', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}}
+    ]
     out = autoroute_layout(layout, connections)
     stats = out['autoroute_stats']
     assert stats['routed'] == 0
@@ -89,22 +94,20 @@ def test_short_nets_routed_before_long_ones():
     """Greedy ordering: короткие net'ы должны проходить первыми → их пути не
     блокируются длинными.  Проверяем что оба net'а разведены."""
     layout = {
-        'pcb_w_mm': 60.0, 'pcb_h_mm': 60.0, 'trace_width_mm': 0.5,
+        'pcb_w_mm': 60.0,
+        'pcb_h_mm': 60.0,
+        'trace_width_mm': 0.5,
         'pads': [
-            {'comp_id': 'A', 'port_id': '1', 'x_mm': 5.0,  'y_mm': 10.0},
-            {'comp_id': 'A', 'port_id': '2', 'x_mm': 8.0,  'y_mm': 10.0},
+            {'comp_id': 'A', 'port_id': '1', 'x_mm': 5.0, 'y_mm': 10.0},
+            {'comp_id': 'A', 'port_id': '2', 'x_mm': 8.0, 'y_mm': 10.0},
             {'comp_id': 'B', 'port_id': '1', 'x_mm': 55.0, 'y_mm': 50.0},
             {'comp_id': 'C', 'port_id': '1', 'x_mm': 55.0, 'y_mm': 10.0},
         ],
         'comps': [],
     }
     connections = [
-        {'id': 'long',
-         'from': {'compId': 'A', 'portId': '1'},
-         'to':   {'compId': 'B', 'portId': '1'}},
-        {'id': 'short',
-         'from': {'compId': 'A', 'portId': '2'},
-         'to':   {'compId': 'C', 'portId': '1'}},
+        {'id': 'long', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}},
+        {'id': 'short', 'from': {'compId': 'A', 'portId': '2'}, 'to': {'compId': 'C', 'portId': '1'}},
     ]
     out = autoroute_layout(layout, connections)
     assert out['autoroute_stats']['routed'] == 2

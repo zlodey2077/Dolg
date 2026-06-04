@@ -22,11 +22,13 @@ class Command(BaseCommand):
             self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
             return
         style = self.style.SUCCESS if result['ok'] else self.style.ERROR
-        self.stdout.write(style(
-            f"AI dataset validation: scanned={result['scanned']} "
-            f"errors={result['errors_count']} warnings={result['warnings_count']}"
-        ))
+        self.stdout.write(
+            style(
+                f'AI dataset validation: scanned={result["scanned"]} '
+                f'errors={result["errors_count"]} warnings={result["warnings_count"]}'
+            )
+        )
         for row in result['errors'][:10]:
-            self.stdout.write(self.style.ERROR(f"ERROR #{row['id']} {row['code']}: {row['message']}"))
+            self.stdout.write(self.style.ERROR(f'ERROR #{row["id"]} {row["code"]}: {row["message"]}'))
         for row in result['warnings'][:10]:
-            self.stdout.write(self.style.WARNING(f"WARN #{row['id']} {row['code']}: {row['message']}"))
+            self.stdout.write(self.style.WARNING(f'WARN #{row["id"]} {row["code"]}: {row["message"]}'))

@@ -4,6 +4,7 @@ This module is intentionally small and lazy.  It centralises the business
 question "can this user use this capability?" without importing numerical,
 AI or payment stacks at Django startup.
 """
+
 from __future__ import annotations
 
 import functools
@@ -11,7 +12,6 @@ from dataclasses import dataclass
 from typing import Callable, Iterable
 
 from django.http import JsonResponse
-
 
 PLAN_GUEST = 'guest'
 PLAN_FREE = 'free'
@@ -75,12 +75,8 @@ FEATURE_MATRIX = {
     PLAN_UNLIMITED: ENTERPRISE_FEATURES | {'unlimited'},
 }
 
-FEATURE_REQUIRED_PLAN = {
-    feature: PRO_REQUIRED for feature in PRO_FEATURES - FREE_FEATURES
-}
-FEATURE_REQUIRED_PLAN.update({
-    feature: ENTERPRISE_REQUIRED for feature in ENTERPRISE_FEATURES - PRO_FEATURES
-})
+FEATURE_REQUIRED_PLAN = {feature: PRO_REQUIRED for feature in PRO_FEATURES - FREE_FEATURES}
+FEATURE_REQUIRED_PLAN.update({feature: ENTERPRISE_REQUIRED for feature in ENTERPRISE_FEATURES - PRO_FEATURES})
 
 FEATURE_LABELS = {
     'pro_fft': 'FFT spectrum',
@@ -206,6 +202,7 @@ def require_feature(
     organization_getter: Callable | None = None,
 ):
     """Decorator for JSON endpoints and lightweight HTML gates."""
+
     def decorator(view):
         @functools.wraps(view)
         def wrapper(request, *args, **kwargs):
@@ -220,7 +217,9 @@ def require_feature(
             if denied is not None:
                 return denied
             return view(request, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -253,11 +252,9 @@ def _best_plan_from_memberships(user) -> str:
     try:
         from Dolg_APP.models import OrganizationMember
 
-        memberships = (
-            OrganizationMember.objects
-            .filter(user=user, deactivated_at__isnull=True)
-            .select_related('organization')
-        )
+        memberships = OrganizationMember.objects.filter(
+            user=user, deactivated_at__isnull=True
+        ).select_related('organization')
         best = PLAN_FREE
         for membership in memberships:
             plan = _plan_from_org(user, membership.organization)
@@ -274,10 +271,7 @@ def _org_has_active_subscription(organization) -> bool:
     try:
         from Dolg_APP.models import Subscription
 
-        return any(
-            sub.is_pro_active()
-            for sub in Subscription.objects.filter(organization=organization)
-        )
+        return any(sub.is_pro_active() for sub in Subscription.objects.filter(organization=organization))
     except Exception:
         return False
 

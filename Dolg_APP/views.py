@@ -73,9 +73,11 @@ def _simulation_analysis():
 
     return simulation_analysis
 
+
 # ---------------------------------------------------------------------------
 # Page views
 # ---------------------------------------------------------------------------
+
 
 def pcb_editor(request, project_id=None):
     """2026-06-02 Phase 2.1: 2D PCB editor (top/bottom view).
@@ -100,19 +102,22 @@ def pcb_editor(request, project_id=None):
     user_projects = []
     if request.user.is_authenticated:
         user_projects = list(
-            SchematicProject.objects
-            .filter(user=request.user)
+            SchematicProject.objects.filter(user=request.user)
             .order_by('-updated_at')
             .values('id', 'name', 'updated_at')[:30]
         )
 
-    return render(request, 'tools/pcb_editor.html', {
-        'project': project,
-        'scheme_data_json': json.dumps(scheme_data) if scheme_data else 'null',
-        'user_projects': user_projects,
-        'page_title': 'PCB Editor — 2D',
-        'page_description': 'Двумерный редактор печатной платы (top/bottom view, layer toggle).',
-    })
+    return render(
+        request,
+        'tools/pcb_editor.html',
+        {
+            'project': project,
+            'scheme_data_json': json.dumps(scheme_data) if scheme_data else 'null',
+            'user_projects': user_projects,
+            'page_title': 'PCB Editor — 2D',
+            'page_description': 'Двумерный редактор печатной платы (top/bottom view, layer toggle).',
+        },
+    )
 
 
 def news(request):
@@ -122,19 +127,26 @@ def news(request):
     Истёкшие (expires_at < now) скрываются. Pagination 20/страница.
     """
     from django.core.paginator import Paginator
+
     now = timezone.now()
-    qs = Announcement.objects.filter(is_published=True).filter(
-        Q(expires_at__isnull=True) | Q(expires_at__gte=now)
-    ).select_related('author')
+    qs = (
+        Announcement.objects.filter(is_published=True)
+        .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=now))
+        .select_related('author')
+    )
     paginator = Paginator(qs, 20)
     page_num = request.GET.get('page') or 1
     page = paginator.get_page(page_num)
-    return render(request, 'news/list.html', {
-        'announcements': page,
-        'paginator': paginator,
-        'page_obj': page,
-        'page_title': 'Новости DOLG',
-    })
+    return render(
+        request,
+        'news/list.html',
+        {
+            'announcements': page,
+            'paginator': paginator,
+            'page_obj': page,
+            'page_title': 'Новости DOLG',
+        },
+    )
 
 
 @never_cache
@@ -148,7 +160,7 @@ def simulation(request):
         'is_guest_demo': not request.user.is_authenticated,
         'entitlements': feature_summary(request.user),
         'page_title': 'Симуляция электроники',
-        'page_description': 'Инструмент для симуляции поведения электронных компонентов'
+        'page_description': 'Инструмент для симуляции поведения электронных компонентов',
     }
     return render(request, 'tools/simulation.html', context)
 
@@ -162,10 +174,14 @@ def ar_viewer(request):
     телефоне (Android SceneViewer / iOS QuickLook через model-viewer's встроенную
     AR-кнопку) и работает без login: модель остаётся на стороне клиента.
     """
-    return render(request, 'tools/ar_viewer.html', {
-        'model_url': request.GET.get('model', ''),
-        'title': request.GET.get('title', 'DOLG 3D-модель'),
-    })
+    return render(
+        request,
+        'tools/ar_viewer.html',
+        {
+            'model_url': request.GET.get('model', ''),
+            'title': request.GET.get('title', 'DOLG 3D-модель'),
+        },
+    )
 
 
 @ensure_csrf_cookie
@@ -174,53 +190,64 @@ def cad(request):
     смотреть, изменять локально, экспортировать — но save/load/projects
     отключены через is_guest флаг в шаблоне."""
     reb_products = (
-        Product.objects
-        .select_related('category')
-        .filter(category__slug__in=[
-            'resistors', 'capacitors', 'transistors', 'ics',
-            'diodes', 'inductors', 'connectors', 'relays',
-        ])
+        Product.objects.select_related('category')
+        .filter(
+            category__slug__in=[
+                'resistors',
+                'capacitors',
+                'transistors',
+                'ics',
+                'diodes',
+                'inductors',
+                'connectors',
+                'relays',
+            ]
+        )
         .order_by('category__slug', 'price', 'name')[:48]
     )
     catalog = []
     for product in reb_products:
-        catalog.append({
-            'id': product.id,
-            'slug': product.slug,
-            'name': product.name,
-            'part_number': product.part_number,
-            'category': product.category.name,
-            'category_slug': product.category.slug,
-            'manufacturer': product.get_manufacturer_display(),
-            'package_type': product.package_type,
-            'price': float(product.price),
-            'stock': product.stock,
-            'lifecycle_status': product.lifecycle_status,
-            'lifecycle_display': product.get_lifecycle_status_display(),
-            'datasheet_url': product.datasheet_url,
-            'parameters': product.parameters or {},
-            'url': f'/product/{product.slug}/',
-            'image_url': product.image.url if product.image else '',
-        })
+        catalog.append(
+            {
+                'id': product.id,
+                'slug': product.slug,
+                'name': product.name,
+                'part_number': product.part_number,
+                'category': product.category.name,
+                'category_slug': product.category.slug,
+                'manufacturer': product.get_manufacturer_display(),
+                'package_type': product.package_type,
+                'price': float(product.price),
+                'stock': product.stock,
+                'lifecycle_status': product.lifecycle_status,
+                'lifecycle_display': product.get_lifecycle_status_display(),
+                'datasheet_url': product.datasheet_url,
+                'parameters': product.parameters or {},
+                'url': f'/product/{product.slug}/',
+                'image_url': product.image.url if product.image else '',
+            }
+        )
 
     knowledge = []
     try:
         from knowledge.models import Article
+
         for article in (
-            Article.objects
-            .select_related('category')
+            Article.objects.select_related('category')
             .filter(is_published=True)
             .order_by('category__order', 'order', 'title')[:36]
         ):
-            knowledge.append({
-                'title': article.title,
-                'summary': article.summary,
-                'category': article.category.name,
-                'topic': article.category.topic,
-                'slug': article.slug,
-                'url': f'/knowledge/article/{article.slug}/',
-                'related': article.related_components_note,
-            })
+            knowledge.append(
+                {
+                    'title': article.title,
+                    'summary': article.summary,
+                    'category': article.category.name,
+                    'topic': article.category.topic,
+                    'slug': article.slug,
+                    'url': f'/knowledge/article/{article.slug}/',
+                    'related': article.related_components_note,
+                }
+            )
     except Exception:
         knowledge = []
 
@@ -244,7 +271,7 @@ def projects(request):
     context = {
         'user': request.user,
         'page_title': 'Мои проекты',
-        'page_description': 'Управление вашими электронными проектами'
+        'page_description': 'Управление вашими электронными проектами',
     }
     return render(request, 'tools/projects.html', context)
 
@@ -293,6 +320,7 @@ def billing_activate_trial(request):
     from django.contrib import messages
 
     from . import billing as billing_mod
+
     success, msg = billing_mod.activate_trial(request.user)
     (messages.success if success else messages.warning)(request, msg)
     return redirect('hello:billing_plans')
@@ -310,7 +338,7 @@ def billing_activate_pro(request):
 
     try:
         months = max(1, min(12, int(request.POST.get('months', 1))))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         months = 1
 
     if stripe_billing.is_stripe_live():
@@ -338,13 +366,17 @@ def billing_checkout_success(request):
     from django.contrib import messages
 
     from . import billing as billing_mod
+
     sub = billing_mod.get_or_create_subscription(request.user)
 
     session_id = request.GET.get('session_id', '')
     if sub.is_pro_active():
         messages.success(request, f'🎉 Pro-подписка активирована! Действует до {sub.period_end.date()}.')
     elif session_id:
-        messages.info(request, '✓ Платёж принят. Активация обычно занимает несколько секунд — обновите страницу через минуту.')
+        messages.info(
+            request,
+            '✓ Платёж принят. Активация обычно занимает несколько секунд — обновите страницу через минуту.',
+        )
     else:
         messages.warning(request, 'Нет данных о checkout-сессии. Если оплата прошла — обновите страницу.')
     return redirect('hello:billing_plans')
@@ -382,16 +414,20 @@ def billing_stripe_webhook(request):
               customer.subscription.deleted, invoice.payment_failed
     """
     from . import stripe_billing
+
     if not stripe_billing.is_stripe_live():
         # В demo-mode принимаем всё как 200, чтобы локальное тестирование не падало.
         return JsonResponse({'status': 'demo_mode'}, status=200)
 
     import stripe
+
     payload = request.body
     sig = request.META.get('HTTP_STRIPE_SIGNATURE', '')
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig, settings.STRIPE_WEBHOOK_SECRET,
+            payload,
+            sig,
+            settings.STRIPE_WEBHOOK_SECRET,
         )
     except ValueError:
         return JsonResponse({'error': 'invalid_payload'}, status=400)
@@ -460,9 +496,10 @@ def api_ai_find_analogs(request):
 
     from .ml import pipeline
     from .ml.semantic_search import is_semantic_available, semantic_top_k
+
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     pid = data.get('product_id')
     query = (data.get('query') or '').strip()
@@ -490,48 +527,50 @@ def api_ai_find_analogs(request):
             sem_results = sem_results[:top_k]
             if sem_results:
                 backend = 'semantic'
-                products_map = {
-                    p.id: p for p in Product.objects.filter(
-                        id__in=[r[0] for r in sem_results]
-                    )
-                }
+                products_map = {p.id: p for p in Product.objects.filter(id__in=[r[0] for r in sem_results])}
                 results = []
                 for p_id, score in sem_results:
                     p = products_map.get(p_id)
                     if p:
-                        results.append({
-                            'product': p,
-                            'score': round(score, 4),
-                            'why': f'Semantic similarity {score:.3f}',
-                        })
+                        results.append(
+                            {
+                                'product': p,
+                                'score': round(score, 4),
+                                'why': f'Semantic similarity {score:.3f}',
+                            }
+                        )
                 return _serialize_analogs(results, backend=backend)
 
     # Fallback: rule-based feature-vectors
     if source_product is None:
-        return _json_error('Semantic поиск недоступен (нет индекса), нужен product_id для rule-based fallback')
+        return _json_error(
+            'Semantic поиск недоступен (нет индекса), нужен product_id для rule-based fallback'
+        )
     results = pipeline.find_analogs(source_product, top_k=top_k)
     return _serialize_analogs(results, backend=backend)
 
 
 def _serialize_analogs(results, *, backend: str):
-    return JsonResponse({
-        'ok': True,
-        'action': 'find_analogs',
-        'backend': backend,
-        'results': [
-            {
-                'product_id': r['product'].id,
-                'slug': r['product'].slug,
-                'name': r['product'].name,
-                'part_number': r['product'].part_number,
-                'price': float(r['product'].price),
-                'url': f'/product/{r["product"].slug}/',
-                'score': r['score'],
-                'why': r['why'],
-            }
-            for r in results
-        ],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'action': 'find_analogs',
+            'backend': backend,
+            'results': [
+                {
+                    'product_id': r['product'].id,
+                    'slug': r['product'].slug,
+                    'name': r['product'].name,
+                    'part_number': r['product'].part_number,
+                    'price': float(r['product'].price),
+                    'url': f'/product/{r["product"].slug}/',
+                    'score': r['score'],
+                    'why': r['why'],
+                }
+                for r in results
+            ],
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -540,18 +579,21 @@ def _serialize_analogs(results, *, backend: str):
 def api_ai_detect_anomalies(request):
     """POST {scheme_data: {...}} → list[anomaly]"""
     from .ml import pipeline
+
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     anomalies = pipeline.detect_anomalies(scheme_data)
-    return JsonResponse({
-        'ok': True,
-        'action': 'detect_anomalies',
-        'anomalies': anomalies,
-        'total': len(anomalies),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'action': 'detect_anomalies',
+            'anomalies': anomalies,
+            'total': len(anomalies),
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -564,9 +606,10 @@ def api_ai_explain_scheme(request):
     if denied:
         return denied
     from .ml import pipeline
+
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     result = pipeline.explain_scheme(scheme_data)
@@ -583,22 +626,27 @@ def api_ai_recommend_next(request):
     if denied:
         return denied
     from .ml import pipeline
+
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     recs = pipeline.recommend_next_component(scheme_data)
-    return JsonResponse({
-        'ok': True, 'action': 'recommend_next_component',
-        'recommendations': recs,
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'action': 'recommend_next_component',
+            'recommendations': recs,
+        }
+    )
 
 
 def api_ai_pipeline_info(request):
     """GET → {backend, model_version, capabilities}. Без auth, открыт всем
     (метаданные о pipeline, без секретов)."""
     from .ml import pipeline
+
     return JsonResponse({'ok': True, **pipeline.info()})
 
 
@@ -616,16 +664,17 @@ PRO_COMMENT_MAX_LEN = 5000
 
 def _comment_to_dict(c, request_user=None):
     from moderation.services import display_body, is_content_visible_to
+
     body = display_body(c, request_user)
     is_visible = is_content_visible_to(c, request_user)
     return {
         'id': c.id,
         'user': {
             'username': c.user.username,
-            'avatar_url': (c.user.profile.avatar.url
-                           if hasattr(c.user, 'profile') and c.user.profile.avatar
-                           else ''),
-            'is_pro': c.is_rich,   # rich-comment ≡ автор был Pro в момент написания
+            'avatar_url': (
+                c.user.profile.avatar.url if hasattr(c.user, 'profile') and c.user.profile.avatar else ''
+            ),
+            'is_pro': c.is_rich,  # rich-comment ≡ автор был Pro в момент написания
         },
         'body': body,
         'body_html': c.render_html() if is_visible else body,
@@ -643,6 +692,7 @@ def api_comments_list(request):
     from moderation.services import visible_queryset
 
     from .models import Comment
+
     project_id = request.GET.get('project')
     article_id = request.GET.get('article')
     qs = Comment.objects.select_related('user', 'user__profile').order_by('created_at')
@@ -665,9 +715,10 @@ def api_comments_create(request):
 
     from .models import Comment
     from .quotas import get_user_tier
+
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     if user_is_restricted(request.user, 'write'):
@@ -681,11 +732,14 @@ def api_comments_create(request):
     is_pro = tier in ('pro', 'unlimited')
     max_len = PRO_COMMENT_MAX_LEN if is_pro else FREE_COMMENT_MAX_LEN
     if len(body) > max_len:
-        return JsonResponse({
-            'ok': False, 'error': 'too_long',
-            'message': f'Превышен лимит {max_len} символов для tier «{tier}». '
-                       f'У вас {len(body)}.',
-        }, status=400)
+        return JsonResponse(
+            {
+                'ok': False,
+                'error': 'too_long',
+                'message': f'Превышен лимит {max_len} символов для tier «{tier}». У вас {len(body)}.',
+            },
+            status=400,
+        )
 
     project_id = data.get('project')
     article_id = data.get('article')
@@ -702,11 +756,14 @@ def api_comments_create(request):
     if project_id:
         # Проверим, что проект существует и видим юзеру (свой / shared / public)
         project = _project_for_read(request.user, project_id)
-        if project.organization_id and user_is_restricted(request.user, 'write', organization=project.organization):
+        if project.organization_id and user_is_restricted(
+            request.user, 'write', organization=project.organization
+        ):
             return _json_error('Ваш аккаунт временно ограничен модератором в этой команде.', status=403)
         kwargs['project'] = project
     else:
         from knowledge.models import Article
+
         try:
             Article.objects.get(pk=article_id)
         except Article.DoesNotExist:
@@ -715,11 +772,16 @@ def api_comments_create(request):
 
     comment = Comment.objects.create(**kwargs)
     if project_id:
-        _log_project_event(comment.project, request.user, 'comment_added', {
-            'comment_id': comment.id,
-            'parent_id': comment.parent_id,
-            'is_rich': comment.is_rich,
-        })
+        _log_project_event(
+            comment.project,
+            request.user,
+            'comment_added',
+            {
+                'comment_id': comment.id,
+                'parent_id': comment.parent_id,
+                'is_rich': comment.is_rich,
+            },
+        )
     return JsonResponse({'ok': True, 'comment': _comment_to_dict(comment, request.user)})
 
 
@@ -729,6 +791,7 @@ def api_comments_delete(request, pk):
     """POST → soft-delete (физ.удаление) собственного комментария.
     Только автор или staff."""
     from .models import Comment
+
     comment = get_object_or_404(Comment, pk=pk)
     if comment.user_id != request.user.id and not request.user.is_staff:
         return _json_error('forbidden', status=403)
@@ -736,7 +799,9 @@ def api_comments_delete(request, pk):
         comment.delete()
         return JsonResponse({'ok': True, 'purged': True})
     comment.moderation_status = 'removed'
-    comment.moderation_reason = 'Удалено пользователем' if comment.user_id == request.user.id else 'Удалено модератором'
+    comment.moderation_reason = (
+        'Удалено пользователем' if comment.user_id == request.user.id else 'Удалено модератором'
+    )
     comment.moderated_by = request.user
     comment.moderated_at = timezone.now()
     comment.save(update_fields=['moderation_status', 'moderation_reason', 'moderated_by', 'moderated_at'])
@@ -762,6 +827,7 @@ def pcb_view(request, project_id):
     """Просмотр PCB-разводки проекта. Авто-расстановка из scheme_data,
     отрисовка в SVG (для печати/сохранения), кнопка скачать Gerber+drill."""
     from . import pcb_layout
+
     project = _project_for_read(request.user, project_id)
     layout = pcb_layout.compute_pcb_layout(project.scheme_data)
     context = {
@@ -781,6 +847,7 @@ def pcb_gerber_download(request, project_id):
     from io import BytesIO
 
     from . import pcb_layout
+
     project = _project_for_read(request.user, project_id)
     layout = pcb_layout.compute_pcb_layout(project.scheme_data)
 
@@ -789,6 +856,7 @@ def pcb_gerber_download(request, project_id):
     is_pro_branding = False
     try:
         from .quotas import get_user_tier
+
         if get_user_tier(request.user) in ('pro', 'unlimited'):
             if hasattr(request.user, 'profile') and request.user.profile.pro_logo:
                 pro_logo_path = request.user.profile.pro_logo.path
@@ -832,7 +900,7 @@ def pcb_gerber_download(request, project_id):
                     ext = pro_logo_path.rsplit('.', 1)[-1]
                     zf.writestr(f'logo.{ext}', f.read())
             except Exception:
-                pass   # не валим экспорт если файл недоступен
+                pass  # не валим экспорт если файл недоступен
 
     response = HttpResponse(buf.getvalue(), content_type='application/zip')
     response['Content-Disposition'] = f'attachment; filename="dolg_pcb_{project.id}.zip"'
@@ -848,17 +916,20 @@ def api_pcb_autoroute(request, project_id):
     """
     from . import pcb_layout
     from .services.autorouter import autoroute_layout
+
     project = _project_for_read(request.user, project_id)
     base_layout = pcb_layout.compute_pcb_layout(project.scheme_data)
     connections = (project.scheme_data or {}).get('connections', []) or []
     new_layout = autoroute_layout(base_layout, connections)
-    return JsonResponse({
-        'ok': True,
-        'stats': new_layout.get('autoroute_stats', {}),
-        'traces': new_layout.get('traces', []),
-        'pcb_w_mm': new_layout.get('pcb_w_mm'),
-        'pcb_h_mm': new_layout.get('pcb_h_mm'),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'stats': new_layout.get('autoroute_stats', {}),
+            'traces': new_layout.get('traces', []),
+            'pcb_w_mm': new_layout.get('pcb_w_mm'),
+            'pcb_h_mm': new_layout.get('pcb_h_mm'),
+        }
+    )
 
 
 def shared_scheme(request, token):
@@ -874,6 +945,7 @@ def shared_scheme(request, token):
     if not token or len(token) < 8:
         # Защита от accidental пустого токена в URL.
         from django.http import Http404
+
         raise Http404('Invalid share token')
     context = {
         'user': request.user,
@@ -893,35 +965,46 @@ def api_project_share_toggle(request, pk):
     """Включает / выключает sharing проекта. Возвращает токен (или пустую
     строку если выключен). Только владелец может управлять шарингом."""
     import secrets
+
     project = _project_for_write(request.user, pk)
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         data = {}
     enable = bool(data.get('enable', True))
     if enable and not project.share_token:
         # Лимит активных share-link'ов tier'а (Free: 5)
         allowed, reason = check_active_share_links(request.user)
         if not allowed:
-            return JsonResponse({
-                'ok': False, 'error': 'quota_exceeded', 'message': reason,
-                'limit': get_limit(request.user, 'max_active_share_links'),
-            }, status=400)
+            return JsonResponse(
+                {
+                    'ok': False,
+                    'error': 'quota_exceeded',
+                    'message': reason,
+                    'limit': get_limit(request.user, 'max_active_share_links'),
+                },
+                status=400,
+            )
         # Генерация: 16 байт URL-safe = 22 символа base64 без padding.
         project.share_token = secrets.token_urlsafe(16)
     elif not enable:
         project.share_token = ''
     project.save(update_fields=['share_token', 'updated_at'])
-    return JsonResponse({
-        'ok': True,
-        'token': project.share_token,
-        'url': request.build_absolute_uri('/s/' + project.share_token + '/') if project.share_token else '',
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'token': project.share_token,
+            'url': request.build_absolute_uri('/s/' + project.share_token + '/')
+            if project.share_token
+            else '',
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # JSON API helpers
 # ---------------------------------------------------------------------------
+
 
 def _project_to_dict(p):
     return {
@@ -964,7 +1047,12 @@ def _find_dwg_converter():
     installed converter. ODA File Converter is the preferred path; LibreDWG's
     dwg2dxf is also supported when present in PATH.
     """
-    for name in ('ODAFileConverter', 'ODAFileConverter.exe', 'TeighaFileConverter', 'TeighaFileConverter.exe'):
+    for name in (
+        'ODAFileConverter',
+        'ODAFileConverter.exe',
+        'TeighaFileConverter',
+        'TeighaFileConverter.exe',
+    ):
         exe = shutil.which(name)
         if exe:
             return 'oda', exe
@@ -1049,6 +1137,7 @@ def _project_for_read(user, pk):
             return candidate
     # Иначе нет доступа
     from django.http import Http404
+
     raise Http404('No read access')
 
 
@@ -1065,9 +1154,11 @@ def _project_for_write(user, pk):
     # 2) team-проект + user имеет project.edit_team в org
     if candidate.organization_id:
         from .org_permissions import user_can
+
         if user_can(user, candidate.organization, 'project.edit_team'):
             return candidate
     from django.http import Http404
+
     raise Http404('No write access')
 
 
@@ -1097,7 +1188,7 @@ def _read_json_payload(request):
         return {}
     try:
         return json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return {}
 
 
@@ -1226,14 +1317,19 @@ def _create_project_review(project, user, import_summary=None):
         scheme_data=project.scheme_data,
         import_summary=import_summary or {},
     )
-    _log_project_event(project, user, 'review_created', {
-        'review_id': review.id,
-        'score': review.score,
-        'status': review.status,
-        'errors': len(review.errors or []),
-        'warnings': len(review.warnings or []),
-        'url': reverse('hello:project_review_page', args=[review.id]),
-    })
+    _log_project_event(
+        project,
+        user,
+        'review_created',
+        {
+            'review_id': review.id,
+            'score': review.score,
+            'status': review.status,
+            'errors': len(review.errors or []),
+            'warnings': len(review.warnings or []),
+            'url': reverse('hello:project_review_page', args=[review.id]),
+        },
+    )
     return review
 
 
@@ -1250,6 +1346,7 @@ def _review_for_read(user, review_id):
 # API endpoints — все требуют авторизации, все отдают JSON
 # ---------------------------------------------------------------------------
 
+
 @login_required(login_url='accounts:login')
 @require_GET
 def api_projects_list(request):
@@ -1264,6 +1361,7 @@ def api_projects_list(request):
     elif org_slug:
         # Конкретная org — проверим membership
         from .models import Organization
+
         try:
             org = Organization.objects.get(slug=org_slug)
         except Organization.DoesNotExist:
@@ -1274,10 +1372,11 @@ def api_projects_list(request):
     else:
         # Default: личные + demo + все team-проекты org куда user входит
         from .models import OrganizationMember
+
         org_ids = list(
-            OrganizationMember.objects
-            .filter(user=request.user, deactivated_at__isnull=True)
-            .values_list('organization_id', flat=True)
+            OrganizationMember.objects.filter(user=request.user, deactivated_at__isnull=True).values_list(
+                'organization_id', flat=True
+            )
         )
         qs = SchematicProject.objects.filter(
             Q(user=request.user)
@@ -1286,11 +1385,13 @@ def api_projects_list(request):
         ).distinct()
 
     qs = qs.select_related('user', 'organization')
-    return JsonResponse({
-        'ok': True,
-        'projects': [_project_to_dict(p) for p in qs],
-        'quota': quota_dict(request.user),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'projects': [_project_to_dict(p) for p in qs],
+            'quota': quota_dict(request.user),
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1299,7 +1400,7 @@ def api_projects_list(request):
 def api_project_create(request):
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     name = data.get('name', '').strip()
@@ -1314,15 +1415,20 @@ def api_project_create(request):
     if org_slug:
         from .models import Organization
         from .org_permissions import user_can
+
         try:
             organization = Organization.objects.get(slug=org_slug)
         except Organization.DoesNotExist:
             return _json_error('Organization not found', status=404)
         if not user_can(request.user, organization, 'project.create'):
-            return JsonResponse({
-                'ok': False, 'error': 'permission_denied',
-                'message': f'У вас нет прав создавать проекты в {organization.name}',
-            }, status=403)
+            return JsonResponse(
+                {
+                    'ok': False,
+                    'error': 'permission_denied',
+                    'message': f'У вас нет прав создавать проекты в {organization.name}',
+                },
+                status=403,
+            )
         # Team-проект — visibility=team по умолчанию (или public если запрошен)
         if visibility == 'private':
             visibility = 'team'
@@ -1337,19 +1443,27 @@ def api_project_create(request):
         organization=organization,
         visibility=visibility,
     )
-    _log_project_event(project, request.user, 'project_created', {
-        'name': project.name,
-        'category': project.category,
-        'visibility': project.visibility,
-    })
+    _log_project_event(
+        project,
+        request.user,
+        'project_created',
+        {
+            'name': project.name,
+            'category': project.category,
+            'visibility': project.visibility,
+        },
+    )
 
     # Audit log для team-проектов
     if organization:
         from .models import AuditLog
+
         AuditLog.log(
-            actor=request.user, action='project.create',
+            actor=request.user,
+            action='project.create',
             organization=organization,
-            object_type='SchematicProject', object_id=project.id,
+            object_type='SchematicProject',
+            object_id=project.id,
             payload={'name': project.name, 'visibility': project.visibility},
             request=request,
         )
@@ -1364,18 +1478,25 @@ def api_project_update(request, pk):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     for field in ('name', 'description', 'category', 'status'):
         if field in data:
             setattr(project, field, data[field])
     project.save()
-    _log_project_event(project, request.user, 'project_updated', {
-        'name': project.name,
-        'status': project.status,
-        'changed_fields': [field for field in ('name', 'description', 'category', 'status') if field in data],
-    })
+    _log_project_event(
+        project,
+        request.user,
+        'project_updated',
+        {
+            'name': project.name,
+            'status': project.status,
+            'changed_fields': [
+                field for field in ('name', 'description', 'category', 'status') if field in data
+            ],
+        },
+    )
     return JsonResponse({'ok': True, 'project': _project_to_dict(project)})
 
 
@@ -1387,11 +1508,13 @@ def api_project_delete(request, pk):
     /projects/api/<pk>/purge/ (без возврата)."""
     project = _project_for_write(request.user, pk)
     project.soft_delete()
-    return JsonResponse({
-        'ok': True,
-        'soft_deleted': True,
-        'message': f'Проект «{project.name}» в корзине. Восстановить можно в течение 30 дней.',
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'soft_deleted': True,
+            'message': f'Проект «{project.name}» в корзине. Восстановить можно в течение 30 дней.',
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1400,14 +1523,18 @@ def api_project_restore(request, pk):
     """Возвращает проект из корзины (deleted_at=None)."""
     project = get_object_or_404(
         SchematicProject.all_objects,
-        pk=pk, user=request.user, deleted_at__isnull=False,
+        pk=pk,
+        user=request.user,
+        deleted_at__isnull=False,
     )
     project.restore()
-    return JsonResponse({
-        'ok': True,
-        'project': _project_to_dict(project),
-        'message': f'Проект «{project.name}» восстановлен.',
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'project': _project_to_dict(project),
+            'message': f'Проект «{project.name}» восстановлен.',
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1416,7 +1543,9 @@ def api_project_purge(request, pk):
     """Физическое удаление soft-deleted проекта. После этого восстановить нельзя."""
     project = get_object_or_404(
         SchematicProject.all_objects,
-        pk=pk, user=request.user, deleted_at__isnull=False,
+        pk=pk,
+        user=request.user,
+        deleted_at__isnull=False,
     )
     name = project.name
     project.delete()  # реальное удаление из БД
@@ -1428,12 +1557,15 @@ def api_project_purge(request, pk):
 def api_project_trash_list(request):
     """Список soft-deleted проектов (для UI «Корзина»)."""
     qs = SchematicProject.all_objects.filter(
-        user=request.user, deleted_at__isnull=False,
+        user=request.user,
+        deleted_at__isnull=False,
     ).order_by('-deleted_at')[:50]
-    return JsonResponse({
-        'ok': True,
-        'projects': [_project_to_dict(p) for p in qs],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'projects': [_project_to_dict(p) for p in qs],
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1443,7 +1575,7 @@ def api_project_save_scheme(request, pk):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data', {})
@@ -1461,19 +1593,28 @@ def api_project_save_scheme(request, pk):
     max_components = get_limit(request.user, 'max_components_per_scheme')
     max_sheets = get_limit(request.user, 'max_sheets_per_project')
     if max_components is not None and len(components) > max_components:
-        return JsonResponse({
-            'ok': False, 'error': 'quota_exceeded',
-            'message': f'Free-tier: до {max_components} компонентов на схему. '
-                       f'У вас {len(components)}. Удалите лишние или upgrade.',
-            'limit': max_components, 'current': len(components),
-        }, status=400)
+        return JsonResponse(
+            {
+                'ok': False,
+                'error': 'quota_exceeded',
+                'message': f'Free-tier: до {max_components} компонентов на схему. '
+                f'У вас {len(components)}. Удалите лишние или upgrade.',
+                'limit': max_components,
+                'current': len(components),
+            },
+            status=400,
+        )
     if max_sheets is not None and len(sheets) > max_sheets:
-        return JsonResponse({
-            'ok': False, 'error': 'quota_exceeded',
-            'message': f'Free-tier: до {max_sheets} листов на проект. '
-                       f'У вас {len(sheets)}.',
-            'limit': max_sheets, 'current': len(sheets),
-        }, status=400)
+        return JsonResponse(
+            {
+                'ok': False,
+                'error': 'quota_exceeded',
+                'message': f'Free-tier: до {max_sheets} листов на проект. У вас {len(sheets)}.',
+                'limit': max_sheets,
+                'current': len(sheets),
+            },
+            status=400,
+        )
 
     project.scheme_data = scheme_data
     project.save(update_fields=['scheme_data', 'updated_at'])
@@ -1483,20 +1624,24 @@ def api_project_save_scheme(request, pk):
         scheme_data=scheme_data,
         change_note=data.get('change_note', 'Сохранение из редактора'),
     )
-    _log_project_event(project, request.user, 'scheme_saved', {
-        'version_number': version.version_number,
-        'components': len(components),
-        'connections': len(scheme_data.get('connections') or []),
-        'sheets': len(sheets),
-        'drc_ok': drc.get('ok', False),
-    })
+    _log_project_event(
+        project,
+        request.user,
+        'scheme_saved',
+        {
+            'version_number': version.version_number,
+            'components': len(components),
+            'connections': len(scheme_data.get('connections') or []),
+            'sheets': len(sheets),
+            'drc_ok': drc.get('ok', False),
+        },
+    )
 
     # Trim истории до max_history_versions — Free: 10, Pro: 100
     max_versions = get_limit(request.user, 'max_history_versions')
     if max_versions is not None:
         excess_ids = list(
-            project.versions.order_by('-version_number')
-            .values_list('id', flat=True)[max_versions:]
+            project.versions.order_by('-version_number').values_list('id', flat=True)[max_versions:]
         )
         if excess_ids:
             ProjectVersion.objects.filter(id__in=excess_ids).delete()
@@ -1508,11 +1653,13 @@ def api_project_save_scheme(request, pk):
 @require_GET
 def api_project_load_scheme(request, pk):
     project = _project_for_read(request.user, pk)
-    return JsonResponse({
-        'ok': True,
-        'scheme_data': project.scheme_data,
-        'project': _project_to_dict(project),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'scheme_data': project.scheme_data,
+            'project': _project_to_dict(project),
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1520,18 +1667,20 @@ def api_project_load_scheme(request, pk):
 def api_project_versions(request, pk):
     project = _project_for_read(request.user, pk)
     versions = project.versions.all()[:25]
-    return JsonResponse({
-        'ok': True,
-        'versions': [
-            {
-                'id': version.id,
-                'version_number': version.version_number,
-                'change_note': version.change_note,
-                'created': version.created_at.isoformat(),
-            }
-            for version in versions
-        ],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'versions': [
+                {
+                    'id': version.id,
+                    'version_number': version.version_number,
+                    'change_note': version.change_note,
+                    'created': version.created_at.isoformat(),
+                }
+                for version in versions
+            ],
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1546,42 +1695,44 @@ def api_project_dashboard(request, pk):
     except Exception:
         comments_count = 0
     runs = project.simulation_runs.select_related('user')[:10]
-    return JsonResponse({
-        'ok': True,
-        'project': _project_to_dict(project),
-        'scheme': {
-            'components': len((project.scheme_data or {}).get('components') or []),
-            'connections': len((project.scheme_data or {}).get('connections') or []),
-            'has_scheme': bool(project.scheme_data),
-        },
-        'versions': [
-            {
-                'id': version.id,
-                'version_number': version.version_number,
-                'change_note': version.change_note,
-                'created': version.created_at.isoformat(),
-            }
-            for version in project.versions.all()[:8]
-        ],
-        'simulation_runs': [
-            {
-                'id': run.id,
-                'analysis_type': run.analysis_type,
-                'engine': run.engine,
-                'elapsed_ms': run.elapsed_ms,
-                'status': run.status,
-                'progress_percent': run.progress_percent,
-                'message': run.message,
-                'created': run.created_at.isoformat(),
-            }
-            for run in runs
-        ],
-        'measurements': [_measurement_to_dict(item) for item in project.measurements.all()[:12]],
-        'latest_review': _review_to_dict(latest_review) if latest_review else None,
-        'bom': ((latest_review.sections or {}).get('bom') if latest_review else {}) or {},
-        'comments_count': comments_count,
-        'events': [_event_to_dict(item) for item in project.events.select_related('user')[:20]],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'project': _project_to_dict(project),
+            'scheme': {
+                'components': len((project.scheme_data or {}).get('components') or []),
+                'connections': len((project.scheme_data or {}).get('connections') or []),
+                'has_scheme': bool(project.scheme_data),
+            },
+            'versions': [
+                {
+                    'id': version.id,
+                    'version_number': version.version_number,
+                    'change_note': version.change_note,
+                    'created': version.created_at.isoformat(),
+                }
+                for version in project.versions.all()[:8]
+            ],
+            'simulation_runs': [
+                {
+                    'id': run.id,
+                    'analysis_type': run.analysis_type,
+                    'engine': run.engine,
+                    'elapsed_ms': run.elapsed_ms,
+                    'status': run.status,
+                    'progress_percent': run.progress_percent,
+                    'message': run.message,
+                    'created': run.created_at.isoformat(),
+                }
+                for run in runs
+            ],
+            'measurements': [_measurement_to_dict(item) for item in project.measurements.all()[:12]],
+            'latest_review': _review_to_dict(latest_review) if latest_review else None,
+            'bom': ((latest_review.sections or {}).get('bom') if latest_review else {}) or {},
+            'comments_count': comments_count,
+            'events': [_event_to_dict(item) for item in project.events.select_related('user')[:20]],
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1589,26 +1740,28 @@ def api_project_dashboard(request, pk):
 def api_project_simulation_runs(request, pk):
     project = _project_for_read(request.user, pk)
     runs = project.simulation_runs.select_related('user')[:25]
-    return JsonResponse({
-        'ok': True,
-        'runs': [
-            {
-                'id': run.id,
-                'analysis_type': run.analysis_type,
-                'engine': run.engine,
-                'elapsed_ms': run.elapsed_ms,
-                'status': run.status,
-                'progress_percent': run.progress_percent,
-                'message': run.message,
-                'summary': run.result_summary,
-                'warnings': run.warnings,
-                'started': run.started_at.isoformat() if run.started_at else None,
-                'finished': run.finished_at.isoformat() if run.finished_at else None,
-                'created': run.created_at.isoformat(),
-            }
-            for run in runs
-        ],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'runs': [
+                {
+                    'id': run.id,
+                    'analysis_type': run.analysis_type,
+                    'engine': run.engine,
+                    'elapsed_ms': run.elapsed_ms,
+                    'status': run.status,
+                    'progress_percent': run.progress_percent,
+                    'message': run.message,
+                    'summary': run.result_summary,
+                    'warnings': run.warnings,
+                    'started': run.started_at.isoformat() if run.started_at else None,
+                    'finished': run.finished_at.isoformat() if run.finished_at else None,
+                    'created': run.created_at.isoformat(),
+                }
+                for run in runs
+            ],
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1626,7 +1779,7 @@ def api_project_save_simulation(request, pk):
     project = _project_for_write(request.user, pk)
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     result = data.get('result', {})
@@ -1639,7 +1792,9 @@ def api_project_save_simulation(request, pk):
         engine=data.get('engine', ''),
         elapsed_ms=max(0, int(data.get('elapsed_ms') or 0)),
         status=status,
-        progress_percent=max(0, min(100, int(data.get('progress_percent') or (100 if status == 'success' else 0)))),
+        progress_percent=max(
+            0, min(100, int(data.get('progress_percent') or (100 if status == 'success' else 0)))
+        ),
         message=(data.get('message') or '')[:240],
         started_at=now,
         finished_at=now if status in {'success', 'error'} else None,
@@ -1648,26 +1803,33 @@ def api_project_save_simulation(request, pk):
         result_data=result,
         warnings=data.get('warnings') or result.get('warnings') or [],
     )
-    _log_project_event(project, request.user, 'simulation_run', {
-        'run_id': run.id,
-        'analysis_type': run.analysis_type,
-        'engine': run.engine,
-        'status': run.status,
-        'elapsed_ms': run.elapsed_ms,
-        'progress_percent': run.progress_percent,
-    })
-    return JsonResponse({
-        'ok': True,
-        'run': {
-            'id': run.id,
+    _log_project_event(
+        project,
+        request.user,
+        'simulation_run',
+        {
+            'run_id': run.id,
             'analysis_type': run.analysis_type,
             'engine': run.engine,
-            'elapsed_ms': run.elapsed_ms,
             'status': run.status,
+            'elapsed_ms': run.elapsed_ms,
             'progress_percent': run.progress_percent,
-            'created': run.created_at.isoformat(),
         },
-    })
+    )
+    return JsonResponse(
+        {
+            'ok': True,
+            'run': {
+                'id': run.id,
+                'analysis_type': run.analysis_type,
+                'engine': run.engine,
+                'elapsed_ms': run.elapsed_ms,
+                'status': run.status,
+                'progress_percent': run.progress_percent,
+                'created': run.created_at.isoformat(),
+            },
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1707,12 +1869,17 @@ def api_project_simulation_postprocess(request, pk):
         )
         saved.append(_measurement_to_dict(measurement))
 
-    _log_project_event(project, request.user, 'measurement_added', {
-        'source': 'postprocess',
-        'simulation_run_id': run.id if run else None,
-        'measurements': len(saved),
-        'metrics': list((result.get('metrics') or {}).keys()),
-    })
+    _log_project_event(
+        project,
+        request.user,
+        'measurement_added',
+        {
+            'source': 'postprocess',
+            'simulation_run_id': run.id if run else None,
+            'measurements': len(saved),
+            'metrics': list((result.get('metrics') or {}).keys()),
+        },
+    )
     return JsonResponse({'ok': True, 'postprocess': result, 'measurements': saved})
 
 
@@ -1724,11 +1891,16 @@ def api_project_simulation_export_csv(request, pk, run_id):
     csv_text = _simulation_analysis().simulation_result_to_csv(run.result_data or {})
     response = HttpResponse(csv_text, content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="dolg_simulation_{run.id}.csv"'
-    _log_project_event(project, request.user, 'simulation_run', {
-        'run_id': run.id,
-        'action': 'csv_export',
-        'analysis_type': run.analysis_type,
-    })
+    _log_project_event(
+        project,
+        request.user,
+        'simulation_run',
+        {
+            'run_id': run.id,
+            'action': 'csv_export',
+            'analysis_type': run.analysis_type,
+        },
+    )
     return response
 
 
@@ -1736,10 +1908,12 @@ def api_project_simulation_export_csv(request, pk, run_id):
 @require_GET
 def api_project_measurements(request, pk):
     project = _project_for_read(request.user, pk)
-    return JsonResponse({
-        'ok': True,
-        'measurements': [_measurement_to_dict(item) for item in project.measurements.all()[:50]],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'measurements': [_measurement_to_dict(item) for item in project.measurements.all()[:50]],
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1752,7 +1926,7 @@ def api_project_measurement_create(request, pk):
         return _json_error('metric is required')
     try:
         value = float(data.get('value'))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _json_error('value must be numeric')
 
     expected = data.get('expected_value')
@@ -1765,7 +1939,7 @@ def api_project_measurement_create(request, pk):
         expected_num = float(expected) if expected not in (None, '') else None
         tolerance_abs_num = float(tolerance_abs) if tolerance_abs not in (None, '') else None
         tolerance_percent_num = float(tolerance_percent) if tolerance_percent not in (None, '') else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _json_error('expected/tolerance fields must be numeric')
 
     result = data.get('result') if isinstance(data.get('result'), dict) else {}
@@ -1802,15 +1976,20 @@ def api_project_measurement_create(request, pk):
         source=(data.get('source') or 'manual')[:40],
         result=result,
     )
-    _log_project_event(project, request.user, 'measurement_added', {
-        'measurement_id': item.id,
-        'metric': item.metric,
-        'label': item.label,
-        'value': item.value,
-        'unit': item.unit,
-        'status': item.status,
-        'simulation_run_id': item.simulation_run_id,
-    })
+    _log_project_event(
+        project,
+        request.user,
+        'measurement_added',
+        {
+            'measurement_id': item.id,
+            'metric': item.metric,
+            'label': item.label,
+            'value': item.value,
+            'unit': item.unit,
+            'status': item.status,
+            'simulation_run_id': item.simulation_run_id,
+        },
+    )
     return JsonResponse({'ok': True, 'measurement': _measurement_to_dict(item)})
 
 
@@ -1889,7 +2068,9 @@ def api_simulation_fallback_solve(request):
     if denied:
         return denied
     data = _read_json_payload(request)
-    result = _simulation_analysis().server_side_dc_fallback(data.get('scheme_data') or data.get('scheme') or {})
+    result = _simulation_analysis().server_side_dc_fallback(
+        data.get('scheme_data') or data.get('scheme') or {}
+    )
     return JsonResponse(result, status=200 if result.get('ok') else 400)
 
 
@@ -1919,13 +2100,17 @@ def api_project_review_latest(request, pk):
 @login_required(login_url='accounts:login')
 def project_review_page(request, review_id):
     review = _review_for_read(request.user, review_id)
-    return render(request, 'tools/project_review.html', {
-        'review': review,
-        'review_display': _review_to_dict(review),
-        'project': review.project,
-        'learning_suggestions': learning_suggestions_from_review(review),
-        'page_title': f'Проверка схемы: {review.project.name}',
-    })
+    return render(
+        request,
+        'tools/project_review.html',
+        {
+            'review': review,
+            'review_display': _review_to_dict(review),
+            'project': review.project,
+            'learning_suggestions': learning_suggestions_from_review(review),
+            'page_title': f'Проверка схемы: {review.project.name}',
+        },
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -1991,25 +2176,22 @@ def project_review_pdf(request, review_id):
     draw_list(
         'Экспертные правила',
         [
-            f"{item.get('rule_id')} [{item.get('severity_label')}]: "
-            f"{item.get('title')} - {item.get('recommendation')}"
+            f'{item.get("rule_id")} [{item.get("severity_label")}]: '
+            f'{item.get("title")} - {item.get("recommendation")}'
             for item in review_display.get('expert_findings') or []
         ],
     )
     draw_list(
         'Источники проверки',
         [
-            f"{item.get('rule_id')}: {source.get('title')} - {source.get('url')}"
+            f'{item.get("rule_id")}: {source.get("title")} - {source.get("url")}'
             for item in review_display.get('expert_findings') or []
             for source in (item.get('source_references') or [])[:3]
         ],
     )
     draw_list(
         'Сценарии неисправностей',
-        [
-            f"{item.get('title')}: {item.get('recommendation')}"
-            for item in review_display.get('faults') or []
-        ],
+        [f'{item.get("title")}: {item.get("recommendation")}' for item in review_display.get('faults') or []],
     )
     page.save()
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
@@ -2026,7 +2208,9 @@ def api_cad_import_preview(request):
     class ImportedProject:
         scheme_data = result.get('scheme_data') or {}
 
-    review = build_design_review(ImportedProject(), simulation_runs=[], measurements=[], import_summary=result.get('summary'))
+    review = build_design_review(
+        ImportedProject(), simulation_runs=[], measurements=[], import_summary=result.get('summary')
+    )
     payload = {
         'ok': bool(result.get('ok')),
         'format': result.get('format'),
@@ -2048,13 +2232,18 @@ def api_cad_import_preview(request):
             scheme_data=result.get('scheme_data') or {},
         )
         saved_review = _create_project_review(project, request.user, import_summary=result.get('summary'))
-        _log_project_event(project, request.user, 'import_finished', {
-            'format': result.get('format'),
-            'components': (result.get('summary') or {}).get('components_count'),
-            'connections': (result.get('summary') or {}).get('connections_count'),
-            'unsupported': len(result.get('unsupported') or []),
-            'review_id': saved_review.id,
-        })
+        _log_project_event(
+            project,
+            request.user,
+            'import_finished',
+            {
+                'format': result.get('format'),
+                'components': (result.get('summary') or {}).get('components_count'),
+                'connections': (result.get('summary') or {}).get('connections_count'),
+                'unsupported': len(result.get('unsupported') or []),
+                'review_id': saved_review.id,
+            },
+        )
         payload['project'] = _project_to_dict(project)
         payload['saved_review'] = _review_to_dict(saved_review)
 
@@ -2099,11 +2288,14 @@ def api_lithium_import_preview(request):
     except LithiumImportError as exc:
         return _json_error(str(exc), status=400)
 
-    return JsonResponse({
-        'ok': True,
-        'summary': project.to_dict(),
-        'imported_files': sorted(files_text.keys()),
-    }, status=200)
+    return JsonResponse(
+        {
+            'ok': True,
+            'summary': project.to_dict(),
+            'imported_files': sorted(files_text.keys()),
+        },
+        status=200,
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -2112,7 +2304,7 @@ def api_lithium_import_preview(request):
 def api_export_scheme_pdf(request):
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data', {})
@@ -2138,7 +2330,11 @@ def api_export_scheme_pdf(request):
     for item in components[:40]:
         label = item.get('label') or item.get('type') or 'component'
         catalog_ref = item.get('catalog_ref') or item.get('part_number') or ''
-        page.drawString(40, y, f"#{item.get('id')} {label} ({item.get('type')}) x={item.get('x')} y={item.get('y')} {catalog_ref}")
+        page.drawString(
+            40,
+            y,
+            f'#{item.get("id")} {label} ({item.get("type")}) x={item.get("x")} y={item.get("y")} {catalog_ref}',
+        )
         y -= 14
         if y < 80:
             page.showPage()
@@ -2224,7 +2420,7 @@ def api_ai_context(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     project = None
@@ -2235,7 +2431,7 @@ def api_ai_context(request):
             project = _project_for_read(request.user, int(project_id))
             if not scheme:
                 scheme = project.scheme_data
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             project = None
 
     context = build_ai_scheme_context(
@@ -2256,12 +2452,13 @@ def api_monte_carlo(request):
     Response: per-node statistics (mean/std/p05/p50/p95) + timing.
     """
     from .services.monte_carlo import run_monte_carlo
+
     denied = _require_pro_feature(request.user, 'pro_monte_carlo')
     if denied:
         return denied
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
@@ -2288,9 +2485,10 @@ def api_export_circuit_python(request):
     Response: text/plain с готовым code.py для скачивания.
     """
     from .services.circuit_python_export import generate_circuit_python
+
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data') or {}
@@ -2304,6 +2502,7 @@ def api_export_circuit_python(request):
         return _json_error(f'Generator failed: {exc}')
 
     from django.http import HttpResponse
+
     response = HttpResponse(code, content_type='text/x-python; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="code.py"'
     return response
@@ -2323,7 +2522,7 @@ def api_engineering_review(request):
     """
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data') or {}
@@ -2359,21 +2558,23 @@ def api_engineering_review(request):
         'final_score': score,
     }
 
-    return JsonResponse({
-        'ok': True,
-        'score': score,
-        'status': review.get('status'),
-        'summary': review.get('summary'),
-        'score_breakdown': breakdown,
-        'errors': review.get('errors') or [],
-        'warnings': review.get('warnings') or [],
-        'recommendations': review.get('recommendations') or [],
-        'faults': review.get('faults') or [],
-        'sections': review.get('sections') or {},
-        'expert_findings': review.get('expert_findings') or [],
-        'critical_count': review.get('critical_count', 0),
-        'risk_count': review.get('risk_count', 0),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'score': score,
+            'status': review.get('status'),
+            'summary': review.get('summary'),
+            'score_breakdown': breakdown,
+            'errors': review.get('errors') or [],
+            'warnings': review.get('warnings') or [],
+            'recommendations': review.get('recommendations') or [],
+            'faults': review.get('faults') or [],
+            'sections': review.get('sections') or {},
+            'expert_findings': review.get('expert_findings') or [],
+            'critical_count': review.get('critical_count', 0),
+            'risk_count': review.get('risk_count', 0),
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -2384,7 +2585,7 @@ def api_ai_chat(request):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     mode = (data.get('mode') or 'recommend').strip()
@@ -2428,7 +2629,7 @@ def api_ai_chat(request):
             project = _project_for_read(request.user, int(project_id))
             if not scheme:
                 scheme = project.scheme_data
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             project = None
 
     if not ai_assistant.is_enabled():
@@ -2444,40 +2645,44 @@ def api_ai_chat(request):
             last_intent=last_intent,
             include_deep_hint=has_feature(request.user, 'ai_deep_hint'),
         )
-        return JsonResponse({
-            'ok': True,
-            'demo': True,
-            'self_hosted': True,
-            'reply': result['reply'],
-            'mode': mode,
-            'plan': effective_plan,
-            'entitlements': feature_summary(request.user),
-            'agent': result['agent'],
-            'intent': result.get('intent'),
-            'intent_label': result.get('intent_label'),
-            'confidence': result.get('confidence'),
-            'quick_actions': result.get('quick_actions') or [],
-            'skills': result.get('skills') or [],
-            'context_sources': result.get('context_sources') or [],
-            'used_context': result.get('used_context') or {},
-            'retrieval_context': result.get('retrieval_context') or {},
-            'deep_hint': result.get('deep_hint') or {},
-            'session_summary': result.get('session_summary') or '',
-            'usage': result.get('usage') or {},
-            'token_usage': result.get('usage') or {},
-        })
+        return JsonResponse(
+            {
+                'ok': True,
+                'demo': True,
+                'self_hosted': True,
+                'reply': result['reply'],
+                'mode': mode,
+                'plan': effective_plan,
+                'entitlements': feature_summary(request.user),
+                'agent': result['agent'],
+                'intent': result.get('intent'),
+                'intent_label': result.get('intent_label'),
+                'confidence': result.get('confidence'),
+                'quick_actions': result.get('quick_actions') or [],
+                'skills': result.get('skills') or [],
+                'context_sources': result.get('context_sources') or [],
+                'used_context': result.get('used_context') or {},
+                'retrieval_context': result.get('retrieval_context') or {},
+                'deep_hint': result.get('deep_hint') or {},
+                'session_summary': result.get('session_summary') or '',
+                'usage': result.get('usage') or {},
+                'token_usage': result.get('usage') or {},
+            }
+        )
 
     if not ai_assistant.is_enabled():
-        return JsonResponse({
-            'ok': True,
-            'demo': True,
-            'reply': (
-                '🔒 AI-ассистент в demo-режиме: ANTHROPIC_API_KEY не настроен на сервере. '
-                'Задайте переменную окружения ANTHROPIC_API_KEY и перезапустите Django, '
-                'чтобы активировать live-чат с Claude.'
-            ),
-            'mode': mode,
-        })
+        return JsonResponse(
+            {
+                'ok': True,
+                'demo': True,
+                'reply': (
+                    '🔒 AI-ассистент в demo-режиме: ANTHROPIC_API_KEY не настроен на сервере. '
+                    'Задайте переменную окружения ANTHROPIC_API_KEY и перезапустите Django, '
+                    'чтобы активировать live-чат с Claude.'
+                ),
+                'mode': mode,
+            }
+        )
 
     scheme = scheme or (data.get('scheme') if mode == 'explain' else None)
     target_pn = None
@@ -2486,7 +2691,9 @@ def api_ai_chat(request):
 
     if mode == 'replace':
         catalog = ai_assistant.build_catalog_snapshot(
-            lifecycle_in=['active', 'nrnd'], exclude_pn=target_pn, limit=60,
+            lifecycle_in=['active', 'nrnd'],
+            exclude_pn=target_pn,
+            limit=60,
         )
     elif mode == 'explain':
         cats = set()
@@ -2496,23 +2703,30 @@ def api_ai_chat(request):
                 if slug:
                     cats.add(slug)
         catalog = ai_assistant.build_catalog_snapshot(
-            category_slugs=list(cats) or None, limit=20,
+            category_slugs=list(cats) or None,
+            limit=20,
         )
     else:
         catalog = ai_assistant.build_catalog_snapshot(limit=30)
 
     messages = _ai_history_from_payload(data, limit=live_history_limit)
     if session_summary:
-        messages.insert(0, {
-            'role': 'assistant',
-            'content': f'Краткая сводка предыдущего диалога: {session_summary}',
-        })
+        messages.insert(
+            0,
+            {
+                'role': 'assistant',
+                'content': f'Краткая сводка предыдущего диалога: {session_summary}',
+            },
+        )
     messages.append({'role': 'user', 'content': user_message})
 
     # build_system_blocks — список блоков с cache_control на стабильном
     # префиксе; экономит ~5× токенов между turn-ами одной сессии.
     system_blocks = ai_assistant.build_system_blocks(
-        mode, catalog, scheme=scheme, target_pn=target_pn,
+        mode,
+        catalog,
+        scheme=scheme,
+        target_pn=target_pn,
     )
     try:
         result = ai_assistant.call_claude(messages, system_blocks, mode=mode)
@@ -2522,17 +2736,19 @@ def api_ai_chat(request):
             status=exc.http_status,
         )
 
-    return JsonResponse({
-        'ok': True,
-        'reply': result['text'],
-        'usage': result.get('usage') or {},
-        'token_usage': result.get('usage') or {},
-        'mode': mode,
-        'plan': effective_plan,
-        'entitlements': feature_summary(request.user),
-        'agent': result.get('agent'),
-        'model': result.get('model'),
-        'session_summary': session_summary,
-        'context_sources': [],
-        'quick_actions': [],
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'reply': result['text'],
+            'usage': result.get('usage') or {},
+            'token_usage': result.get('usage') or {},
+            'mode': mode,
+            'plan': effective_plan,
+            'entitlements': feature_summary(request.user),
+            'agent': result.get('agent'),
+            'model': result.get('model'),
+            'session_summary': session_summary,
+            'context_sources': [],
+            'quick_actions': [],
+        }
+    )

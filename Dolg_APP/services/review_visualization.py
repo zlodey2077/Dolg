@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 SEVERITY_COLORS = {
     'ok': '#72ffad',
     'info': '#7fdbff',
@@ -38,7 +37,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
             break
     try:
         return float(''.join(number)) if number else default
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -128,7 +127,9 @@ def build_review_3d_payload(review_payload: dict[str, Any] | None) -> dict[str, 
     derating_count = _count((derating or {}).get('issues') if isinstance(derating, dict) else [])
     validity_count = _count((validity or {}).get('issues') if isinstance(validity, dict) else [])
     bom_risk_count = _count((bom or {}).get('risks') if isinstance(bom, dict) else [])
-    missing_readiness_count = _count((manufacturing or {}).get('missing') if isinstance(manufacturing, dict) else [])
+    missing_readiness_count = _count(
+        (manufacturing or {}).get('missing') if isinstance(manufacturing, dict) else []
+    )
     external_count = _count((external_cad or {}).get('findings') if isinstance(external_cad, dict) else [])
 
     component_count = metrics.get('components', (connectivity or {}).get('component_count', 0))
@@ -136,32 +137,111 @@ def build_review_3d_payload(review_payload: dict[str, Any] | None) -> dict[str, 
     simulation_count = metrics.get('simulations', 0)
     measurement_count = metrics.get('measurements', _count(measurements))
     cycle_count = metrics.get('cycle_count', (connectivity or {}).get('cycle_count', 0))
-    floating_count = _count((connectivity or {}).get('floating_components') if isinstance(connectivity, dict) else [])
+    floating_count = _count(
+        (connectivity or {}).get('floating_components') if isinstance(connectivity, dict) else []
+    )
     if not floating_count:
-        floating_count = _count((connectivity or {}).get('unconnected') if isinstance(connectivity, dict) else [])
+        floating_count = _count(
+            (connectivity or {}).get('unconnected') if isinstance(connectivity, dict) else []
+        )
 
     columns = [
         _score_bar(review_payload.get('score', 0)),
         _bar('components', 'Компоненты', component_count, scale=0.33, severity='info'),
         _bar('connections', 'Соединения', connection_count, scale=0.33, severity='info'),
-        _bar('measurements', 'Измерения', measurement_count, scale=0.55, severity='ok' if _count(measurement_count) else 'warning'),
-        _bar('simulations', 'Симуляции', simulation_count, scale=0.55, severity='ok' if _count(simulation_count) else 'warning'),
+        _bar(
+            'measurements',
+            'Измерения',
+            measurement_count,
+            scale=0.55,
+            severity='ok' if _count(measurement_count) else 'warning',
+        ),
+        _bar(
+            'simulations',
+            'Симуляции',
+            simulation_count,
+            scale=0.55,
+            severity='ok' if _count(simulation_count) else 'warning',
+        ),
         _bar('cycles', 'Контуры', cycle_count, scale=0.65, severity='info'),
-        _bar('errors', 'Ошибки', error_count, scale=1.2, severity=_severity_for_risk(error_count, critical=True), category='risk'),
-        _bar('warnings', 'Предупреждения', warning_count, scale=0.85, severity=_severity_for_risk(warning_count), category='risk'),
-        _bar('expert', 'Expert findings', expert_count, scale=0.8, severity=_severity_for_risk(expert_count), category='risk'),
-        _bar('bom_risk', 'BOM-риск', bom_risk_count, scale=1.0, severity=_severity_for_risk(bom_risk_count), category='risk'),
-        _bar('derating', 'Запас/нагрев', derating_count, scale=1.0, severity=_severity_for_risk(derating_count), category='risk'),
-        _bar('validity', 'Limits', validity_count, scale=1.0, severity=_severity_for_risk(validity_count), category='risk'),
-        _bar('readiness', 'Сборка', missing_readiness_count, scale=0.75, severity=_severity_for_risk(missing_readiness_count), category='risk'),
-        _bar('external_cad', 'CAD/ERC', external_count, scale=0.9, severity=_severity_for_risk(external_count), category='risk'),
-        _bar('floating', 'Floating', floating_count, scale=1.0, severity=_severity_for_risk(floating_count), category='risk'),
+        _bar(
+            'errors',
+            'Ошибки',
+            error_count,
+            scale=1.2,
+            severity=_severity_for_risk(error_count, critical=True),
+            category='risk',
+        ),
+        _bar(
+            'warnings',
+            'Предупреждения',
+            warning_count,
+            scale=0.85,
+            severity=_severity_for_risk(warning_count),
+            category='risk',
+        ),
+        _bar(
+            'expert',
+            'Expert findings',
+            expert_count,
+            scale=0.8,
+            severity=_severity_for_risk(expert_count),
+            category='risk',
+        ),
+        _bar(
+            'bom_risk',
+            'BOM-риск',
+            bom_risk_count,
+            scale=1.0,
+            severity=_severity_for_risk(bom_risk_count),
+            category='risk',
+        ),
+        _bar(
+            'derating',
+            'Запас/нагрев',
+            derating_count,
+            scale=1.0,
+            severity=_severity_for_risk(derating_count),
+            category='risk',
+        ),
+        _bar(
+            'validity',
+            'Limits',
+            validity_count,
+            scale=1.0,
+            severity=_severity_for_risk(validity_count),
+            category='risk',
+        ),
+        _bar(
+            'readiness',
+            'Сборка',
+            missing_readiness_count,
+            scale=0.75,
+            severity=_severity_for_risk(missing_readiness_count),
+            category='risk',
+        ),
+        _bar(
+            'external_cad',
+            'CAD/ERC',
+            external_count,
+            scale=0.9,
+            severity=_severity_for_risk(external_count),
+            category='risk',
+        ),
+        _bar(
+            'floating',
+            'Floating',
+            floating_count,
+            scale=1.0,
+            severity=_severity_for_risk(floating_count),
+            category='risk',
+        ),
     ]
 
     visible_columns = [
-        item for item in columns
-        if item['key'] in {'health_score', 'components', 'connections'}
-        or item['value'] > 0
+        item
+        for item in columns
+        if item['key'] in {'health_score', 'components', 'connections'} or item['value'] > 0
     ][:14]
 
     risk_points = [
@@ -193,7 +273,13 @@ def build_review_3d_payload(review_payload: dict[str, Any] | None) -> dict[str, 
             'status': review_payload.get('status'),
             'status_label': review_payload.get('status_label'),
             'topology': metrics.get('topology') or (connectivity or {}).get('topology') or 'generic',
-            'risk_total': error_count + warning_count + expert_count + derating_count + validity_count + bom_risk_count + external_count,
+            'risk_total': error_count
+            + warning_count
+            + expert_count
+            + derating_count
+            + validity_count
+            + bom_risk_count
+            + external_count,
         },
         'columns': visible_columns,
         'risk_points': risk_points,

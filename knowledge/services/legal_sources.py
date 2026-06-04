@@ -5,7 +5,6 @@ from typing import Any
 
 from django.conf import settings
 
-
 LEGAL_SOURCES_PATH = Path(settings.BASE_DIR) / 'knowledge' / 'data' / 'legal_sources.json'
 REQUIRED_TOPICS = {
     'electronics',
@@ -56,7 +55,12 @@ RULE_SOURCE_DEFAULTS = {
 LEARNING_TOPIC_DEFAULTS = {
     'ohm': ['all_about_circuits_textbook', 'openstax_university_physics_2', 'sympy_docs'],
     'divider': ['all_about_circuits_textbook', 'openstax_university_physics_2', 'z3_guide'],
-    'rc': ['all_about_circuits_textbook', 'openstax_university_physics_2', 'ngspice_docs', 'ltspice_analog_devices'],
+    'rc': [
+        'all_about_circuits_textbook',
+        'openstax_university_physics_2',
+        'ngspice_docs',
+        'ltspice_analog_devices',
+    ],
     'gnd': ['all_about_circuits_textbook', 'ngspice_docs', 'kicad_docs'],
     'spice': ['ngspice_docs', 'ltspice_analog_devices', 'lark_docs'],
     'drc': ['kicad_docs', 'networkx_algorithms'],
@@ -123,7 +127,9 @@ def summarize_legal_sources(sources: list[dict[str, Any]] | None = None) -> dict
     }
 
 
-def find_legal_sources(query: str, topics: list[str] | tuple[str, ...] | set[str] | None = None, limit: int = 5) -> list[dict[str, Any]]:
+def find_legal_sources(
+    query: str, topics: list[str] | tuple[str, ...] | set[str] | None = None, limit: int = 5
+) -> list[dict[str, Any]]:
     sources = load_legal_sources()
     allowed_topics = {str(topic).strip() for topic in (topics or []) if str(topic).strip()}
     tokens = _tokens(query)
@@ -146,7 +152,9 @@ def find_legal_sources(query: str, topics: list[str] | tuple[str, ...] | set[str
     return scored[: max(1, int(limit or 5))]
 
 
-def sources_by_ids(source_ids: list[str] | tuple[str, ...] | set[str], *, limit: int | None = None) -> list[dict[str, Any]]:
+def sources_by_ids(
+    source_ids: list[str] | tuple[str, ...] | set[str], *, limit: int | None = None
+) -> list[dict[str, Any]]:
     wanted = [_canonical_source_id(source_id) for source_id in source_ids if str(source_id).strip()]
     if not wanted:
         return []

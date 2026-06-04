@@ -81,7 +81,17 @@ def validate_rule_pack(rule_pack: dict[str, Any]) -> dict[str, Any]:
     return {'ok': True, 'version': rule_pack.get('version'), 'rules': len(rule_pack.get('rules') or [])}
 
 
-def build_expert_facts(*, connectivity=None, bom=None, derating=None, measurements=None, import_summary=None, errors=None, warnings=None, scheme_data=None) -> dict[str, Any]:
+def build_expert_facts(
+    *,
+    connectivity=None,
+    bom=None,
+    derating=None,
+    measurements=None,
+    import_summary=None,
+    errors=None,
+    warnings=None,
+    scheme_data=None,
+) -> dict[str, Any]:
     connectivity = connectivity or {}
     bom = bom or {}
     derating = derating or {}
@@ -148,15 +158,17 @@ def evaluate_expert_rules(facts: dict[str, Any], rule_pack: dict[str, Any] | Non
         try:
             matched = bool(_rule_engine_rule(rule['when']).matches(facts))
         except Exception as exc:
-            findings.append({
-                'rule_id': rule.get('id', 'invalid'),
-                'title': rule.get('title') or rule.get('id', 'Invalid rule'),
-                'severity': 'error',
-                'evidence': {'expression': rule.get('when'), 'error': str(exc)},
-                'recommendation': 'Исправьте условие экспертного правила.',
-                'confidence': 1.0,
-                'references': {},
-            })
+            findings.append(
+                {
+                    'rule_id': rule.get('id', 'invalid'),
+                    'title': rule.get('title') or rule.get('id', 'Invalid rule'),
+                    'severity': 'error',
+                    'evidence': {'expression': rule.get('when'), 'error': str(exc)},
+                    'recommendation': 'Исправьте условие экспертного правила.',
+                    'confidence': 1.0,
+                    'references': {},
+                }
+            )
             continue
         if not matched:
             continue
@@ -180,16 +192,18 @@ def evaluate_expert_rules(facts: dict[str, Any], rule_pack: dict[str, Any] | Non
                 ]
             except Exception:
                 source_references = []
-        findings.append({
-            'rule_id': rule['id'],
-            'title': rule.get('title') or rule['id'],
-            'severity': rule.get('severity', 'info'),
-            'evidence': evidence,
-            'recommendation': rule.get('recommendation', ''),
-            'confidence': float(rule.get('confidence', 0.5)),
-            'references': references,
-            'source_references': source_references,
-        })
+        findings.append(
+            {
+                'rule_id': rule['id'],
+                'title': rule.get('title') or rule['id'],
+                'severity': rule.get('severity', 'info'),
+                'evidence': evidence,
+                'recommendation': rule.get('recommendation', ''),
+                'confidence': float(rule.get('confidence', 0.5)),
+                'references': references,
+                'source_references': source_references,
+            }
+        )
 
     return {
         'ok': True,

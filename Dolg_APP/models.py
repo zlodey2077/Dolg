@@ -3,7 +3,6 @@ from django.conf import settings as django_settings
 from django.db import models
 from django.utils import timezone
 
-
 MODERATION_STATUS_CHOICES = [
     ('visible', 'Видимый'),
     ('pending', 'На проверке'),
@@ -29,28 +28,30 @@ class Subscription(models.Model):
     expire_subscriptions либо продлевает (если стоит флаг и есть реальный
     payment provider), либо помечает status='expired'.
     """
+
     TIER_CHOICES = [
         ('free', 'Free'),
-        ('pro',  'Pro'),
+        ('pro', 'Pro'),
     ]
     STATUS_CHOICES = [
-        ('trial',     'Пробный период'),
-        ('active',    'Активна'),
+        ('trial', 'Пробный период'),
+        ('active', 'Активна'),
         ('cancelled', 'Отменена (доступ до конца периода)'),
-        ('expired',   'Истекла'),
+        ('expired', 'Истекла'),
     ]
     PROVIDER_CHOICES = [
-        ('trial',        '14-дневный trial'),
-        ('manual',       'Выдано админом'),
-        ('stripe',       'Stripe'),
-        ('cloudpayments','CloudPayments'),
+        ('trial', '14-дневный trial'),
+        ('manual', 'Выдано админом'),
+        ('stripe', 'Stripe'),
+        ('cloudpayments', 'CloudPayments'),
     ]
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='subscription',
-        null=True, blank=True,   # null если подписка корпоративная (на org, не на user)
+        null=True,
+        blank=True,  # null если подписка корпоративная (на org, не на user)
     )
     # Корпоративная подписка: один Subscription per organization. Free/Pro user-only
     # подписки имеют user но НЕ имеют organization. Enterprise — наоборот.
@@ -58,7 +59,8 @@ class Subscription(models.Model):
         'Dolg_APP.Organization',
         on_delete=models.CASCADE,
         related_name='subscription',
-        null=True, blank=True,
+        null=True,
+        blank=True,
     )
     tier = models.CharField(max_length=10, choices=TIER_CHOICES, default='free')
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='active')
@@ -91,6 +93,7 @@ class Subscription(models.Model):
     def is_pro_active(self) -> bool:
         """True если юзер имеет активный Pro-доступ ПРЯМО СЕЙЧАС."""
         from django.utils import timezone
+
         if self.tier != 'pro':
             return False
         if self.status == 'expired':
@@ -102,6 +105,7 @@ class Subscription(models.Model):
     def days_left(self) -> int:
         """Сколько дней до истечения. None если бессрочно."""
         from django.utils import timezone
+
         if self.period_end is None:
             return None
         delta = self.period_end - timezone.now()
@@ -115,6 +119,7 @@ class DailyUsage(models.Model):
 
     Используется в Dolg_APP/quotas.py через get_or_create по (user, date).
     """
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -159,9 +164,10 @@ class Organization(models.Model):
     - 'business' (sales-led, 10-100 seats)
     - 'enterprise' (custom, 100+ seats, SOC2/ISO compliance)
     """
+
     PLAN_CHOICES = [
-        ('team',       'Team (до 10 seats)'),
-        ('business',   'Business (10-100 seats)'),
+        ('team', 'Team (до 10 seats)'),
+        ('business', 'Business (10-100 seats)'),
         ('enterprise', 'Enterprise (∞ seats)'),
     ]
 
@@ -170,7 +176,7 @@ class Organization(models.Model):
     billing_email = models.EmailField()
     plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='team')
     seats_max = models.PositiveIntegerField(default=10)
-    storage_quota_bytes = models.BigIntegerField(default=100 * 1024 ** 3)  # 100 GB
+    storage_quota_bytes = models.BigIntegerField(default=100 * 1024**3)  # 100 GB
 
     # Settings — JSONField для policies (require_2fa, allowed_domains, etc.)
     # см. Etap E плана Enterprise scenario.
@@ -205,7 +211,8 @@ class Organization(models.Model):
         if not user or not user.is_authenticated:
             return False
         return self.memberships.filter(
-            user=user, deactivated_at__isnull=True,
+            user=user,
+            deactivated_at__isnull=True,
         ).exists()
 
     def get_role(self, user) -> str:
@@ -227,27 +234,32 @@ class OrganizationMember(models.Model):
     - reviewer: read + approve/reject BOM
     - viewer: read-only
     """
+
     ROLE_CHOICES = [
-        ('owner',    'Владелец'),
-        ('admin',    'Администратор'),
+        ('owner', 'Владелец'),
+        ('admin', 'Администратор'),
         ('engineer', 'Инженер'),
         ('reviewer', 'Ревьюер'),
         ('moderator', 'Модератор команды'),
-        ('viewer',   'Наблюдатель'),
+        ('viewer', 'Наблюдатель'),
     ]
 
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE,
+        Organization,
+        on_delete=models.CASCADE,
         related_name='memberships',
     )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         related_name='org_memberships',
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='engineer')
     invited_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True,
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='+',  # обратной связи не нужно
     )
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -270,8 +282,10 @@ class OrganizationInvite(models.Model):
     """Pending-приглашение в org. Token-based magic-link.
     Срок жизни 7 дней. После accepted_at преобразуется в OrganizationMember.
     """
+
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE,
+        Organization,
+        on_delete=models.CASCADE,
         related_name='invites',
     )
     email = models.EmailField()
@@ -282,15 +296,21 @@ class OrganizationInvite(models.Model):
         default='engineer',
     )
     invited_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='+',
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     accepted_at = models.DateTimeField(null=True, blank=True)
     accepted_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='+',
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
     )
 
     class Meta:
@@ -307,6 +327,7 @@ class OrganizationInvite(models.Model):
 
     def is_expired(self) -> bool:
         from django.utils import timezone
+
         return timezone.now() > self.expires_at and not self.accepted_at
 
     def is_pending(self) -> bool:
@@ -320,13 +341,19 @@ class AuditLog(models.Model):
     actor = кто сделал, organization = в какой org, action = что (string-namespace
     типа 'project.create', 'bom.approve', 'user.invite').
     """
+
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='audit_entries',
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_entries',
     )
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE,
-        null=True, blank=True,
+        Organization,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='audit_log',
     )
     action = models.CharField(max_length=80, db_index=True)
@@ -353,8 +380,7 @@ class AuditLog(models.Model):
         return f'{self.timestamp:%Y-%m-%d %H:%M} {who}{where}: {self.action}'
 
     @classmethod
-    def log(cls, actor, action, organization=None,
-            object_type='', object_id='', payload=None, request=None):
+    def log(cls, actor, action, organization=None, object_type='', object_id='', payload=None, request=None):
         """Хелпер для централизованного логирования.
         request — optional, для IP и User-Agent.
         """
@@ -386,16 +412,20 @@ class OrganizationApiToken(models.Model):
     Авторизация: Authorization: Bearer dolg_<token>.
     Scope — список разрешённых действий (например ['projects.read', 'bom.read']).
     """
+
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE,
+        Organization,
+        on_delete=models.CASCADE,
         related_name='api_tokens',
     )
     name = models.CharField(max_length=120, help_text='Что использует токен (для аудита)')
     token = models.CharField(max_length=80, unique=True, db_index=True)
     scope = models.JSONField(default=list, blank=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, related_name='+',
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='+',
     )
     last_used_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
@@ -417,13 +447,14 @@ class EnterpriseInquiry(models.Model):
     Заполняется через /enterprise/contact/, обрабатывается admin'ом через
     /admin/ или management-команду provision_enterprise.
     """
+
     STATUS_CHOICES = [
-        ('new',              'Новая заявка'),
-        ('contacted',        'Связались'),
-        ('demo_scheduled',   'Демо запланировано'),
-        ('proposal_sent',    'Предложение отправлено'),
-        ('won',              'Закрыт успехом'),
-        ('lost',             'Закрыт отказом'),
+        ('new', 'Новая заявка'),
+        ('contacted', 'Связались'),
+        ('demo_scheduled', 'Демо запланировано'),
+        ('proposal_sent', 'Предложение отправлено'),
+        ('won', 'Закрыт успехом'),
+        ('lost', 'Закрыт отказом'),
     ]
     company_name = models.CharField(max_length=200)
     contact_name = models.CharField(max_length=120)
@@ -435,8 +466,11 @@ class EnterpriseInquiry(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new', db_index=True)
     notes_internal = models.TextField(blank=True, help_text='Только для admin DOLG')
     converted_to_org = models.ForeignKey(
-        Organization, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='+',
+        Organization,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     contacted_at = models.DateTimeField(null=True, blank=True)
@@ -461,6 +495,7 @@ class Comment(models.Model):
     Полиморфизм: один из (project, article) обязателен.
     Replies: parent → корневой comment.
     """
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -470,19 +505,22 @@ class Comment(models.Model):
         'Dolg_APP.SchematicProject',
         on_delete=models.CASCADE,
         related_name='comments',
-        null=True, blank=True,
+        null=True,
+        blank=True,
     )
     article = models.ForeignKey(
         'knowledge.Article',
         on_delete=models.CASCADE,
         related_name='comments',
-        null=True, blank=True,
+        null=True,
+        blank=True,
     )
     parent = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
         related_name='replies',
-        null=True, blank=True,
+        null=True,
+        blank=True,
     )
     body = models.TextField()
     is_rich = models.BooleanField(
@@ -524,6 +562,7 @@ class Comment(models.Model):
         Pro (is_rich=True): Markdown через markdown2 → bleach-sanitize.
         """
         from . import comments_render
+
         return comments_render.render(self.body, rich=self.is_rich)
 
 
@@ -577,41 +616,47 @@ class SchematicProject(models.Model):
     organization = models.ForeignKey(
         'Dolg_APP.Organization',
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='projects',
         db_index=True,
     )
     VISIBILITY_CHOICES = [
         ('private', 'Только владелец'),
-        ('team',    'Видна команде'),
-        ('public',  'Публичный marketplace'),
+        ('team', 'Видна команде'),
+        ('public', 'Публичный marketplace'),
     ]
     visibility = models.CharField(
-        max_length=10, choices=VISIBILITY_CHOICES, default='private',
+        max_length=10,
+        choices=VISIBILITY_CHOICES,
+        default='private',
     )
     # Approval workflow (для BOM/order, для Enterprise отделения duties):
     APPROVAL_STATES = [
-        ('draft',           'Черновик'),
-        ('pending_review',  'На ревью'),
-        ('approved',        'Одобрено'),
-        ('rejected',        'Отклонено'),
+        ('draft', 'Черновик'),
+        ('pending_review', 'На ревью'),
+        ('approved', 'Одобрено'),
+        ('rejected', 'Отклонено'),
     ]
     approval_state = models.CharField(
-        max_length=20, choices=APPROVAL_STATES, default='draft',
+        max_length=20,
+        choices=APPROVAL_STATES,
+        default='draft',
     )
 
     # objects присвоится ниже (ActiveProjectManager определяется после класса).
-    all_objects = models.Manager()   # Включает soft-deleted
+    all_objects = models.Manager()  # Включает soft-deleted
 
     class Meta:
         ordering = ['-updated_at']
-        base_manager_name = 'all_objects'   # related-lookups берут из all_objects
+        base_manager_name = 'all_objects'  # related-lookups берут из all_objects
 
     def __str__(self):
-        return f"{self.user.username} — {self.name}"
+        return f'{self.user.username} — {self.name}'
 
     def soft_delete(self):
         from django.utils import timezone
+
         self.deleted_at = timezone.now()
         self.save(update_fields=['deleted_at'])
 
@@ -627,6 +672,7 @@ class SchematicProject(models.Model):
 class ActiveProjectManager(models.Manager):
     """Default manager — скрывает soft-deleted. Чтобы получить включая —
     использовать SchematicProject.all_objects."""
+
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
 
@@ -656,7 +702,7 @@ class ProjectVersion(models.Model):
         verbose_name_plural = 'Версии схем'
 
     def __str__(self):
-        return f"{self.project.name} v{self.version_number}"
+        return f'{self.project.name} v{self.version_number}'
 
 
 class SimulationRun(models.Model):
@@ -699,7 +745,8 @@ class SimulationRun(models.Model):
         verbose_name_plural = 'Запуски симуляций'
 
     def __str__(self):
-        return f"{self.project.name} — {self.analysis_type} — {self.created_at:%Y-%m-%d %H:%M}"
+        return f'{self.project.name} — {self.analysis_type} — {self.created_at:%Y-%m-%d %H:%M}'
+
 
 class ProjectMeasurement(models.Model):
     project = models.ForeignKey(
@@ -841,6 +888,7 @@ class ProjectEvent(models.Model):
 # Enterprise беседы (OrgConversation + OrgConversationMessage) — приватные каналы org
 # ============================================================
 
+
 class EngineeringArtifact(models.Model):
     """Normalized engineering file or report used by review, learning and AI."""
 
@@ -950,15 +998,151 @@ class AITrainingExample(models.Model):
         return f'{self.kind}: {self.prompt[:60]}'
 
 
+class MLJob(models.Model):
+    """Persistent operational record for ML import, validation and training jobs."""
+
+    JOB_TYPE_CHOICES = [
+        ('dataset_import', 'Dataset import'),
+        ('training', 'Training'),
+        ('validation', 'Validation'),
+        ('export', 'Export'),
+        ('promotion', 'Promotion'),
+    ]
+    STATUS_CHOICES = [
+        ('queued', 'queued'),
+        ('running', 'running'),
+        ('success', 'success'),
+        ('error', 'error'),
+        ('cancelled', 'cancelled'),
+        ('stale', 'stale'),
+    ]
+
+    job_type = models.CharField(max_length=32, choices=JOB_TYPE_CHOICES, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued', db_index=True)
+    progress_percent = models.PositiveSmallIntegerField(default=0)
+    source = models.CharField(max_length=160, blank=True)
+    message = models.CharField(max_length=260, blank=True)
+    parameters = models.JSONField(default=dict, blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    stdout_tail = models.TextField(blank=True)
+    error = models.TextField(blank=True)
+    processed = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    updated_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ml_jobs',
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['job_type', 'status', '-created_at'], name='mljob_type_status_created_idx'),
+            models.Index(fields=['status', '-heartbeat_at'], name='mljob_status_heartbeat_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.job_type} #{self.pk} [{self.status}]'
+
+    def mark_running(self, *, message: str = ''):
+        now = timezone.now()
+        if self.started_at is None:
+            self.started_at = now
+        self.status = 'running'
+        self.heartbeat_at = now
+        if message:
+            self.message = message[:260]
+        self.save(update_fields=['status', 'started_at', 'heartbeat_at', 'message', 'updated_at'])
+
+    def update_progress(
+        self,
+        *,
+        progress_percent=None,
+        processed=None,
+        created_count=None,
+        updated_count=None,
+        skipped_count=None,
+        message: str = '',
+        result=None,
+        stdout_tail: str = '',
+    ):
+        now = timezone.now()
+        self.status = 'running' if self.status in {'queued', 'running'} else self.status
+        self.heartbeat_at = now
+        if progress_percent is not None:
+            self.progress_percent = max(0, min(100, int(progress_percent)))
+        if processed is not None:
+            self.processed = max(0, int(processed))
+        if created_count is not None:
+            self.created_count = max(0, int(created_count))
+        if updated_count is not None:
+            self.updated_count = max(0, int(updated_count))
+        if skipped_count is not None:
+            self.skipped_count = max(0, int(skipped_count))
+        if message:
+            self.message = message[:260]
+        if result is not None:
+            self.result = result
+        if stdout_tail:
+            self.stdout_tail = stdout_tail[-4000:]
+        self.save()
+
+    def mark_success(self, *, message: str = '', result=None, stdout_tail: str = ''):
+        now = timezone.now()
+        self.status = 'success'
+        self.progress_percent = 100
+        self.heartbeat_at = now
+        self.finished_at = now
+        if message:
+            self.message = message[:260]
+        if result is not None:
+            self.result = result
+        if stdout_tail:
+            self.stdout_tail = stdout_tail[-4000:]
+        self.save()
+
+    def mark_error(self, *, error: str = '', message: str = '', stdout_tail: str = ''):
+        now = timezone.now()
+        self.status = 'error'
+        self.heartbeat_at = now
+        self.finished_at = now
+        if message:
+            self.message = message[:260]
+        if error:
+            self.error = error
+        if stdout_tail:
+            self.stdout_tail = stdout_tail[-4000:]
+        self.save()
+
+    def mark_cancelled(self, *, message: str = ''):
+        now = timezone.now()
+        self.status = 'cancelled'
+        self.heartbeat_at = now
+        self.finished_at = now
+        if message:
+            self.message = message[:260]
+        self.save(update_fields=['status', 'heartbeat_at', 'finished_at', 'message', 'updated_at'])
+
+
 class ChatTopic(models.Model):
     """Публичный технический топик (Q&A-стиль)."""
+
     CATEGORY_CHOICES = [
-        ('general',    'Общее'),
+        ('general', 'Общее'),
         ('schematics', 'Схемы'),
         ('simulation', 'Симуляция'),
-        ('cad',        'CAD'),
+        ('cad', 'CAD'),
         ('components', 'Компоненты РЭБ'),
-        ('ai',         'AI-ассистент'),
+        ('ai', 'AI-ассистент'),
     ]
 
     title = models.CharField(max_length=200)
@@ -966,7 +1150,8 @@ class ChatTopic(models.Model):
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='chat_topics',
     )
     category = models.CharField(max_length=24, choices=CATEGORY_CHOICES, default='general', db_index=True)
@@ -977,7 +1162,8 @@ class ChatTopic(models.Model):
     attached_project = models.ForeignKey(
         SchematicProject,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='chat_topics',
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -1015,11 +1201,13 @@ class ChatTopic(models.Model):
 
 class ChatReply(models.Model):
     """Ответ в топике. Поддерживает nested-threading через parent."""
+
     topic = models.ForeignKey(ChatTopic, on_delete=models.CASCADE, related_name='replies')
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='chat_replies',
     )
     body = models.TextField()
@@ -1027,7 +1215,8 @@ class ChatReply(models.Model):
     parent = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='children',
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1062,16 +1251,19 @@ class ChatReaction(models.Model):
     Ровно один из target_topic / target_reply должен быть заполнен — это
     enforced через partial unique constraints + clean() в save-path.
     """
+
     target_topic = models.ForeignKey(
         ChatTopic,
         on_delete=models.CASCADE,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='reactions',
     )
     target_reply = models.ForeignKey(
         ChatReply,
         on_delete=models.CASCADE,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='reactions',
     )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -1102,6 +1294,7 @@ class OrgConversation(models.Model):
 
     Видим только members этой org. Создаётся owner/admin'ами.
     """
+
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
@@ -1112,14 +1305,16 @@ class OrgConversation(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='created_conversations',
     )
     is_archived = models.BooleanField(default=False)
     attached_project = models.ForeignKey(
         SchematicProject,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='org_conversations',
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1139,18 +1334,21 @@ class OrgConversation(models.Model):
 
 class OrgConversationMessage(models.Model):
     """Сообщение в org-канале. Поддерживает Markdown (все Enterprise = Pro)."""
+
     conversation = models.ForeignKey(OrgConversation, on_delete=models.CASCADE, related_name='messages')
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='org_messages',
     )
     body = models.TextField()
     parent = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='replies',
     )
     mentions = models.JSONField(default=list, blank=True)
@@ -1188,9 +1386,10 @@ class Announcement(models.Model):
     Не путать с ChatTopic — пользователь не может отвечать или реагировать.
     Используется для: релизы, плановые работы, новости проекта.
     """
+
     LEVEL_CHOICES = [
-        ('info',     'ℹ Информация'),
-        ('warning',  '⚠ Предупреждение'),
+        ('info', 'ℹ Информация'),
+        ('warning', '⚠ Предупреждение'),
         ('critical', '🔴 Критично'),
     ]
 
@@ -1199,14 +1398,19 @@ class Announcement(models.Model):
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
+        null=True,
+        blank=True,
         related_name='announcements',
     )
     level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='info')
     is_published = models.BooleanField(default=True, db_index=True)
     is_pinned = models.BooleanField(default=False)
-    expires_at = models.DateTimeField(null=True, blank=True, db_index=True,
-                                      help_text='Если задано — после этой даты объявление скрывается из сайдбара')
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Если задано — после этой даты объявление скрывается из сайдбара',
+    )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -1231,29 +1435,29 @@ class Announcement(models.Model):
 # со смещением до позиции курсора. Аналог Lithium ECAD «Functional blocks».
 class FunctionalBlock(models.Model):
     CATEGORY_CHOICES = [
-        ('power',    '⚡ Питание'),
-        ('analog',   '🔊 Аналог'),
-        ('digital',  '💾 Цифра'),
-        ('rf',       '📡 РЧ'),
-        ('filter',   '🌊 Фильтры'),
-        ('sensor',   '🌡 Датчики'),
-        ('other',    '📦 Прочее'),
+        ('power', '⚡ Питание'),
+        ('analog', '🔊 Аналог'),
+        ('digital', '💾 Цифра'),
+        ('rf', '📡 РЧ'),
+        ('filter', '🌊 Фильтры'),
+        ('sensor', '🌡 Датчики'),
+        ('other', '📦 Прочее'),
     ]
     name = models.CharField(max_length=80, help_text='Название блока (напр. "DC-DC 5В→3.3В")')
-    description = models.CharField(max_length=200, blank=True,
-                                   help_text='Краткое описание для тултипа')
+    description = models.CharField(max_length=200, blank=True, help_text='Краткое описание для тултипа')
     category = models.CharField(max_length=16, choices=CATEGORY_CHOICES, default='other')
     schema_json = models.JSONField(
-        help_text='{"components":[...],"connections":[...]} формата applySchemeData')
-    preview_svg = models.TextField(blank=True,
-                                   help_text='Опциональная мини-SVG-отрисовка')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-                             related_name='functional_blocks',
-                             help_text='Владелец блока')
-    is_public = models.BooleanField(default=False, db_index=True,
-                                    help_text='Виден ли другим юзерам')
-    use_count = models.PositiveIntegerField(default=0,
-                                            help_text='Счётчик использований (drag в схему)')
+        help_text='{"components":[...],"connections":[...]} формата applySchemeData'
+    )
+    preview_svg = models.TextField(blank=True, help_text='Опциональная мини-SVG-отрисовка')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='functional_blocks',
+        help_text='Владелец блока',
+    )
+    is_public = models.BooleanField(default=False, db_index=True, help_text='Виден ли другим юзерам')
+    use_count = models.PositiveIntegerField(default=0, help_text='Счётчик использований (drag в схему)')
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1271,12 +1475,12 @@ class FunctionalBlock(models.Model):
     def component_count(self):
         try:
             return len((self.schema_json or {}).get('components', []))
-        except (TypeError, AttributeError):
+        except TypeError, AttributeError:
             return 0
 
     @property
     def connection_count(self):
         try:
             return len((self.schema_json or {}).get('connections', []))
-        except (TypeError, AttributeError):
+        except TypeError, AttributeError:
             return 0

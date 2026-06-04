@@ -93,8 +93,7 @@ def _lesson_cards(slug_reasons, limit):
         if slug in seen:
             continue
         lesson = (
-            LearningLesson.objects
-            .select_related('track')
+            LearningLesson.objects.select_related('track')
             .prefetch_related('tasks')
             .filter(slug=slug, is_published=True, track__is_published=True)
             .first()
@@ -105,17 +104,19 @@ def _lesson_cards(slug_reasons, limit):
         for task in lesson.tasks.all():
             if task.task_type not in task_types:
                 task_types.append(task.task_type)
-        cards.append({
-            'lesson_id': lesson.id,
-            'lesson_slug': lesson.slug,
-            'title': lesson.title,
-            'track': lesson.track.title,
-            'summary': lesson.summary,
-            'reason': reason,
-            'task_count': lesson.tasks.count(),
-            'task_types': task_types,
-            'url': reverse('knowledge:learning_lesson', args=[lesson.slug]),
-        })
+        cards.append(
+            {
+                'lesson_id': lesson.id,
+                'lesson_slug': lesson.slug,
+                'title': lesson.title,
+                'track': lesson.track.title,
+                'summary': lesson.summary,
+                'reason': reason,
+                'task_count': lesson.tasks.count(),
+                'task_types': task_types,
+                'url': reverse('knowledge:learning_lesson', args=[lesson.slug]),
+            }
+        )
         seen.add(slug)
         if len(cards) >= limit:
             break

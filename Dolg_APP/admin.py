@@ -4,13 +4,14 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import (
-    Announcement,
     AITrainingExample,
+    Announcement,
+    AuditLog,
     ChatReply,
     ChatTopic,
     Comment,
     EngineeringArtifact,
-    AuditLog,
+    MLJob,
     Organization,
     OrganizationInvite,
     OrganizationMember,
@@ -28,13 +29,29 @@ from .models import (
 @admin.register(SchematicProject)
 class SchematicProjectAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'user', 'organization', 'category', 'status', 'approval_state',
-        'visibility', 'difficulty', 'versions_count', 'runs_count',
-        'reviews_count', 'measurements_count', 'updated_at',
+        'name',
+        'user',
+        'organization',
+        'category',
+        'status',
+        'approval_state',
+        'visibility',
+        'difficulty',
+        'versions_count',
+        'runs_count',
+        'reviews_count',
+        'measurements_count',
+        'updated_at',
     )
     list_filter = (
-        'category', 'status', 'approval_state', 'visibility', 'difficulty',
-        'is_demo', 'created_at', 'updated_at',
+        'category',
+        'status',
+        'approval_state',
+        'visibility',
+        'difficulty',
+        'is_demo',
+        'created_at',
+        'updated_at',
     )
     search_fields = ('name', 'description', 'user__username', 'user__email')
     readonly_fields = ('created_at', 'updated_at')
@@ -42,18 +59,25 @@ class SchematicProjectAdmin(admin.ModelAdmin):
     change_list_template = 'admin/dolg_app/schematicproject/change_list.html'
     fieldsets = (
         (None, {'fields': ('user', 'organization', 'name', 'description')}),
-        ('Классификация', {'fields': ('category', 'status', 'approval_state', 'visibility', 'difficulty', 'is_demo')}),
+        (
+            'Классификация',
+            {'fields': ('category', 'status', 'approval_state', 'visibility', 'difficulty', 'is_demo')},
+        ),
         ('Публикация и доступ', {'fields': ('share_token', 'deleted_at'), 'classes': ('collapse',)}),
         ('Данные схемы', {'fields': ('scheme_data',), 'classes': ('collapse',)}),
         ('Метаданные', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
-            _versions_count=Count('versions', distinct=True),
-            _runs_count=Count('simulation_runs', distinct=True),
-            _reviews_count=Count('reviews', distinct=True),
-            _measurements_count=Count('measurements', distinct=True),
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                _versions_count=Count('versions', distinct=True),
+                _runs_count=Count('simulation_runs', distinct=True),
+                _reviews_count=Count('reviews', distinct=True),
+                _measurements_count=Count('measurements', distinct=True),
+            )
         )
 
     def changelist_view(self, request, extra_context=None):
@@ -74,10 +98,12 @@ class SchematicProjectAdmin(admin.ModelAdmin):
 
     def versions_count(self, obj):
         return getattr(obj, '_versions_count', obj.versions.count())
+
     versions_count.short_description = 'Версий'
 
     def runs_count(self, obj):
         return getattr(obj, '_runs_count', obj.simulation_runs.count())
+
     runs_count.short_description = 'Симуляций'
 
     @admin.display(description='Review', ordering='_reviews_count')
@@ -139,7 +165,16 @@ class ProjectVersionAdmin(admin.ModelAdmin):
 
 @admin.register(SimulationRun)
 class SimulationRunAdmin(admin.ModelAdmin):
-    list_display = ('project', 'user', 'analysis_type', 'engine', 'elapsed_ms', 'progress_badge', 'status', 'created_at')
+    list_display = (
+        'project',
+        'user',
+        'analysis_type',
+        'engine',
+        'elapsed_ms',
+        'progress_badge',
+        'status',
+        'created_at',
+    )
     list_filter = ('analysis_type', 'engine', 'status', 'created_at')
     search_fields = ('project__name', 'user__username', 'netlist')
     readonly_fields = ('created_at', 'started_at', 'finished_at')
@@ -156,7 +191,17 @@ class SimulationRunAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectMeasurement)
 class ProjectMeasurementAdmin(admin.ModelAdmin):
-    list_display = ('project', 'user', 'metric', 'value', 'unit', 'expected_value', 'delta_display', 'status', 'created_at')
+    list_display = (
+        'project',
+        'user',
+        'metric',
+        'value',
+        'unit',
+        'expected_value',
+        'delta_display',
+        'status',
+        'created_at',
+    )
     list_filter = ('metric', 'status', 'source', 'created_at')
     search_fields = ('project__name', 'user__username', 'metric', 'label')
     readonly_fields = ('created_at',)
@@ -184,7 +229,10 @@ class ProjectReviewAdmin(admin.ModelAdmin):
     list_select_related = ('project', 'user')
     fieldsets = (
         (None, {'fields': ('project', 'user', 'score', 'status', 'summary', 'finding_summary')}),
-        ('Findings', {'fields': ('errors', 'warnings', 'recommendations', 'faults'), 'classes': ('collapse',)}),
+        (
+            'Findings',
+            {'fields': ('errors', 'warnings', 'recommendations', 'faults'), 'classes': ('collapse',)},
+        ),
         ('Metrics and sections', {'fields': ('metrics', 'sections'), 'classes': ('collapse',)}),
         ('Input snapshots', {'fields': ('scheme_data', 'import_summary'), 'classes': ('collapse',)}),
         ('Metadata', {'fields': ('created_at',), 'classes': ('collapse',)}),
@@ -252,6 +300,8 @@ def hide_content(modeladmin, request, queryset):
         moderated_by=request.user,
         moderated_at=timezone.now(),
     )
+
+
 hide_content.short_description = 'Скрыть выбранное'
 
 
@@ -262,6 +312,8 @@ def restore_content(modeladmin, request, queryset):
         moderated_by=request.user,
         moderated_at=timezone.now(),
     )
+
+
 restore_content.short_description = 'Восстановить выбранное'
 
 
@@ -279,8 +331,16 @@ class CommentAdmin(admin.ModelAdmin):
 @admin.register(EngineeringArtifact)
 class EngineeringArtifactAdmin(admin.ModelAdmin):
     list_display = (
-        'source_name', 'project', 'artifact_type', 'status', 'parser',
-        'size_kb', 'facts_count', 'warnings_count', 'errors_count', 'created_at',
+        'source_name',
+        'project',
+        'artifact_type',
+        'status',
+        'parser',
+        'size_kb',
+        'facts_count',
+        'warnings_count',
+        'errors_count',
+        'created_at',
     )
     list_filter = ('artifact_type', 'status', 'parser', 'created_at')
     search_fields = ('source_name', 'source_path', 'summary', 'project__name')
@@ -352,12 +412,24 @@ class EngineeringArtifactAdmin(admin.ModelAdmin):
                 },
             )
             created += 1
-        self.message_user(request, f'AI examples создано/найдено: {created}; пропущено без summary: {skipped}.')
+        self.message_user(
+            request, f'AI examples создано/найдено: {created}; пропущено без summary: {skipped}.'
+        )
 
 
 @admin.register(AITrainingExample)
 class AITrainingExampleAdmin(admin.ModelAdmin):
-    list_display = ('kind', 'prompt_preview', 'project', 'artifact', 'feature_sources', 'is_validated', 'created_at')
+    list_display = (
+        'kind',
+        'dataset_kind',
+        'graph_ready',
+        'prompt_preview',
+        'project',
+        'artifact',
+        'feature_sources',
+        'is_validated',
+        'created_at',
+    )
     list_filter = ('kind', 'is_validated', 'created_at')
     search_fields = ('prompt', 'target', 'project__name', 'artifact__source_name')
     readonly_fields = ('created_at',)
@@ -365,10 +437,20 @@ class AITrainingExampleAdmin(admin.ModelAdmin):
     list_select_related = ('artifact', 'project', 'user')
     date_hierarchy = 'created_at'
     change_list_template = 'admin/dolg_app/aitrainingexample/change_list.html'
-    actions = ('mark_validated', 'mark_unvalidated', 'promote_to_private_projects', 'promote_to_demo_projects')
+    actions = (
+        'normalize_metadata',
+        'exclude_from_graph_training',
+        'mark_validated',
+        'mark_unvalidated',
+        'promote_to_private_projects',
+        'promote_to_demo_projects',
+    )
 
     def changelist_view(self, request, extra_context=None):
-        from Dolg_APP.services.ai_training import summarize_ai_training_examples, validate_ai_training_examples
+        from Dolg_APP.services.ai_training import (
+            summarize_ai_training_examples,
+            validate_ai_training_examples,
+        )
 
         summary = summarize_ai_training_examples()
         validation = validate_ai_training_examples(limit=500)
@@ -386,6 +468,14 @@ class AITrainingExampleAdmin(admin.ModelAdmin):
     def prompt_preview(self, obj):
         return obj.prompt[:90]
 
+    @admin.display(description='Dataset')
+    def dataset_kind(self, obj):
+        return (obj.features or {}).get('dataset_kind') or 'unclassified'
+
+    @admin.display(description='Graph')
+    def graph_ready(self, obj):
+        return 'yes' if (obj.features or {}).get('graph_training_ready') else 'no'
+
     @admin.display(description='Sources')
     def feature_sources(self, obj):
         features = obj.features or {}
@@ -393,6 +483,35 @@ class AITrainingExampleAdmin(admin.ModelAdmin):
         teacher_rules = features.get('teacher_rules') or []
         labels = [*source_ids[:2], *teacher_rules[:2]]
         return ', '.join(labels) if labels else ''
+
+    @admin.action(description='Normalize dataset metadata')
+    def normalize_metadata(self, request, queryset):
+        from Dolg_APP.services.ai_training import normalize_ai_training_example
+
+        scanned = changed = graph_ready = 0
+        for example in queryset:
+            scanned += 1
+            result = normalize_ai_training_example(example)
+            changed += int(bool(result.get('changed')))
+            graph_ready += int(bool(result.get('graph_training_ready')))
+        self.message_user(
+            request,
+            f'AI examples normalized: scanned={scanned}, changed={changed}, graph_ready={graph_ready}.',
+        )
+
+    @admin.action(description='Exclude selected from graph training')
+    def exclude_from_graph_training(self, request, queryset):
+        updated = 0
+        for example in queryset:
+            features = dict(example.features or {})
+            features['graph_training_ready'] = False
+            features['training_role'] = 'retrieval_context'
+            features['graph_excluded_by_admin'] = True
+            features['graph_excluded_reason'] = 'Excluded from Django admin'
+            example.features = features
+            example.save(update_fields=['features'])
+            updated += 1
+        self.message_user(request, f'AI examples excluded from graph training: {updated}.')
 
     @admin.action(description='Подтвердить для обучения')
     def mark_validated(self, request, queryset):
@@ -419,8 +538,8 @@ class AITrainingExampleAdmin(admin.ModelAdmin):
         )
         self.message_user(
             request,
-            f"Projects created={result['created']}, updated={result['updated']}, "
-            f"skipped quality={result['skipped_quality']}."
+            f'Projects created={result["created"]}, updated={result["updated"]}, '
+            f'skipped quality={result["skipped_quality"]}.',
         )
 
     @admin.action(description='Create public demo projects from selected AI examples')
@@ -438,9 +557,93 @@ class AITrainingExampleAdmin(admin.ModelAdmin):
         )
         self.message_user(
             request,
-            f"Demo projects created={result['created']}, updated={result['updated']}, "
-            f"skipped quality={result['skipped_quality']}."
+            f'Demo projects created={result["created"]}, updated={result["updated"]}, '
+            f'skipped quality={result["skipped_quality"]}.',
         )
+
+
+@admin.register(MLJob)
+class MLJobAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'job_type',
+        'status_badge',
+        'progress_percent',
+        'source',
+        'processed',
+        'created_count',
+        'updated_count',
+        'skipped_count',
+        'created_by',
+        'started_at',
+        'heartbeat_at',
+        'finished_at',
+    )
+    list_filter = ('job_type', 'status', 'source', 'created_at', 'finished_at')
+    search_fields = ('source', 'message', 'error', 'stdout_tail', 'created_by__username', 'created_by__email')
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+        'started_at',
+        'heartbeat_at',
+        'finished_at',
+        'stdout_tail',
+        'error',
+    )
+    autocomplete_fields = ('created_by',)
+    list_select_related = ('created_by',)
+    date_hierarchy = 'created_at'
+    actions = ('mark_cancelled', 'mark_stale', 'mark_success')
+
+    @admin.display(description='Status', ordering='status')
+    def status_badge(self, obj):
+        colors = {
+            'queued': '#6b7280',
+            'running': '#2563eb',
+            'success': '#168a3a',
+            'error': '#b3261e',
+            'cancelled': '#7c3aed',
+            'stale': '#b8860b',
+        }
+        return format_html(
+            '<strong style="color:{};">{}</strong>',
+            colors.get(obj.status, '#555'),
+            obj.status,
+        )
+
+    @admin.action(description='Mark selected jobs cancelled')
+    def mark_cancelled(self, request, queryset):
+        now = timezone.now()
+        updated = queryset.update(
+            status='cancelled',
+            heartbeat_at=now,
+            finished_at=now,
+            message='Cancelled from Django admin',
+        )
+        self.message_user(request, f'ML jobs cancelled: {updated}.')
+
+    @admin.action(description='Mark selected jobs stale')
+    def mark_stale(self, request, queryset):
+        now = timezone.now()
+        updated = queryset.update(
+            status='stale',
+            heartbeat_at=now,
+            finished_at=now,
+            message='Marked stale from Django admin',
+        )
+        self.message_user(request, f'ML jobs marked stale: {updated}.')
+
+    @admin.action(description='Mark selected jobs success')
+    def mark_success(self, request, queryset):
+        now = timezone.now()
+        updated = queryset.update(
+            status='success',
+            progress_percent=100,
+            heartbeat_at=now,
+            finished_at=now,
+            message='Marked success from Django admin',
+        )
+        self.message_user(request, f'ML jobs marked success: {updated}.')
 
 
 @admin.register(Announcement)
@@ -463,7 +666,16 @@ class AnnouncementAdmin(admin.ModelAdmin):
 
 @admin.register(ChatTopic)
 class ChatTopicAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'category', 'moderation_status', 'is_pinned', 'is_resolved', 'views_count', 'last_activity_at')
+    list_display = (
+        'title',
+        'author',
+        'category',
+        'moderation_status',
+        'is_pinned',
+        'is_resolved',
+        'views_count',
+        'last_activity_at',
+    )
     list_filter = ('category', 'moderation_status', 'is_pinned', 'is_resolved', 'created_at')
     search_fields = ('title', 'body', 'author__username')
     readonly_fields = ('views_count', 'created_at', 'updated_at', 'last_activity_at', 'moderated_at')

@@ -34,8 +34,14 @@ class Category(models.Model):
 
     # Категории РЭБ для шаблонов/фильтров
     REB_SLUGS = {
-        'resistors', 'capacitors', 'transistors',
-        'ics', 'diodes', 'inductors', 'connectors', 'relays',
+        'resistors',
+        'capacitors',
+        'transistors',
+        'ics',
+        'diodes',
+        'inductors',
+        'connectors',
+        'relays',
     }
 
     name = models.CharField(max_length=200, unique=True)
@@ -105,7 +111,8 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     description = models.TextField()
     price = models.DecimalField(
-        max_digits=10, decimal_places=2,
+        max_digits=10,
+        decimal_places=2,
         validators=[
             MinValueValidator(Decimal('0.00')),
             MaxValueValidator(Decimal('99999999.99')),
@@ -167,13 +174,16 @@ class CartItem(models.Model):
     - user (для auth) — переживает logout/login, сохраняется навсегда.
     При login сессионные items мигрируют на user_id (signal в shop/signals.py).
     """
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField(default=1)
     session_id = models.CharField(max_length=40, blank=True, default='', db_index=True)
     user = models.ForeignKey(
         'auth.User',
         on_delete=models.CASCADE,
-        null=True, blank=True, db_index=True,
+        null=True,
+        blank=True,
+        db_index=True,
         related_name='cart_items',
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -182,7 +192,7 @@ class CartItem(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.product.name} x {self.quantity}"
+        return f'{self.product.name} x {self.quantity}'
 
     def get_total_price(self):
         return self.product.price * self.quantity
@@ -194,6 +204,7 @@ class ViewedProduct(models.Model):
     для guest. Здесь — персональная история, переживает logout.
     Retention: 90 дней (purge_old_viewed_products command).
     """
+
     user = models.ForeignKey(
         'auth.User',
         on_delete=models.CASCADE,

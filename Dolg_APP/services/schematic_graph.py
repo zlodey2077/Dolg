@@ -146,7 +146,9 @@ def analyze_graph_topology(scheme_data):
     source_nodes = [node for node, data in graph.nodes(data=True) if data.get('is_source')]
     output_nodes = [node for node, data in graph.nodes(data=True) if data.get('is_output')]
 
-    connected_components = [sorted(group) for group in nx.connected_components(graph)] if graph.number_of_nodes() else []
+    connected_components = (
+        [sorted(group) for group in nx.connected_components(graph)] if graph.number_of_nodes() else []
+    )
     isolated = sorted(nx.isolates(graph))
     floating_components = []
     paths_to_ground = {}

@@ -17,6 +17,7 @@
 SECRET_KEY проекта используется как fernet-key. Поэтому ротация SECRET_KEY
 ломает все 2FA-устройства — об этом нужно знать при prod-deployment.
 """
+
 from __future__ import annotations
 
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken

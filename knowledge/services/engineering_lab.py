@@ -83,6 +83,7 @@ LAB_TOOLS = [
 
 LAB_TOOL_MAP = {item['kind']: item for item in LAB_TOOLS}
 
+
 def _parse_number(value, default=None):
     parsed = parse_engineering_number(value, default=default)
     return parsed if parsed is not None else default
@@ -117,9 +118,14 @@ def _status(status, feedback, warnings=None):
 def _thermal_status(junction_c, max_junction_c, dropout_margin=None):
     margin = max_junction_c - junction_c
     if dropout_margin is not None and dropout_margin < 0:
-        return _status('needs_margin', 'Входного напряжения не хватает для стабильной работы линейного стабилизатора.')
+        return _status(
+            'needs_margin', 'Входного напряжения не хватает для стабильной работы линейного стабилизатора.'
+        )
     if junction_c >= max_junction_c:
-        return _status('overheat', 'Расчетная температура выше допустимой: нужен радиатор, меньший ток или другой узел питания.')
+        return _status(
+            'overheat',
+            'Расчетная температура выше допустимой: нужен радиатор, меньший ток или другой узел питания.',
+        )
     if margin < 20:
         return _status('risk', 'Запас по температуре меньше 20 °C: схема работает на грани.')
     return _status('ok', 'Тепловой режим выглядит нормально, запас достаточный.')
@@ -141,12 +147,14 @@ def calculate_lab(kind, payload):
             'feedback': 'Неизвестный расчет инженерной лаборатории.',
         }
     result = calculators[kind](payload or {})
-    result.update({
-        'ok': True,
-        'kind': kind,
-        'title': LAB_TOOL_MAP[kind]['title'],
-        'validation_backend': ENGINEERING_VALIDATION_BACKEND,
-    })
+    result.update(
+        {
+            'ok': True,
+            'kind': kind,
+            'title': LAB_TOOL_MAP[kind]['title'],
+            'validation_backend': ENGINEERING_VALIDATION_BACKEND,
+        }
+    )
     return result
 
 
@@ -168,7 +176,9 @@ def _calculate_transistor_switch(payload):
     if input_voltage <= vbe:
         assessment = _status('needs_margin', 'Управляющее напряжение ниже Vbe: ключ не откроется надежно.')
     elif load_resistor <= 0:
-        assessment = _status('risk', 'Для выбранного питания и нагрузки не остается напряжения на резистор нагрузки.')
+        assessment = _status(
+            'risk', 'Для выбранного питания и нагрузки не остается напряжения на резистор нагрузки.'
+        )
     elif transistor_power > 0.5:
         assessment = _status('risk', 'Мощность на транзисторе уже заметная: проверьте корпус и радиатор.')
     else:
@@ -198,9 +208,13 @@ def _calculate_ne555_astable(payload):
     duty_cycle = high_time / period * 100
 
     if duty_cycle > 80:
-        assessment = _status('risk', 'Скважность сильно смещена к высокому уровню: для симметрии нужна другая схема или диод.')
+        assessment = _status(
+            'risk', 'Скважность сильно смещена к высокому уровню: для симметрии нужна другая схема или диод.'
+        )
     elif frequency > 100_000:
-        assessment = _status('risk', 'Частота высоковата для базового NE555: проверьте datasheet и паразитные емкости.')
+        assessment = _status(
+            'risk', 'Частота высоковата для базового NE555: проверьте datasheet и паразитные емкости.'
+        )
     else:
         assessment = _status('ok', 'Режим генератора выглядит нормальным для учебной астабильной схемы.')
 
@@ -323,7 +337,11 @@ def extract_measurement(simulation_result, metric, rubric=None):
 
     if metric == 'node_voltage':
         node = str(rubric.get('node') or rubric.get('target_node') or '')
-        for node_map in (simulation_result.get('node_voltages'), simulation_result.get('nodeVoltages'), simulation_result.get('voltages')):
+        for node_map in (
+            simulation_result.get('node_voltages'),
+            simulation_result.get('nodeVoltages'),
+            simulation_result.get('voltages'),
+        ):
             if isinstance(node_map, dict):
                 if node and node in node_map:
                     return _parse_number(node_map[node])
@@ -335,7 +353,11 @@ def extract_measurement(simulation_result, metric, rubric=None):
 
     if metric == 'branch_current':
         branch = str(rubric.get('branch') or rubric.get('component') or '')
-        for current_map in (simulation_result.get('branch_currents'), simulation_result.get('branchCurrents'), simulation_result.get('currents')):
+        for current_map in (
+            simulation_result.get('branch_currents'),
+            simulation_result.get('branchCurrents'),
+            simulation_result.get('currents'),
+        ):
             if isinstance(current_map, dict) and branch in current_map:
                 return _parse_number(current_map[branch])
 

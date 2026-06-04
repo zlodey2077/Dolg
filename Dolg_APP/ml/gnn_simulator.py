@@ -20,6 +20,7 @@ Phase 2 (post-defense): расширение на токи ветвей + transi
 Fallback: если torch не установлен или модель не загружена — возвращаем None
 и caller использует ngspice как обычно.
 """
+
 from __future__ import annotations
 
 import logging
@@ -33,19 +34,18 @@ def _require_torch():
     try:
         import torch  # type: ignore
         from torch import nn  # type: ignore
+
         return torch, nn
     except ImportError as exc:
-        raise RuntimeError(
-            'PyTorch не установлен. Запустите: pip install -r requirements-ai.txt'
-        ) from exc
+        raise RuntimeError('PyTorch не установлен. Запустите: pip install -r requirements-ai.txt') from exc
 
 
 # Размерности feature-векторов
-NODE_FEATURE_DIM = 16   # degree + типы соседей + has_source + is_ground + ...
-EDGE_FEATURE_DIM = 8    # R/L/C/V values normalized + component type one-hot
+NODE_FEATURE_DIM = 16  # degree + типы соседей + has_source + is_ground + ...
+EDGE_FEATURE_DIM = 8  # R/L/C/V values normalized + component type one-hot
 HIDDEN_DIM = 64
 NUM_GRAPH_CONV_LAYERS = 3
-MAX_NODES = 256         # cap for batch processing
+MAX_NODES = 256  # cap for batch processing
 
 
 def build_node_features(scheme_data: dict) -> tuple[list[list[float]], dict[str, int]]:
@@ -86,8 +86,12 @@ def build_node_features(scheme_data: dict) -> tuple[list[list[float]], dict[str,
     # Step 3: build features per node
     features = []
     type_to_onehot = {
-        'resistor': 0, 'capacitor': 1, 'inductor': 2,
-        'diode': 3, 'battery': 4, 'ground': 4,
+        'resistor': 0,
+        'capacitor': 1,
+        'inductor': 2,
+        'diode': 3,
+        'battery': 4,
+        'ground': 4,
     }
     for c in components:
         cid = c.get('id') or ''
@@ -104,8 +108,10 @@ def build_node_features(scheme_data: dict) -> tuple[list[list[float]], dict[str,
             onehot[type_to_onehot[ctype]] = 1.0
         feat = [
             float(deg),
-            is_ground, is_source,
-            is_passive, is_active,
+            is_ground,
+            is_source,
+            is_passive,
+            is_active,
             *onehot,
             *([0.0] * 6),  # reserved (degree squared, neighbour sum, etc.)
         ]
@@ -113,7 +119,9 @@ def build_node_features(scheme_data: dict) -> tuple[list[list[float]], dict[str,
     return features, node_map
 
 
-def build_edge_features(scheme_data: dict, node_map: dict[str, int]) -> tuple[list[tuple[int, int]], list[list[float]]]:
+def build_edge_features(
+    scheme_data: dict, node_map: dict[str, int]
+) -> tuple[list[tuple[int, int]], list[list[float]]]:
     """Edge index + features. Каждый edge — connection между двумя компонентами.
 
     Edge features:
@@ -141,9 +149,9 @@ def build_edge_features(scheme_data: dict, node_map: dict[str, int]) -> tuple[li
         v = float(f_comp.get('voltage') or 0)
         feat = [
             _safe_log10(r),
-            _safe_log10(c * 1e-6),    # uF → F
+            _safe_log10(c * 1e-6),  # uF → F
             _safe_log10(ind * 1e-3),  # mH → H
-            v / 50.0,                  # voltage normalized по ~50В range
+            v / 50.0,  # voltage normalized по ~50В range
             *([0.0] * 4),
         ]
         edge_features.append(feat[:EDGE_FEATURE_DIM])
@@ -154,6 +162,7 @@ def _safe_log10(v):
     if v <= 0:
         return -10.0
     import math
+
     return math.log10(v) / 10.0  # normalize to ~[-1, 1]
 
 
@@ -243,7 +252,11 @@ class GNNSimulator:
                 return None
             edges, edge_feats = build_edge_features(scheme_data, node_map)
             x = torch.tensor(features, dtype=torch.float32)
-            ef = torch.tensor(edge_feats, dtype=torch.float32) if edge_feats else torch.zeros((0, EDGE_FEATURE_DIM))
+            ef = (
+                torch.tensor(edge_feats, dtype=torch.float32)
+                if edge_feats
+                else torch.zeros((0, EDGE_FEATURE_DIM))
+            )
             with torch.no_grad():
                 voltages = self.model(x, edges, ef)
             # Map back to component IDs
@@ -254,7 +267,9 @@ class GNNSimulator:
             return None
 
 
-def benchmark_against_ngspice(scheme_data: dict, ngspice_voltages: dict[str, float], model: GNNSimulator) -> dict:
+def benchmark_against_ngspice(
+    scheme_data: dict, ngspice_voltages: dict[str, float], model: GNNSimulator
+) -> dict:
     """Сравнение GNN-предсказаний с ngspice baseline.
 
     Возвращает: {mean_abs_err, max_abs_err, mean_rel_err}
