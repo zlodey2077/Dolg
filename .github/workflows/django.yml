@@ -19,8 +19,12 @@ jobs:
         run: ruff check Dolg_APP shop accounts orders knowledge Dolg_PR
       - name: Ruff format check
         run: |
-          ruff --version
-          ruff format --check --diff Dolg_APP shop accounts orders knowledge Dolg_PR
+          ruff --version | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```diff' >> "$GITHUB_STEP_SUMMARY"
+          ruff format --check --diff Dolg_APP shop accounts orders knowledge Dolg_PR 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          status=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
   security:
     runs-on: ubuntu-latest
@@ -39,7 +43,13 @@ jobs:
         # --strict: fail при любой ошибке.
         # Падающие dev-зависимости исключаем через --ignore-vuln если
         # появятся шумные false-positives.
-        run: pip-audit --requirement requirements.txt --no-deps --strict --vulnerability-service osv
+        run: |
+          pip-audit --version | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          pip-audit --requirement requirements.txt --no-deps --strict --vulnerability-service osv 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          status=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
   test:
     runs-on: ubuntu-latest
