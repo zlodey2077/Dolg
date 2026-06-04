@@ -220,7 +220,75 @@
 | 13.17 | Secret scanning alerts (GitHub native, public repo only) | ❓ | 🟧 | 1 клик |
 | 13.18 | Push protection (отказ push'а с обнаруженным secret'ом) | ❓ | 🟧 | 1 клик |
 
-## 14. Docker / K8s roadmap (явный запрос юзера на будущее)
+## 14. Runtime detection / IDS / anomaly response (запрос юзера 2026-06-04)
+
+Связка «детектор + автоматический response» — чтобы я меньше «выдумывал»
+проблемы, а реальные подозрительные действия отлавливались утилитами.
+DOLG сейчас закрыт django-axes (только login). Расширяем.
+
+### 14.A — Host / network уровень
+
+| # | Что | Тип | Состояние | Прио | Усилие |
+|---|---|---|---|---|---|
+| 14.1 | **CrowdSec** (open-source, замена fail2ban + crowdsourced IP-reputation) — детект подозрительных HTTP-паттернов (SQL-i, XSS, scanners) + автоматический block через nginx-bouncer | network-IDS + auto-block | ❌ | 🔥 | 1 ч (deb-пакет + nginx bouncer) |
+| 14.2 | fail2ban на SSH (5 неудачных → 1ч ban) | network | ❓ нужно глянуть `yc-bootstrap.sh` | 🟧 | 5 мин |
+| 14.3 | **Falco** (eBPF runtime security для контейнеров) — детект suspicious syscalls (`/etc/shadow` read, reverse shell и т.п.) | container runtime | ❌ — нужен K8s или docker | 📚 | post-K8s (см § 16) |
+| 14.4 | **Wazuh** (host-IDS, FIM + log monitoring + rootcheck) | HIDS | ❌ | 📚 | 4-6 ч setup |
+| 14.5 | Auditd на хосте (audit-trail для критичных файлов/процессов) | host | ❌ | 🟧 | 30 мин policy |
+| 14.6 | **ModSecurity / Coraza** в nginx (WAF с OWASP CRS) — режет SQL-i/XSS на L7 до Django | WAF | ❌ | 🟧 | 1 ч |
+| 14.7 | **Cloudflare WAF rules** — Custom Rules (rate limit per-IP, geo-block, bot fight) | edge WAF | 🟡 базовые правила работают, кастомные не настроены | 🟧 | 30 мин на dashboard |
+
+### 14.B — Application уровень (circuit breakers / kill switches)
+
+| # | Что | Состояние | Прио | Усилие |
+|---|---|---|---|---|
+| 14.8 | **Axes расширить за пределы login** — на /api/ai/chat/, /cad/api/import/, /reviews/ создать кастомные failure-точки (axes имеет `lockout_callable`) | 🟡 axes есть, но только login | 🔥 | 1 ч |
+| 14.9 | **Honeypot endpoints** — `/wp-admin/`, `/.env`, `/phpmyadmin/` → middleware ловит → bans IP в axes/CrowdSec → 1 строка лога | ❌ | 🟧 | 30 мин |
+| 14.10 | **Honeypot fields** в формах регистрации (hidden input — если заполнен, бот) | ❌ | 🟢 | 15 мин |
+| 14.11 | **Feature kill switches** — `FEATURE_FLAGS` модель: `ai_chat_enabled`, `lithium_import_enabled`, `simulation_enabled` — админ может отрубить одной кнопкой при инциденте | ❌ | 🟧 | 2 ч |
+| 14.12 | **Circuit breaker для AI/ML endpoints** — если error rate за 5 мин >20%, фича авто-отключается на 10 мин, в Sentry летит alert | ❌ | 🟧 | 2 ч (см. `pybreaker` либа — dev-tooling, можно ставить) |
+| 14.13 | **Rate limit per-user** на тяжёлые операции (поверх существующих daily-quota) — мгновенный per-minute throttle | 🟡 daily quota есть, per-minute нет | 🟧 | 1 ч |
+| 14.14 | **Admin-action audit trail** — каждое staff-действие (delete, edit чужого) → `AdminAuditLog` модель + Sentry breadcrumb | 🟡 ProjectEvent для project-mutations есть, для остального нет | 🟧 | 2 ч |
+| 14.15 | **Anomaly alert** — если суточный traffic вырос в 3× — Telegram-bot пишет «спай» | ❌ | 🟢 | 1 ч (management command + cron) |
+| 14.16 | **Anti-CSRF на admin-actions через двойной HMAC** — если паранойя, действия типа «delete project» требуют второй token из почты | ❌ | 📚 | — |
+
+### 14.C — Bug tracking (для того, чтобы я не выдумывал, что упустил)
+
+| # | Что | Состояние | Прио | Усилие |
+|---|---|---|---|---|
+| 14.17 | **Sentry** — error/exception tracking | ✅ `sentry-sdk` в requirements, активируется env | — | — |
+| 14.18 | **GlitchTip** — self-hosted Sentry-совместимый, если хочется без облака | ❌ | 📚 | post-defense |
+| 14.19 | **Sentry performance monitoring** — slow queries, slow views | ❌ — sentry-sdk умеет, нужен `traces_sample_rate` | 🟧 | 5 мин config |
+| 14.20 | **`django-silk` или `django-debug-toolbar`** в dev/staging — профилирование запросов | ❌ | 🟢 | 10 мин (dev only) |
+| 14.21 | **`django-health-check`** — `/healthz/` с DB/cache/storage/Sentry/Stripe API status | ❌ | 🟧 | 15 мин |
+| 14.22 | **Uptime monitor** (UptimeRobot бесплатно, или CrowdSec community alerts) | ❌ | 🟢 | 5 мин |
+
+## 15. Углублённая чистка файлов с access-control (запрос юзера 2026-06-04)
+
+Сверх § 12 — не просто удалить/переместить, но и закрыть доступ к
+перенесённым артефактам, чтобы случайный gh-clone'ер не видел диплом-
+доки/презы/секреты.
+
+| # | Что | Состояние | Прио | Усилие |
+|---|---|---|---|---|
+| 15.1 | **Diploma `.docx`/`.pptx` из git → вне репо** | в `docs/` лежат `Диплом_DOLG_финальная_редакция_*.docx` (3 МБ), `Презентация_DOLG_основная_защита_*.pptx` (3 МБ), `Речь_и_вопросы_к_защите_*.docx` (40 КБ) — это PII (мой текст + сведения) | 🔥 | 30 мин: перенести в `~/Documents/DOLG_diploma_artifacts/`, симлинк в `docs/local/` (gitignored), git-rm из репо. Git history scrub через `git filter-repo` |
+| 15.2 | **`docs/diploma_assets/generated/`** (новые ассеты, не закоммичены) — в `.gitignore` если не нужны под версионированием | ❓ | 🟧 | 5 мин |
+| 15.3 | **`backups/` за пределы репо** — `~/.dolg-backups/` (gitignored ✅), но добавить encryption-at-rest через `age -p` (или `gpg --symmetric`) | 🟡 gitignored, не зашифрованы | 🟧 | 1 ч (расширить `hourly-snapshot.bat`) |
+| 15.4 | **`media/products/`, `media/avatars/` chmod 750** на проде (group www-data, не world-readable) | ❓ | 🟧 | nginx config + chmod |
+| 15.5 | **`.env` chmod 600** + audit `git ls-files` что не закоммичен | ✅ gitignored, нужно проверить chmod на проде | 🟧 | 5 мин |
+| 15.6 | **`deploy/cloudflared.exe` (65 МБ binary)** — gitignored ✅, проверить что нет в истории | ✅ check | 🟢 | 5 мин (`git log --all --full-history -- deploy/cloudflared.exe`) |
+| 15.7 | **Login-required доступ к `/static/screenshots/` и `/static/cad/templates/`** через nginx `auth_request` или Django serve — внутренние demo-материалы | ❌ | 🟧 | 30 мин |
+| 15.8 | **`docs/`-папка с tier'ами** — `docs/public/` (README, ARCHITECTURE, DEPLOY) и `docs/internal/` (planning, security backlog, gap analyses) с .htaccess/nginx deny если репо публичный | ❌ | 🟢 | 30 мин (если защищаем приватность планов) |
+| 15.9 | **EXIF strip с upload'ов** — Pillow `image.info` чистка GPS-координат и devicе info при сохранении продуктовых фото | ❌ | 🟧 | 15 мин (`piexif` или ручной clean) |
+| 15.10 | **db.sqlite3** — gitignored ✅, но на проде шифровать ФС-уровнем (LUKS на YC volume) | 🟡 plain | 📚 | — |
+| 15.11 | **`importtime_check.log`** — снёс ✅ commit `837a59c` | ✅ | — | — |
+| 15.12 | **`scripts/archive/`** — старые genenrator'ы перенести; **gitignore** их или закоммитить как archive read-only | ❌ | 🟧 | 30 мин |
+| 15.13 | **`.claude/` и `~/.claude/projects/`** memory-файлы со ВСЕЙ моей перепиской — НЕ в репо ✅ (это локальная папка Claude), но проверить что нигде не закоммитили | ✅ check | — | — |
+| 15.14 | **Audit `git log -p` на любые секреты в history** — = H5 (gitleaks) — ⚠ результат может потребовать `git filter-repo` + force-push | ❌ | 🔥 | см. H5 |
+| 15.15 | **Презентации с avatar/email в metadata** — pptx содержит автора, проверить «Свойства документа» в Office перед коммитом | ❓ | 🟢 | manual |
+| 15.16 | **`media/ml/`** — ML модели/датасеты gitignored ✅, проверить .gitattributes для LFS если будут >100МБ | 🟡 | 🟢 | 10 мин |
+
+## 16. Docker / K8s roadmap (явный запрос юзера на будущее)
 
 | # | Что | Состояние | Прио | Усилие |
 |---|---|---|---|---|
