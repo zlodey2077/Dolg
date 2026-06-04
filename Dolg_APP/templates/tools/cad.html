@@ -2598,7 +2598,136 @@ function onKeyDown(e) {
         else if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey) {
             e.preventDefault(); openArrayDialog();
         }
+        else if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            e.preventDefault(); saveSelectionAsUserBlock();
+        }
     }
+    if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && e.shiftKey) {
+        e.preventDefault(); openUserBlocksLibrary();
+    }
+}
+
+// Пользовательские блоки: serialize выделение → localStorage, потом вставка
+// как нового кластера объектов в текущий слой. Аналогично готовым ГОСТ-
+// шаблонам, только source — собственная библиотека юзера, persistent между
+// сессиями.
+const _USER_BLOCKS_KEY = 'dolg.cad.userBlocks';
+
+function _loadUserBlocks() {
+    try { return JSON.parse(localStorage.getItem(_USER_BLOCKS_KEY) || '[]'); }
+    catch (_e) { return []; }
+}
+function _saveUserBlocks(blocks) {
+    try { localStorage.setItem(_USER_BLOCKS_KEY, JSON.stringify(blocks)); }
+    catch (_e) { /* квота — игнорируем */ }
+}
+
+function saveSelectionAsUserBlock() {
+    const selected = selectionObjects();
+    if (!selected.length) return;
+    const name = prompt('Имя блока:', `Block_${_loadUserBlocks().length + 1}`);
+    if (!name) return;
+    const bbox = _selectionBbox(selected);
+    if (!bbox) return;
+    // Нормализуем координаты — bbox.minX/minY → (0, 0). При вставке
+    // блока юзер укажет позицию, и мы прибавим её.
+    const objects = selected.map(o => {
+        const clone = JSON.parse(JSON.stringify(o));
+        translateObject(clone, -bbox.minX, -bbox.minY);
+        return clone;
+    });
+    const block = {
+        id: Date.now(),
+        name: name.trim().slice(0, 60),
+        width: bbox.maxX - bbox.minX,
+        height: bbox.maxY - bbox.minY,
+        objects,
+        created: new Date().toISOString(),
+    };
+    const blocks = _loadUserBlocks();
+    blocks.push(block);
+    _saveUserBlocks(blocks);
+    if (typeof showCadToast === 'function') showCadToast(`✓ Блок «${block.name}» сохранён (${objects.length} объектов)`);
+    else alert(`Блок «${block.name}» сохранён (${objects.length} объектов).`);
+}
+
+function openUserBlocksLibrary() {
+    const blocks = _loadUserBlocks();
+    const bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed; inset:0; background:rgba(5,10,25,0.92); backdrop-filter:blur(4px); z-index:99996; display:flex; align-items:center; justify-content:center; padding:20px;';
+    const cards = blocks.length
+        ? blocks.map((b, i) => `<div class="_userBlockCard" data-i="${i}" style="background:rgba(0,0,0,0.3); border:1px solid rgba(0,212,255,0.25); border-radius:8px; padding:12px 14px; cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:8px;"><strong style="color:#cfe;">${b.name}</strong>
+                <button class="_userBlockDel" data-i="${i}" title="Удалить" style="margin-left:auto; background:transparent; border:1px solid rgba(255,138,138,0.4); color:#ff9090; width:24px; height:24px; border-radius:4px; cursor:pointer;">✕</button>
+            </div>
+            <div style="color:#94a3b8; font-size:0.78rem; margin-top:4px;">${b.objects.length} объектов · ${Math.round(b.width)}×${Math.round(b.height)} px</div>
+            <div style="color:rgba(0,212,255,0.55); font-size:0.7rem; margin-top:3px;">${b.created ? new Date(b.created).toLocaleDateString('ru') : ''}</div>
+        </div>`).join('')
+        : '<p style="color:#94a3b8; text-align:center; padding:20px;">— нет сохранённых блоков —<br><span style="font-size:0.85rem;">Выдели объекты и нажми <kbd>B</kbd> чтобы сохранить.</span></p>';
+    bg.innerHTML = `<div style="background:linear-gradient(135deg,rgba(10,14,39,0.98),rgba(26,39,68,0.98)); border:2px solid #00d4ff; border-radius:14px; max-width:640px; width:100%; max-height:80vh; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(0,212,255,0.2); background:rgba(0,0,0,0.25);">
+            <h2 style="color:#00d4ff; font-size:1.1rem; font-weight:600; margin:0;">📦 Мои блоки</h2>
+            <span style="color:#94a3b8; font-size:0.85rem;">${blocks.length} шт.</span>
+            <button id="_blkClose" style="margin-left:auto; background:transparent; border:1px solid rgba(255,138,138,0.4); color:#ff9090; width:30px; height:30px; border-radius:6px; cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding:18px 22px; display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px;">${cards}</div>
+        <div style="padding:10px 20px; background:rgba(0,0,0,0.25); color:#94a3b8; font-size:0.78rem; border-top:1px solid rgba(0,212,255,0.18);">
+            💡 Клик по блоку — вставить в центр текущего viewport. ✕ — удалить из библиотеки.
+            Сохраняется в localStorage браузера.
+        </div>
+    </div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#_blkClose').onclick = () => bg.remove();
+    bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+    bg.querySelectorAll('._userBlockCard').forEach(card => {
+        card.addEventListener('click', e => {
+            if (e.target.closest('._userBlockDel')) return;
+            insertUserBlock(parseInt(card.dataset.i, 10));
+            bg.remove();
+        });
+    });
+    bg.querySelectorAll('._userBlockDel').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const i = parseInt(btn.dataset.i, 10);
+            const blks = _loadUserBlocks();
+            if (confirm(`Удалить блок «${blks[i]?.name}»?`)) {
+                blks.splice(i, 1);
+                _saveUserBlocks(blks);
+                bg.remove();
+                openUserBlocksLibrary();
+            }
+        });
+    });
+}
+
+function insertUserBlock(index) {
+    const block = _loadUserBlocks()[index];
+    if (!block) return;
+    const layer = State.layers.find(l => l.id === State.currentLayerId);
+    if (!layer) return;
+    // Центр viewport в world coords
+    const rect = State.canvas.getBoundingClientRect();
+    const cx = ((rect.width / 2 - State.panX) / State.zoom) - block.width / 2;
+    const cy = ((rect.height / 2 - State.panY) / State.zoom) - block.height / 2;
+    const copies = [];
+    let counter = Date.now();
+    for (const proto of block.objects) {
+        const copy = JSON.parse(JSON.stringify(proto));
+        copy.id = ++counter;
+        translateObject(copy, cx, cy);
+        layer.objs.push(copy);
+        copies.push(copy);
+    }
+    State.objects = State.layers.flatMap(l => l.objs);
+    setCadSelection(copies);
+    saveHistory();
+    render();
+    renderSelectedObjPanel();
+    if (typeof renderDrcPanel === 'function') renderDrcPanel();
+    if (typeof renderBomPanel === 'function') renderBomPanel();
+    document.getElementById('objCountSpan').textContent = `Объектов: ${State.objects.length}`;
+    if (typeof showCadToast === 'function') showCadToast(`✓ Блок «${block.name}» вставлен`);
 }
 
 // AutoCAD-стиль массив: прямоугольная сетка ИЛИ круговой паттерн вокруг центра.
