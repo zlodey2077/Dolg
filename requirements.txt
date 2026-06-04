@@ -79,7 +79,7 @@ tzdata==2026.1
 urllib3==2.7.0
 # .env подгрузка — settings.py загружает HF_TOKEN, SECRET_KEY и т.п.
 # из BASE_DIR/.env при старте. Без него env-vars нужно задавать в shell.
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 z3-solver==4.16.0.0
 
 # ─── Observability / monitoring stack ──────────────────────────────
