@@ -64,7 +64,7 @@
 | 3.6 | Anthropic API key rotation | ❌ ручная rotation, no automated | 📚 | — |
 | 3.7 | Database encryption at rest | ❌ SQLite plain file. Postgres + pgcrypto — post-defense | 📚 | — |
 | 3.8 | Encrypted backups | 🟡 `backups/` создаются, но без шифрования | 🟧 | 30 мин (`age` или `gpg`) |
-| 3.9 | Secrets manager (Vault / AWS SM / sops) | ❌ env-vars сейчас в plaintext | 📚 | — |
+| 3.9 | **Secrets manager — HashiCorp Vault + GitOps** | ❌ env-vars сейчас в plaintext. После K8s — Vault Secrets Operator ([ricoberger/vault-secrets-operator](https://github.com/ricoberger/vault-secrets-operator)) синхронизирует Vault → K8s `Secret` через Custom Resources, прокидывается через Flux/Argo (см § 16.6) | 📚 | post-K8s, 1 день |
 | 3.10 | TLS на всех соединениях (cert auto-renewal) | ✅ Cloudflare Tunnel terminates TLS | — | — |
 | 3.11 | Hash алгоритм для паролей | ✅ Django PBKDF2 (или Argon2 если установлен) | — | — |
 
@@ -292,15 +292,20 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 
 | # | Что | Состояние | Прио | Усилие |
 |---|---|---|---|---|
-| 12.1 | Dockerfile production-ready (multi-stage, slim, non-root) | 🟡 есть Dockerfile, нужна полировка | 🟢 | 1 ч |
-| 12.2 | docker-compose с health checks + resource limits | 🟡 есть compose, дополнить | 🟢 | 30 мин |
-| 12.3 | K8s Deployment + Service + Ingress | ❌ | 📚 | 1 день |
-| 12.4 | Helm chart | ❌ | 📚 | 1 день |
-| 12.5 | ArgoCD / Flux для GitOps | ❌ | 📚 | — |
-| 12.6 | Secrets через ExternalSecrets / Sealed Secrets | ❌ | 📚 | — |
-| 12.7 | HPA (Horizontal Pod Autoscaler) | ❌ | 📚 | — |
-| 12.8 | NetworkPolicy default-deny | ❌ | 📚 | — |
-| 12.9 | PodSecurityStandard `restricted` | ❌ | 📚 | — |
+| 16.1 | Dockerfile production-ready (multi-stage, slim, non-root) | 🟡 есть Dockerfile, нужна полировка | 🟢 | 1 ч |
+| 16.2 | docker-compose с health checks + resource limits | 🟡 есть compose, дополнить | 🟢 | 30 мин |
+| 16.3 | **`buildg`** — интерактивный отладчик Dockerfile с IDE-интеграцией (VS Code), breakpoints + step exec на build шагах, основан на BuildKit. [ktock/buildg](https://github.com/ktock/buildg) | ❌ | 🟢 (dev-tool, ставится по желанию при отладке billion-step Dockerfile) | 5 мин binary install |
+| 16.4 | K8s Deployment + Service + Ingress | ❌ | 📚 | 1 день |
+| 16.5 | Helm chart | ❌ | 📚 | 1 день |
+| 16.6 | **Vault Secrets Operator + ArgoCD/Flux GitOps**: коммит → Flux pull → applies → Vault Secrets Operator читает из HashiCorp Vault → создаёт K8s Secret. Operator: [ricoberger/vault-secrets-operator](https://github.com/ricoberger/vault-secrets-operator). Закрывает § 3.9 (Secrets manager) | ❌ | 📚 | 1 день setup Vault + 1 день operator |
+| 16.7 | Альтернатива 16.6 — **ExternalSecrets Operator** + AWS SM/Azure KV/GCP SM (если не хотим self-host Vault) | ❌ | 📚 | — |
+| 16.8 | **Sealed Secrets** (Bitnami) — простой вариант для маленького кластера, ключ encryption-at-rest шифрует секреты внутри git | ❌ | 📚 | 2 ч |
+| 16.9 | HPA (Horizontal Pod Autoscaler) | ❌ | 📚 | — |
+| 16.10 | NetworkPolicy default-deny | ❌ | 📚 | — |
+| 16.11 | PodSecurityStandard `restricted` | ❌ | 📚 | — |
+| 16.12 | **Falco** (см § 14.3) — eBPF runtime security для контейнеров | ❌ | 📚 | post-K8s |
+| 16.13 | **Trivy / Grype** container image scan в CI | ❌ | 🟧 | 15 мин CI step |
+| 16.14 | **Cosign / Sigstore** image signing | ❌ | 📚 | — |
 
 ---
 
