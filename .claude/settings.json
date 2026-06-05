@@ -10,7 +10,23 @@
             "PowerShell(Where-Object *)",
             "PowerShell(Select-Object *)",
             "PowerShell(Measure-Object *)",
-            "PowerShell(Format-Table *)"
+            "PowerShell(Format-Table *)",
+            "Bash(.venv/Scripts/ruff.exe *)",
+            "Bash(.venv/Scripts/python.exe -m py_compile *)",
+            "Bash(node --check *)"
+        ]
+    },
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "C:\\Users\\spieh\\Desktop\\DOLG_Diploma\\.venv\\Scripts\\python.exe C:\\Users\\spieh\\Desktop\\DOLG_Diploma\\scripts\\hook_post_edit_lint.py"
+                    }
+                ]
+            }
         ]
     }
 }
