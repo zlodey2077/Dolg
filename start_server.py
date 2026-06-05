@@ -57,6 +57,61 @@ def port_in_use(host, port):
         return False
 
 
+def free_port(port):
+    """Снять залипший python-сервер, слушающий port (zombie со старым кодом).
+
+    Бьём ТОЛЬКО процессы с именем python* — чтобы не задеть посторонние
+    приложения, которые могли занять этот порт. Возвращает список убитых PID.
+    Без psutil тихо ничего не делает (порт-проверка обработает ошибку выше).
+    """
+    killed = []
+    try:
+        import psutil
+    except Exception:
+        return killed
+    targets = {}
+    for conn in psutil.net_connections(kind='inet'):
+        try:
+            if not conn.laddr or conn.laddr.port != port:
+                continue
+            if conn.status != psutil.CONN_LISTEN or not conn.pid:
+                continue
+            proc = psutil.Process(conn.pid)
+            if 'python' not in proc.name().lower():
+                continue
+            # runserver с auto-reload = reloader-родитель + слушающий ребёнок.
+            # Убиваем оба, иначе родитель респавнит ребёнка и порт не освободится.
+            targets[proc.pid] = proc
+            try:
+                parent = proc.parent()
+                if parent and 'python' in parent.name().lower():
+                    targets[parent.pid] = parent
+                    for child in parent.children(recursive=True):
+                        targets[child.pid] = child
+            except Exception:
+                pass
+        except Exception:
+            continue
+    for pid, proc in targets.items():
+        try:
+            proc.terminate()
+            killed.append(pid)
+        except Exception:
+            continue
+    if killed:
+        gone, alive = [], []
+        try:
+            gone, alive = psutil.wait_procs([psutil.Process(pid) for pid in killed], timeout=3)
+        except Exception:
+            time.sleep(1.0)
+        for proc in alive:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    return killed
+
+
 def wait_tcp(host, port, timeout=25):
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -122,10 +177,36 @@ def banner(url):
     p('')
 
 
-def main():
-    p('[DOLG launcher] starting...')
+def jurigged_available():
+    try:
+        import jurigged  # noqa: F401
+        return True
+    except Exception:
+        return False
 
-    if not CLOUDFLARED.exists():
+
+def build_django_cmd(py, hot):
+    """Komanda zapuska Django. hot=True -> cherez jurigged (zhivoy hot-reload
+    bez restarta: pravki tel funktsiy primenyayutsya za <1 sek). Strukturnye
+    pravki (URL/model/settings) vse ravno trebuyut restarta."""
+    base = ['manage.py', 'runserver', '127.0.0.1:%d' % DJANGO_PORT, '--skip-checks']
+    if hot and jurigged_available():
+        watch = []
+        for app in ('Dolg_APP', 'shop', 'accounts', 'orders', 'knowledge', 'Dolg_PR'):
+            d = ROOT / app
+            if d.exists():
+                watch += ['--watch', str(d)]
+        # --noreload: shtatnyy Django-reloader vyklyuchen, perezagruzku vedet jurigged.
+        return [py, '-m', 'jurigged'] + watch + base + ['--noreload'], True
+    return [py] + base, False
+
+
+def main():
+    local_only = ('--local' in sys.argv) or ('--no-tunnel' in sys.argv)
+    hot = ('--hot' in sys.argv) and ('--no-hot' not in sys.argv)
+    p('[DOLG launcher] starting%s...' % (' (local only, no tunnel)' if local_only else ''))
+
+    if not local_only and not CLOUDFLARED.exists():
         p('[ERROR] cloudflared.exe ne nayden: %s' % CLOUDFLARED)
         input('\nEnter dlya vyhoda...')
         return 1
@@ -137,11 +218,17 @@ def main():
     p('             Cloudflared tunnel pereletivayet avtomaticheski (1-2 sek).')
 
     if port_in_use('127.0.0.1', DJANGO_PORT):
-        p('[ERROR] Port %d is already in use by another process.' % DJANGO_PORT)
-        p('        Close the other Django/server first, or use start_local.bat')
-        p('        to attach to the running instance.')
-        input('\nEnter dlya vyhoda...')
-        return 1
+        p('[INFO] Port %d zanyat — osvobozhdayu (snimayu zalipshie python-servery)...' % DJANGO_PORT)
+        killed = free_port(DJANGO_PORT)
+        if killed:
+            p('       Ostanovleny stale PID: %s' % ', '.join(str(k) for k in killed))
+            time.sleep(1.0)
+        if port_in_use('127.0.0.1', DJANGO_PORT):
+            p('[ERROR] Port %d vse eshe zanyat (NE nashim python-serverom).' % DJANGO_PORT)
+            p('        Zakroyte storonnee prilozhenie na etom portu i povtorite.')
+            input('\nEnter dlya vyhoda...')
+            return 1
+        p('       Port svoboden, startuyu svezhiy server.')
 
     env = os.environ.copy()
     env['DEBUG'] = 'True'
@@ -162,15 +249,22 @@ def main():
     # нам ничего делать не надо. Cloudflared tunnel при кратковременной потере
     # порта 8000 авто-переподключается. Раньше стоял --noreload из-за мнимого
     # «conflict с управлением subprocess» — на практике работает чисто.
+    django_cmd, hot_active = build_django_cmd(py, hot)
+    if hot and not hot_active:
+        p('      [WARN] --hot zaproshen, no jurigged ne ustanovlen. Obychnyy reload.')
+        p('             Postavit: .venv\\Scripts\\python.exe -m pip install jurigged')
+    if hot_active:
+        p('      [HOT] Hot-reload (jurigged): pravki tel funktsiy -> v zhivom protsesse za <1 sek.')
+        p('            Strukturnye pravki (URL/model/settings) trebuyut restarta okna.')
     django = subprocess.Popen(
         # --skip-checks: пропускаем системные проверки (-2..-5 сек на старте).
-        [py, 'manage.py', 'runserver', '127.0.0.1:%d' % DJANGO_PORT, '--skip-checks'],
+        django_cmd,
         cwd=str(ROOT), env=env,
         stdout=django_log, stderr=subprocess.STDOUT,
     )
 
-    if not wait_tcp('127.0.0.1', DJANGO_PORT, timeout=90):
-        p('[ERROR] Django ne podnyalsya za 90 sek. Log:')
+    if not wait_tcp('127.0.0.1', DJANGO_PORT, timeout=120):
+        p('[ERROR] Django ne podnyalsya za 120 sek. Log:')
         try:
             with open(django_log_path, encoding='utf-8') as f:
                 p(f.read()[-1500:])
@@ -182,75 +276,93 @@ def main():
 
     p('      OK')
 
-    p('')
-    p('[2/3] Zapuskayu Cloudflare Quick Tunnel...')
-
-    cf = subprocess.Popen(
-        [str(CLOUDFLARED), 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:%d' % DJANGO_PORT],
-        cwd=str(ROOT),
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,
-        creationflags=creation_flags_cf,
-    )
-
-    store = {'url': None, 'log': []}
-    t = threading.Thread(target=reader_thread, args=(cf.stdout, store), daemon=True)
-    t.start()
-
-    p('      Zhdu publichnyy URL...')
-    deadline = time.time() + 40
-    while time.time() < deadline and not store['url']:
-        if cf.poll() is not None:
-            p('[ERROR] cloudflared upal. Log:')
-            for ln in store['log'][-25:]:
-                p('  ' + ln)
-            django.terminate()
-            input('\nEnter dlya vyhoda...')
-            return 1
-        time.sleep(0.3)
-
-    if not store['url']:
-        p('[ERROR] Cloudflare ne dal URL za 40 sek. Log:')
-        for ln in store['log'][-30:]:
-            p('  ' + ln)
-        cf.terminate()
-        django.terminate()
-        input('\nEnter dlya vyhoda...')
-        return 1
-
-    public_url = store['url']
-    p('      URL: %s' % public_url)
-    p('')
-    p('[3/3] Tunnel ustanovlen, propagiruyu (10-30 sek)...')
-
-    # Цикл prefetch до 60 сек. Probe возвращает True при ЛЮБОМ HTTP-ответе
-    # (не только 200) — это значит туннель работает. 530 = «ещё не готов».
-    propag_deadline = time.time() + 60
-    propagated = False
-    while time.time() < propag_deadline:
-        if probe_url(public_url, timeout=6):
-            propagated = True
-            break
-        time.sleep(3)
-
-    if propagated:
-        p('      OK, tunnel otvetil.')
-    else:
-        p('[WARN] Tunnel ne otvetil za 60 sek. URL VSE RAVNO mozhet rabotat -')
-        p('       inogda Cloudflare propagiruet do 2 minut.')
-
-    banner(public_url)
-
-    # Открываем в браузере только если propagated — иначе юзер сразу
-    # увидит ошибку 1033 и расстроится.
-    if propagated:
+    cf = None
+    if local_only:
+        local_url = 'http://127.0.0.1:%d/' % DJANGO_PORT
+        line = '=' * 60
+        p('')
+        p(line)
+        p('              >>> DOLG GOTOV K TESTU (lokalno) <<<')
+        p(line)
+        p('')
+        p('       ' + local_url)
+        p('')
+        p('   Auto-reload AKTIVEN (.py / urls.py). Ctrl+C ili zakroyte okno dlya ostanovki.')
+        p('')
         try:
-            webbrowser.open(public_url)
+            webbrowser.open(local_url)
         except Exception:
             pass
     else:
-        p('   Brauzer NE otkryl avtomaticheski (tunnel eshe greetsya).')
-        p('   Skoporiy URL vyshe i otkroy vruchnuyu cherez 30-60 sek.')
         p('')
+        p('[2/3] Zapuskayu Cloudflare Quick Tunnel...')
+
+        cf = subprocess.Popen(
+            [str(CLOUDFLARED), 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:%d' % DJANGO_PORT],
+            cwd=str(ROOT),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,
+            creationflags=creation_flags_cf,
+        )
+
+        store = {'url': None, 'log': []}
+        t = threading.Thread(target=reader_thread, args=(cf.stdout, store), daemon=True)
+        t.start()
+
+        p('      Zhdu publichnyy URL...')
+        deadline = time.time() + 40
+        while time.time() < deadline and not store['url']:
+            if cf.poll() is not None:
+                p('[ERROR] cloudflared upal. Log:')
+                for ln in store['log'][-25:]:
+                    p('  ' + ln)
+                django.terminate()
+                input('\nEnter dlya vyhoda...')
+                return 1
+            time.sleep(0.3)
+
+        if not store['url']:
+            p('[ERROR] Cloudflare ne dal URL za 40 sek. Log:')
+            for ln in store['log'][-30:]:
+                p('  ' + ln)
+            cf.terminate()
+            django.terminate()
+            input('\nEnter dlya vyhoda...')
+            return 1
+
+        public_url = store['url']
+        p('      URL: %s' % public_url)
+        p('')
+        p('[3/3] Tunnel ustanovlen, propagiruyu (10-30 sek)...')
+
+        # Цикл prefetch до 60 сек. Probe возвращает True при ЛЮБОМ HTTP-ответе
+        # (не только 200) — это значит туннель работает. 530 = «ещё не готов».
+        propag_deadline = time.time() + 60
+        propagated = False
+        while time.time() < propag_deadline:
+            if probe_url(public_url, timeout=6):
+                propagated = True
+                break
+            time.sleep(3)
+
+        if propagated:
+            p('      OK, tunnel otvetil.')
+        else:
+            p('[WARN] Tunnel ne otvetil za 60 sek. URL VSE RAVNO mozhet rabotat -')
+            p('       inogda Cloudflare propagiruet do 2 minut.')
+
+        banner(public_url)
+
+        # Открываем в браузере только если propagated — иначе юзер сразу
+        # увидит ошибку 1033 и расстроится.
+        if propagated:
+            try:
+                webbrowser.open(public_url)
+            except Exception:
+                pass
+        else:
+            p('   Brauzer NE otkryl avtomaticheski (tunnel eshe greetsya).')
+            p('   Skoporiy URL vyshe i otkroy vruchnuyu cherez 30-60 sek.')
+            p('')
 
     try:
         while True:
@@ -258,7 +370,7 @@ def main():
             if django.poll() is not None:
                 p('\n[!] Django process died.')
                 break
-            if cf.poll() is not None:
+            if cf is not None and cf.poll() is not None:
                 p('\n[!] Cloudflared process died.')
                 break
     except KeyboardInterrupt:
@@ -268,7 +380,7 @@ def main():
         # CREATE_NEW_PROCESS_GROUP (т.е. cloudflared). Django был запущен
         # без флага — посылка CTRL_BREAK туда упадёт с ValueError, поэтому
         # для него сразу .terminate().
-        graceful = [(cf, 'cloudflared', True), (django, 'django', False)]
+        graceful = ([(cf, 'cloudflared', True)] if cf is not None else []) + [(django, 'django', False)]
         for proc, name, can_ctrl_break in graceful:
             try:
                 if proc.poll() is None:

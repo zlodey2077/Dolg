@@ -112,6 +112,10 @@ djangorestframework==3.16.1
 mypy==1.18.2
 django-stubs==5.2.5
 pre-commit==4.6.0
+# jurigged — hot-reload: правки тел функций применяются в живом процессе
+# за <1с без рестарта (start_local.bat --hot). Работает на Py3.14 (reloadium —
+# только <=3.11). Структурные правки (URL/model/settings) всё равно требуют рестарт.
+jurigged==0.6.1
 
 # ─── РЭБ-killer feature ────────────────────────────────────────────
 # RF-анализ: S-параметры, Smith chart, передаточные функции. Опциональный
