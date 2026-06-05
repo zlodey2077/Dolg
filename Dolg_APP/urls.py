@@ -101,6 +101,7 @@ urlpatterns = [
     ),
     path('projects/review/<int:review_id>/', views.project_review_page, name='project_review_page'),
     path('projects/review/<int:review_id>.pdf', views.project_review_pdf, name='project_review_pdf'),
+    path('projects/review/<int:review_id>.md', views.project_review_md, name='project_review_md'),
     path('simulation/api/pro/fft/', views.api_simulation_fft, name='api_simulation_fft'),
     path('simulation/api/pro/bode/', views.api_simulation_bode, name='api_simulation_bode'),
     path(

@@ -2200,6 +2200,18 @@ def project_review_pdf(request, review_id):
 
 
 @login_required(login_url='accounts:login')
+def project_review_md(request, review_id):
+    """Авто-протокол инженерной проверки в Markdown (для вставки в диплом/отчёты)."""
+    from .services.protocol_report import render_review_markdown
+
+    review = _review_for_read(request.user, review_id)
+    markdown = render_review_markdown(_review_to_dict(review), review.project)
+    response = HttpResponse(markdown, content_type='text/markdown; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="dolg_protocol_{review.id}.md"'
+    return response
+
+
+@login_required(login_url='accounts:login')
 @require_POST
 def api_cad_import_preview(request):
     data = _read_json_payload(request)

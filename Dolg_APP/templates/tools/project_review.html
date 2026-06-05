@@ -497,6 +497,7 @@
             <p class="review-summary">{{ review_display.summary }}</p>
             <div class="review-actions">
                 <a href="{% url 'hello:project_review_pdf' review.id %}">PDF-отчет</a>
+                <a href="{% url 'hello:project_review_md' review.id %}">Протокол .md</a>
                 <a href="{% url 'hello:simulation' %}?project={{ project.id }}">Открыть в симуляторе</a>
                 <a href="{% url 'hello:projects' %}">К проектам</a>
             </div>
