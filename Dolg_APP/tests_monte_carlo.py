@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 
 from Dolg_APP.services.monte_carlo import (
+    MAX_ITERATIONS,
     run_monte_carlo,
+    run_tolerance_analysis,
+    run_worst_case,
     scheme_to_circuit,
     solve_dc,
 )
@@ -86,7 +89,7 @@ def test_monte_carlo_empty_scheme():
 def test_monte_carlo_clamps_iterations():
     """Слишком большое N зажимается MAX_ITERATIONS."""
     result = run_monte_carlo(_voltage_divider(), iterations=100000, tolerance=0.05, seed=1)
-    assert result['iterations'] <= 5000
+    assert result['iterations'] <= MAX_ITERATIONS
 
 
 def test_monte_carlo_reproducible_with_seed():
@@ -109,3 +112,76 @@ def test_monte_carlo_tolerance_edge_values(tolerance):
     """Tolerance клампится в [0, 0.5]."""
     result = run_monte_carlo(_voltage_divider(), iterations=50, tolerance=tolerance, seed=1)
     assert 0.0 <= result['tolerance'] <= 0.5
+
+
+def test_monte_carlo_reports_nominal():
+    """В отчёте есть номинал (без джиттера): делитель 9V/(1k+2k) → 6V на узле."""
+    result = run_monte_carlo(_voltage_divider(), iterations=100, seed=1)
+    assert any(abs(v - 6.0) < 1e-3 for v in result['nominal'].values())
+
+
+# ─── Worst-case / corner analysis ────────────────────────────────────────
+def test_worst_case_envelope_brackets_nominal():
+    """Угловой анализ: огибающая узла охватывает номинал, полный перебор 2^3."""
+    wc = run_worst_case(_voltage_divider(), tolerance=0.05, seed=1)
+    assert wc['exhaustive'] is True
+    assert wc['components'] == 3  # B1 + R1 + R2 толерантны
+    assert wc['evaluated'] == 8  # 2^3 углов
+    div_node = max(wc['nodes'].values(), key=lambda n: n['span'])
+    assert div_node['min'] < div_node['nominal'] < div_node['max']
+
+
+def test_worst_case_per_component_override_shrinks_span():
+    """Зажатие допусков всех компонентов в 0 → нулевая огибающая."""
+    wide = run_worst_case(_voltage_divider(), tolerance=0.05, seed=1)
+    tight = run_worst_case(
+        _voltage_divider(),
+        component_tolerances={'B1': 0.0, 'R1': 0.0, 'R2': 0.0},
+        seed=1,
+    )
+    wide_span = max(n['span'] for n in wide['nodes'].values())
+    tight_span = max(n['span'] for n in tight['nodes'].values())
+    assert tight_span < wide_span
+    assert tight_span < 1e-6
+
+
+def test_worst_case_zero_tolerance_no_spread():
+    wc = run_worst_case(_voltage_divider(), tolerance=0.0, seed=1)
+    assert all(n['span'] < 1e-6 for n in wc['nodes'].values())
+
+
+def test_component_tolerance_percent_one_is_one_percent():
+    """Регрессия: tolerance_percent=1 (E96) = ±1%, НЕ ±100%."""
+    scheme = _voltage_divider()
+    for comp in scheme['components']:
+        if comp['id'] == 'R1':
+            comp['tolerance_percent'] = 1  # 1% точный резистор
+    # R1 узкий (1%), у остальных глобальный 0.05 → R1 почти не влияет на разброс
+    circuit_tol = run_worst_case(scheme, tolerance=0.05, seed=1)
+    # Если бы 1 трактовалось как 100%, огибающая была бы огромной (>>номинала).
+    div_node = max(circuit_tol['nodes'].values(), key=lambda n: n['span'])
+    assert div_node['span'] < abs(div_node['nominal'])  # разброс меньше номинала
+
+
+# ─── Комбинированный отчёт + paranoia ────────────────────────────────────
+def test_tolerance_analysis_combines_mc_and_worst_case():
+    rep = run_tolerance_analysis(_voltage_divider(), iterations=200, seed=1)
+    assert 'monte_carlo' in rep
+    assert 'worst_case' in rep
+    assert 'paranoia' in rep
+    assert rep['paranoia']['verdict'] in {'ok', 'warning', 'critical'}
+
+
+def test_paranoia_flags_high_spread_as_critical():
+    """Большой допуск → широкая огибающая → critical-вердикт с флагами."""
+    rep = run_tolerance_analysis(_voltage_divider(), iterations=100, tolerance=0.3, seed=1)
+    par = rep['paranoia']
+    assert par['verdict'] == 'critical'
+    assert par['high'] >= 1
+    assert any(f['severity'] == 'high' for f in par['flags'])
+
+
+def test_paranoia_ok_when_tolerances_zero():
+    rep = run_tolerance_analysis(_voltage_divider(), iterations=50, tolerance=0.0, seed=1)
+    assert rep['paranoia']['verdict'] == 'ok'
+    assert rep['paranoia']['flags'] == []

@@ -135,6 +135,8 @@ urlpatterns = [
     path('api/sim/export/circuit_python/', views.api_export_circuit_python, name='api_export_circuit_python'),
     # Block D2: server-side Monte Carlo DC analysis (numpy MNA, 1000+ iter/sec).
     path('api/sim/monte_carlo/', views.api_monte_carlo, name='api_monte_carlo'),
+    # RF S-параметры 2-портовых фильтров через scikit-rf (S21/S11, −3дБ).
+    path('api/sim/rf_analysis/', views.api_rf_analysis, name='api_rf_analysis'),
     # Usage stats — для UI-баннеров «15/20 today»
     path('api/usage/today/', views.api_usage_today, name='api_usage_today'),
     # Legal pages

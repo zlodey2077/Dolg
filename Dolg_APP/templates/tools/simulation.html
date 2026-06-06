@@ -629,7 +629,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
         <!-- Правая панель - контрольная панель -->
         <div class="control-panel">
             <h3>📊 Статистика</h3>
-            
+
             <div class="stats-panel">
                 <p><strong>Компоненты:</strong> <span id="components-count">0</span></p>
                 <p><strong>Проводов:</strong> <span id="wires-count">0</span></p>
@@ -639,7 +639,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <div class="panel-divider"></div>
 
             <h3>🔬 Симуляция</h3>
-            
+
             <div class="simulation-controls">
                 <label>
                     <span>Тип анализа:</span>
@@ -1664,7 +1664,6 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     margin: 0 4px;
     flex-shrink: 0;
 }
-.simulator-container > .components-panel .components-list,
 .simulator-container > .components-panel .tools-list {
     display: flex !important;
     flex-direction: row !important;
@@ -1715,8 +1714,6 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     gap: 4px !important;
     white-space: nowrap;
 }
-.simulator-container > .components-panel .components-more,
-.simulator-container > .components-panel .component-search-input,
 .simulator-container > .components-panel .sticky-add-toggle {
     flex-shrink: 0;
     max-width: 180px;
@@ -2415,7 +2412,6 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     flex-shrink: 0;
 }
 
-.components-list,
 .tools-list {
     display: grid;
     grid-template-columns: 1fr;
@@ -2423,22 +2419,6 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     flex-shrink: 0;
 }
 
-.component-search-input {
-    width: 100%;
-    padding: 6px 10px;
-    margin: 6px 0 8px;
-    background: rgba(10, 14, 39, 0.7);
-    border: 1px solid rgba(0, 212, 255, 0.3);
-    border-radius: 4px;
-    color: #e0e0e0;
-    font-size: 0.85rem;
-    box-sizing: border-box;
-}
-.component-search-input:focus {
-    outline: none;
-    border-color: var(--accent-cyan);
-    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
-}
 .component-btn.search-hidden { display: none !important; }
 
 /* ── Sticky-add toggle (серия) ── */
@@ -2469,30 +2449,6 @@ body.sim-sticky-add .sticky-add-toggle {
     color: #fff;
     box-shadow: 0 0 8px rgba(0, 212, 255, 0.35) inset;
 }
-
-/* ── «+ ещё компоненты» сворачиваемый блок ── */
-.components-more {
-    margin-top: 0.4rem;
-    border-top: 1px dashed rgba(0, 212, 255, 0.15);
-    padding-top: 0.45rem;
-}
-.components-more > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 0.35rem 0.45rem;
-    color: rgba(0, 212, 255, 0.75);
-    font-size: 0.82rem;
-    border-radius: 4px;
-    user-select: none;
-}
-.components-more > summary::-webkit-details-marker { display: none; }
-.components-more > summary::after {
-    content: ' ▾';
-    font-size: 0.7em;
-    opacity: 0.7;
-}
-.components-more[open] > summary::after { content: ' ▴'; }
-.components-more > summary:hover { background: rgba(0, 212, 255, 0.1); color: #fff; }
 
 .component-btn {
     background: linear-gradient(135deg, rgba(0, 150, 255, 0.3), rgba(100, 50, 180, 0.3));
@@ -5087,10 +5043,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (simShouldShowTour()) {
         setTimeout(simStartTour, 400);
     }
-    
+
     canvas = document.getElementById('schematicCanvas');
     ctx = canvas.getContext('2d');
-    
+
     function resizeCanvas() {
         const container = canvas.parentElement;
         canvas.width = container.clientWidth;
@@ -5101,7 +5057,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         drawCanvas();
     }
-    
+
     requestAnimationFrame(resizeCanvas);
     window.addEventListener('resize', resizeCanvas);
     // 2026-06-01 recovery #2: ResizeObserver на .canvas-container —
@@ -5114,7 +5070,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window._canvasResizeObserver = ro;
     } catch (_e) { /* старые браузеры — fallback на window resize */ }
     rebuildSheetTabs();   // multi-sheet: первичный рендер табов
-    
+
     canvas.addEventListener('mousedown', onCanvasMouseDown);
     canvas.addEventListener('mousemove', onCanvasMouseMove);
     canvas.addEventListener('mouseup', onCanvasMouseUp);
@@ -5145,9 +5101,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-    
+
     document.addEventListener('keydown', onKeyDown);
-    
+
     // НОВОЕ: Обработчики кнопок инструментов
     document.getElementById('select-btn')?.addEventListener('click', resetMode);
     document.getElementById('wire-btn')?.addEventListener('click', activateWireMode);
@@ -5156,7 +5112,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('save-btn')?.addEventListener('click', saveScheme);
     document.getElementById('load-btn')?.addEventListener('click', loadScheme);
     document.getElementById('bom-btn')?.addEventListener('click', openBom);
-    
+
     // Поиск по палитре компонентов: фильтрует .component-btn по тексту в
     // метке (русское название) и кратком обозначении (R/C/L/...). Регистр
     // не учитывает. Пустой запрос — показывает все.
@@ -5184,7 +5140,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('modeIndicator').textContent = `✚ Кликните на холсте, чтобы поставить ${this.querySelector('span').textContent}. Зажмите Shift, чтобы продолжить добавлять подряд.`;
         });
     });
-    
+
     // Отключаем стандартное контекстное меню и показываем свое.
     // Клик закрывает меню ТОЛЬКО если он снаружи #context-menu —
     // иначе клик на <summary> группы (раскрытие/сворачивание) тут же
@@ -5664,7 +5620,7 @@ function _autoOpenPropertiesIfDesired() {
 function selectComponentMode(btn) {
     document.querySelectorAll('.component-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    
+
     addMode = btn.dataset.component;
     canvas.style.cursor = 'crosshair';
     document.getElementById('modeIndicator').textContent = `✚ Кликните на холсте для добавления ${btn.querySelector('span').textContent}`;
@@ -5828,7 +5784,7 @@ const WAYPOINT_DRAG_DISTANCE = 8;
 // НОВОЕ (Фаза 3): Найти waypoint рядом с позицией клика
 function getWaypointAtPosition(x, y) {
     if (!selectedConnection || !selectedConnection.waypoints) return -1;
-    
+
     for (let i = 0; i < selectedConnection.waypoints.length; i++) {
         const wp = selectedConnection.waypoints[i];
         const dist = Math.sqrt((wp.x - x) ** 2 + (wp.y - y) ** 2);
@@ -7132,14 +7088,14 @@ function showConnectionContextMenu(x, y) {
     menu.style.padding = '8px';
     menu.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.1)';
     menu.style.zIndex = '1000';
-    
+
     const items = [
         { text: '✓ Выбрать', action: () => { /* уже выбран */ } },
         { text: '🗑️ Удалить', action: deleteSelectedConnection },
         { text: '🔄 Сбросить изгибы', action: clearWaypoints },
         { text: '← Добавить изгиб', action: () => { showNotification('Shift+Click на выбранном проводе'); } }
     ];
-    
+
     items.forEach(item => {
         const btn = document.createElement('button');
         btn.style.width = '100%';
@@ -7160,9 +7116,9 @@ function showConnectionContextMenu(x, y) {
         };
         menu.appendChild(btn);
     });
-    
+
     document.body.appendChild(menu);
-    
+
     // Закрыть меню при клике в другом месте
     setTimeout(() => {
         document.addEventListener('click', function closeMenu(e) {
@@ -7186,14 +7142,14 @@ function showComponentContextMenu(x, y) {
     menu.style.padding = '8px';
     menu.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.1)';
     menu.style.zIndex = '1000';
-    
+
     const items = [
         { text: '✓ Выбрать', action: () => { /* уже выбран */ } },
         { text: '🗑️ Удалить', action: () => { deleteComponent(selectedComponent.id); } },
         { text: '🔄 Повернуть', action: () => { selectedComponent.rotation = (selectedComponent.rotation + 90) % 360; drawCanvas(); } },
         { text: '🔧 Свойства', action: editComponentProperties }
     ];
-    
+
     items.forEach(item => {
         const btn = document.createElement('button');
         btn.style.width = '100%';
@@ -7214,9 +7170,9 @@ function showComponentContextMenu(x, y) {
         };
         menu.appendChild(btn);
     });
-    
+
     document.body.appendChild(menu);
-    
+
     // Закрыть меню при клике в другом месте
     setTimeout(() => {
         document.addEventListener('click', function closeMenu(e) {
@@ -7237,19 +7193,19 @@ function clearWaypoints() {
         showNotification('✓ Изгибы сброшены');
         }
     }
-    
+
     // НОВОЕ (Фаза 2.5): Pan/Zoom функциональность
     function onCanvasWheel(e) {
         e.preventDefault();
-        
+
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         const oldZoom = zoom;
         zoom *= (1 - e.deltaY * 0.001);
         zoom = Math.max(0.1, Math.min(3, zoom));  // Ограничиваем zoom от 0.1x до 3x
-        
+
         // Регулируем pan чтобы zoom был относительно курсора мыши
         panX = x - (x - panX) * (zoom / oldZoom);
         panY = y - (y - panY) * (zoom / oldZoom);
@@ -7259,7 +7215,7 @@ function clearWaypoints() {
         const sz = document.getElementById('status-zoom');
         if (sz) sz.textContent = `${Math.round(zoom * 100)}%`;
     }
-    
+
     function onCanvasMouseDown(e) {
         // Read-only sharing: панорама / выделение остаются, но добавление /
         // wire-mode / drag — блокируются. Левый клик в shared-режиме при
@@ -7421,7 +7377,7 @@ function clearWaypoints() {
             drawCanvas();
         }
     }
-    
+
     // НОВОЕ: Получить компонент в позиции мыши
     function getComponentAtPosition(x, y) {
         // Multi-sheet: только компоненты текущего листа кликабельны.
@@ -7436,7 +7392,7 @@ function clearWaypoints() {
         }
         return null;
     }
-    
+
     // НОВОЕ: Выбрать компонент по ID
     function selectComponent(id) {
         selectedComponent = components.find(c => c.id === id) || null;
@@ -7445,7 +7401,7 @@ function clearWaypoints() {
         drawCanvas();
         if (typeof updateStatusBar === 'function') updateStatusBar();
     }
-    
+
     function isPointInComponent(x, y, comp) {
         return x >= comp.x && x <= comp.x + COMPONENT_WIDTH &&
                y >= comp.y && y <= comp.y + COMPONENT_HEIGHT;
@@ -7634,7 +7590,7 @@ function drawCanvas() {
     if (simShowGrid) {
         drawEngineeringGrid(startX, startY, endX, endY, gridSize);
     }
-    
+
     // На больших схемах 600 элементов × 800 проводов даёт O(N×M) при наивном
     // .find на каждом проводе. Один раз строим Map id→component — O(N+M).
     const compById = new Map();
@@ -7699,7 +7655,7 @@ function drawCanvas() {
             ctx.setLineDash([]);
         }
     }
-    
+
     components.forEach(comp => {
         if (!_isOnCurrentSheet(comp)) return;
         const isSel = comp === selectedComponent || selectedComponentIds.has(comp.id);
@@ -8061,7 +8017,7 @@ function drawComponent(comp, isSelected) {
     }
 
     if (_rot !== 0) ctx.rotate((_rot * Math.PI) / 180);
-    
+
     if (isSelected) {
         ctx.strokeStyle = palette.selected;
         ctx.lineWidth = symbolLineWidth;
@@ -8076,10 +8032,10 @@ function drawComponent(comp, isSelected) {
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'miter';
     ctx.fillStyle = ctx.strokeStyle;
-    
+
     const w = COMPONENT_WIDTH / 2;
     const h = COMPONENT_HEIGHT / 2;
-    
+
     switch (comp.type) {
         case 'resistor':
             drawResistor(-w, -h, w, h);
@@ -8138,7 +8094,7 @@ function drawComponent(comp, isSelected) {
             break;
         }
     }
-    
+
     // Портовые ручки показываем только во время редактирования/выделения.
     // В обычном состоянии схема остаётся похожей на инженерный чертёж:
     // без красно-зелёной служебной разметки поверх УГО.
@@ -8175,7 +8131,7 @@ function drawComponent(comp, isSelected) {
             }
         });
     }
-    
+
     ctx.restore();
 
     // Подпись рисуем ОТДЕЛЬНО, без трансформации rotate, чтобы текст всегда
@@ -8356,7 +8312,7 @@ function drawCapacitor(x1, y1, x2, y2) {
     const cx = (x1 + x2) / 2;
     const plateGap = simSchematicStyle === 'modern' ? 5 : 4;
     const plateHalf = simSchematicStyle === 'modern' ? 10 : 10;
-    
+
     ctx.beginPath();
     ctx.moveTo(x1, 0);
     ctx.lineTo(cx - plateGap, 0);
@@ -8365,7 +8321,7 @@ function drawCapacitor(x1, y1, x2, y2) {
     ctx.moveTo(cx - plateGap, -plateHalf);
     ctx.lineTo(cx - plateGap, plateHalf);
     ctx.stroke();
-    
+
     ctx.beginPath();
     ctx.moveTo(cx + plateGap, -plateHalf);
     ctx.lineTo(cx + plateGap, plateHalf);
@@ -8380,17 +8336,17 @@ function drawInductor(x1, y1, x2, y2) {
     const coils = 4;
     const lead = simSchematicStyle === 'modern' ? 12 : 10;
     const spacing = (x2 - x1 - lead * 2) / coils;
-    
+
     ctx.beginPath();
     ctx.moveTo(x1, 0);
     if (lead) ctx.lineTo(x1 + lead, 0);
-    
+
     for (let i = 0; i < coils; i++) {
         const cx = x1 + lead + spacing * (i + 0.5);
         const r = simSchematicStyle === 'modern' ? Math.min(7, spacing / 2) : Math.min(6, spacing / 2);
         ctx.arc(cx, 0, r, Math.PI, 0);
     }
-    
+
     if (lead) ctx.lineTo(x2 - lead, 0);
     ctx.lineTo(x2, 0);
     ctx.stroke();
@@ -8527,12 +8483,12 @@ function drawCurrentSource(x1, y1, x2, y2) {
 
 function drawSwitch(x1, y1, x2, y2) {
     const cx = (x1 + x2) / 2;
-    
+
     ctx.beginPath();
     ctx.moveTo(x1, 0);
     ctx.lineTo(cx - 8, 0);
     ctx.stroke();
-    
+
     ctx.fillStyle = ctx.strokeStyle;
     ctx.beginPath();
     ctx.arc(cx - 8, 0, 2, 0, Math.PI * 2);
@@ -8546,7 +8502,7 @@ function drawSwitch(x1, y1, x2, y2) {
     ctx.beginPath();
     ctx.arc(cx + 8, 0, 2, 0, Math.PI * 2);
     ctx.fill();
-    
+
     ctx.beginPath();
     ctx.moveTo(cx + 8, 0);
     ctx.lineTo(x2, 0);
@@ -8681,7 +8637,7 @@ function updateProperties() {
         const conn = selectedConnection;
         const fromComp = components.find(c => c.id === conn.from.compId);
         const toComp = components.find(c => c.id === conn.to.compId);
-        
+
         if (fromComp && toComp) {
             const props = `
                 <div style="color: #ccc;">
@@ -8690,11 +8646,11 @@ function updateProperties() {
                     <p><strong>К:</strong> ${toComp.label}${toComp.id} (${conn.to.portId})</p>
                     <p><strong>Тип:</strong> электрический (DC)</p>
                     <p><strong>Изгибы пути:</strong> ${conn.waypoints.length}</p>
-                    
+
                     <div style="margin-top: 1rem; padding: 1rem; background-color: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 4px;">
                         <p style="margin: 0; font-size: 0.9em; color: rgba(0, 212, 255, 0.8);">💡 Совет: Shift+Click на провод добавит изгиб</p>
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1rem;">
                         <button onclick="deleteSelectedConnection()" style="padding: 0.5rem; background-color: #ff6464; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">🗑️ Удалить</button>
                         <button onclick="clearWaypoints()" style="padding: 0.5rem; background-color: #b300ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">🔄 Сбросить</button>
@@ -8705,7 +8661,7 @@ function updateProperties() {
         }
         return;
     }
-    
+
     if (!selectedComponent) {
         document.getElementById('properties-panel').innerHTML = '<p class="placeholder">Кликните по компоненту, чтобы изменить его параметры (R, C, L, V) или повернуть.</p>';
         return;
@@ -8861,6 +8817,12 @@ function formatEngValue(field, value) {
 // значения, а не предыдущее семантическое действие.
 function setCompField(field, value) {
     if (!selectedComponent) return;
+    // Перед ПЕРВОЙ правкой в серии фиксируем состояние ДО изменения — иначе
+    // отложенный (debounced) snapshot ставит в историю только «после», и
+    // Ctrl+Z мог схлопнуть правку с предыдущим действием («откатывает шире
+    // нужного»). snapshotScheme идемпотентен: если базовое состояние уже в
+    // истории, дубль не пушится. Серию правок детектим по таймеру.
+    if (!window._fieldSnapshotTimer) snapshotScheme();
     if (typeof value === 'boolean') {
         selectedComponent[field] = value;
     } else if (FIELD_UNIT_TO_SI[field] != null) {
@@ -8874,7 +8836,12 @@ function setCompField(field, value) {
     }
     drawCanvas();
     clearTimeout(window._fieldSnapshotTimer);
-    window._fieldSnapshotTimer = setTimeout(snapshotScheme, 350);
+    // Таймер ОБЯЗАТЕЛЬНО обнуляем при срабатывании — иначе stale-id остаётся
+    // truthy и детект «первой правки серии» выше больше не сработает.
+    window._fieldSnapshotTimer = setTimeout(function () {
+        window._fieldSnapshotTimer = null;
+        snapshotScheme();
+    }, 350);
 }
 
 function queueCatalogSearch(query) {
@@ -10661,25 +10628,74 @@ function getAcBodePayload() {
     };
 }
 
-function getVoltageDividerMonteCarloPayload() {
-    const resistors = components.filter(c => c && c.type === 'resistor').slice(0, 2);
-    const source = components.find(c => c && c.type === 'battery');
-    if (resistors.length < 2 || !source) {
-        throw new Error('Для Monte Carlo Vout добавьте источник и два резистора делителя.');
+// «Шизо-тест»: payload для server-side MNA Monte Carlo + worst-case по ЛЮБОЙ
+// схеме. Если у компонента задан tolerance_percent — шлём его персонально,
+// иначе сервер применит глобальный допуск.
+function getToleranceAnalysisPayload() {
+    const scheme = buildSchemeData();
+    if (!scheme || !(scheme.components || []).length) {
+        throw new Error('Добавьте компоненты на схему перед запуском анализа допусков.');
     }
-    const r1 = parseEngValue('resistance', resistors[0].resistance ?? resistors[0].value ?? 1000);
-    const r2 = parseEngValue('resistance', resistors[1].resistance ?? resistors[1].value ?? 1000);
-    const vin = parseEngValue('voltage', source.voltage ?? source.value ?? 5);
-    if (![r1, r2, vin].every(Number.isFinite)) throw new Error('Не удалось прочитать номиналы делителя.');
+    const componentTolerances = {};
+    (scheme.components || []).forEach(c => {
+        const tol = Number(c && c.tolerance_percent);
+        if (Number.isFinite(tol) && tol > 0) componentTolerances[c.id] = tol;
+    });
     return {
-        kind: 'voltage_divider',
-        vin,
-        r1_ohm: r1,
-        r2_ohm: r2,
-        r1_tolerance_percent: 5,
-        r2_tolerance_percent: 5,
-        samples: 2000,
+        scheme_data: scheme,
+        iterations: 5000,
+        tolerance: 0.05,
+        worst_case: true,
+        component_tolerances: componentTolerances,
     };
+}
+
+// Рендер отчёта надёжности: разброс (Monte Carlo) + гарантированная огибающая
+// (worst-case углы) + «паранойя»-вердикт.
+function renderToleranceReport(data) {
+    const esc = escapeHtml;
+    const wc = data.worst_case || {};
+    const par = data.paranoia || {};
+    const wcNodes = Object.entries(wc.nodes || {}).filter(([n]) => String(n) !== '0');
+    wcNodes.sort((a, b) => (b[1].span || 0) - (a[1].span || 0));
+
+    const verdictColor = { ok: '#a7ffbf', warning: '#ffd98a', critical: '#ff9b9b' }[par.verdict] || '#cfefff';
+    const verdictLabel = { ok: '✅ устойчива', warning: '⚠️ умеренный риск', critical: '🛑 высокий риск' }[par.verdict] || par.verdict || '—';
+
+    let html = '';
+    html += `<div style="font-weight:600;">Анализ допусков (шизо-тест)</div>`;
+    html += `<div style="opacity:.85;font-size:12px;">`
+        + `${data.iterations} прогонов Monte Carlo · ${Math.round(data.iter_per_sec || 0)} итер/с · `
+        + `углы: ${wc.evaluated || 0}${wc.exhaustive ? ' (полный перебор)' : ' (выборка)'} · `
+        + `±${wc.sigma_multiplier || 3}σ</div>`;
+
+    html += `<div style="margin-top:6px;color:${verdictColor};font-weight:600;">Вердикт: ${esc(verdictLabel)}</div>`;
+    if (par.summary) html += `<div style="opacity:.9;">${esc(par.summary)}</div>`;
+
+    const flags = (par.flags || []).slice(0, 6);
+    if (flags.length) {
+        html += `<ul style="margin:6px 0 0 0;padding-left:18px;">`;
+        flags.forEach(f => {
+            const c = f.severity === 'high' ? '#ff9b9b' : '#ffd98a';
+            html += `<li style="color:${c};">${esc(f.message || '')}</li>`;
+        });
+        html += `</ul>`;
+    }
+
+    if (wcNodes.length) {
+        html += `<table style="margin-top:8px;border-collapse:collapse;font-size:12px;width:100%;">`
+            + `<tr style="opacity:.7;"><td>узел</td><td>номинал</td><td>worst-case</td><td>разброс</td></tr>`;
+        wcNodes.slice(0, 6).forEach(([node, w]) => {
+            html += `<tr>`
+                + `<td>${esc(node)}</td>`
+                + `<td>${Number(w.nominal).toFixed(3)} В</td>`
+                + `<td>${Number(w.min).toFixed(3)}…${Number(w.max).toFixed(3)} В</td>`
+                + `<td>${Number(w.span).toFixed(3)} В</td>`
+                + `</tr>`;
+        });
+        html += `</table>`;
+    }
+    return html;
 }
 
 function getParameterSweepPayload() {
@@ -10883,32 +10899,35 @@ async function runParameterSweep() {
 
 async function runProMonteCarlo() {
     try {
-        setProAnalysisOutput('Запускаю Monte Carlo tolerance...');
-        const data = await simApiFetch(SIM_ANALYSIS_API.monteCarlo, {
+        setProAnalysisOutput('Запускаю анализ допусков (Monte Carlo + worst-case)...');
+        const data = await simApiFetch(SIM_ANALYSIS_API.monteCarloMna, {
             method: 'POST',
-            body: JSON.stringify(getVoltageDividerMonteCarloPayload()),
+            body: JSON.stringify(getToleranceAnalysisPayload()),
         });
-        setProAnalysisOutput(
-            `mean=${Number(data.mean).toFixed(4)} ${escapeHtml(data.unit || '')}, ` +
-            `p05=${Number(data.p05).toFixed(4)}, p95=${Number(data.p95).toFixed(4)}${cleanServerSvg(data.svg)}`,
-            'ok',
-            {
-                metric: data.metric || 'monte_carlo_mean',
-                label: `Monte Carlo ${data.metric || 'metric'} mean`,
-                value: data.mean,
-                unit: data.unit || '',
+        if (data.ok === false) throw new Error(data.error || 'Анализ не выполнен.');
+        // Узел с наибольшей огибающей — его и сохраняем как измерение.
+        const wcNodes = Object.entries((data.worst_case || {}).nodes || {})
+            .filter(([n]) => String(n) !== '0')
+            .sort((a, b) => (b[1].span || 0) - (a[1].span || 0));
+        const top = wcNodes[0];
+        const metric = top
+            ? {
+                metric: 'worst_case_span',
+                label: `Worst-case разброс узла ${top[0]}`,
+                value: top[1].span,
+                unit: 'В',
                 source: 'pro_monte_carlo',
                 result: {
-                    samples: data.samples,
-                    std: data.std,
-                    p05: data.p05,
-                    p50: data.p50,
-                    p95: data.p95,
-                    min: data.min,
-                    max: data.max,
+                    verdict: (data.paranoia || {}).verdict,
+                    iterations: data.iterations,
+                    worst_case: top[1],
+                    paranoia_flags: ((data.paranoia || {}).flags || []).length,
                 },
-            },
-        );
+            }
+            : null;
+        const par = data.paranoia || {};
+        const status = par.verdict === 'critical' ? 'error' : 'ok';
+        setProAnalysisOutput(renderToleranceReport(data), status, metric);
     } catch (e) {
         setProAnalysisOutput(escapeHtml(e.message), 'error');
         showNotification('Monte Carlo: ' + e.message, 'warning');
@@ -11547,6 +11566,7 @@ const SIM_ANALYSIS_API = {
     fft: '{% url "hello:api_simulation_fft" %}',
     bode: '{% url "hello:api_simulation_bode" %}',
     monteCarlo: '{% url "hello:api_simulation_monte_carlo" %}',
+    monteCarloMna: '{% url "hello:api_monte_carlo" %}',
     signalQuality: '{% url "hello:api_simulation_signal_quality" %}',
     parameterSweep: '{% url "hello:api_simulation_parameter_sweep" %}',
     fallbackSolve: '{% url "hello:api_simulation_fallback_solve" %}',
@@ -14606,12 +14626,12 @@ function exportResults() {
         connections: connections,  // НОВОЕ: экспортируем соединения
         timestamp: new Date().toISOString()
     };
-    
+
     const link = document.createElement('a');
     link.href = 'data:text/json,' + encodeURIComponent(JSON.stringify(data, null, 2));
     link.download = 'scheme_' + Date.now() + '.json';
     link.click();
-    
+
     showNotification('✓ Экспортировано', 'success');
 }
 
@@ -14619,11 +14639,11 @@ function showNotification(msg, type = 'info') {
     const notif = document.createElement('div');
     notif.className = 'sim-notification';
     notif.textContent = msg;
-    
-    const bgColor = type === 'success' ? 'rgba(0, 212, 255, 0.95)' : 
+
+    const bgColor = type === 'success' ? 'rgba(0, 212, 255, 0.95)' :
                     type === 'warning' ? 'rgba(255, 200, 0, 0.95)' : 'rgba(0, 212, 255, 0.95)';
     const textColor = type === 'warning' ? '#000' : '#000';
-    
+
     notif.style.cssText = `
         position: fixed;
         top: 80px;
@@ -14638,7 +14658,7 @@ function showNotification(msg, type = 'info') {
         font-weight: 500;
     `;
     document.body.appendChild(notif);
-    
+
     setTimeout(() => notif.remove(), 3000);
 }
 
@@ -14675,12 +14695,12 @@ function showContextMenu(x, y, target) {
             });
         });
     }
-    
+
     // Скрываем все подменю
     emptyMenu.style.display = 'none';
     componentMenu.style.display = 'none';
     wireMenu.style.display = 'none';
-    
+
     // Показываем нужное подменю
     if (target === 'empty') {
         emptyMenu.style.display = 'block';
@@ -14694,7 +14714,7 @@ function showContextMenu(x, y, target) {
     } else if (target === 'wire') {
         wireMenu.style.display = 'block';
     }
-    
+
     // Позиционируем меню. Сначала «припарковываем» в (x+5, y+5),
     // потом проверяем, что меню не вылезает за viewport — иначе
     // прижимаем к правому/нижнему краю окна. Это убирает наезд
@@ -14721,7 +14741,7 @@ function addComponentFromContext(type) {
     const x = contextMenuX;
     const y = contextMenuY;
     const placed = snapComponentTopLeft(x - COMPONENT_WIDTH / 2, y - COMPONENT_HEIGHT / 2);
-    
+
     const component = {
         id: _allocComponentId(),
         type: type,
@@ -17547,39 +17567,50 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         }, 1600);
     }
 
-    // Typewriter: постепенно дописывает текст в DOM. Скорость подобрана
-    // эмпирически — ~30 символов в секунду (видно глазами, не слишком медленно).
-    // Использует requestAnimationFrame для плавности, а не setTimeout(1ms).
+    // Typewriter: постепенно дописывает текст в DOM с читаемой скоростью, чтобы
+    // ответ выглядел «живым» (печатается на глазах), а не вываливался разом.
+    // Скорость задаётся по времени (символы/сек), а не по кадрам — поэтому она
+    // одинакова на любом ответе и не зависит от частоты кадров устройства.
     function _typewriteIntoElement(targetEl, fullHtml, doneCallback) {
-        // Используем innerHTML после рендера, но печатаем по символам исходного
-        // текста (без HTML-тегов). Финальный пейзаж получит полный HTML.
+        // Печатаем по символам исходного текста (без HTML-тегов); по завершении
+        // вставляем полный HTML, чтобы Markdown-разметка отрисовалась корректно.
         const sourceText = String(fullHtml).replace(/<[^>]+>/g, '');
+        const total = sourceText.length;
+        const finish = () => {
+            targetEl.insertAdjacentHTML('beforeend', fullHtml);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            if (doneCallback) doneCallback();
+        };
+        // Пустой текст или prefers-reduced-motion — показываем сразу, без анимации.
+        const reduceMotion = window.matchMedia
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!total || reduceMotion) { finish(); return; }
+
         const cursor = document.createElement('span');
         cursor.className = 'typewriter-cursor';
         targetEl.appendChild(cursor);
-        let charIdx = 0;
-        const total = sourceText.length;
-        // Целевая скорость: ~600 символов/сек на быстром ответе, замедляется
-        // на коротких сообщениях чтобы было видно эффект.
-        const CHARS_PER_FRAME = Math.max(1, Math.floor(total / 90));
-        let textNode = document.createTextNode('');
+        const textNode = document.createTextNode('');
         targetEl.insertBefore(textNode, cursor);
 
-        function step() {
-            if (charIdx >= total) {
+        // ~55 символов/сек — читаемо, видно эффект печати. На длинных ответах
+        // ускоряемся, чтобы уложиться максимум в ~6.5 сек (не томить ожиданием).
+        const BASE_CPS = 55;
+        const MAX_DURATION_SEC = 6.5;
+        const cps = Math.max(BASE_CPS, total / MAX_DURATION_SEC);
+        let startTs = 0;
+
+        function step(ts) {
+            if (!startTs) startTs = ts;
+            const shown = Math.min(total, Math.floor(((ts - startTs) / 1000) * cps));
+            textNode.textContent = sourceText.slice(0, shown);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            if (shown >= total) {
                 // Финал: заменяем простой текст на полный HTML и убираем cursor.
                 cursor.remove();
                 textNode.remove();
-                targetEl.insertAdjacentHTML('beforeend', fullHtml);
-                // Auto-scroll до конца после полного рендера.
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-                if (doneCallback) doneCallback();
+                finish();
                 return;
             }
-            charIdx = Math.min(total, charIdx + CHARS_PER_FRAME);
-            textNode.textContent = sourceText.slice(0, charIdx);
-            // Auto-scroll по мере роста текста.
-            messagesEl.scrollTop = messagesEl.scrollHeight;
             requestAnimationFrame(step);
         }
         requestAnimationFrame(step);
@@ -18758,4 +18789,3 @@ body.modal-open {
 </script>
 
 {% endblock %}
-

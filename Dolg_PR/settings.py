@@ -228,23 +228,25 @@ if _HAS_AXES:
 # CSP (Content Security Policy): защита от XSS. В DEBUG отключен (мешает hot-reload).
 if _HAS_CSP:
     MIDDLEWARE.insert(1, 'csp.middleware.CSPMiddleware')  # после SecurityMiddleware
-    # Базовый профиль — self только, + CDN для нескольких внешних либ.
+    # django-csp 4.0 читает ЕДИНЫЙ словарь CONTENT_SECURITY_POLICY; старый
+    # формат CSP_* (django-csp <4) в 4.0 ИГНОРИРУЕТСЯ. Значения директив —
+    # списки строк ("'self'" и т.п.).
     # 'unsafe-inline' пока ОСТАЁТСЯ — simulation.html содержит 15k+ строк
-    # инлайн-JS, миграция всего этого на nonce (см. ниже) — отдельная
-    # post-defense задача [[project-security-backlog]] § 1.3.
-    CSP_DEFAULT_SRC = ("'self'",)
-    CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'unpkg.com')
-    CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", 'fonts.googleapis.com', 'cdn.jsdelivr.net')
-    CSP_FONT_SRC = ("'self'", 'fonts.gstatic.com')
-    CSP_IMG_SRC = ("'self'", 'data:', 'huggingface.co')
-    CSP_CONNECT_SRC = ("'self'", 'api.anthropic.com', 'huggingface.co')
-    CSP_FRAME_ANCESTORS = ("'none'",)  # защита от clickjacking
-    # Nonce для inline-скриптов/стилей — django-csp генерит `request.csp_nonce`
-    # на каждый request. В НОВЫХ шаблонах используем:
-    #   <script nonce="{{ request.csp_nonce }}">...</script>
-    # Когда все inline-блоки портированы — убираем 'unsafe-inline' выше и
-    # получаем полноценную XSS-защиту.
-    CSP_INCLUDE_NONCE_IN = ['script-src', 'style-src']
+    # инлайн-JS; миграция на nonce — отдельная post-defense задача
+    # [[project-security-backlog]] § 1.3. ВАЖНО: nonce и 'unsafe-inline'
+    # взаимоисключающи (при наличии nonce браузер игнорит unsafe-inline и
+    # рубит инлайн без nonce), поэтому пока nonce НЕ включаем.
+    CONTENT_SECURITY_POLICY = {
+        'DIRECTIVES': {
+            'default-src': ["'self'"],
+            'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'unpkg.com'],
+            'style-src': ["'self'", "'unsafe-inline'", 'fonts.googleapis.com', 'cdn.jsdelivr.net'],
+            'font-src': ["'self'", 'fonts.gstatic.com'],
+            'img-src': ["'self'", 'data:', 'huggingface.co'],
+            'connect-src': ["'self'", 'api.anthropic.com', 'huggingface.co'],
+            'frame-ancestors': ["'none'"],  # защита от clickjacking
+        },
+    }
 
 # Silk (профайлер) — opt-in, тяжёлый, только для dev/staging диагностики.
 if _HAS_SILK:

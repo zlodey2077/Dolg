@@ -2458,12 +2458,14 @@ def api_ai_context(request):
 @require_POST
 @enforce_daily_quota('simulations')
 def api_monte_carlo(request):
-    """Block D2: server-side Monte Carlo DC analysis.
+    """Block D2: server-side Monte Carlo DC analysis + worst-case «шизо-тест».
 
-    POST body: {scheme_data, iterations?, tolerance?, seed?}
-    Response: per-node statistics (mean/std/p05/p50/p95) + timing.
+    POST body: {scheme_data, iterations?, tolerance?, seed?,
+                component_tolerances?: {comp_id: percent}, worst_case?: bool}
+    Response: per-node statistics (mean/std/p05/p50/p95) + timing; при
+    worst_case=true дополнительно угловая огибающая + paranoia-отчёт.
     """
-    from .services.monte_carlo import run_monte_carlo
+    from .services.monte_carlo import _paranoia_report, run_monte_carlo, run_worst_case
 
     denied = _require_pro_feature(request.user, 'pro_monte_carlo')
     if denied:
@@ -2475,15 +2477,82 @@ def api_monte_carlo(request):
     scheme_data = data.get('scheme_data') or {}
     if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
         return _json_error('scheme_data with components required')
+
+    # component_tolerances в payload — проценты ({comp_id: 5}); сервис ждёт доли.
+    raw_tolerances = data.get('component_tolerances')
+    component_tolerances = None
+    if isinstance(raw_tolerances, dict):
+        converted = {}
+        for key, val in raw_tolerances.items():
+            try:
+                converted[str(key)] = float(val) / 100.0
+            except TypeError, ValueError:
+                continue
+        component_tolerances = converted or None
+    want_worst_case = bool(data.get('worst_case', True))
     try:
         result = run_monte_carlo(
             scheme_data,
             iterations=int(data.get('iterations') or 1000),
             tolerance=float(data.get('tolerance') or 0.05),
             seed=data.get('seed'),
+            component_tolerances=component_tolerances,
         )
+        if want_worst_case:
+            worst = run_worst_case(
+                scheme_data,
+                tolerance=float(data.get('tolerance') or 0.05),
+                component_tolerances=component_tolerances,
+                seed=data.get('seed'),
+            )
+            result['worst_case'] = worst
+            result['paranoia'] = _paranoia_report(worst)
     except Exception as exc:
         return _json_error(f'Monte Carlo failed: {exc}')
+    return JsonResponse({'ok': True, **result})
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+@enforce_daily_quota('simulations')
+def api_rf_analysis(request):
+    """RF S-параметры 2-портового фильтра через scikit-rf.
+
+    POST body: {kind: rc_lowpass|rc_highpass|lc_lowpass, r_ohm?, c_farad?,
+                l_henry?, f_start?, f_stop?, points?}
+    Response: S21/S11 (дБ) по частоте + частота среза −3 дБ + аналитический угол.
+    """
+    from .services.rf_analysis import analyze_filter
+
+    denied = _require_pro_feature(request.user, 'pro_monte_carlo')
+    if denied:
+        return denied
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError, ValueError:
+        return _json_error('Invalid JSON')
+
+    def _num(key):
+        val = data.get(key)
+        try:
+            return float(val) if val is not None else None
+        except TypeError, ValueError:
+            return None
+
+    try:
+        result = analyze_filter(
+            (data.get('kind') or 'rc_lowpass').strip(),
+            r_ohm=_num('r_ohm'),
+            c_farad=_num('c_farad'),
+            l_henry=_num('l_henry'),
+            f_start=_num('f_start'),
+            f_stop=_num('f_stop'),
+            points=int(data.get('points') or 401),
+        )
+    except ValueError as exc:
+        return _json_error(str(exc))
+    except Exception as exc:
+        return _json_error(f'RF analysis failed: {exc}')
     return JsonResponse({'ok': True, **result})
 
 
@@ -2747,6 +2816,29 @@ def api_ai_chat(request):
         scheme=scheme,
         target_pn=target_pn,
     )
+
+    # Retrieval-grounding: подмешиваем выверенные факты из базы DOLG (глоссарий,
+    # статьи, практикумы, источники) отдельным НЕкешируемым блоком в конце —
+    # чтобы на «что такое резистор» ассистент опирался на текст, а не выдумывал,
+    # и мог сослаться на источник (expert-first). Cache breakpoint на блоке 0 не
+    # ломается: добавляем после стабильного префикса.
+    from .services.ai_retrieval import build_retrieval_context, retrieval_lines
+
+    retrieval = build_retrieval_context(
+        user_message_clean,
+        intent=last_intent,
+        project=project,
+        scheme=scheme if isinstance(scheme, dict) else None,
+    )
+    context_lines = retrieval_lines(retrieval, limit=6)
+    if context_lines:
+        context_block = (
+            '### CONTEXT (факты из базы DOLG — опирайся на них, при использовании '
+            'ссылайся на источник; если данных нет, скажи об этом, не выдумывай) ###\n'
+            + '\n'.join(f'- {line}' for line in context_lines)
+        )
+        system_blocks.append({'type': 'text', 'text': context_block})
+
     try:
         result = ai_assistant.call_claude(messages, system_blocks, mode=mode)
     except ai_assistant.AIError as exc:
@@ -2767,7 +2859,8 @@ def api_ai_chat(request):
             'agent': result.get('agent'),
             'model': result.get('model'),
             'session_summary': session_summary,
-            'context_sources': [],
+            'context_sources': retrieval.get('sources') or [],
+            'used_context': retrieval.get('counts') or {},
             'quick_actions': [],
         }
     )

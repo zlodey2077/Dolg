@@ -7,8 +7,13 @@ knowledge, learning, catalog and artifact context.
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
+
+_GLOSSARY_PATH = Path(__file__).resolve().parents[2] / 'knowledge' / 'data' / 'glossary.json'
+_GLOSSARY_CACHE: list[dict[str, Any]] | None = None
 
 STOPWORDS = {
     'and',
@@ -49,6 +54,7 @@ def build_retrieval_context(
 ) -> dict[str, Any]:
     tokens = _query_tokens(message, intent=intent, scheme=scheme, review=review)
     items: list[dict[str, Any]] = []
+    items.extend(_glossary_items(tokens))
     items.extend(_artifact_items(project, tokens))
     items.extend(_training_items(project, tokens))
     items.extend(_legal_source_items(tokens))
@@ -71,6 +77,7 @@ def retrieval_lines(context: dict[str, Any] | None, *, limit: int = 5) -> list[s
         snippet = item.get('snippet') or ''
         url = item.get('url') or ''
         prefix = {
+            'glossary': 'глоссарий',
             'article': 'статья',
             'learning': 'практикум',
             'catalog': 'каталог',
@@ -317,6 +324,49 @@ def _training_items(project, tokens: list[str]) -> list[dict[str, Any]]:
         return rows
     except Exception:
         return []
+
+
+def _load_glossary() -> list[dict[str, Any]]:
+    """Curated-глоссарий базовых терминов. Кешируется в памяти процесса —
+    это маленький статичный файл, перечитывать на каждый запрос незачем."""
+    global _GLOSSARY_CACHE
+    if _GLOSSARY_CACHE is None:
+        try:
+            with open(_GLOSSARY_PATH, encoding='utf-8') as fh:
+                _GLOSSARY_CACHE = json.load(fh)
+        except Exception:
+            _GLOSSARY_CACHE = []
+    return _GLOSSARY_CACHE
+
+
+def _glossary_items(tokens: list[str]) -> list[dict[str, Any]]:
+    """Точные определения базовых терминов — чтобы на вопрос вроде «что такое
+    резистор» ассистент опирался на выверенный текст, а не выдумывал. Матч по
+    алиасам термина; найденному даём высокий базовый score, чтобы определение
+    шло первым в контексте."""
+    token_set = set(tokens)
+    items: list[dict[str, Any]] = []
+    for entry in _load_glossary():
+        aliases = [str(a).lower() for a in entry.get('aliases') or []]
+        aliases.append(str(entry.get('term') or '').lower())
+        if not any(alias and alias in token_set for alias in aliases):
+            continue
+        snippet = entry.get('definition') or ''
+        if entry.get('formula'):
+            snippet += f' Формула: {entry["formula"]}.'
+        items.append(
+            {
+                'source': 'glossary',
+                'id': entry.get('id'),
+                'source_id': entry.get('source'),
+                'title': entry.get('term'),
+                'snippet': snippet,
+                'url': entry.get('url') or '',
+                'keywords': ' '.join(aliases),
+                'score': 5,
+            }
+        )
+    return items
 
 
 def _counts_by_source(items: list[dict[str, Any]]) -> dict[str, int]:

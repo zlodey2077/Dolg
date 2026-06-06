@@ -30,6 +30,7 @@ Phase 2 (post-defense):
 
 from __future__ import annotations
 
+import itertools
 import logging
 import time
 
@@ -39,11 +40,37 @@ logger = logging.getLogger(__name__)
 
 # Толеранс по умолчанию (1σ) — стандарт E96 (1%), E24 (5%), E12 (10%).
 DEFAULT_TOLERANCE = 0.05
-MAX_ITERATIONS = 5000  # safety cap (~1 сек @ 50 nodes)
+MAX_ITERATIONS = 10000  # safety cap (~2 сек @ 50 nodes) — режим «шизо-теста»
 MIN_ITERATIONS = 10
 GMIN = 1e-12  # против сингулярности «плавающих» узлов
 DIODE_DROP = 0.7
 LED_DROP = 2.0
+# Worst-case: на сколько σ уходим к краю допуска (совпадает с clamp Monte Carlo,
+# поэтому угловой конверт гарантированно охватывает все MC-выборки).
+SIGMA_MULTIPLIER = 3.0
+# Полный перебор углов = 2^k solve-вызовов. Выше порога — случайная выборка углов.
+WORST_CASE_MAX_COMPONENTS = 13  # 2^13 = 8192 прогонов
+
+
+def _component_tolerance(component: dict) -> float | None:
+    """Относительный допуск компонента (0.05 = ±5%) из scheme. None — если не
+    задан (тогда берётся глобальный). Поле `tolerance_percent` — это проценты
+    (1 → 0.01, важно для E96 1%-резисторов); поле `tolerance` — уже доля."""
+    if component.get('tolerance_percent') is not None:
+        try:
+            value = float(component['tolerance_percent']) / 100.0
+        except TypeError, ValueError:
+            return None
+        return max(0.0, min(0.5, value))
+    if component.get('tolerance') is not None:
+        try:
+            value = float(component['tolerance'])
+        except TypeError, ValueError:
+            return None
+        if value > 1.0:  # прислали проценты в поле доли — мягко конвертируем
+            value /= 100.0
+        return max(0.0, min(0.5, value))
+    return None
 
 
 # ─── Преобразование scheme_data → circuit (зеркало scheme-netlist.js) ─────
@@ -156,6 +183,7 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
                     'value': max(value, 1e-3),
                     'label': f'R{cid}',
                     'tolerable': True,
+                    'tolerance': _component_tolerance(c),
                 }
             )
         elif ctype == 'capacitor':
@@ -190,6 +218,7 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
                     'value': value,
                     'label': f'V{cid}',
                     'tolerable': True,
+                    'tolerance': _component_tolerance(c),
                 }
             )
         elif ctype == 'diode':
@@ -294,6 +323,37 @@ def solve_dc(circuit: dict, *, caps_open: bool = True, inds_short: bool = True) 
     return {'voltages': voltages, 'currents': currents}
 
 
+# ─── Tolerance resolution (per-element) ──────────────────────────────────
+def _resolve_tolerances(
+    elements: list[dict],
+    global_tolerance: float,
+    component_tolerances: dict | None,
+) -> np.ndarray:
+    """Возвращает per-element массив относительных допусков (1σ). Приоритет:
+    явный override по id компонента → собственный допуск элемента → глобальный.
+    Нетолерантные элементы (C/L/D) всегда 0. `component_tolerances` — доли
+    (0.05 = ±5%); percent→доля конвертирует вызывающий слой (view)."""
+    overrides = {}
+    for key, val in (component_tolerances or {}).items():
+        try:
+            v = float(val)
+        except TypeError, ValueError:
+            continue
+        overrides[str(key)] = max(0.0, min(0.5, v))
+
+    out = np.zeros(len(elements), dtype=np.float64)
+    for i, e in enumerate(elements):
+        if not e.get('tolerable'):
+            continue
+        if str(e.get('id')) in overrides:
+            out[i] = overrides[str(e['id'])]
+        elif e.get('tolerance') is not None:
+            out[i] = float(e['tolerance'])
+        else:
+            out[i] = max(0.0, min(0.5, float(global_tolerance)))
+    return out
+
+
 # ─── Monte Carlo entry-point ─────────────────────────────────────────────
 def run_monte_carlo(
     scheme_data: dict,
@@ -301,6 +361,7 @@ def run_monte_carlo(
     iterations: int = 1000,
     tolerance: float = DEFAULT_TOLERANCE,
     seed: int | None = None,
+    component_tolerances: dict | None = None,
 ) -> dict:
     """Прогоняет N итераций DC с гауссовским jitter параметров.
 
@@ -335,9 +396,14 @@ def run_monte_carlo(
             'errors': ['scheme has no simulatable components'],
         }
 
-    # Кэшируем индексы компонентов с tolerable=True (jitter применяем только к ним)
+    # Per-element допуски (1σ): override по id → собственный → глобальный.
     base_values = np.array([e['value'] for e in base_circuit['elements']], dtype=np.float64)
-    tolerable_mask = np.array([e.get('tolerable', False) for e in base_circuit['elements']])
+    tol_array = _resolve_tolerances(base_circuit['elements'], tolerance, component_tolerances)
+    # Номинал (без джиттера) — опора для worst-case и paranoia.
+    try:
+        nominal_voltages = solve_dc(base_circuit)['voltages']
+    except ValueError:
+        nominal_voltages = {}
 
     node_samples: dict[int, list[float]] = {}
     current_samples: dict[str, list[float]] = {}
@@ -347,10 +413,10 @@ def run_monte_carlo(
     start_ns = time.perf_counter_ns()
 
     for _ in range(iterations):
-        # Gaussian jitter — clamp на 3σ чтобы не получать отрицательные R
-        jitter = rng.normal(loc=1.0, scale=tolerance, size=base_values.shape)
-        jitter = np.clip(jitter, 1.0 - 3 * tolerance, 1.0 + 3 * tolerance)
-        new_values = np.where(tolerable_mask, base_values * jitter, base_values)
+        # Gaussian jitter с per-element σ — clamp на 3σ (scale=0 → элемент не дрожит)
+        jitter = rng.normal(loc=1.0, scale=tol_array, size=base_values.shape)
+        jitter = np.clip(jitter, 1.0 - 3 * tol_array, 1.0 + 3 * tol_array)
+        new_values = base_values * jitter
         new_values = np.maximum(new_values, 1e-6)  # никаких отрицательных
 
         # Локальный circuit
@@ -397,8 +463,215 @@ def run_monte_carlo(
         'tolerance': tolerance,
         'success': success,
         'failed': failed,
+        'nominal': {str(node): float(v) for node, v in sorted(nominal_voltages.items())},
         'nodes': {str(node): _stats(samples) for node, samples in sorted(node_samples.items())},
         'currents': {vid: _stats(samples) for vid, samples in current_samples.items()},
         'errors': errors,
         'algorithm': 'NumPy MNA + Gaussian Monte Carlo (DC)',
     }
+
+
+# ─── Worst-case / corner analysis ────────────────────────────────────────
+def run_worst_case(
+    scheme_data: dict,
+    *,
+    tolerance: float = DEFAULT_TOLERANCE,
+    component_tolerances: dict | None = None,
+    seed: int | None = None,
+    max_components: int = WORST_CASE_MAX_COMPONENTS,
+) -> dict:
+    """Угловой (worst-case) анализ: каждый толерантный параметр ставится в край
+    допуска (±3σ, как clamp Monte Carlo). При ≤ max_components параметрах
+    перебираются ВСЕ 2^k углов (точная огибающая), иначе — случайная выборка
+    углов (приближённая). Возвращает per-node min/max/span вокруг номинала."""
+    circuit = scheme_to_circuit(scheme_data)
+    elements = circuit['elements']
+    if not elements:
+        return {
+            'evaluated': 0,
+            'failed': 0,
+            'exhaustive': True,
+            'components': 0,
+            'sigma_multiplier': SIGMA_MULTIPLIER,
+            'nodes': {},
+            'nominal': {},
+            'errors': ['scheme has no simulatable components'],
+        }
+
+    base_values = np.array([e['value'] for e in elements], dtype=np.float64)
+    tol_array = _resolve_tolerances(elements, tolerance, component_tolerances)
+    tol_idx = [i for i, t in enumerate(tol_array) if t > 0]
+    k = len(tol_idx)
+    rng = np.random.default_rng(seed)
+
+    exhaustive = k <= max_components
+    if k == 0:
+        sign_combos: list[tuple] = [()]
+    elif exhaustive:
+        sign_combos = list(itertools.product((-1, 1), repeat=k))
+    else:
+        cap = 2**max_components
+        sign_combos = [tuple(int(s) for s in rng.choice((-1, 1), size=k)) for _ in range(cap)]
+
+    node_min: dict[int, float] = {}
+    node_max: dict[int, float] = {}
+    evaluated = 0
+    failed = 0
+    for signs in sign_combos:
+        vals = base_values.copy()
+        for pos, j in enumerate(tol_idx):
+            vals[j] = base_values[j] * (1.0 + signs[pos] * SIGMA_MULTIPLIER * tol_array[j])
+        vals = np.maximum(vals, 1e-6)
+        local = {
+            'n_nodes': circuit['n_nodes'],
+            'elements': [{**e, 'value': float(vals[i])} for i, e in enumerate(elements)],
+        }
+        try:
+            res = solve_dc(local)
+        except ValueError:
+            failed += 1
+            continue
+        evaluated += 1
+        for node, v in res['voltages'].items():
+            if node not in node_min or v < node_min[node]:
+                node_min[node] = v
+            if node not in node_max or v > node_max[node]:
+                node_max[node] = v
+
+    try:
+        nominal = solve_dc(circuit)['voltages']
+    except ValueError:
+        nominal = {}
+
+    nodes = {}
+    for node in sorted(node_min):
+        lo, hi = node_min[node], node_max[node]
+        nom = float(nominal.get(node, (lo + hi) / 2.0))
+        nodes[str(node)] = {
+            'min': round(lo, 6),
+            'max': round(hi, 6),
+            'nominal': round(nom, 6),
+            'span': round(hi - lo, 6),
+        }
+    return {
+        'evaluated': evaluated,
+        'failed': failed,
+        'exhaustive': exhaustive,
+        'components': k,
+        'sigma_multiplier': SIGMA_MULTIPLIER,
+        'nodes': nodes,
+        'nominal': {str(n): round(float(v), 6) for n, v in sorted(nominal.items())},
+        'algorithm': 'NumPy MNA worst-case corner sweep (DC)',
+    }
+
+
+def _paranoia_report(worst_case: dict) -> dict:
+    """«Паранойя-отчёт»: по огибающей worst-case выявляет узлы с опасным
+    разбросом или сменой знака. Severity: high (>30% или смена знака) /
+    medium (>10%). Для питча по надёжности (РЭБ/критичные условия)."""
+    flags = []
+    for node, wc in (worst_case.get('nodes') or {}).items():
+        if node == '0':  # ground
+            continue
+        nom = wc.get('nominal', 0.0)
+        span = wc.get('span', 0.0)
+        ref = max(abs(nom), 1e-9)
+        span_pct = span / ref * 100.0
+        sign_flip = wc.get('min', 0.0) < -1e-9 and wc.get('max', 0.0) > 1e-9
+        if sign_flip:
+            flags.append(
+                {
+                    'node': node,
+                    'severity': 'high',
+                    'span_pct': round(span_pct, 1),
+                    'min': wc.get('min'),
+                    'max': wc.get('max'),
+                    'nominal': nom,
+                    'message': (
+                        f'узел {node}: напряжение меняет знак в пределах допусков '
+                        f'({wc.get("min"):.3f}…{wc.get("max"):.3f} В) — риск инверсии полярности'
+                    ),
+                }
+            )
+        elif span_pct >= 30.0:
+            flags.append(
+                {
+                    'node': node,
+                    'severity': 'high',
+                    'span_pct': round(span_pct, 1),
+                    'min': wc.get('min'),
+                    'max': wc.get('max'),
+                    'nominal': nom,
+                    'message': (
+                        f'узел {node}: разброс {span_pct:.0f}% от номинала ({nom:.3f} В) — '
+                        f'вне инженерного запаса'
+                    ),
+                }
+            )
+        elif span_pct >= 10.0:
+            flags.append(
+                {
+                    'node': node,
+                    'severity': 'medium',
+                    'span_pct': round(span_pct, 1),
+                    'min': wc.get('min'),
+                    'max': wc.get('max'),
+                    'nominal': nom,
+                    'message': f'узел {node}: разброс {span_pct:.0f}% от номинала ({nom:.3f} В)',
+                }
+            )
+
+    if worst_case.get('failed'):
+        flags.append(
+            {
+                'node': None,
+                'severity': 'high',
+                'message': (
+                    f'{worst_case["failed"]} угловых комбинаций дали вырожденную матрицу — '
+                    f'схема неустойчива в части диапазона допусков'
+                ),
+            }
+        )
+
+    flags.sort(key=lambda f: (0 if f['severity'] == 'high' else 1, -f.get('span_pct', 0)))
+    high = sum(1 for f in flags if f['severity'] == 'high')
+    medium = sum(1 for f in flags if f['severity'] == 'medium')
+    verdict = 'critical' if high else 'warning' if medium else 'ok'
+    summary = {
+        'ok': 'Схема устойчива к разбросу параметров в заданных допусках.',
+        'warning': f'Умеренный разброс: {medium} узл(ов) выходят за 10% от номинала.',
+        'critical': f'Высокий риск: {high} критичн(ых) узл(ов) (>30% или смена знака).',
+    }[verdict]
+    return {'verdict': verdict, 'high': high, 'medium': medium, 'flags': flags, 'summary': summary}
+
+
+def run_tolerance_analysis(
+    scheme_data: dict,
+    *,
+    iterations: int = 1000,
+    tolerance: float = DEFAULT_TOLERANCE,
+    seed: int | None = None,
+    component_tolerances: dict | None = None,
+    worst_case: bool = True,
+) -> dict:
+    """Полный «шизо-тест»: Monte Carlo + worst-case corner + paranoia-отчёт.
+    Один вызов для UI — собирает разброс (статистика) и гарантированную
+    огибающую (углы) в единый отчёт надёжности."""
+    mc = run_monte_carlo(
+        scheme_data,
+        iterations=iterations,
+        tolerance=tolerance,
+        seed=seed,
+        component_tolerances=component_tolerances,
+    )
+    report = {'monte_carlo': mc}
+    if worst_case:
+        wc = run_worst_case(
+            scheme_data,
+            tolerance=tolerance,
+            component_tolerances=component_tolerances,
+            seed=seed,
+        )
+        report['worst_case'] = wc
+        report['paranoia'] = _paranoia_report(wc)
+    return report
