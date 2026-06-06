@@ -157,6 +157,71 @@ def audit_product_image(product, *, media_root: Path | None = None) -> dict[str,
     return report
 
 
+# ── Покрытие изображений по категориям (лёгкий аудит без открытия файлов) ──
+# Маппинг политики источника → человекочитаемый «класс качества» картинки.
+_SOURCE_CLASS = {
+    'local_asset': 'real',  # локальный растровый ассет / подтверждённое фото
+    'generated': 'placeholder',  # сгенерированный technical art (заглушка)
+    'missing': 'missing',
+    'forbidden': 'problem',
+    'off_policy': 'problem',
+}
+
+
+def classify_image_source(product) -> str:
+    """Дешёвая классификация источника картинки продукта (без открытия файла)."""
+    return _source_type(product, _image_name(getattr(product, 'image', None)))
+
+
+def aggregate_media_coverage(items: Iterable[tuple[str, str]]) -> dict[str, Any]:
+    """Чистый агрегатор: на вход (category_slug, source_type) пары → покрытие по
+    категориям. Вынесено отдельно от классификации, чтобы тестировать без БД/PIL."""
+    cats: dict[str, dict[str, Any]] = {}
+    t_total = t_real = t_placeholder = t_missing = t_problem = 0
+    for slug, source_type in items:
+        slug = slug or 'unknown'
+        klass = _SOURCE_CLASS.get(source_type, 'problem')
+        bucket = cats.setdefault(
+            slug,
+            {'total': 0, 'real': 0, 'placeholder': 0, 'missing': 0, 'problem': 0, 'by_type': {}},
+        )
+        bucket['total'] += 1
+        bucket[klass] += 1
+        bucket['by_type'][source_type] = bucket['by_type'].get(source_type, 0) + 1
+        t_total += 1
+        if klass == 'real':
+            t_real += 1
+        elif klass == 'placeholder':
+            t_placeholder += 1
+        elif klass == 'missing':
+            t_missing += 1
+        else:
+            t_problem += 1
+    for bucket in cats.values():
+        n = bucket['total'] or 1
+        bucket['real_coverage'] = round(bucket['real'] / n, 3)
+    return {
+        'categories': dict(sorted(cats.items())),
+        'totals': {
+            'total': t_total,
+            'real': t_real,
+            'placeholder': t_placeholder,
+            'missing': t_missing,
+            'problem': t_problem,
+            'real_coverage': round(t_real / t_total, 3) if t_total else 0.0,
+        },
+    }
+
+
+def media_coverage_by_category(products: Iterable[Any]) -> dict[str, Any]:
+    """Покрытие изображений каталога по категориям и типам источника
+    (real/placeholder/missing/problem). Лёгкий аудит — не открывает файлы."""
+    items = [
+        (getattr(getattr(p, 'category', None), 'slug', None), classify_image_source(p)) for p in products
+    ]
+    return aggregate_media_coverage(items)
+
+
 def audit_catalog_media_quality(products: Iterable[Any], *, media_root: Path | None = None) -> dict[str, Any]:
     media_root = Path(media_root or settings.MEDIA_ROOT)
     reports = [audit_product_image(product, media_root=media_root) for product in products]
