@@ -137,8 +137,12 @@
 
 ### 5. 🔒 БЕЗОПАСНОСТЬ / гигиена кода `∥`
 HIGH-волна закрыта (H4/H6/H7/H8/H9). Осталось:
-1. P1·M — **Permission audit** (ML/admin/API views) + **IDOR/org-isolation** (`owner_required` на
-   `/projects/<id>/`, `/reviews/<id>/`, `/orgs/<id>/`).
+1. ✅ **IDOR/org-isolation** (verify+test 2026-06-06): аудит показал — уже защищено
+   (`_project_for_read/write`, `_review_for_read`, `@require_org_permission`, org-фильтры в
+   lookup'ах). `owner_required`-декоратора нет, но helper'ы его заменяют. Не хватало регрессии —
+   добавил 5 IDOR-тестов (чужой не читает/пишет/обновляет проект и не открывает review → 404).
+   `api_comments_delete` post-fetch проверка корректна (владелец ИЛИ staff-модерация). Остаток:
+   permission audit ML/admin-вьюх (отдельная мелкая проверка).
 2. P2·S — Stripe webhook signature verify; **AI-tool backend-auth** (destructive `scheme.clear_all`
    → `@require_permission`); path-traversal в media-serving; Lithium import XSS escaping.
 3. P2·M — rate-limit per-minute tier-aware (anti-DoS на кошелёк Anthropic); GDPR cascading delete;
