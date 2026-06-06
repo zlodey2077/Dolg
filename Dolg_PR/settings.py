@@ -144,6 +144,11 @@ try:
 except ImportError:
     _HAS_PROMETHEUS = False
 
+# Токен для машинного доступа к /metrics/ (Prometheus-скрейпер шлёт его в
+# заголовке Authorization: Bearer <token> или ?token=). Пусто → доступ к
+# метрикам только у staff-пользователей (fail-closed). См. Dolg_APP/metrics_guard.
+METRICS_TOKEN = os.environ.get('METRICS_TOKEN', '')
+
 # Optional security/dev libs — conditional import + STRICT opt-in.
 # ВНИМАНИЕ: каждая из этих либ требует MIGRATIONS (axes, silk имеют свои таблицы).
 # Если включить без миграций → ЛЮБОЙ view ломается → blank page.

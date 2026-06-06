@@ -39,9 +39,13 @@ urlpatterns = [
 ]
 
 # Prometheus: /metrics/ только если пакет реально подгрузился (см. settings).
-# Иначе URL не регистрируется — не блокирует роутинг.
+# Иначе URL не регистрируется — не блокирует роутинг. Вместо открытого
+# include('django_prometheus.urls') отдаём метрики через staff/token-guard
+# (см. Dolg_APP/metrics_guard) — иначе внутренние счётчики публичны.
 if getattr(settings, '_HAS_PROMETHEUS', False):
-    urlpatterns.append(path('', include('django_prometheus.urls')))
+    from Dolg_APP.metrics_guard import protected_metrics
+
+    urlpatterns.append(path('metrics', protected_metrics, name='prometheus-django-metrics'))
 
 # Silk profiler: /silk/ доступен только staff (см. SILKY_PERMISSIONS).
 if getattr(settings, '_HAS_SILK', False):
