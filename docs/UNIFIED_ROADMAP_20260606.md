@@ -67,11 +67,13 @@
 3. P2·M — **дотянуть параметры по категориям** (теперь по отчёту audit_catalog_schema): capacitors
    (type×24, dielectric×14, max_temp×14, tolerance×13), ics (channels×29, family×27, supply_voltage×10),
    transistors (power×14, rds_on×11, ft×11, hfe×10), diodes (max_voltage×13), connectors (pitch/gender).
-4. P2·M — **Media V2:** чистый UGO-PNG без текста/неона ИЛИ официальное фото; image-audit по
-   категориям. No-Wikimedia policy.
+4. ✅ (аудит) **Media V2 image-audit** (2026-06-07): `audit_catalog_media` — per-category покрытие
+   real/placeholder/missing/problem (364 товара, real 22%; modules/tools/monitors 0%, resistors 6%).
+   +5 тестов. Остаток (контент): дотянуть real-фото где 0-6% (по отчёту), чистый UGO-PNG.
 5. P2·M — **Datasheet Intelligence** (PyMuPDF): pinout / absolute max / thermal / типовые схемы.
-6. P3·S — **Smart-search Phase 1.5:** range-токены (`R<10k`), подсветка `<mark>`, facets в sidebar,
-   autocomplete part_number.
+6. ✅ (backend) **Smart-search Phase 1.5 range-токены** (2026-06-07): `R<10k`/`P>0.25`/`V<=50`
+   (R/C/L/V/P/I → параметры, единицы через parse_engineering_value) в `apply_catalog_filters`.
+   +10 тестов. Остаток (frontend): `<mark>`-подсветка, facets в sidebar, autocomplete part_number.
 7. P3·S — пустые карточки (category=tools) дефолтные параметры; чипы 3 класса (ресурсы/мета/параметры).
 
 ### 2. ⚡ СИМУЛЯТОР / редактор схем (высокий вау, pre-defense)
@@ -107,11 +109,12 @@
    confidence в `expert_rules`/findings), но без регрессии и с двумя багами. Добавлены тесты
    (`tests_expert_rules`, валидность пака + expert-first поля); починено: `min_*_px` дефолт 0→+∞
    (ложные «провода близко»), evaluate пропускает правила без нужных фактов вместо error-спама.
-3. P1·L — **GNN Neural Circuit Simulator (A1):** skeleton есть → нужен **train+bench**
-   («80× speedup, <5% error» — pitch для защиты).
-4. ✅ (частично) **RAG Phase A** — хук `### CONTEXT ###` в `/api/ai/chat/` уже сделан glossary-
+3. P1·L — **GNN Neural Circuit Simulator (A1):** ⏳ оценено 2026-06-07 — torch 2.12 работает,
+   skeleton `ml/gnn_simulator.py` + команды `train_tiny_circuit_ai`/`evaluate_circuit_ai` есть.
+   Выполнимо, но крупно (данные+обучение+замер «80×/<5%») → **отдельная фокус-сессия**.
+4. ✅ (достаточно) **RAG Phase A** — хук `### CONTEXT ###` в `/api/ai/chat/` сделан glossary-
    grounding'ом (Wave 0′ #1): retrieval из glossary/articles/learning/catalog/legal/training.
-   Остаток: вынести в полноценный TF-IDF-индекс (сейчас substring-ранжирование).
+   TF-IDF-индекс (вместо substring) — nice-to-have, отложено (substring работает).
 5. P2·M — **расширить нейро-корпус** до 1000+ схем через opt-in `allow_ai_training` + dataset
    governance (validation/coverage/topology balance перед дообучением).
 6. P2·M — **Корутины в AI-ассистенте (асинхронность «для себя»):** (a) async-вызов Anthropic
@@ -147,8 +150,10 @@ HIGH-волна закрыта (H4/H6/H7/H8/H9). Осталось:
    handler'ах + demo-gate); AI-tools frontend-only (нет backend-эндпоинта на destructive, tier-gate
    на уровне чата); media через безопасный Django `serve()` (нет custom path); Lithium import →
    JSON-ответ, без `|safe`/template-XSS. Backlog был перестрахован.
-3. P2·M — rate-limit per-minute tier-aware (anti-DoS; `_ai_rate_limit` per-sec уже есть); GDPR
-   cascading delete; log scrubbing; `.dockerignore`+Trivy; nginx hardening.
+3. ✅ (частично, 2026-06-07): **rate-limit per-minute tier-aware** (`_ai_rate_limit`: guest8/free12/
+   pro40/ent80, staff∞; +3 теста); **log scrubbing** (`log_scrub.SensitiveDataFilter` в LOGGING:
+   ключи/токены/пароли/email; +8 тестов); **`.dockerignore`** создан. Остаток: GDPR cascading
+   delete; Trivy/container scan; nginx hardening.
    ✅ **`/healthz`** (2026-06-06): анонимная liveness/readiness-проба (БД+кеш, 200/503). +2 теста.
 4. P2·S — **авто-чистка кода** (ruff `✅`/autoflake unused/vulture dead-code/orphan templates).
 5. ⏸ — анти-AI чистка ~157 датированных меток + scrub git history — **только по явной команде**.
