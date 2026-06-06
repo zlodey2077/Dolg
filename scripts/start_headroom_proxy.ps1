@@ -56,12 +56,16 @@ if (Test-ProxyHealthy) {
   return
 }
 
-if (-not (Test-Path $python)) { throw "venv python not found at $python - create .venv and pip install headroom-ai first." }
+$headroom = Join-Path $repo '.venv\Scripts\headroom.exe'
+if (-not (Test-Path $headroom)) { throw "headroom.exe not found at $headroom - pip install headroom-ai in .venv first." }
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 
 $env:HEADROOM_REQUIRE_RUST_CORE = 'false'
-Start-Process -FilePath $python `
-  -ArgumentList '-c', 'from headroom.cli import main; main()', 'proxy', '--port', $Port, '--no-telemetry' `
+# headroom.exe напрямую, НЕ python -c: Start-Process -ArgumentList не цитирует
+# аргумент с пробелами, из-за чего 'from headroom.cli import main; main()' рвался
+# по пробелам -> python -c from -> SyntaxError.
+Start-Process -FilePath $headroom `
+  -ArgumentList 'proxy', '--port', $Port, '--no-telemetry' `
   -WindowStyle Hidden `
   -RedirectStandardOutput (Join-Path $logDir 'headroom_proxy.out.log') `
   -RedirectStandardError  (Join-Path $logDir 'headroom_proxy.err.log') | Out-Null
