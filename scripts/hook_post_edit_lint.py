@@ -31,10 +31,17 @@ def main() -> int:
     path = Path(fp)
     if not path.exists():
         return 0
+    # Scope-guard: hook лежит в глобальных user-настройках, но трогаем ТОЛЬКО
+    # файлы внутри репозитория DOLG (иначе линтил бы чужие проекты ruff'ом DOLG).
+    try:
+        path.resolve().relative_to(ROOT)
+    except ValueError:
+        return 0
     ruff = str(RUFF) if RUFF.exists() else 'ruff'
-    # 1) безопасные авто-фиксы
+    # 1) безопасные авто-фиксы (lint) + авто-формат (отступы/кавычки/пробелы)
     try:
         subprocess.run([ruff, 'check', '--fix', '--quiet', str(path)], cwd=str(ROOT), timeout=60)
+        subprocess.run([ruff, 'format', '--quiet', str(path)], cwd=str(ROOT), timeout=60)
     except Exception:
         pass
     # 2) остаток проблем — в stdout, агент увидит
