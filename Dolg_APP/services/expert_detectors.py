@@ -731,8 +731,15 @@ def detect_bom_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[st
         'min_segment_length_px',
     ]:
         if k not in evidence:
-            evidence[k] = (
-                0 if 'count' in k or k.endswith('_violations') else False if k.startswith('has_') else 0
-            )
+            if k.endswith('_px'):
+                # «минимум расстояния/длины»: нечего измерять → НЕ нарушение.
+                # Дефолт 0 ложно срабатывал бы на правилах вида `_px < N`.
+                evidence[k] = 1e9
+            elif 'count' in k or k.endswith('_violations'):
+                evidence[k] = 0
+            elif k.startswith('has_'):
+                evidence[k] = False
+            else:
+                evidence[k] = 0
 
     return evidence

@@ -154,9 +154,17 @@ def evaluate_expert_rules(facts: dict[str, Any], rule_pack: dict[str, Any] | Non
     validate_rule_pack(rule_pack)
     findings = []
 
+    import rule_engine.errors
+
     for rule in rule_pack.get('rules') or []:
         try:
             matched = bool(_rule_engine_rule(rule['when']).matches(facts))
+        except rule_engine.errors.SymbolResolutionError:
+            # Правило ссылается на факт, недоступный в этом контексте (например,
+            # wire-geometry без scheme_data) → правило неприменимо, тихо пропускаем.
+            # Синтаксис правил проверяется при загрузке (validate_rule_pack), так
+            # что это именно «нет данных», а не сломанное выражение.
+            continue
         except Exception as exc:
             findings.append(
                 {
