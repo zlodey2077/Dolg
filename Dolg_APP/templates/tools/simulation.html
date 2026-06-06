@@ -203,6 +203,83 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     </div>
     {% endif %}
 
+    <style>
+    /* Полноэкранный режим симулятора (как рабочее пространство AutoCAD): прячем
+       шапку/футер сайта и разворачиваем рабочую зону почти на весь viewport.
+       Тот же приём, что в CAD (position:fixed не годится — у .main-content
+       трансформированный предок). Esc / кнопка ⛶ в углу холста — выход. */
+    body.sim-fullscreen { overflow: hidden; }
+    body.sim-fullscreen header,
+    body.sim-fullscreen footer { display: none !important; }
+    body.sim-fullscreen .main-content { padding: 0 !important; }
+    body.sim-fullscreen .main-content > .container {
+        max-width: 100% !important;
+        padding: 6px !important;
+    }
+    body.sim-fullscreen .simulator-container {
+        height: calc(100vh - 12px) !important;
+    }
+    .canvas-container { position: relative; }
+    .sim-fs-btn {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        z-index: 30;
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        background: rgba(10, 14, 39, 0.82);
+        color: #7fdbff;
+        border: 1px solid rgba(0, 212, 255, 0.45);
+        border-radius: 7px;
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+        transition: background-color 0.2s, box-shadow 0.2s;
+    }
+    .sim-fs-btn:hover {
+        background: rgba(0, 212, 255, 0.25);
+        box-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+    }
+    </style>
+    <script>
+    // Полноэкранный режим симулятора: класс body.sim-fullscreen + native Fullscreen
+    // API. resize -> resizeCanvas() сам переразмечает холст (зум сохраняется).
+    (function () {
+        function refit() {
+            window.dispatchEvent(new Event('resize'));
+            setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 90);
+        }
+        function setLabel(on) {
+            var b = document.getElementById('simFullscreenBtn');
+            if (b) { b.textContent = on ? '⤢' : '⛶'; b.title = on ? 'Свернуть (Esc)' : 'Полноэкранный режим (Esc — выход)'; }
+        }
+        function toggle() {
+            var on = document.body.classList.toggle('sim-fullscreen');
+            setLabel(on);
+            try {
+                if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
+                else if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
+            } catch (e) {}
+            refit();
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            var b = document.getElementById('simFullscreenBtn');
+            if (b) b.addEventListener('click', toggle);
+        });
+        document.addEventListener('keydown', function (e) {
+            // Только если НЕ в native fullscreen (там Esc гасит браузер сам).
+            if (e.key === 'Escape' && document.body.classList.contains('sim-fullscreen') && !document.fullscreenElement) toggle();
+        });
+        document.addEventListener('fullscreenchange', function () {
+            if (!document.fullscreenElement && document.body.classList.contains('sim-fullscreen')) {
+                document.body.classList.remove('sim-fullscreen'); setLabel(false); refit();
+            }
+        });
+    })();
+    </script>
     <div class="simulator-container">
         <!-- Левая панель - компоненты -->
         <div class="components-panel">
@@ -545,6 +622,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 {% endcomment %}
                 <div id="schematic-hover-popover" class="schematic-hover-popover" aria-hidden="true"></div>
                 <p class="canvas-hint" id="modeIndicator">💡 ПКМ+перетаскивание — панорама &nbsp;·&nbsp; Колесо мыши — масштаб &nbsp;·&nbsp; Выберите компонент в палитре слева или откройте демо-проект</p>
+                <button type="button" id="simFullscreenBtn" class="sim-fs-btn" title="Полноэкранный режим (Esc — выход)">⛶</button>
             </div>
         </div>
 
