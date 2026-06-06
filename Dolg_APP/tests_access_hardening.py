@@ -105,6 +105,53 @@ class AccessHardeningTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(public_project.reviews.count(), 0)
 
+    def test_other_user_cannot_load_private_project_scheme(self):
+        """IDOR: Bob не должен читать схему приватного проекта Alice."""
+        self.client.force_login(self.bob)
+        response = self.client.get(f'/projects/api/{self.private_project.id}/load-scheme/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_can_load_own_private_project_scheme(self):
+        """Позитивный контроль: владелец читает свой проект."""
+        self.client.force_login(self.alice)
+        response = self.client.get(f'/projects/api/{self.private_project.id}/load-scheme/')
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_other_user_cannot_save_private_project_scheme(self):
+        """IDOR: Bob не должен перезаписывать схему приватного проекта Alice."""
+        self.client.force_login(self.bob)
+        response = self.client.post(
+            f'/projects/api/{self.private_project.id}/save-scheme/',
+            data=json.dumps(
+                {'scheme_data': {'components': [{'id': 'X', 'type': 'resistor'}], 'connections': []}}
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+        self.private_project.refresh_from_db()
+        self.assertEqual(self.private_project.scheme_data, {'components': [], 'connections': []})
+
+    def test_other_user_cannot_update_private_project(self):
+        """IDOR: Bob не должен править метаданные приватного проекта Alice."""
+        self.client.force_login(self.bob)
+        response = self.client.post(
+            f'/projects/api/{self.private_project.id}/update/',
+            data=json.dumps({'name': 'hijacked'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+        self.private_project.refresh_from_db()
+        self.assertEqual(self.private_project.name, 'Private draft')
+
+    def test_other_user_cannot_read_private_project_review(self):
+        """IDOR: Bob не должен открывать review приватного проекта Alice."""
+        from Dolg_APP.models import ProjectReview
+
+        review = ProjectReview.objects.create(project=self.private_project, user=self.alice)
+        self.client.force_login(self.bob)
+        response = self.client.get(f'/projects/review/{review.id}/')
+        self.assertEqual(response.status_code, 404)
+
     def test_save_scheme_persists_draft_with_drc_errors(self):
         self.client.force_login(self.alice)
         broken_scheme = {
