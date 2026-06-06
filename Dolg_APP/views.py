@@ -2384,10 +2384,17 @@ AI_LIVE_HISTORY_TAIL = 16  # live LLM получает меньше истори
 # Минимальный интервал между вызовами Claude API одним пользователем (в секундах).
 # Защищает от случайных дабл-кликов и от спама в окно ввода. Хранится в session.
 AI_MIN_INTERVAL_SEC = 2.0
+# Per-minute tier-aware лимит AI-чата (анти-DoS на кошелёк Anthropic).
+AI_PER_MINUTE_LIMITS = {'guest': 8, 'free': 12, 'pro': 40, 'enterprise': 80}
 
 
 def _ai_rate_limit(request):
     """True если запрос отклонён по rate-limit. Состояние — в session.
+
+    Два слоя: (1) per-call минимальный интервал (анти-burst) и (2) per-minute
+    tier-aware счётчик (анти-DoS на кошелёк Anthropic) — у Pro/Enterprise лимит
+    выше, staff (unlimited) без per-minute. Жёсткий дневной потолок — отдельно
+    в enforce_daily_quota (БД, per-user). Здесь session-слой как доп. защита.
 
     Используем time.time() (wall clock), а не time.monotonic() — monotonic
     сбрасывается при рестарте процесса, и сохранённое значение становится
@@ -2399,6 +2406,21 @@ def _ai_rate_limit(request):
         delta = now - last
         if 0 <= delta < AI_MIN_INTERVAL_SEC:
             return True
+
+    # Per-minute tier-aware (fixed-window). unlimited (staff) — без лимита.
+    plan = get_effective_plan(request.user)
+    if plan != 'unlimited':
+        limit = AI_PER_MINUTE_LIMITS.get(plan, AI_PER_MINUTE_LIMITS['free'])
+        window = int(now // 60)
+        if request.session.get('_ai_minute_window') == window:
+            count = request.session.get('_ai_minute_count', 0)
+            if count >= limit:
+                return True
+            request.session['_ai_minute_count'] = count + 1
+        else:
+            request.session['_ai_minute_window'] = window
+            request.session['_ai_minute_count'] = 1
+
     request.session['_ai_last_call_at'] = now
     return False
 
