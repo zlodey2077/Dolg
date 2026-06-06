@@ -147,8 +147,9 @@ HIGH-волна закрыта (H4/H6/H7/H8/H9). Осталось:
    handler'ах + demo-gate); AI-tools frontend-only (нет backend-эндпоинта на destructive, tier-gate
    на уровне чата); media через безопасный Django `serve()` (нет custom path); Lithium import →
    JSON-ответ, без `|safe`/template-XSS. Backlog был перестрахован.
-3. P2·M — rate-limit per-minute tier-aware (anti-DoS на кошелёк Anthropic); GDPR cascading delete;
-   log scrubbing; `.dockerignore`+Trivy+`/healthz`; nginx hardening.
+3. P2·M — rate-limit per-minute tier-aware (anti-DoS; `_ai_rate_limit` per-sec уже есть); GDPR
+   cascading delete; log scrubbing; `.dockerignore`+Trivy; nginx hardening.
+   ✅ **`/healthz`** (2026-06-06): анонимная liveness/readiness-проба (БД+кеш, 200/503). +2 теста.
 4. P2·S — **авто-чистка кода** (ruff `✅`/autoflake unused/vulture dead-code/orphan templates).
 5. ⏸ — анти-AI чистка ~157 датированных меток + scrub git history — **только по явной команде**.
 
