@@ -603,3 +603,25 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # request.get_host() возвращает внешний хост (.trycloudflare.com), а не
 # localhost из Host-заголовка. Cloudflare пробрасывает X-Forwarded-Host.
 USE_X_FORWARDED_HOST = True
+
+# Logging: console-handler со скрабингом чувствительных данных (PII/секреты).
+# disable_existing_loggers=False — не глушим Django-логгеры, только добавляем
+# фильтр маскировки ключей/токенов/паролей/email (см. Dolg_APP/log_scrub).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'scrub_sensitive': {'()': 'Dolg_APP.log_scrub.SensitiveDataFilter'},
+    },
+    'formatters': {
+        'standard': {'format': '%(levelname)s %(asctime)s %(name)s %(message)s'},
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['scrub_sensitive'],
+            'formatter': 'standard',
+        },
+    },
+    'root': {'handlers': ['console'], 'level': os.environ.get('LOG_LEVEL', 'INFO')},
+}

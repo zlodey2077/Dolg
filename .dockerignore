@@ -1,0 +1,52 @@
+# VCS / IDE
+.git
+.gitignore
+.github
+.vscode
+.idea
+.claude
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Local DB / media / logs / temp
+*.sqlite3
+db.sqlite3
+/media/
+.tmp_django.log
+*.log
+tmp/
+.cache/
+
+# Secrets / env (НЕ тащим в образ)
+.env
+.env.*
+*.pem
+*.key
+
+# Build / dist
+build/
+dist/
+node_modules/
+staticfiles/
+
+# Docs / heavy diploma artifacts (не нужны в рантайм-образе)
+docs/
+*.docx
+*.pptx
+*.pdf
+
+# Tests
+**/tests_*.py
+**/test_*.py
