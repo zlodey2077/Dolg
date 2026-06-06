@@ -11,7 +11,7 @@ from django.db.models import QuerySet
 
 from Dolg_APP.services.engineering_units import parse_engineering_quantity
 from shop.models import Product
-from shop.smart_search import parse_query_tokens
+from shop.smart_search import extract_range_constraints, filter_by_ranges, parse_query_tokens
 
 ENGINEERING_FILTERS = {
     'nominal': ('value', 'resistance', 'capacitance', 'inductance', 'capacity'),
@@ -197,7 +197,13 @@ def apply_catalog_filters(products, params) -> tuple[list[Product], str]:
 
     items = list(products.select_related('category') if isinstance(products, QuerySet) else products)
     if query:
-        items = _search_products(items, query)
+        # Phase 1.5: вынимаем range-токены («R<10k», «P>0.25») и фильтруем по
+        # параметрам (Python-side), остаток — обычный текстовый поиск.
+        text_query, range_constraints = extract_range_constraints(query)
+        if range_constraints:
+            items = filter_by_ranges(items, range_constraints)
+        if text_query:
+            items = _search_products(items, text_query)
 
     manufacturer = active.get('manufacturer')
     if manufacturer:

@@ -28,12 +28,16 @@ DB-agnostic — работает и на SQLite (dev), и на Postgres (prod). 
 
 from __future__ import annotations
 
+import math
+import operator
 import re
 from collections import Counter
-from typing import Iterable
+from typing import Iterable, NamedTuple
 
 from django.db.models import Q, QuerySet
 from rapidfuzz import fuzz, process
+
+from shop.component_validation import parse_engineering_value
 
 # Минимальный similarity-score для fuzzy fallback (0-100). 75 для partial_ratio:
 # короткая needle («резстор», 7 симв.) против длинного haystack (name + category
@@ -73,6 +77,76 @@ def parse_query_tokens(query: str) -> list[str]:
             seen.add(key)
             result.append(t)
     return result
+
+
+# ── Range-токены (Phase 1.5): «R<10k», «P>0.25», «C>=100n», «V<=50» ──────────
+# Префикс компонента → (поле для parse_engineering_value, ключи parameters).
+# Парсим и значение продукта, и таргет одним и тем же `field` — единицы
+# согласованы (parse_engineering_value учитывает k/M/n/µ/п/к/н и кириллицу).
+RANGE_PREFIX_FIELDS: dict[str, tuple[str, tuple[str, ...]]] = {
+    'r': ('resistance', ('resistance',)),
+    'c': ('capacitance', ('capacitance',)),
+    'l': ('inductance', ('inductance',)),
+    'v': ('voltage', ('voltage', 'max_voltage')),
+    'p': ('power', ('power',)),
+    'i': ('current', ('current', 'max_current')),
+}
+_RANGE_RE = re.compile(r'^([rclvpi])(<=|>=|<|>|=)(\S+)$', re.IGNORECASE)
+_RANGE_OPS = {
+    '<': operator.lt,
+    '<=': operator.le,
+    '>': operator.gt,
+    '>=': operator.ge,
+    '=': lambda a, b: math.isclose(a, b, rel_tol=1e-3),
+}
+
+
+class RangeConstraint(NamedTuple):
+    prefix: str
+    op: str
+    target: float
+    field: str
+    keys: tuple[str, ...]
+
+
+def extract_range_constraints(query: str) -> tuple[str, list[RangeConstraint]]:
+    """Вынимает range-токены из запроса. Возвращает (очищенный_текст, constraints).
+
+    «резистор R<10k P>0.1» → ('резистор', [R<10k, P>0.1]). Невалидный таргет —
+    токен остаётся в тексте (не теряем обычные слова вроде «v2»)."""
+    if not query:
+        return query, []
+    kept: list[str] = []
+    constraints: list[RangeConstraint] = []
+    for word in query.split():
+        match = _RANGE_RE.match(word)
+        if match:
+            prefix = match.group(1).lower()
+            field, keys = RANGE_PREFIX_FIELDS[prefix]
+            target = parse_engineering_value(field, match.group(3))
+            if target is not None:
+                constraints.append(RangeConstraint(prefix, match.group(2), target, field, keys))
+                continue
+        kept.append(word)
+    return ' '.join(kept), constraints
+
+
+def product_matches_range(product, constraint: RangeConstraint) -> bool:
+    params = product.parameters if isinstance(getattr(product, 'parameters', None), dict) else {}
+    raw = next((params[k] for k in constraint.keys if params.get(k) not in (None, '')), None)
+    if raw is None:
+        return False
+    value = parse_engineering_value(constraint.field, raw)
+    if value is None:
+        return False
+    return _RANGE_OPS[constraint.op](value, constraint.target)
+
+
+def filter_by_ranges(products: Iterable, constraints: list[RangeConstraint]) -> list:
+    """AND-фильтр по всем range-ограничениям (Python-side: параметры — строки с единицами)."""
+    if not constraints:
+        return list(products)
+    return [p for p in products if all(product_matches_range(p, c) for c in constraints)]
 
 
 def build_token_filter(tokens: list[str]) -> Q:
