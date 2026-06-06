@@ -143,8 +143,10 @@ HIGH-волна закрыта (H4/H6/H7/H8/H9). Осталось:
    добавил 5 IDOR-тестов (чужой не читает/пишет/обновляет проект и не открывает review → 404).
    `api_comments_delete` post-fetch проверка корректна (владелец ИЛИ staff-модерация). Остаток:
    permission audit ML/admin-вьюх (отдельная мелкая проверка).
-2. P2·S — Stripe webhook signature verify; **AI-tool backend-auth** (destructive `scheme.clear_all`
-   → `@require_permission`); path-traversal в media-serving; Lithium import XSS escaping.
+2. ✅ **verify 2026-06-06 — все 4 уже закрыты:** Stripe webhook sig ver(`construct_event` в обоих
+   handler'ах + demo-gate); AI-tools frontend-only (нет backend-эндпоинта на destructive, tier-gate
+   на уровне чата); media через безопасный Django `serve()` (нет custom path); Lithium import →
+   JSON-ответ, без `|safe`/template-XSS. Backlog был перестрахован.
 3. P2·M — rate-limit per-minute tier-aware (anti-DoS на кошелёк Anthropic); GDPR cascading delete;
    log scrubbing; `.dockerignore`+Trivy+`/healthz`; nginx hardening.
 4. P2·S — **авто-чистка кода** (ruff `✅`/autoflake unused/vulture dead-code/orphan templates).
