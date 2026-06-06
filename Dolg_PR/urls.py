@@ -21,7 +21,11 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from django.views.static import serve
 
+from Dolg_APP.health import healthz
+
 urlpatterns = [
+    # Liveness/readiness-проба (анонимная, без чувствительных данных) — раньше всего.
+    path('healthz', healthz, name='healthz'),
     path('admin/', admin.site.urls),
     path('', include('shop.urls', namespace='shop')),  # Shop is main page
     path('accounts/', include('accounts.urls', namespace='accounts')),
