@@ -103,13 +103,15 @@
 
 ### 3. 🧠 НЕЙРОНКА / AI / RAG (высокий вау, pre-defense)
 1. **Wave 0′ #1** — glossary + typewriter-стриминг (P1·S-M).
-2. P1 — **Expert-first закрепить везде:** любой вывод review/AI имеет `rule_id`/severity/evidence/
-   recommendation/confidence + ссылку на расчёт/статью/задание. Нейронка = подсказка, НЕ verdict.
-   (Сильнейшая дипломная рамка.)
+2. ✅ **Expert-first** (verify+fix 2026-06-06): инфра была (rule_id/severity/evidence/recommendation/
+   confidence в `expert_rules`/findings), но без регрессии и с двумя багами. Добавлены тесты
+   (`tests_expert_rules`, валидность пака + expert-first поля); починено: `min_*_px` дефолт 0→+∞
+   (ложные «провода близко»), evaluate пропускает правила без нужных фактов вместо error-спама.
 3. P1·L — **GNN Neural Circuit Simulator (A1):** skeleton есть → нужен **train+bench**
    («80× speedup, <5% error» — pitch для защиты).
-4. P2·M — **RAG Phase A** (½ дня, без либ): TF-IDF индекс на knowledge/rules/projects/training +
-   хук `### CONTEXT ###` в `/api/ai/chat/`.
+4. ✅ (частично) **RAG Phase A** — хук `### CONTEXT ###` в `/api/ai/chat/` уже сделан glossary-
+   grounding'ом (Wave 0′ #1): retrieval из glossary/articles/learning/catalog/legal/training.
+   Остаток: вынести в полноценный TF-IDF-индекс (сейчас substring-ранжирование).
 5. P2·M — **расширить нейро-корпус** до 1000+ схем через opt-in `allow_ai_training` + dataset
    governance (validation/coverage/topology balance перед дообучением).
 6. P2·M — **Корутины в AI-ассистенте (асинхронность «для себя»):** (a) async-вызов Anthropic
@@ -123,7 +125,9 @@
    AutoML topology search (NSGA-II+Z3); multimodal photo-to-schematic.
 
 ### 4. 🛠️ АДМИНКА / мониторинг `∥`
-1. P2·M — **Защитить `/metrics/`** (nginx) + runtime metrics через `psutil` + `ops_metrics` service.
+1. ✅ **Защита `/metrics/` + ops_metrics** (verify+fix 2026-06-06): `ops_metrics.py` (psutil runtime)
+   и `/staff/ops/` дашборд УЖЕ были. Реальный gap — `/metrics/` был публичным; закрыт guard'ом
+   (staff ИЛИ `METRICS_TOKEN`, fail-closed, +7 тестов). Опц. остаток: nginx allowlist в prod.
 2. P2·M — **расширенный `/staff/ops/` cockpit** + custom `dolg_*` Prometheus + Grafana dashboards +
    alerts + snapshot для защиты.
 3. P2·M — **ML-curation UI / dataset review queue** (🔁 давняя просьба): таблица `AITrainingExample`
