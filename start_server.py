@@ -4,6 +4,7 @@
 падает с UnicodeEncodeError на cp1251-консоли. Эмодзи только в вывод
 через print с explicit encoding-fallback.
 """
+
 import os
 import re
 import signal
@@ -170,7 +171,7 @@ def banner(url):
     p('')
     p('   (HTTPS, bez firewall, lyubaya set)')
     p('')
-    p('   Lokal\'no: http://127.0.0.1:%d/' % DJANGO_PORT)
+    p("   Lokal'no: http://127.0.0.1:%d/" % DJANGO_PORT)
     p(line)
     p('')
     p('   Ctrl+C ili zakroyte okno dlya ostanovki.')
@@ -180,6 +181,7 @@ def banner(url):
 def jurigged_available():
     try:
         import jurigged  # noqa: F401
+
         return True
     except Exception:
         return False
@@ -234,6 +236,11 @@ def main():
     env['DEBUG'] = 'True'
     env['PYTHONIOENCODING'] = 'utf-8'
     env['PYTHONUNBUFFERED'] = '1'
+    # UTF-8 mode: иначе на русской Windows open() по умолчанию = cp1251, и jurigged
+    # при hot-reload перечитывает UTF-8 исходники как cp1251 -> UnicodeDecodeError
+    # (byte 0x98) на каждом сохранении, hot-reload отваливается. PYTHONUTF8=1
+    # делает дефолтную кодировку open()/locale UTF-8 для всего дочернего процесса.
+    env['PYTHONUTF8'] = '1'
 
     django_log_path = ROOT / '.tmp_django.log'
     django_log = open(django_log_path, 'w', encoding='utf-8', buffering=1)
@@ -259,8 +266,10 @@ def main():
     django = subprocess.Popen(
         # --skip-checks: пропускаем системные проверки (-2..-5 сек на старте).
         django_cmd,
-        cwd=str(ROOT), env=env,
-        stdout=django_log, stderr=subprocess.STDOUT,
+        cwd=str(ROOT),
+        env=env,
+        stdout=django_log,
+        stderr=subprocess.STDOUT,
     )
 
     if not wait_tcp('127.0.0.1', DJANGO_PORT, timeout=120):
@@ -300,7 +309,9 @@ def main():
         cf = subprocess.Popen(
             [str(CLOUDFLARED), 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:%d' % DJANGO_PORT],
             cwd=str(ROOT),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
             creationflags=creation_flags_cf,
         )
 
