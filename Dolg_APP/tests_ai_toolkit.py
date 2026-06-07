@@ -58,3 +58,38 @@ class LineHelpersTests(SimpleTestCase):
     def test_unsolvable_returns_empty(self):
         self.assertEqual(ai_toolkit.dc_voltage_lines({'components': [], 'connections': []}), [])
         self.assertEqual(ai_toolkit.power_lines(None), [])
+
+
+class FormulaComputeTests(SimpleTestCase):
+    def test_rc_cutoff_real_number(self):
+        rc = {
+            'components': [
+                {'id': 'R1', 'type': 'resistor', 'resistance': 1600, 'ports': [{'id': '1'}, {'id': '2'}]},
+                {'id': 'C1', 'type': 'capacitor', 'capacitance': '100n', 'ports': [{'id': '1'}, {'id': '2'}]},
+            ],
+            'connections': [],
+        }
+        lines = ai_toolkit.formula_compute(rc, 'rc_network')
+        self.assertTrue(any('fc' in line and 'Гц' in line for line in lines))
+        self.assertTrue(any('99' in line for line in lines))  # ~995 Гц
+
+    def test_led_current_real_number(self):
+        led = {
+            'components': [
+                {'id': 'B1', 'type': 'battery', 'voltage': 5, 'ports': [{'id': '+'}, {'id': '-'}]},
+                {'id': 'D1', 'type': 'led', 'vf': 2, 'ports': [{'id': '1'}, {'id': '2'}]},
+                {'id': 'R1', 'type': 'resistor', 'resistance': 330, 'ports': [{'id': '1'}, {'id': '2'}]},
+            ],
+            'connections': [],
+        }
+        lines = ai_toolkit.formula_compute(led, 'led_indicator')
+        self.assertTrue(any('Iled' in line and 'мА' in line for line in lines))
+        self.assertTrue(any('9.' in line for line in lines))  # ~9.1 мА
+
+    def test_divider_reports_node_voltages(self):
+        lines = ai_toolkit.formula_compute(_divider(9, 1000, 2000), 'voltage_divider')
+        self.assertTrue(any('MNA' in line for line in lines))
+
+    def test_missing_values_empty(self):
+        self.assertEqual(ai_toolkit.formula_compute({'components': []}, 'rc_network'), [])
+        self.assertEqual(ai_toolkit.formula_compute(None, 'unknown_topology'), [])

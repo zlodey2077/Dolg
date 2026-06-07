@@ -1219,6 +1219,11 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
             ]
         sections = [
             *common_head,
+            _line_items(
+                'Расчёт по схеме (движок)',
+                ai_toolkit.formula_compute(scheme_data, topology),
+                'Добавьте номиналы компонентов — посчитаю значение.',
+            ),
             _line_items('Формула', formula_lines, 'Недостаточно данных для выбора формулы.'),
             _line_items(
                 'Что сверить', _measurement_plan(connectivity), 'Сначала сохраните расчетное expected value.'
