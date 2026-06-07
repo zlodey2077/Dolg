@@ -118,18 +118,18 @@
 
 | # | Что | Состояние | Прио | Усилие |
 |---|---|---|---|---|
-| 6.1 | Dockerfile multi-stage build | ❓ нужно проверить `deploy/Dockerfile` | 🟧 | — |
-| 6.2 | Non-root user в контейнере | ❓ | 🟧 | 5 мин (`USER appuser`) |
-| 6.3 | Минимальный base image (`slim` / `distroless`) | ❓ | 🟢 | 10 мин |
-| 6.4 | `.dockerignore` (не копируем .git, venv) | ❓ | 🟧 | 5 мин |
-| 6.5 | Container scanning (Trivy / Snyk / Grype) в CI | ❌ | 🟧 | 15 мин CI step |
-| 6.6 | Docker secrets / docker-compose secrets вместо env | ❌ env через `--env-file` | 🟢 | — |
-| 6.7 | Health checks (`HEALTHCHECK` в Dockerfile, `/healthz` endpoint) | ❓ | 🟧 | 30 мин |
-| 6.8 | Resource limits (cpu/memory limits в compose) | ❓ | 🟢 | 5 мин |
-| 6.9 | Read-only root filesystem | ❌ | 📚 | — |
-| 6.10 | Drop capabilities (`cap_drop: [ALL]`) | ❌ | 📚 | — |
-| 6.11 | K8s manifests (Deployment + Service + Ingress) | ❌ | 📚 (post-defense, по запросу юзера на «установить на будущее») | 1 день |
-| 6.12 | K8s NetworkPolicy / PodSecurityPolicy | ❌ | 📚 | 1 день |
+| 6.1 | Dockerfile multi-stage build | 🟡 есть production-ready single-stage `python:3.14-slim`; multi-stage оставлен optional, потому что тяжёлые wheel-зависимости ставятся без C-toolchain | 🟢 | post-runtime |
+| 6.2 | Non-root user в контейнере | ✅ `USER dolg` в `deploy/Dockerfile` | — | — |
+| 6.3 | Минимальный base image (`slim` / `distroless`) | ✅ `python:3.14-slim` | — | — |
+| 6.4 | `.dockerignore` (не копируем .git, venv) | ✅ корневой `.dockerignore` исключает `.git`, `.venv`, docs, media, logs, `.codex` | — | — |
+| 6.5 | Container scanning (Trivy / Snyk / Grype) в CI | ✅ Trivy image scan в `.github/workflows/django.yml` | — | — |
+| 6.6 | Docker secrets / docker-compose secrets вместо env | 🟡 local smoke через ignored env-file; для prod нужен внешний secret supply | 🟢 | post-runtime |
+| 6.7 | Health checks (`HEALTHCHECK` в Dockerfile, `/healthz` endpoint) | ✅ Dockerfile, compose и K8s probes используют `/healthz` | — | — |
+| 6.8 | Resource limits (cpu/memory limits в compose) | ✅ compose limits + K8s requests/limits | — | — |
+| 6.9 | Read-only root filesystem | 🟡 включено для app/nginx контейнеров; stateful/monitoring сервисы требуют отдельной политики | 🟢 | 30 мин |
+| 6.10 | Drop capabilities (`cap_drop: [ALL]`) | 🟡 включено в compose для app/nginx; для K8s нужен отдельный securityContext/capabilities pass | 🟢 | 30 мин |
+| 6.11 | K8s manifests (Deployment + Service + Ingress) | 🟡 base `deploy/k8s` добавлен: Deployment/Service/nginx edge; Ingress/Helm оставлены следующим слоем | 🟢 | post-runtime |
+| 6.12 | K8s NetworkPolicy / PodSecurityPolicy | ❌ NetworkPolicy + PodSecurity admission не добавлены | 📚 | 1 день |
 
 ## 7. Network / инфраструктура
 
@@ -312,10 +312,10 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 
 | # | Что | Состояние | Прио | Усилие |
 |---|---|---|---|---|
-| 16.1 | Dockerfile production-ready (multi-stage, slim, non-root) | 🟡 есть Dockerfile, нужна полировка | 🟢 | 1 ч |
-| 16.2 | docker-compose с health checks + resource limits | 🟡 есть compose, дополнить | 🟢 | 30 мин |
+| 16.1 | Dockerfile production-ready (multi-stage, slim, non-root) | 🟡 slim + non-root + healthcheck готовы; multi-stage optional после runtime smoke | 🟢 | post-runtime |
+| 16.2 | docker-compose с health checks + resource limits | ✅ compose закрывает db/redis/web/asgi/worker/nginx/prometheus/grafana | — | — |
 | 16.3 | **`buildg`** — интерактивный отладчик Dockerfile с IDE-интеграцией (VS Code), breakpoints + step exec на build шагах, основан на BuildKit. [ktock/buildg](https://github.com/ktock/buildg) | ❌ | 🟢 (dev-tool, ставится по желанию при отладке billion-step Dockerfile) | 5 мин binary install |
-| 16.4 | K8s Deployment + Service + Ingress | ❌ | 📚 | 1 день |
+| 16.4 | K8s Deployment + Service + Ingress | 🟡 base Deployment/Service/nginx edge готов; Ingress/Helm values ещё нет | 🟢 | post-runtime |
 | 16.5 | Helm chart | ❌ | 📚 | 1 день |
 | 16.6 | **Vault Secrets Operator + ArgoCD/Flux GitOps**: коммит → Flux pull → applies → Vault Secrets Operator читает из HashiCorp Vault → создаёт K8s Secret. Operator: [ricoberger/vault-secrets-operator](https://github.com/ricoberger/vault-secrets-operator). Закрывает § 3.9 (Secrets manager) | ❌ | 📚 | 1 день setup Vault + 1 день operator |
 | 16.7 | Альтернатива 16.6 — **ExternalSecrets Operator** + AWS SM/Azure KV/GCP SM (если не хотим self-host Vault) | ❌ | 📚 | — |
@@ -324,7 +324,7 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 | 16.10 | NetworkPolicy default-deny | ❌ | 📚 | — |
 | 16.11 | PodSecurityStandard `restricted` | ❌ | 📚 | — |
 | 16.12 | **Falco** (см § 14.3) — eBPF runtime security для контейнеров | ❌ | 📚 | post-K8s |
-| 16.13 | **Trivy / Grype** container image scan в CI | ❌ | 🟧 | 15 мин CI step |
+| 16.13 | **Trivy / Grype** container image scan в CI | ✅ Trivy image scan добавлен в container job | — | — |
 | 16.14 | **Cosign / Sigstore** image signing | ❌ | 📚 | — |
 
 ---
@@ -349,7 +349,7 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 
 - 1.14, 1.15 (rate limit + JSON size limit)
 - 4.3, 4.5 (GDPR cascading delete + log scrubbing)
-- 6.4, 6.5, 6.7 (.dockerignore + container scan + health checks)
+- 6.6, 6.9, 6.10, 6.12 (secret supply + read-only/capabilities polish + K8s policy)
 - 7.4 (nginx hardening)
 - 8.3 (Grafana metrics export)
 - 9.7 (branch protection)
@@ -358,7 +358,7 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 
 ### 📚 NICE-TO-HAVE (post-defense, production-readiness)
 
-- Категория 12 целиком (K8s) + 6.9-6.10 (read-only fs, drop caps).
+- Helm/GitOps/secrets слой для K8s + NetworkPolicy/PodSecurity + 6.9-6.10 polish.
 - 4.1, 4.2, 4.6, 4.8 (PII inventory + DSR + cookie consent + audit trail).
 - 8.5, 8.6, 8.8 (alerting + log aggregation + anomaly detection).
 - 3.7, 3.8 (DB encryption at rest, encrypted backups).

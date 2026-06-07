@@ -289,20 +289,22 @@ service mesh (mTLS между сервисами, трейсинг, ретраи
 
 **Релевантность DOLG после containerization-прохода:**
 - Уже закрыто: Git/Markdown как рабочая дисциплина, Dockerfile, Compose, `web/asgi/worker`, Redis,
-  nginx edge, Prometheus/Grafana, CI container job, production preflight.
-- Следующий практический слой: локально поднять Docker Desktop/WSL2 и прогнать `docker compose config`,
-  `docker build`, `docker compose up db redis web`, затем `curl /healthz/`.
-- После Docker runtime: добавить hadolint/Trivy policy в CI, backup/PITR runbook для Postgres,
-  Ansible bootstrap для VM вместо ручного `yc-bootstrap.sh`.
-- Kubernetes пока не нужен для дипломного production, но roadmap полезен для защиты: можно объяснить,
-  как DOLG эволюционирует от одного Compose-хоста к Helm/GitOps, не таща БД в кластер преждевременно.
+  nginx edge, Prometheus/Grafana, CI container job, Trivy scan, production preflight, K8s base manifests,
+  Docker/Kubernetes static checks и runbook `docs/CONTAINERS_AND_KUBERNETES.md`.
+- Следующий практический слой: один раз поднять Docker Desktop engine через UAC/admin, затем прогнать
+  `scripts/docker_compose_up.ps1`, `docker build`, `docker compose up`, `/healthz`, Prometheus/Grafana.
+- После Docker runtime: прогнать `kubectl apply -k deploy/k8s`, добавить Helm/values, NetworkPolicy,
+  PodSecurity, real secret supply и backup/PITR runbook для Postgres.
+- Kubernetes пока не обязателен для дипломного production, но базовый путь уже зафиксирован: DOLG
+  эволюционирует от одного Compose-хоста к registry + Helm/GitOps без преждевременного переноса БД в кластер.
 
 **Локальный статус Docker на 2026-06-07:**
-- `where docker` не находит Docker CLI.
-- Docker Desktop не найден в `C:\Program Files\Docker\Docker`.
-- VS Code установлен, но это не равно Docker Engine; Docker extension без daemon не даст `docker build`.
-- `winget search Docker.DockerDesktop` видит пакет Docker Desktop 4.76.0, но установка из текущей Codex-сессии
-  невозможна без UAC/admin (`IsAdmin=False`), installer зависает и был остановлен.
-- Корректный следующий шаг: запустить терминал/installer от администратора, установить Docker Desktop,
-  включить WSL2/VirtualMachinePlatform при запросе Windows, перезагрузить машину, затем проверить:
-  `docker version`, `docker run --rm hello-world`, `docker compose version`.
+- Docker CLI найден: `C:\Program Files\Docker\Docker\resources\bin\docker.exe`.
+- Docker Compose найден: `Docker Compose version v5.1.4`.
+- `kubectl` найден: `C:\Program Files\Docker\Docker\resources\bin\kubectl.exe`.
+- Пользователь `spieh` состоит в группе `docker-users`.
+- Docker Desktop установлен и процессы стартуют, но `com.docker.service` остаётся `STOPPED`.
+- `net start com.docker.service` из текущей неадминской Codex-сессии возвращает `System error 5 / Access is denied`;
+  `docker info` без запущенного service висит до timeout.
+- Корректный следующий шаг: запустить `scripts/bootstrap_docker_desktop.ps1 -StartVisible`, принять UAC/admin,
+  дождаться ready engine, затем `scripts/docker_compose_up.ps1`.

@@ -109,3 +109,15 @@ fails fast on missing secrets.
 - Replace `dolg:local` with an immutable registry tag.
 - Keep `METRICS_TOKEN` synchronized between Django and Prometheus.
 - Run migrations as an explicit release job before scaling web replicas.
+
+## 6. What remains
+
+- OS/runtime: start `com.docker.service` through UAC/admin once and confirm
+  `docker info` returns the server version.
+- Runtime smoke: run `scripts/docker_compose_up.ps1` and verify the app,
+  Prometheus, and Grafana URLs.
+- Kubernetes smoke: enable Docker Desktop Kubernetes or use kind/minikube, then
+  run `kubectl apply -k deploy/k8s`.
+- Production hardening: replace local literals with a real secret manager,
+  publish immutable images to a registry, add Helm values per environment,
+  define NetworkPolicy/PodSecurity, and document Postgres backup/PITR.

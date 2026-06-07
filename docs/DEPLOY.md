@@ -188,7 +188,9 @@ Render-данные backup'ятся автоматически (free tier — 7 
 
 ## Связано
 
-- `deploy/nginx.conf` закрывает публичные `/metrics` и `/metrics/` через `403`. Prometheus должен собирать метрики напрямую с `web:8000/metrics/` внутри Docker network, как описано в `deploy/prometheus.yml`.
+- `deploy/nginx.conf` закрывает публичные `/metrics` и `/metrics/` через `403`. Prometheus собирает метрики напрямую
+  с `web:8000/metrics` внутри Docker network и должен передавать тот же `METRICS_TOKEN`, что задан для Django
+  (см. `deploy/prometheus.yml` и `.env.example`).
 - Для production-мониторинга `/staff/ops/` использует `Dolg_APP/services/ops_metrics.py` и `psutil`: перед деплоем убедитесь, что `psutil==7.2.2` установлен из `requirements.txt` / `requirements-prod.txt`.
 - `render.yaml` — Blueprint конфиг
 - `Procfile` — запуск web/release
