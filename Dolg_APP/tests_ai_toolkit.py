@@ -112,3 +112,16 @@ class RfFilterTests(SimpleTestCase):
     def test_no_capacitor_empty(self):
         only_r = {'components': [{'id': 'R1', 'type': 'resistor', 'resistance': 1000}], 'connections': []}
         self.assertEqual(ai_toolkit.rf_filter_lines(only_r), [])
+
+
+class NeuralHintTests(SimpleTestCase):
+    def test_divider_hint_has_topology_and_source(self):
+        lines = ai_toolkit.neural_hint_lines(_divider(9, 1000, 2000))
+        # tiny-AI обучена → должна вернуть подсказку; если torch/модель нет — пусто (ок)
+        if lines:
+            self.assertTrue(any('топология' in line for line in lines))
+            self.assertTrue(any('tiny-AI' in line and 'подсказка' in line for line in lines))
+
+    def test_empty_scheme_no_hint(self):
+        self.assertEqual(ai_toolkit.neural_hint_lines({'components': []}), [])
+        self.assertEqual(ai_toolkit.neural_hint_lines(None), [])

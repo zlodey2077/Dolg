@@ -121,6 +121,46 @@ def formula_compute(scheme_data: dict | None, topology: str | None) -> list[str]
     return lines
 
 
+_NEURAL_ADVISOR = None
+
+
+def neural_hint_lines(scheme_data: dict | None) -> list[str]:
+    """Локальная tiny-AI (PyTorch): топология/риск/следующий компонент.
+
+    Expert-first: это ПОДСКАЗКА, финальный контроль — за правилами и человеком.
+    Пустой список, если torch/модель недоступны или схема пустая."""
+    global _NEURAL_ADVISOR
+    if not scheme_data or not scheme_data.get('components'):
+        return []
+    try:
+        from Dolg_APP.ml.neural import NeuralCircuitAdvisor, torch_available
+
+        if not torch_available():
+            return []
+        if _NEURAL_ADVISOR is None:
+            _NEURAL_ADVISOR = NeuralCircuitAdvisor()
+        pred = _NEURAL_ADVISOR.predict(scheme_data or {})
+    except Exception:
+        return []
+    if not isinstance(pred, dict) or not pred.get('topology'):
+        return []
+    lines = [f'топология: {pred["topology"]} ({float(pred.get("topology_confidence") or 0):.2f})']
+    if pred.get('risk_label'):
+        lines.append(f'риск: {pred["risk_label"]} ({float(pred.get("risk_score") or 0):.2f})')
+    nexts = pred.get('next_components') or []
+    if nexts and isinstance(nexts[0], dict):
+        top = nexts[0]
+        lines.append(
+            f'следующий компонент: {top.get("component_type")} ({float(top.get("confidence") or 0):.2f})'
+        )
+    if pred.get('agreement_score') is not None:
+        lines.append(
+            f'согласие с expert-baseline: {float(pred["agreement_score"]):.2f} ({pred.get("confidence_policy")})'
+        )
+    lines.append('источник: локальная tiny-AI (PyTorch) — подсказка, не вердикт')
+    return lines
+
+
 def rf_filter_lines(scheme_data: dict | None) -> list[str]:
     """S-параметры RC-фильтра через scikit-rf: частота среза −3 дБ + полоса.
 

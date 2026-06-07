@@ -45,7 +45,17 @@ class SectionsForIntentTests(SimpleTestCase):
 
     def test_manifest(self):
         keys = {a['key'] for a in ai_algorithms.available_algorithms()}
-        self.assertTrue({'dc_voltages', 'power', 'formula', 'rf_filter', 'tolerance'}.issubset(keys))
+        self.assertTrue(
+            {'dc_voltages', 'power', 'formula', 'rf_filter', 'tolerance', 'tiny_ai'}.issubset(keys)
+        )
         meas = {a['key'] for a in ai_algorithms.available_algorithms('measurement')}
         self.assertIn('dc_voltages', meas)
         self.assertNotIn('power', meas)
+
+    def test_tiny_ai_skill_in_overview(self):
+        # tiny-AI зарегистрирована как skill для overview (если torch есть — секция появится)
+        meta = {a['key']: a['intents'] for a in ai_algorithms.available_algorithms()}
+        self.assertIn('overview', meta['tiny_ai'])
+        sections = ai_algorithms.sections_for_intent('overview', _divider())
+        # не падает; если tiny-AI доступна — будет секция «Нейроподсказка»
+        self.assertIsInstance(sections, list)

@@ -53,6 +53,12 @@ ALGORITHMS: list[Algorithm] = [
         frozenset({'thermal', 'why_failed'}),
         lambda scheme, topology: ai_toolkit.tolerance_lines(scheme),
     ),
+    Algorithm(
+        'tiny_ai',
+        'Нейроподсказка (tiny-AI)',
+        frozenset({'overview', 'scheme_overview', 'recommend'}),
+        lambda scheme, topology: ai_toolkit.neural_hint_lines(scheme),
+    ),
 ]
 
 

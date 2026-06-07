@@ -1281,6 +1281,7 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     elif intent == 'recommend':
         sections = [
             *common_head,
+            *engine_sections,
             _line_items('Что выбрать или проверить', recs, 'Явных рисков выбора не найдено.'),
             _line_items(
                 'Ограничения перед подбором',
