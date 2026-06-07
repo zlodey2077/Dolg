@@ -11,7 +11,7 @@ import hashlib
 import json
 from collections import Counter
 
-from . import ai_toolkit
+from . import ai_algorithms
 from .ai_retrieval import build_retrieval_context
 from .ai_retrieval import retrieval_lines as ai_retrieval_lines
 from .artifact_learning import artifact_training_summary, learning_suggestions_from_artifacts
@@ -1090,9 +1090,17 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
         _graph_summary(connectivity),
     ]
 
+    # L2: движок-секции из декларативного реестра алгоритмов (реальные числа).
+    topology = connectivity.get('topology')
+    engine_sections = [
+        _line_items(title, lines, '')
+        for title, lines in ai_algorithms.sections_for_intent(intent, scheme_data, topology)
+    ]
+
     if intent in {'overview', 'scheme_overview'}:
         sections = [
             *common_head,
+            *engine_sections,
             _line_items('Паспорт схемы', _passport_lines(scheme_data, connectivity), 'Схема пока пустая.'),
             _line_items('Экспертный след', expert_lines, 'Экспертные правила не нашли отдельного риска.'),
             _line_items('Следующие действия', recs, 'Откройте отчет review для деталей.'),
@@ -1108,6 +1116,7 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
             ]
         sections = [
             *common_head,
+            *engine_sections,
             _line_items('Почему может не проходить', failure_lines, 'Критичных причин не найдено.'),
             _line_items(
                 'План проверки',
@@ -1129,16 +1138,7 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     elif intent == 'measurement':
         sections = [
             *common_head,
-            _line_items(
-                'Расчёт DC движком (MNA)',
-                ai_toolkit.dc_voltage_lines(scheme_data),
-                'Схема не решается MNA — проверьте GND и источник.',
-            ),
-            *(
-                [_line_items('RF-анализ фильтра (scikit-rf)', _rf_m, '')]
-                if (_rf_m := ai_toolkit.rf_filter_lines(scheme_data))
-                else []
-            ),
+            *engine_sections,
             _line_items('Сохраненные измерения', _measurement_lines(review), 'Измерений пока нет.'),
             _line_items(
                 'Что измерить дальше', _measurement_plan(connectivity), 'Начните с DC-напряжений узлов.'
@@ -1148,11 +1148,7 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     elif intent == 'thermal':
         sections = [
             *common_head,
-            _line_items(
-                'Мощность на резисторах (расчёт MNA)',
-                ai_toolkit.power_lines(scheme_data),
-                'Нет резисторов с током — мощность не считается.',
-            ),
+            *engine_sections,
             _line_items(
                 'Запас по мощности и температуре',
                 _derating_lines(review),
@@ -1201,7 +1197,6 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
             ),
         ]
     elif intent == 'formula':
-        topology = connectivity.get('topology')
         if topology == 'voltage_divider':
             formula_lines = [
                 'Делитель: Vout = Vin * R2 / (R1 + R2).',
@@ -1224,16 +1219,7 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
             ]
         sections = [
             *common_head,
-            _line_items(
-                'Расчёт по схеме (движок)',
-                ai_toolkit.formula_compute(scheme_data, topology),
-                'Добавьте номиналы компонентов — посчитаю значение.',
-            ),
-            *(
-                [_line_items('RF-анализ фильтра (scikit-rf)', _rf_lines, '')]
-                if (_rf_lines := ai_toolkit.rf_filter_lines(scheme_data))
-                else []
-            ),
+            *engine_sections,
             _line_items('Формула', formula_lines, 'Недостаточно данных для выбора формулы.'),
             _line_items(
                 'Что сверить', _measurement_plan(connectivity), 'Сначала сохраните расчетное expected value.'
