@@ -17,6 +17,91 @@ function Test-IsAdmin {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Invoke-ElevatedSelf($Reason) {
+    Write-Warning $Reason
+    Write-Warning "Relaunching this script as Administrator."
+    $args = @("-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"", "-TimeoutSeconds", $TimeoutSeconds)
+    if ($StartVisible) { $args += "-StartVisible" }
+    if ($InstallIfMissing) { $args += "-InstallIfMissing" }
+    Start-Process powershell.exe -Verb RunAs -ArgumentList $args
+    exit 2
+}
+
+function Enable-WindowsFeatureIfNeeded($FeatureName) {
+    $feature = Get-WindowsOptionalFeature -Online -FeatureName $FeatureName -ErrorAction Stop
+    if ($feature.State -eq "Enabled") {
+        Write-Host "${FeatureName}: Enabled"
+        return $false
+    }
+
+    Write-Warning "${FeatureName}: $($feature.State); enabling it now."
+    $result = Enable-WindowsOptionalFeature -Online -FeatureName $FeatureName -All -NoRestart -ErrorAction Stop
+    return [bool]$result.RestartNeeded
+}
+
+function Repair-WslBackendIfNeeded($IsAdmin) {
+    $requiredServices = @("LxssManager", "vmcompute", "hns")
+    $missingServices = @(
+        foreach ($name in $requiredServices) {
+            if (-not (Get-Service -Name $name -ErrorAction SilentlyContinue)) {
+                $name
+            }
+        }
+    )
+
+    if ($missingServices.Count -eq 0) {
+        foreach ($name in $requiredServices) {
+            $service = Get-Service -Name $name -ErrorAction SilentlyContinue
+            Write-Host "${name}: $($service.Status)"
+        }
+        return
+    }
+
+    $missingText = $missingServices -join ", "
+    if (-not $IsAdmin) {
+        Invoke-ElevatedSelf "Windows WSL/VM backend services are missing: $missingText."
+    }
+
+    Write-Warning "Windows WSL/VM backend services are missing: $missingText."
+    Write-Step "Enabling WSL2 and virtualization Windows features"
+    $restartNeeded = $false
+    foreach ($feature in @("Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform", "HypervisorPlatform")) {
+        try {
+            if (Enable-WindowsFeatureIfNeeded $feature) {
+                $restartNeeded = $true
+            }
+        }
+        catch {
+            Write-Warning "Could not inspect or enable ${feature}: $($_.Exception.Message)"
+        }
+    }
+
+    try {
+        bcdedit /set hypervisorlaunchtype auto | Out-Host
+    }
+    catch {
+        Write-Warning "Could not set hypervisorlaunchtype=auto: $($_.Exception.Message)"
+    }
+
+    try {
+        wsl --set-default-version 2 | Out-Host
+    }
+    catch {
+        Write-Warning "Could not set WSL default version to 2 yet: $($_.Exception.Message)"
+    }
+
+    $stillMissing = @(
+        foreach ($name in $requiredServices) {
+            if (-not (Get-Service -Name $name -ErrorAction SilentlyContinue)) {
+                $name
+            }
+        }
+    )
+    if ($restartNeeded -or $stillMissing.Count -gt 0) {
+        throw "WSL/virtualization components were enabled or repaired. Restart Windows, start Docker Desktop, then run this script again."
+    }
+}
+
 function Invoke-DockerInfoOnce {
     $stdout = New-TemporaryFile
     $stderr = New-TemporaryFile
@@ -59,15 +144,14 @@ Write-Host "Docker Desktop: $desktop"
 Write-Host "Current user: $env:USERNAME"
 Write-Host "Admin shell: $isAdmin"
 
+Write-Step "Checking WSL2/VM backend prerequisites"
+Repair-WslBackendIfNeeded $isAdmin
+
 Write-Step "Checking docker-users membership"
 $members = (cmd /c "net localgroup docker-users" 2>$null) -join "`n"
 if ($members -notmatch [regex]::Escape($env:USERNAME)) {
     if (-not $isAdmin) {
-        Write-Warning "Current user is not in docker-users. Relaunching this script as Administrator."
-        $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"", "-TimeoutSeconds", $TimeoutSeconds)
-        if ($StartVisible) { $args += "-StartVisible" }
-        Start-Process powershell.exe -Verb RunAs -ArgumentList $args
-        exit 2
+        Invoke-ElevatedSelf "Current user is not in docker-users."
     }
     cmd /c "net localgroup docker-users `"$env:USERNAME`" /add"
     Write-Warning "User was added to docker-users. Sign out/in if Docker still refuses access."
@@ -84,12 +168,7 @@ if ($service -and $service.Status -ne "Running") {
         Write-Host "com.docker.service started."
     }
     else {
-        Write-Warning "com.docker.service is $($service.Status); starting it requires UAC/Admin."
-        Write-Warning "Relaunching this script as Administrator so the service can be started."
-        $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"", "-TimeoutSeconds", $TimeoutSeconds)
-        if ($StartVisible) { $args += "-StartVisible" }
-        Start-Process powershell.exe -Verb RunAs -ArgumentList $args
-        exit 2
+        Invoke-ElevatedSelf "com.docker.service is $($service.Status); starting it requires UAC/Admin."
     }
 }
 
