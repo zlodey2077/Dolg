@@ -23,3 +23,10 @@ dill>=0.4.0
 multiprocess>=0.70.17
 pyarrow>=14.0
 huggingface-hub>=0.20
+
+# ─── Видео → конспект (YouTube транскрипты) ────────────────────────
+# scripts/yt_transcript.py (CLI) + scripts/yt_mcp_server.py (MCP «yt-transcript»
+# в ~/.claude/mcp.json). Движок: youtube-transcript-api (быстрые сабы) +
+# yt-dlp фолбэк (метаданные/авто-сабы). Для анализа обучающих видео по проекту.
+yt-dlp>=2026.3
+youtube-transcript-api>=1.0
