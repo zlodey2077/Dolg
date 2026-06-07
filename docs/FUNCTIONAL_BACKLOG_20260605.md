@@ -11,7 +11,7 @@ DEFENSE_MATERIALS_REWORK, HF-alternatives, resource-driven workfront'ов и з�
 
 ## A. 🎓 Защитные материалы (диплом / презентация / речь)
 
-Полный план — `docs/DEFENSE_MATERIALS_REWORK_PLAN_20260603.md`.
+Исторический defense-план консолидирован здесь и в `docs/UNIFIED_ROADMAP_20260606.md`.
 
 - `[ ]` **P0 · L — Диплом: санитарная пересборка.** Чистое оглавление (убрать `TOC/PAGEREF`
   field-code мусор), строго **2 главы**, единые стили (Times 14pt, 1.5, отступ 1.25),
@@ -92,7 +92,7 @@ DEFENSE_MATERIALS_REWORK, HF-alternatives, resource-driven workfront'ов и з�
 
 ## F. 🛠️ Админка / мониторинг / ops
 
-Фронт — `docs/WORKFRONT_20260603_ADMIN_MONITORING.md`.
+Фронт консолидирован здесь и в `docs/UNIFIED_ROADMAP_20260606.md`.
 
 - `[ ]` **P2 · M — Защитить `/metrics/`** (nginx) + runtime metrics через `psutil` + общий
   `ops_metrics` service-layer.
@@ -120,7 +120,7 @@ DEFENSE_MATERIALS_REWORK, HF-alternatives, resource-driven workfront'ов и з�
 ## H. 📥 Стратегия добычи датасетов (вкл. идеи юзера #7-14)
 
 **Контекст:** HF import зависает (~6 КБ/с, Cloudflare-фильтр). Рекомендация памяти —
-**procedural-only** как основной безопасный путь (`scripts/seed_ml_dataset.py` →3000-5000 схем,
+**procedural-only** как основной безопасный путь (`python manage.py collect_ai_training_examples --source curated` →3000-5000 схем,
 «balanced procedural dataset» как аргумент в дипломе). Внешние датасеты — страховка/будущее.
 
 - `[ ]` **P2 · S — Доработать `import_external_datasets`:** `--mirror`/`HF_ENDPOINT=hf-mirror.com`,

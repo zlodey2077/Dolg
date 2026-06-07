@@ -55,6 +55,7 @@ media/org_logos/
 # ───── Временные файлы / резервные копии ─────
 *.log
 *.tmp
+.tmp_*
 *.bak
 *~
 *.recovered

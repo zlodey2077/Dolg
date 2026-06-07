@@ -147,13 +147,16 @@ dolg/
 ├── knowledge/              # Туториалы
 ├── docs/                   # Документация
 │   ├── ARCHITECTURE.md
-│   ├── DEPLOYMENT.md
+│   ├── DEPLOY.md
+│   ├── CONTAINERS_AND_KUBERNETES.md
 │   ├── RUNBOOK.md
 │   └── LOCAL_SETUP.md (это)
 ├── scripts/                # Утилиты
-│   ├── backup_db.sh
-│   ├── generate_iteration_report.py
-│   └── ...
+│   ├── bootstrap_docker_desktop.ps1
+│   ├── docker_compose_up.ps1
+│   ├── docker_compose_down.ps1
+│   ├── check_docker_static.py
+│   └── check_k8s_static.py
 ├── shop/static/            # CSS, JS, картинки
 ├── manage.py
 ├── requirements.txt

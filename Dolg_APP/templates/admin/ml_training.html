@@ -211,7 +211,7 @@
                 {% else %}
                 <div class="mlt-meta">
                     ⚠ В <code>Dolg_APP/ml/dataset/</code> нет JSON-датасетов.
-                    Сгенерируйте seed через <code>python scripts/seed_ml_dataset.py</code>
+                    Сгенерируйте seed через <code>python manage.py collect_ai_training_examples --source curated</code>
                     или импортируйте HF ниже.
                 </div>
                 {% endif %}

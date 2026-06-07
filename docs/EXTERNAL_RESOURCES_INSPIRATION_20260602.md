@@ -9,11 +9,11 @@
 | Группа | Локальная фиксация | Что дала DOLG |
 |---|---|---|
 | Lithium ECAD / LECAD | [LITHIUM_INSPECTION_REPORT.md](LITHIUM_INSPECTION_REPORT.md), [LITHIUM_ECAD_ANALYSIS.md](LITHIUM_ECAD_ANALYSIS.md) | Синхронизация представлений, XML-форматы, ERC pin-to-pin, net classes, уровни цепей, функциональные блоки, stack-up, production artifacts. |
-| Архив инженерных работ | [ENGINEERING_PROCESS_NOTES_20260525.md](ENGINEERING_PROCESS_NOTES_20260525.md) | Сеанс проектирования, требования, испытания, reliability/derating, карта отказов, DRC/ERC как внешний evidence. |
+| Архив инженерных работ | [ENGINEERING_NOTES.md](ENGINEERING_NOTES.md) | Сеанс проектирования, требования, испытания, reliability/derating, карта отказов, DRC/ERC как внешний evidence. |
 | Легальные учебные и технические источники | [LEGAL_RESOURCE_MAP_20260526.md](LEGAL_RESOURCE_MAP_20260526.md), `knowledge/data/legal_sources.json` | Evidence для AI/review/learning: All About Circuits, OpenStax, ngspice, LTspice, KiCad, Django, NetworkX, SymPy, Pint, Lark, Z3, PyTorch. |
-| Web-CAD и симуляторы | [PROJECT_SESSION_20260525.md](PROJECT_SESSION_20260525.md), `DEMO_SCENARIO.md` | Qucs-подход к postprocessing: результат симуляции как dataset; WebSocket/async flow; project session вместо разрозненных страниц. |
+| Web-CAD и симуляторы | [UNIFIED_ROADMAP_20260606.md](UNIFIED_ROADMAP_20260606.md), `DEMO_SCENARIO.md` | Qucs-подход к postprocessing: результат симуляции как dataset; WebSocket/async flow; project session вместо разрозненных страниц. |
 | KiCad / Altium / EasyEDA / CircuitLab / Flux | roadmap-документы и речь защиты | Разделение ниш: DOLG не копирует промышленный PCB CAD, а связывает каталог, расчет, схему, симуляцию, review, обучение и заказ. |
-| Открытые ML-ориентиры | [LEGAL_RESOURCE_MAP_20260526.md](LEGAL_RESOURCE_MAP_20260526.md), [NEXT_PLAN.md](NEXT_PLAN.md) | PyTorch использовать как deep-hint слой поверх экспертного baseline; датасет строить из собственных схем, review, измерений и opt-in проектов. |
+| Открытые ML-ориентиры | [LEGAL_RESOURCE_MAP_20260526.md](LEGAL_RESOURCE_MAP_20260526.md), [UNIFIED_ROADMAP_20260606.md](UNIFIED_ROADMAP_20260606.md) | PyTorch использовать как deep-hint слой поверх экспертного baseline; датасет строить из собственных схем, review, измерений и opt-in проектов. |
 
 ## Главный вывод
 
@@ -269,4 +269,3 @@ DOLG реализует web-ориентированную информацио�
 5. `RequirementsTrace`: markdown/JSON матрица требований, модулей, тестов и demo-шагов.
 
 Этот пакет маленькими шагами приближает DOLG к профессиональному CAD-workflow, но не ломает текущую архитектуру и не требует тяжелой нейронки как основы.
-

@@ -1064,7 +1064,7 @@ class Command(BaseCommand):
             base / 'start_public.bat',
             base / 'README.md',
             base / 'docs' / 'TESTS_AND_REPORTS.md',
-            base / 'docs' / 'NEXT_PLAN.md',
+            base / 'docs' / 'UNIFIED_ROADMAP_20260606.md',
             base / 'docs' / 'DEMO_SCENARIO.md',
             base / 'docs' / 'LEGAL_RESOURCE_MAP_20260526.md',
             base / 'knowledge' / 'data' / 'legal_sources.json',
