@@ -1134,6 +1134,11 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
                 ai_toolkit.dc_voltage_lines(scheme_data),
                 'Схема не решается MNA — проверьте GND и источник.',
             ),
+            *(
+                [_line_items('RF-анализ фильтра (scikit-rf)', _rf_m, '')]
+                if (_rf_m := ai_toolkit.rf_filter_lines(scheme_data))
+                else []
+            ),
             _line_items('Сохраненные измерения', _measurement_lines(review), 'Измерений пока нет.'),
             _line_items(
                 'Что измерить дальше', _measurement_plan(connectivity), 'Начните с DC-напряжений узлов.'
@@ -1223,6 +1228,11 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
                 'Расчёт по схеме (движок)',
                 ai_toolkit.formula_compute(scheme_data, topology),
                 'Добавьте номиналы компонентов — посчитаю значение.',
+            ),
+            *(
+                [_line_items('RF-анализ фильтра (scikit-rf)', _rf_lines, '')]
+                if (_rf_lines := ai_toolkit.rf_filter_lines(scheme_data))
+                else []
             ),
             _line_items('Формула', formula_lines, 'Недостаточно данных для выбора формулы.'),
             _line_items(

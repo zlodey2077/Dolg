@@ -121,6 +121,37 @@ def formula_compute(scheme_data: dict | None, topology: str | None) -> list[str]
     return lines
 
 
+def rf_filter_lines(scheme_data: dict | None) -> list[str]:
+    """S-параметры RC-фильтра через scikit-rf: частота среза −3 дБ + полоса.
+
+    Только если в схеме есть резистор и конденсатор. Compute-don't-guess."""
+    from shop.component_validation import parse_engineering_value
+
+    r = _first_of(scheme_data, 'resistor')
+    c = _first_of(scheme_data, 'capacitor')
+    if not (r and c):
+        return []
+    r_ohm = parse_engineering_value('resistance', r.get('resistance') or r.get('value'))
+    c_uf = parse_engineering_value('capacitance', c.get('capacitance') or c.get('value'))
+    if not (r_ohm and c_uf and r_ohm > 0 and c_uf > 0):
+        return []
+    try:
+        from .rf_analysis import analyze_filter
+
+        result = analyze_filter('rc_lowpass', r_ohm=r_ohm, c_farad=c_uf * 1e-6)
+    except Exception:
+        return []
+    cutoff = result.get('cutoff_3db_hz')
+    lines = []
+    if cutoff:
+        lines.append(f'RC low-pass: срез −3 дБ ≈ {cutoff:,.0f} Гц (нагруженный, 50 Ом)')
+    if result.get('analytic_corner_hz'):
+        lines.append(f'ненагруженный угол 1/(2πRC) ≈ {result["analytic_corner_hz"]:,.0f} Гц')
+    lines.append(f'полоса пропускания (S21): {result.get("passband_db", 0):.1f} дБ')
+    lines.append('источник: scikit-rf S-параметры (2-порт)')
+    return lines
+
+
 def tolerance_lines(scheme_data: dict | None, *, tolerance: float = 0.05) -> list[str]:
     """Огибающая напряжений при разбросе номиналов (worst-case + вердикт)."""
     try:

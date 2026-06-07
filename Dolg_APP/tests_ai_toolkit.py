@@ -93,3 +93,22 @@ class FormulaComputeTests(SimpleTestCase):
     def test_missing_values_empty(self):
         self.assertEqual(ai_toolkit.formula_compute({'components': []}, 'rc_network'), [])
         self.assertEqual(ai_toolkit.formula_compute(None, 'unknown_topology'), [])
+
+
+class RfFilterTests(SimpleTestCase):
+    def test_rc_filter_cutoff_and_source(self):
+        rc = {
+            'components': [
+                {'id': 'R1', 'type': 'resistor', 'resistance': 1000, 'ports': [{'id': '1'}, {'id': '2'}]},
+                {'id': 'C1', 'type': 'capacitor', 'capacitance': '100n', 'ports': [{'id': '1'}, {'id': '2'}]},
+            ],
+            'connections': [],
+        }
+        lines = ai_toolkit.rf_filter_lines(rc)
+        self.assertTrue(lines)
+        self.assertTrue(any('scikit-rf' in line for line in lines))
+        self.assertTrue(any('−3 дБ' in line or 'Гц' in line for line in lines))
+
+    def test_no_capacitor_empty(self):
+        only_r = {'components': [{'id': 'R1', 'type': 'resistor', 'resistance': 1000}], 'connections': []}
+        self.assertEqual(ai_toolkit.rf_filter_lines(only_r), [])
