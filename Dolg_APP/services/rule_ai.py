@@ -11,6 +11,7 @@ import hashlib
 import json
 from collections import Counter
 
+from . import ai_toolkit
 from .ai_retrieval import build_retrieval_context
 from .ai_retrieval import retrieval_lines as ai_retrieval_lines
 from .artifact_learning import artifact_training_summary, learning_suggestions_from_artifacts
@@ -1128,6 +1129,11 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     elif intent == 'measurement':
         sections = [
             *common_head,
+            _line_items(
+                'Расчёт DC движком (MNA)',
+                ai_toolkit.dc_voltage_lines(scheme_data),
+                'Схема не решается MNA — проверьте GND и источник.',
+            ),
             _line_items('Сохраненные измерения', _measurement_lines(review), 'Измерений пока нет.'),
             _line_items(
                 'Что измерить дальше', _measurement_plan(connectivity), 'Начните с DC-напряжений узлов.'
@@ -1137,6 +1143,11 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     elif intent == 'thermal':
         sections = [
             *common_head,
+            _line_items(
+                'Мощность на резисторах (расчёт MNA)',
+                ai_toolkit.power_lines(scheme_data),
+                'Нет резисторов с током — мощность не считается.',
+            ),
             _line_items(
                 'Запас по мощности и температуре',
                 _derating_lines(review),
