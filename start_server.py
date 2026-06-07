@@ -203,10 +203,28 @@ def build_django_cmd(py, hot):
     return [py] + base, False
 
 
+# Эти процессы НЕ трогаем при чистке: MCP-серверы Claude и т.п. инфраструктура,
+# которая запускается из .venv этого же проекта, но к dev-серверу не относится.
+_KILL_EXCLUDE = (
+    'mcp_server',
+    'fastmcp',
+    'headroom',
+    'context7',
+    'sequential-thinking',
+    'modelcontextprotocol',
+)
+
+
 def kill_orphans():
-    """Снять орфан-серверы прошлых сессий (jurigged/runserver/daphne) — частая
-    причина «ни один вход не работает»: зависший процесс держит ресурсы/порт.
-    НЕ трогает текущий launcher и его родителя. Без psutil — no-op."""
+    """Убийца зомби-процессов: полный чистый рестарт dev-окружения.
+
+    Снимает ВСЕ процессы прошлых сессий, относящиеся к dev-серверу: любые
+    `manage.py …` (runserver, а также зависшие management-команды вроде обучения
+    GNN), jurigged, daphne и leftover cloudflared. Частая причина «ни один вход
+    не работает» — именно такие зомби, держащие ресурсы/порт.
+
+    НЕ трогает: текущий launcher и его родителя, а также MCP-серверы Claude
+    (_KILL_EXCLUDE). Без psutil — no-op."""
     killed = []
     try:
         import psutil
@@ -222,12 +240,18 @@ def kill_orphans():
             pid = pr.info['pid']
             if pid in (me, parent):
                 continue
-            if 'python' not in (pr.info['name'] or '').lower():
-                continue
+            name = (pr.info['name'] or '').lower()
             cl = ' '.join(pr.info['cmdline'] or [])
-            if 'manage.py runserver' in cl or ('jurigged' in cl and 'runserver' in cl) or 'daphne' in cl:
-                pr.kill()
-                killed.append(pid)
+            cl_low = cl.lower()
+            # leftover cloudflared-туннель (не python) — тоже снимаем.
+            is_cloudflared = 'cloudflared' in name
+            is_devproc = 'python' in name and ('manage.py' in cl or 'jurigged' in cl or 'daphne' in cl_low)
+            if not (is_cloudflared or is_devproc):
+                continue
+            if any(tok in cl_low for tok in _KILL_EXCLUDE):
+                continue  # не убиваем MCP-инфраструктуру
+            pr.kill()
+            killed.append(pid)
         except Exception:
             continue
     return killed

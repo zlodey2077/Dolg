@@ -190,7 +190,7 @@ TRAY_ACTIONS: list[TrayAction] = [
     ),
     TrayAction(
         'restart',
-        '⟳ Перезапустить',
+        '⟳ Полный перезапуск (чистка зомби)',
         lambda c: lambda icon, item: c.restart(),
         enabled=lambda c: c.is_running(),
     ),
