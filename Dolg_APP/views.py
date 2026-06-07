@@ -2769,6 +2769,7 @@ def api_ai_chat(request):
                 'intent_label': result.get('intent_label'),
                 'confidence': result.get('confidence'),
                 'quick_actions': result.get('quick_actions') or [],
+                'render': result.get('render') or [],
                 'skills': result.get('skills') or [],
                 'context_sources': result.get('context_sources') or [],
                 'used_context': result.get('used_context') or {},

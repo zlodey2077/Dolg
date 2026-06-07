@@ -5436,6 +5436,27 @@ function _escapeHtml(s) {
 window.renderNetInspector = renderNetInspector;
 window.renderLayerInspector = renderLayerInspector;
 
+// L3 highlight-директива: локальный AI просит подсветить компонент по id/label.
+// Canvas-мутация — вызывается по клику пользователя (не авто).
+function aiHighlightComponent(idOrLabel) {
+    const key = String(idOrLabel).trim();
+    const comp = (components || []).find(c =>
+        String(c.id) === key || ((c.label || '') + (c.id || '')) === key || c.label === key);
+    if (!comp) {
+        showNotification('Компонент «' + key + '» не найден на схеме', 'warning');
+        return;
+    }
+    selectedComponent = comp;
+    if (typeof selectedComponentIds !== 'undefined' && selectedComponentIds) {
+        selectedComponentIds.clear();
+        selectedComponentIds.add(comp.id);
+    }
+    if (typeof updateProperties === 'function') updateProperties();
+    drawCanvas();
+    showNotification('⌖ Подсвечен ' + (comp.label || '') + (comp.id || ''), 'info');
+}
+window.aiHighlightComponent = aiHighlightComponent;
+
 function _setupFloatPanelGeometry(panelId, defaults) {
     const panel = document.getElementById(panelId);
     if (!panel) return;
@@ -16839,6 +16860,30 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
 .dolg-ai-context-actions button.ai-tool-action--danger:hover {
     background: rgba(255, 80, 80, 0.22); color: #fff;
 }
+/* L3 render-директивы: график (matplotlib SVG), highlight-кнопка, value-бейдж. */
+.dolg-ai-render {
+    display: flex; flex-direction: column; gap: 8px; margin-top: 8px;
+}
+.dolg-ai-plot {
+    margin: 0; padding: 6px; background: #fff; border-radius: 6px;
+    border: 1px solid rgba(0, 160, 192, 0.35);
+}
+.dolg-ai-plot figcaption {
+    font-size: 10px; color: #0a3a44; margin-bottom: 2px; font-weight: 600;
+}
+.dolg-ai-plot-svg svg { max-width: 100%; height: auto; display: block; }
+.dolg-ai-render-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.dolg-ai-render-btn {
+    border: 1px solid rgba(127, 219, 255, 0.5);
+    background: rgba(127, 219, 255, 0.12); color: #cfe;
+    border-radius: 10px; padding: 2px 9px; font-size: 11px; cursor: pointer;
+}
+.dolg-ai-render-btn:hover { background: rgba(127, 219, 255, 0.26); color: #fff; }
+.dolg-ai-render-badge {
+    display: inline-block; padding: 1px 7px; border-radius: 8px;
+    background: rgba(0, 160, 192, 0.16); border: 1px solid rgba(0, 160, 192, 0.4);
+    color: #7fdbff; font-family: monospace; font-size: 11px;
+}
 .dolg-ai-target input {
     flex: 1; padding: 4px 8px; background: #0e1320; border: 1px solid #2a3145;
     border-radius: 4px; color: #e6e9ef; font-size: 12px;
@@ -17502,7 +17547,50 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
             });
             div.appendChild(actions);
         }
+        if (Array.isArray(m.render) && m.render.length) {
+            const strip = _makeRenderStrip(m.render);
+            if (strip) div.appendChild(strip);
+        }
         return div;
+    }
+
+    // L3 гибрид-протокол: рендерит структурные render-директивы локального AI.
+    // plot (matplotlib SVG, display-only) — сразу; highlight (canvas-мутация) — по
+    // клику; value — inline-бейдж. SVG доверенный (генерится бэкендом).
+    function _makeRenderStrip(directives) {
+        const strip = document.createElement('div');
+        strip.className = 'dolg-ai-render';
+        let row = null;
+        const ensureRow = () => {
+            if (!row) { row = document.createElement('div'); row.className = 'dolg-ai-render-row'; strip.appendChild(row); }
+            return row;
+        };
+        directives.forEach(r => {
+            if (r.type === 'plot' && r.format === 'svg' && r.svg) {
+                row = null;
+                const fig = document.createElement('figure');
+                fig.className = 'dolg-ai-plot';
+                if (r.title) { const cap = document.createElement('figcaption'); cap.textContent = r.title; fig.appendChild(cap); }
+                const holder = document.createElement('div');
+                holder.className = 'dolg-ai-plot-svg';
+                holder.innerHTML = r.svg;
+                fig.appendChild(holder);
+                strip.appendChild(fig);
+            } else if (r.type === 'highlight' && r.arg) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'dolg-ai-render-btn';
+                btn.textContent = '⌖ Подсветить ' + r.arg;
+                btn.addEventListener('click', () => window.aiHighlightComponent && window.aiHighlightComponent(r.arg));
+                ensureRow().appendChild(btn);
+            } else if (r.type === 'value' && r.arg) {
+                const badge = document.createElement('span');
+                badge.className = 'dolg-ai-render-badge';
+                badge.textContent = r.arg;
+                ensureRow().appendChild(badge);
+            }
+        });
+        return strip.childNodes.length ? strip : null;
     }
 
     // Полный rebuild — на переключение вкладки, очистку, открытие панели.
@@ -17644,6 +17732,10 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                     actions.appendChild(btn);
                 });
                 div.appendChild(actions);
+            }
+            if (Array.isArray(m.render) && m.render.length) {
+                const strip = _makeRenderStrip(m.render);
+                if (strip) div.appendChild(strip);
             }
         });
     }
@@ -17949,6 +18041,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                     kind: data.demo ? 'demo' : 'bot',
                     content: replyText,
                     actions: data.quick_actions || [],
+                    render: Array.isArray(data.render) ? data.render : [],
                 });
                 if (data.session_summary) sessionSummaries[currentMode] = data.session_summary;
                 if (data.intent) lastIntents[currentMode] = data.intent;

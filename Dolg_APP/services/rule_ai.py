@@ -11,7 +11,7 @@ import hashlib
 import json
 from collections import Counter
 
-from . import ai_algorithms
+from . import ai_algorithms, ai_render
 from .ai_retrieval import build_retrieval_context
 from .ai_retrieval import retrieval_lines as ai_retrieval_lines
 from .artifact_learning import artifact_training_summary, learning_suggestions_from_artifacts
@@ -1326,6 +1326,17 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
     return '\n\n'.join(str(item) for item in sections if item)
 
 
+def _render_directives(intent, reply, scheme_data):
+    """L3 гибрид: структурные render-айтемы (plot/table) + inline-токены из текста.
+
+    Структурный слой надёжен для крупных виджетов; inline-токены [[value:…]] /
+    [[highlight:R1]] из прозы — для контекстных вставок (фронт рендерит оба)."""
+    items = list(ai_render.build_render_items(scheme_data, intent))
+    for token in ai_render.parse_inline_tokens(reply):
+        items.append({'type': token['type'], 'arg': token['arg'], 'raw': token['raw'], 'placement': 'inline'})
+    return items
+
+
 def build_rule_based_reply(
     message,
     *,
@@ -1401,6 +1412,7 @@ def build_rule_based_reply(
             context_sources.append(label)
     quick_actions = _quick_actions(intent, connectivity)
     updated_summary = _make_session_summary(session_summary, history_tail, intent, context_sources)
+    render = _render_directives(intent, reply, scheme_data)
     return {
         'reply': reply,
         'agent': 'Self AI engineer',
@@ -1408,6 +1420,7 @@ def build_rule_based_reply(
         'intent_label': INTENT_LABELS_RU.get(intent, intent),
         'confidence': _confidence(review),
         'quick_actions': quick_actions,
+        'render': render,
         'skills': _skill_manifest(intent),
         'context_sources': context_sources,
         'used_context': {
