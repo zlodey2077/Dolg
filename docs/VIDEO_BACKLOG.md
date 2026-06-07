@@ -132,3 +132,31 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 - ☐⭐ RF Design-6: Smith Chart & Impedance Matching — Anurag Bhargava (`NX6G9A2U7kM`, 43:50)
 - ☐ Impedance Matching on Smith Charts — EMPossible (`L24aB89-m5w`, 12:07)
 - ☐ HackadayU — Introduction to Antenna Basics, Class 1 (`axUcybeamIk`, 41:02)
+
+## Встраиваемые / CircuitPython (наш экспорт schema→code.py, RP2040/ESP32)
+
+- ☐⭐ CircuitPython with Raspberry Pi Pico — Getting Started (`07vG-_CcDG0`, 42:47)
+- ☐ DigiKey — Intro to Raspberry Pi Pico & RP2040, MicroPython (`PrMQpv9iCFw`, 12:40)
+- ☐ CircuitPython vs MicroPython: ключевые отличия (`wyOcb2MHzIs`, 4:13)
+- ☐ Core Electronics — Pico Course for Beginners (`Ic4ExTusoTw`, 243:45) — исчерпывающе, очень длинно
+
+## Безопасность веб/Django (наш security_backlog)
+
+- ☐⭐ DjangoCon US — Security Best Practices for Django (`pMfM7fIK6cs`, 36:05)
+- ☐⭐ PyCon Sweden — Django Security against OWASP (`lWfJfviWIBU`, 30:32)
+- ☐ Ultimate Django Security Cheat Sheet (`CFGjMBtCFbk`, 23:05)
+- ☐ PyCon 2019 — Hands-On Web Application Security (`8W4MGggwgfM`, 78:05)
+
+## Тестирование / pytest (наш testing_infra)
+
+- ☐⭐ Talk Python — pytest tips and tricks (`qQ6b7OwT124`, 58:26)
+- ☐⭐ Zac Hatfield-Dodds — «Stop Writing Tests!» property-based (Hypothesis) (`tiy031EoDXo`, 29:36) — для движков идеально
+- ☐ Testing the Database Layer: problems & best practices (`ZBLaHL1mTW0`, 48:15)
+- ☐ Real Python — Getting Started With Testing (`6tTI2Y8Xsd4`, 58:24)
+
+## Цифровая схемотехника / логика (наши логические компоненты схемы)
+
+- ☐⭐ ПЛИСоводство — Цифровая схемотехника, Л1 (комбинационные схемы) (`aGMfFezjVnQ`, 24:26)
+- ☐ Тимур Маликов — Триггеры (RS, D, JK) (`7QLQplw5EKE`, 16:56)
+- ☐ Dmitry Kuznetsov — Цифровая электроника, вводная (`gGGsVSP0oLc`, 19:34)
+- ☐ Digital Circuit Design / Verilog, L7 (`k88TfckjIGA`, 72:41)
