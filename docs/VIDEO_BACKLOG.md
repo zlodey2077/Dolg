@@ -62,3 +62,17 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 
 **Следующие оси для поиска (TODO):** радиотехника/антенны/РЭБ (наш RF/scikit-rf), встраиваемые/
 микроконтроллеры (наш CircuitPython-экспорт), цифровая схемотехника/логика, трассировка/DFM.
+
+## Код / реализация инженерных программ (архитектура DOLG: CAD, симулятор, движки)
+- ☐⭐ Яков Шамрай — Введение в разработку САПР (`BNuoEWTykOU`, 65:30) — общая архитектура САПР
+- ☐⭐ Introduction to Constraint-based Modelling — Karthik (`G0ibqc6RKSM`, 72:52) — constraint solver (привязки/параметрика CAD)
+- ☐ C3D Labs — Геометрическое ядро C3D и КОМПАС-3D (`-6aeoVhTx84`, 20:28) — что такое геом. ядро (3D-вектор)
+- ☐ IEEE — Introduction to SPICE, General-Purpose Simulator (`BnbcD-k4PD8`, 73:30) — глубже движок симулятора
+- ☐ SolveSpace (open-source параметрический CAD с constraint solver) — референс кода (`7eCLYjkIbU8` — обзор; смотреть репозиторий)
+- ☐ SketchGraphs — датасет CAD-констрейнтов (`ki784S3wjqw`, 2:33) — потенц. корм для ML-привязок
+
+## КПД / производительность (наш Django-бэкенд + профилирование)
+- ☐⭐ PyCon ZA — Supercharge Your Django Apps: Performance Secrets (`BrXXDyO9Pzw`, 29:21)
+- ☐ DjangoCon US — Optimizing Django response times (`vYWPnzhDpTo`, 23:20)
+- ☐ Python Ireland — Django Performance Optimization (Silk) (`mVg3pKEV75M`, 30:24)
+- ☐ NeuralNine — Code Profiling with cProfile (`BZzb_Wpag_M`, 15:10) — профилировщик
