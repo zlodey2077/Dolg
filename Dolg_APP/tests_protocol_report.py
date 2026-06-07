@@ -14,17 +14,29 @@ class ProtocolReportTests(SimpleTestCase):
             'status_label': 'Допустимо',
             'summary': 'Схема в целом исправна, есть замечания по допускам.',
             'errors': ['Отсутствует GND на узле N3'],
-            'warnings': [{'title': 'Резистор R4 близок к пределу мощности', 'recommendation': 'Взять 0.5 Вт'}],
+            'warnings': [
+                {'title': 'Резистор R4 близок к пределу мощности', 'recommendation': 'Взять 0.5 Вт'}
+            ],
             'faults': [{'title': 'LED включён обратной полярностью', 'recommendation': 'Развернуть D1'}],
             'recommendations': ['Добавить развязку по питанию'],
             'expert_findings': [
-                {'rule_id': 'GND_MISSING', 'severity_label': 'критично', 'title': 'Нет опорной земли',
-                 'recommendation': 'Подключить GND'},
+                {
+                    'rule_id': 'GND_MISSING',
+                    'severity_label': 'критично',
+                    'title': 'Нет опорной земли',
+                    'recommendation': 'Подключить GND',
+                },
             ],
             'learning_suggestions': [{'title': 'Урок: зачем схеме земля'}],
             'metric_rows': [{'key': 'node_count', 'label': 'Узлов', 'value': '5'}],
             'measurement_rows': [
-                {'label': 'Напряжение на выходе', 'value': '3.28', 'unit': 'В', 'expected': '3.3', 'status': 'норма'},
+                {
+                    'label': 'Напряжение на выходе',
+                    'value': '3.28',
+                    'unit': 'В',
+                    'expected': '3.3',
+                    'status': 'норма',
+                },
             ],
         }
 

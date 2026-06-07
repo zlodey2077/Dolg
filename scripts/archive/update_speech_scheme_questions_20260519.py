@@ -6,9 +6,9 @@ from docx import Document
 from docx.shared import Pt
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCS = ROOT / "docs"
+DOCS = ROOT / 'docs'
 
-SECTION_TITLE = "## Вопросы по разбираемой схеме"
+SECTION_TITLE = '## Вопросы по разбираемой схеме'
 
 SECTION = """## Вопросы по разбираемой схеме
 
@@ -62,55 +62,59 @@ SECTION = """## Вопросы по разбираемой схеме
 
 
 def latest_md() -> Path:
-    return sorted(DOCS.glob("Речь_и_вопросы_к_защите_DOLG_*.md"), key=lambda p: p.stat().st_mtime, reverse=True)[0]
+    return sorted(
+        DOCS.glob('Речь_и_вопросы_к_защите_DOLG_*.md'), key=lambda p: p.stat().st_mtime, reverse=True
+    )[0]
 
 
 def latest_docx() -> Path:
-    files = [path for path in DOCS.glob("Речь_и_вопросы_к_защите_DOLG_*.docx") if not path.name.startswith("~$")]
+    files = [
+        path for path in DOCS.glob('Речь_и_вопросы_к_защите_DOLG_*.docx') if not path.name.startswith('~$')
+    ]
     return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
 
 
 def update_md() -> None:
     path = latest_md()
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding='utf-8')
     if SECTION_TITLE in text:
         before, rest = text.split(SECTION_TITLE, 1)
-        if "\n## Возможные вопросы и ответы" in rest:
-            _, after = rest.split("\n## Возможные вопросы и ответы", 1)
-            text = before.rstrip() + "\n\n" + SECTION.strip() + "\n\n## Возможные вопросы и ответы" + after
+        if '\n## Возможные вопросы и ответы' in rest:
+            _, after = rest.split('\n## Возможные вопросы и ответы', 1)
+            text = before.rstrip() + '\n\n' + SECTION.strip() + '\n\n## Возможные вопросы и ответы' + after
         else:
-            text = before.rstrip() + "\n\n" + SECTION.strip() + "\n"
+            text = before.rstrip() + '\n\n' + SECTION.strip() + '\n'
     else:
-        marker = "\n## Возможные вопросы и ответы"
+        marker = '\n## Возможные вопросы и ответы'
         if marker in text:
-            text = text.replace(marker, "\n\n" + SECTION.strip() + "\n" + marker, 1)
+            text = text.replace(marker, '\n\n' + SECTION.strip() + '\n' + marker, 1)
         else:
-            text = text.rstrip() + "\n\n" + SECTION.strip() + "\n"
-    path.write_text(text, encoding="utf-8")
+            text = text.rstrip() + '\n\n' + SECTION.strip() + '\n'
+    path.write_text(text, encoding='utf-8')
 
 
 def add_paragraph(doc: Document, text: str, *, bold: bool = False, size: int = 12) -> None:
     paragraph = doc.add_paragraph()
     run = paragraph.add_run(text)
-    run.font.name = "Times New Roman"
+    run.font.name = 'Times New Roman'
     run.font.size = Pt(size)
     run.bold = bold
 
 
 def update_docx() -> Path:
     source = latest_docx()
-    target = DOCS / "Речь_и_вопросы_к_защите_DOLG_20260513_v5_с_вопросами_по_схеме_20260519.docx"
+    target = DOCS / 'Речь_и_вопросы_к_защите_DOLG_20260513_v5_с_вопросами_по_схеме_20260519.docx'
     doc = Document(str(source))
-    full_text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
-    if "Вопросы по разбираемой схеме" not in full_text:
-        add_paragraph(doc, "Вопросы по разбираемой схеме", bold=True, size=15)
+    full_text = '\n'.join(paragraph.text for paragraph in doc.paragraphs)
+    if 'Вопросы по разбираемой схеме' not in full_text:
+        add_paragraph(doc, 'Вопросы по разбираемой схеме', bold=True, size=15)
         for line in SECTION.splitlines()[2:]:
             if not line.strip():
                 continue
-            if line.startswith("Для защиты"):
+            if line.startswith('Для защиты'):
                 add_paragraph(doc, line.strip(), size=12)
-            elif line[0].isdigit() and ". **" in line:
-                question = line.replace("**", "").strip()
+            elif line[0].isdigit() and '. **' in line:
+                question = line.replace('**', '').strip()
                 add_paragraph(doc, question, bold=True, size=12)
             else:
                 add_paragraph(doc, line.strip(), size=12)
@@ -122,8 +126,8 @@ def update_docx() -> Path:
 def main() -> None:
     update_md()
     target = update_docx()
-    print(f"Updated speech questions: {target}")
+    print(f'Updated speech questions: {target}')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

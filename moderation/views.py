@@ -19,14 +19,18 @@ def _json_error(message, *, status=400, code='error'):
 
 
 def _moderatable_cases(user):
-    qs = ModerationCase.objects.select_related('content_type', 'organization').prefetch_related('reports', 'actions')
+    qs = ModerationCase.objects.select_related('content_type', 'organization').prefetch_related(
+        'reports', 'actions'
+    )
     if user_can_moderate_site(user):
         return qs
     org_ids = []
     try:
         org_ids = [
             membership.organization_id
-            for membership in user.org_memberships.select_related('organization').filter(deactivated_at__isnull=True)
+            for membership in user.org_memberships.select_related('organization').filter(
+                deactivated_at__isnull=True
+            )
             if user_can_moderate_org(user, membership.organization)
         ]
     except Exception:
@@ -42,7 +46,9 @@ def _has_moderation_access(user):
     try:
         return any(
             user_can_moderate_org(user, membership.organization)
-            for membership in user.org_memberships.select_related('organization').filter(deactivated_at__isnull=True)
+            for membership in user.org_memberships.select_related('organization').filter(
+                deactivated_at__isnull=True
+            )
         )
     except Exception:
         return False
@@ -53,10 +59,14 @@ def moderation_dashboard(request):
     if not _has_moderation_access(request.user):
         return HttpResponseForbidden('Нет прав на очередь модерации.')
     cases = _moderatable_cases(request.user).filter(status__in=['open', 'in_review'])[:50]
-    return render(request, 'moderation/dashboard.html', {
-        'cases': cases,
-        'can_moderate_site': user_can_moderate_site(request.user),
-    })
+    return render(
+        request,
+        'moderation/dashboard.html',
+        {
+            'cases': cases,
+            'can_moderate_site': user_can_moderate_site(request.user),
+        },
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -74,7 +84,7 @@ def api_queue(request):
 def api_report(request):
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     target_type = data.get('target_type')
@@ -90,41 +100,59 @@ def api_report(request):
         return _json_error('Target not found', status=404, code='not_found')
 
     report = create_report(target=target, reporter=request.user, reason=reason, details=details)
-    return JsonResponse({
-        'ok': True,
-        'report': {
-            'id': report.id,
-            'case_id': report.case_id,
-            'reason': report.reason,
-            'status': report.status,
-        },
-        'case': case_to_dict(report.case),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'report': {
+                'id': report.id,
+                'case_id': report.case_id,
+                'reason': report.reason,
+                'status': report.status,
+            },
+            'case': case_to_dict(report.case),
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
 @require_POST
 def api_case_action(request, case_id):
-    case = get_object_or_404(ModerationCase.objects.select_related('content_type', 'organization'), pk=case_id)
+    case = get_object_or_404(
+        ModerationCase.objects.select_related('content_type', 'organization'), pk=case_id
+    )
     if not user_can_moderate_target(request.user, case.target):
         return _json_error('forbidden', status=403, code='forbidden')
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     action_type = (data.get('action') or '').strip()
     reason = (data.get('reason') or '').strip()[:2000]
     payload = data.get('payload') if isinstance(data.get('payload'), dict) else {}
-    allowed = {'hide', 'restore', 'remove', 'warn', 'mute', 'ban', 'read_only', 'mark_reviewed', 'reject_report'}
+    allowed = {
+        'hide',
+        'restore',
+        'remove',
+        'warn',
+        'mute',
+        'ban',
+        'read_only',
+        'mark_reviewed',
+        'reject_report',
+    }
     if action_type not in allowed:
         return _json_error('Unknown action')
 
-    action = apply_action(case=case, actor=request.user, action_type=action_type, reason=reason, payload=payload)
+    action = apply_action(
+        case=case, actor=request.user, action_type=action_type, reason=reason, payload=payload
+    )
     case.refresh_from_db()
-    return JsonResponse({
-        'ok': True,
-        'action': {'id': action.id, 'type': action.action_type},
-        'case': case_to_dict(case),
-    })
+    return JsonResponse(
+        {
+            'ok': True,
+            'action': {'id': action.id, 'type': action.action_type},
+            'case': case_to_dict(case),
+        }
+    )

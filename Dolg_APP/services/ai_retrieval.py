@@ -61,7 +61,7 @@ def build_retrieval_context(
     items.extend(_article_items(tokens))
     items.extend(_learning_items(tokens))
     items.extend(_product_items(tokens))
-    ranked = _rank_items(items, tokens)[:limit]
+    ranked = _select_diverse_items(_rank_items(items, tokens), limit)
     return {
         'query_tokens': tokens[:14],
         'items': ranked,
@@ -144,6 +144,54 @@ def _rank_items(items: list[dict[str, Any]], tokens: list[str]) -> list[dict[str
     return sorted(unique.values(), key=lambda item: item.get('score', 0), reverse=True)
 
 
+def _select_diverse_items(ranked: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    selected = list(ranked[:limit])
+    selected_keys = {(item.get('source'), item.get('id') or item.get('title')) for item in selected}
+    preferred_sources = (
+        'article',
+        'learning',
+        'catalog',
+        'artifact',
+        'training_example',
+        'legal_source',
+        'glossary',
+    )
+
+    for source in preferred_sources:
+        if any(item.get('source') == source for item in selected):
+            continue
+        candidate = next((item for item in ranked if item.get('source') == source), None)
+        if not candidate:
+            continue
+        key = (candidate.get('source'), candidate.get('id') or candidate.get('title'))
+        if key in selected_keys:
+            continue
+        if len(selected) < limit:
+            selected.append(candidate)
+            selected_keys.add(key)
+            continue
+        replace_at = _lowest_replaceable_index(selected)
+        if replace_at is not None:
+            removed = selected[replace_at]
+            selected_keys.discard((removed.get('source'), removed.get('id') or removed.get('title')))
+            selected[replace_at] = candidate
+            selected_keys.add(key)
+
+    return sorted(selected, key=lambda item: item.get('score', 0), reverse=True)[:limit]
+
+
+def _lowest_replaceable_index(items: list[dict[str, Any]]) -> int | None:
+    source_counts = _counts_by_source(items)
+    candidates = [
+        (idx, item.get('score', 0))
+        for idx, item in enumerate(items)
+        if source_counts.get(item.get('source'), 0) > 1
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda pair: pair[1])[0]
+
+
 def _score_text(text: str, tokens: list[str]) -> int:
     haystack = str(text or '').lower()
     score = 0
@@ -223,9 +271,22 @@ def _learning_items(tokens: list[str]) -> list[dict[str, Any]]:
 
 def _product_items(tokens: list[str]) -> list[dict[str, Any]]:
     try:
+        from django.db.models import Q
+
         from shop.models import Product
 
-        products = Product.objects.select_related('category')[:120]
+        query = Q()
+        for token in tokens[:10]:
+            query |= (
+                Q(name__icontains=token)
+                | Q(description__icontains=token)
+                | Q(part_number__icontains=token)
+                | Q(manufacturer__icontains=token)
+                | Q(package_type__icontains=token)
+                | Q(category__name__icontains=token)
+            )
+        qs = Product.objects.select_related('category')
+        products = qs.filter(query)[:120] if query else qs[:120]
         return [
             {
                 'source': 'catalog',

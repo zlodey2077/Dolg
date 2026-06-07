@@ -1,5 +1,35 @@
 # DOLG — Тесты, отчёты, рекомендации
 
+## 2026-06-03: Admin Monitoring Center P0/P1 baseline
+
+- Закрыт публичный `/metrics` на nginx-границе: Prometheus внутри Docker продолжает scrape `web:8000/metrics/`, но внешний reverse proxy возвращает `403`.
+- Добавлен `psutil==7.2.2` для runtime-снимка процесса: RSS/CPU/threads/uptime, disk usage, размеры `media`, `staticfiles`, `Dolg_APP/ml/dataset`, stale search marker и `.incomplete` downloads.
+- Добавлен `Dolg_APP/services/ops_metrics.py`: единый snapshot service для runtime, catalog, business, project, AI/ML, moderation и security metrics.
+- `/staff/ops/` пересобран как читаемый dashboard с health status, alerts, runtime/disk/business/AI-ML блоками.
+- Добавлен staff-only endpoint `GET /staff/ops/api/snapshot/`.
+- Главная Django admin `/admin/` получила компактный мониторинговый блок над списком моделей. Он открывается быстро и догружает snapshot через AJAX, чтобы не тормозить админку тяжелой валидацией и обходом storage.
+- `check_demo_ready --json` теперь содержит блок `admin_monitoring_stack`.
+- Checks: `FAST_TESTS=1 .\.venv\Scripts\python.exe manage.py test Dolg_APP.tests_ml_admin --keepdb -v 1` — **9/9 OK**; `manage.py check` и `makemigrations --check --dry-run` — OK.
+
+## 2026-06-02: MLJob и staff ops dashboard
+
+- Добавлена модель `Dolg_APP.MLJob` и миграция `0018_mljob`: постоянная история ML-задач (`dataset_import`, `training`, `validation`, `export`, `promotion`) со статусом, прогрессом, heartbeat, counters, stdout/error tail и параметрами запуска.
+- `/staff/ml-training/` теперь создает `MLJob` для обучения tiny PyTorch backend; `/staff/ml-training/status/` возвращает `latest_job`, а reset помечает активные training/import jobs как `cancelled`.
+- `/staff/ml-training/import/` теперь создает `MLJob` для импорта датасетов; `/staff/ml-training/import/status/` синхронизирует cache progress с persistent job и отдает `latest_job`.
+- Добавлен staff cockpit `/staff/ops/`: счетчики каталога, проектов, review, AITrainingExample, artifacts, moderation, ML status/type counters, live cache snapshot и последние MLJob.
+- Django admin получил `MLJobAdmin`: фильтры по типу/статусу/source, counters, heartbeat/finished timestamps и bulk actions `cancelled/stale/success`.
+- Checks: `FAST_TESTS=1 .\.venv\Scripts\python.exe manage.py test Dolg_APP.tests_ml_admin --keepdb -v 2` — **6/6 OK**; `.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run` — **No changes detected**; `.\.venv\Scripts\python.exe manage.py check` — **0 issues**; `.\.venv\Scripts\python.exe manage.py migrate Dolg_APP 0018 --noinput` — **OK**.
+
+## 2026-06-02: AI dataset metadata split
+
+- `AITrainingExample.features` стандартизирован без новой таблицы: добавлены `dataset_kind`, `graph_training_ready` и `training_role`.
+- Классы корпуса: `scheme_backed`, `review_backed`, `artifact_backed`, `text_only`. PyTorch graph-training берет только graph-ready примеры; text-only learning/source-backed examples остаются для retrieval и объяснений AI.
+- Добавлена команда `python manage.py normalize_ai_dataset_metadata --validated-only`: текущая локальная БД обновлена, `scanned=72`, `changed=72`, `graph_training_ready=36`, распределение `text_only=36`, `review_backed=28`, `scheme_backed=8`.
+- `/staff/ml-dataset/` показывает `graph-ready` и распределение `Dataset kind`; `AITrainingExampleAdmin` показывает `dataset_kind` и `graph_ready` в списке.
+- `AITrainingExampleAdmin` получил первые review-queue actions: `Normalize dataset metadata` и `Exclude selected from graph training`.
+- `curated_training_schemes()` теперь фильтрует graph-ready примеры и добавляет `dataset_kind/training_role` в `__training_metadata`.
+- Checks: `FAST_TESTS=1 .\.venv\Scripts\python.exe manage.py test Dolg_APP.tests_ml_admin Dolg_APP.tests_ai_dataset_metadata --keepdb -v 1` — **12/12 OK**; `validate_ai_dataset --validated-only --limit 120 --json` — **0 errors, 0 warnings**; `manage.py check`, `makemigrations --check --dry-run`, `check_demo_ready --json`, `check_data_integrity --json` — **OK**.
+
 ## 2026-06-01: catalog card hotfix and official photo allowlist
 
 - 2026-06-02: Catalog V3 расширен на расходники, инструменты и модули:

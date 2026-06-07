@@ -14,6 +14,26 @@
 
 ---
 
+## Статус HIGH-tier на 2026-06-06 (проверено по коду)
+
+Все 9 рекомендованных до защиты HIGH-пунктов закрыты и подтверждены в коде:
+
+| HIGH | Статус | Подтверждение |
+|---|---|---|
+| H1 Permission audit (2.12, 2.13) | ✅ | `@staff_member_required` на всех вьюхах `Dolg_APP/ml_admin_views.py`; `@login_required` + owner-scoping на project/API |
+| H2 IDOR / org isolation (1.7, 4.9, 11.7) | ✅ | `_project_for_read` / `_project_for_write` / `_review_for_read` в `Dolg_APP/views.py`; org-вьюхи через `user_can()` RBAC |
+| H3 Stripe webhook signature (11.5) | ✅ | `orders/payment_views.py:stripe_webhook` + `Dolg_APP/views.py:billing_stripe_webhook` — `construct_event` + `SignatureVerificationError` |
+| H4 bandit + gitleaks + pip-audit pre-commit (9.2-9.4) | ✅ | commit `fd452b0` |
+| H5 gitleaks history scan + rotate (3.3) | ✅ | скан 2026-06-06 через `.gitleaks.toml` → **no leaks found**, ротировать нечего |
+| H6 SSRF guard (1.5) | ✅ | commit `1629e95` |
+| H7 AI prompt injection (11.1) | ✅ | commit `fa0ee38` |
+| H8 SPICE/formula eval sandbox (11.2) | ✅ | commit `a73f7df` (sympify sandbox) |
+| H9 CSP nonce для inline-JS (1.3) | ✅ | commit `55ef51a` (simulation.html — post-defense split) |
+
+Следующий уровень риска — MEDIUM (rate limits на `/api/ai/chat/` и `/cad/api/import/`, GDPR cascade delete, log scrubbing, JSON body-size limit, file-upload MIME/size, open-redirect `next=`). Не блокирует защиту.
+
+---
+
 ## 1. AppSec / OWASP Top 10
 
 | # | Что | Состояние | Прио | Усилие |

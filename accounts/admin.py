@@ -11,10 +11,22 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = 'Профиль пользователя'
     fields = (
-        'display_name', 'headline', 'phone', 'address', 'city', 'postal_code',
-        'country', 'avatar', 'bio', 'preferred_theme', 'accent_color',
-        'default_unit_system', 'start_page', 'ai_tone',
-        'show_profile_public', 'show_engineering_badges',
+        'display_name',
+        'headline',
+        'phone',
+        'address',
+        'city',
+        'postal_code',
+        'country',
+        'avatar',
+        'bio',
+        'preferred_theme',
+        'accent_color',
+        'default_unit_system',
+        'start_page',
+        'ai_tone',
+        'show_profile_public',
+        'show_engineering_badges',
         'allow_ai_training',
     )
 
@@ -39,6 +51,7 @@ class UserAdmin(BaseUserAdmin):
         if any(group.name == MANAGER_GROUP for group in obj.groups.all()):
             return 'Менеджер'
         return 'Пользователь'
+
     role_label.short_description = 'Роль'
 
 
@@ -48,8 +61,25 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'display_name', 'phone', 'city', 'country', 'preferred_theme', 'accent_color', 'created_at')
-    list_filter = ('country', 'city', 'preferred_theme', 'accent_color', 'default_unit_system', 'ai_tone', 'created_at')
+    list_display = (
+        'user',
+        'display_name',
+        'phone',
+        'city',
+        'country',
+        'preferred_theme',
+        'accent_color',
+        'created_at',
+    )
+    list_filter = (
+        'country',
+        'city',
+        'preferred_theme',
+        'accent_color',
+        'default_unit_system',
+        'ai_tone',
+        'created_at',
+    )
     search_fields = ('user__username', 'user__email', 'display_name', 'headline', 'phone')
     readonly_fields = ('created_at', 'updated_at')
     list_select_related = ('user',)
@@ -59,13 +89,21 @@ class UserProfileAdmin(admin.ModelAdmin):
         ('Пользователь', {'fields': ('user',)}),
         ('Контакты', {'fields': ('display_name', 'headline', 'phone', 'avatar', 'bio')}),
         ('Адрес по умолчанию', {'fields': ('address', 'city', 'postal_code', 'country')}),
-        ('Персонализация', {
-            'fields': (
-                'preferred_theme', 'accent_color', 'default_unit_system',
-                'start_page', 'ai_tone', 'show_profile_public',
-                'show_engineering_badges', 'allow_ai_training',
-            )
-        }),
+        (
+            'Персонализация',
+            {
+                'fields': (
+                    'preferred_theme',
+                    'accent_color',
+                    'default_unit_system',
+                    'start_page',
+                    'ai_tone',
+                    'show_profile_public',
+                    'show_engineering_badges',
+                    'allow_ai_training',
+                )
+            },
+        ),
         ('Метаданные', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 

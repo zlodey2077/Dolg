@@ -24,7 +24,6 @@ from .permissions import (
 )
 from .services import user_is_restricted
 
-
 User = get_user_model()
 
 
@@ -42,11 +41,19 @@ class ModerationRoleTests(TestCase):
         owner = User.objects.create_user('owner', 'owner@example.com', 'pw')
         moderator = User.objects.create_user('orgmod', 'orgmod@example.com', 'pw')
         outsider = User.objects.create_user('outsider', 'out@example.com', 'pw')
-        org = Organization.objects.create(name='Team A', slug='team-a', billing_email='a@example.com', owner=owner)
-        other_org = Organization.objects.create(name='Team B', slug='team-b', billing_email='b@example.com', owner=owner)
+        org = Organization.objects.create(
+            name='Team A', slug='team-a', billing_email='a@example.com', owner=owner
+        )
+        other_org = Organization.objects.create(
+            name='Team B', slug='team-b', billing_email='b@example.com', owner=owner
+        )
         OrganizationMember.objects.create(organization=org, user=moderator, role='moderator')
-        project = SchematicProject.objects.create(user=owner, organization=org, visibility='team', name='Team project')
-        other_project = SchematicProject.objects.create(user=owner, organization=other_org, visibility='team', name='Other project')
+        project = SchematicProject.objects.create(
+            user=owner, organization=org, visibility='team', name='Team project'
+        )
+        other_project = SchematicProject.objects.create(
+            user=owner, organization=other_org, visibility='team', name='Other project'
+        )
 
         self.assertTrue(user_can(moderator, org, 'org.moderation.manage'))
         self.assertTrue(user_can_moderate_target(moderator, project))
@@ -66,19 +73,23 @@ class ModerationApiTests(TestCase):
             name='Moderated project',
             visibility='public',
         )
-        self.comment = Comment.objects.create(user=self.author, project=self.project, body='Unsafe public text')
+        self.comment = Comment.objects.create(
+            user=self.author, project=self.project, body='Unsafe public text'
+        )
         self.client = Client()
 
     def test_report_creates_case_and_report(self):
         self.client.force_login(self.reporter)
         response = self.client.post(
             reverse('moderation:api_report'),
-            data=json.dumps({
-                'target_type': 'comment',
-                'target_id': self.comment.id,
-                'reason': 'abuse',
-                'details': 'bad wording',
-            }),
+            data=json.dumps(
+                {
+                    'target_type': 'comment',
+                    'target_id': self.comment.id,
+                    'reason': 'abuse',
+                    'details': 'bad wording',
+                }
+            ),
             content_type='application/json',
         )
 

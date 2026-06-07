@@ -33,6 +33,8 @@ class Command(BaseCommand):
         )
         manager_group.permissions.set(permissions)
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Роли готовы: "{MANAGER_GROUP}" ({permissions.count()} прав), "{CUSTOMER_GROUP}".'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Роли готовы: "{MANAGER_GROUP}" ({permissions.count()} прав), "{CUSTOMER_GROUP}".'
+            )
+        )

@@ -28,19 +28,31 @@ fi
 echo "[entrypoint] Проверяю prod-конфиг..."
 # В DEBUG=True команда тихо проходит. В проде — exits 1, если найдены нарушения
 # (SECRET_KEY=default, ALLOWED_HOSTS пуст, EMAIL_BACKEND=console, и т.п.).
-python manage.py check_prod_settings
-
-echo "[entrypoint] Применяю миграции..."
-python manage.py migrate --noinput
-
-echo "[entrypoint] Собираю статику..."
-# --clear не используем по умолчанию: rolling-deploy с ManifestStaticFilesStorage
-# может временно держать ссылки на старые хеш-имена. Чтобы насильно очистить —
-# задайте COLLECTSTATIC_CLEAR=1 (например, при первом deploy).
-if [ "$COLLECTSTATIC_CLEAR" = "1" ]; then
-    python manage.py collectstatic --noinput --clear
+if [ "${RUN_PROD_CHECKS:-1}" = "1" ]; then
+    python manage.py check_prod_settings
 else
-    python manage.py collectstatic --noinput
+    echo "[entrypoint] RUN_PROD_CHECKS=0 — пропускаю prod-config assertions."
+fi
+
+if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
+    echo "[entrypoint] Применяю миграции..."
+    python manage.py migrate --noinput
+else
+    echo "[entrypoint] RUN_MIGRATIONS=0 — миграции выполняет web-сервис."
+fi
+
+if [ "${RUN_COLLECTSTATIC:-1}" = "1" ]; then
+    echo "[entrypoint] Собираю статику..."
+    # --clear не используем по умолчанию: rolling-deploy с ManifestStaticFilesStorage
+    # может временно держать ссылки на старые хеш-имена. Чтобы насильно очистить —
+    # задайте COLLECTSTATIC_CLEAR=1 (например, при первом deploy).
+    if [ "$COLLECTSTATIC_CLEAR" = "1" ]; then
+        python manage.py collectstatic --noinput --clear
+    else
+        python manage.py collectstatic --noinput
+    fi
+else
+    echo "[entrypoint] RUN_COLLECTSTATIC=0 — collectstatic выполняет web-сервис."
 fi
 
 # Опционально создаём superuser-а из ENV-vars (для свежей БД в проде).
@@ -49,7 +61,7 @@ fi
 # Прежняя версия интерполировала их прямо в исходник через '$VAR' — это
 # давало shell-injection, если username содержал ' или ); RCE c правами
 # контейнерного юзера. См. AUDIT_REPORT_2026-05-10_round2.md A1.
-if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+if [ "${RUN_CREATE_SUPERUSER:-1}" = "1" ] && [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
     echo "[entrypoint] Проверяю/создаю superuser-а..."
     python manage.py shell -c "
 import os

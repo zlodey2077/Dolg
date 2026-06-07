@@ -938,15 +938,14 @@ def shared_scheme(request, token):
     Не требует логина и квот. Открывается с любого устройства по ссылке.
     Если токен неверен или владелец отключил шаринг — 404.
     """
+    share_alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'
+    if not token or len(token) < 8 or len(token) > 22 or any(ch not in share_alphabet for ch in token):
+        raise Http404('Invalid share token')
+
     project = get_object_or_404(
         SchematicProject.objects.select_related('user'),
         share_token=token,
     )
-    if not token or len(token) < 8:
-        # Защита от accidental пустого токена в URL.
-        from django.http import Http404
-
-        raise Http404('Invalid share token')
     context = {
         'user': request.user,
         'is_guest_demo': not request.user.is_authenticated,

@@ -12,7 +12,6 @@ from django.utils import timezone
 from .models import ModerationAction, ModerationCase, ModerationReport, UserRestriction
 from .permissions import target_organization
 
-
 HIDDEN_PLACEHOLDER = 'Скрыто модератором'
 
 
@@ -34,7 +33,9 @@ def create_report(*, target, reporter, reason='other', details='') -> Moderation
     return report
 
 
-def apply_action(*, case: ModerationCase, actor, action_type: str, reason='', payload=None) -> ModerationAction:
+def apply_action(
+    *, case: ModerationCase, actor, action_type: str, reason='', payload=None
+) -> ModerationAction:
     payload = dict(payload or {})
     target = case.target
     action = ModerationAction.objects.create(
@@ -215,6 +216,7 @@ def _content_type_from_alias(target_type: str):
 def _log_action(*, case, action, actor):
     try:
         from Dolg_APP.models import AuditLog
+
         AuditLog.log(
             actor=actor,
             action=f'moderation.{action.action_type}',

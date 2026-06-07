@@ -1,25 +1,39 @@
 #!/usr/bin/env bash
-# DOLG update — git pull + rebuild + zero-downtime restart на YC VM.
-# Запускать из /opt/dolg/
+# DOLG update for a YC VM: pull, build app images, run release commands once,
+# then restart the runtime services.
 
 set -euo pipefail
+
 PROJECT_DIR="${PROJECT_DIR:-/opt/dolg}"
+COMPOSE=(sudo docker compose -f deploy/docker-compose.yml --env-file .env)
+
 cd "$PROJECT_DIR"
 
-log() { printf "\n\033[1;36m▶ %s\033[0m\n" "$*"; }
+log() { printf "\n\033[1;36m> %s\033[0m\n" "$*"; }
 
-log "[1/4] git pull"
+log "[1/5] git pull"
 git pull --rebase
 
-log "[2/4] Сборка образа web (cached layers где возможно)"
-sudo docker compose -f deploy/docker-compose.yml --env-file .env build web
+log "[2/5] build Django images"
+"${COMPOSE[@]}" build web asgi worker
 
-log "[3/4] Запуск миграций"
-sudo docker compose -f deploy/docker-compose.yml --env-file .env run --rm web python manage.py migrate --no-input
+log "[3/5] run database migrations once"
+"${COMPOSE[@]}" run --rm \
+  -e RUN_MIGRATIONS=0 \
+  -e RUN_COLLECTSTATIC=0 \
+  -e RUN_CREATE_SUPERUSER=0 \
+  web python manage.py migrate --no-input
 
-log "[4/4] Restart web (zero-downtime через --no-deps + up -d)"
-sudo docker compose -f deploy/docker-compose.yml --env-file .env up -d --no-deps web
+log "[4/5] collect static files once"
+"${COMPOSE[@]}" run --rm \
+  -e RUN_MIGRATIONS=0 \
+  -e RUN_COLLECTSTATIC=0 \
+  -e RUN_CREATE_SUPERUSER=0 \
+  web python manage.py collectstatic --no-input --verbosity 0
+
+log "[5/5] restart runtime services"
+"${COMPOSE[@]}" up -d --no-deps web asgi worker nginx
 
 echo
-log "✓ Обновление готово"
-docker ps --filter "name=dolg_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+log "Update complete"
+sudo docker ps --filter "name=dolg" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

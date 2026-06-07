@@ -390,7 +390,14 @@ class ApiTokenTests(TestCase):
         self.client.force_login(owner)
         r = self.client.post('/orgs/tok-org/api-tokens/create/', {'name': 'CI', 'scope': 'projects.read'})
         self.assertEqual(r.status_code, 302)
+        raw_token = self.client.session.get('_just_created_token')
+        self.assertTrue(raw_token.startswith(OrganizationApiToken.TOKEN_PREFIX))
+
         tok = OrganizationApiToken.objects.get(organization=org)
+        self.assertNotEqual(tok.token, raw_token)
+        self.assertTrue(OrganizationApiToken.is_hashed_token(tok.token))
+        self.assertTrue(tok.matches(raw_token))
+        self.assertFalse(tok.matches(raw_token + 'x'))
         self.assertTrue(tok.is_active())
 
         r2 = self.client.post(f'/orgs/tok-org/api-tokens/{tok.id}/revoke/')

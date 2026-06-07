@@ -170,7 +170,11 @@
                                     <li><a href="{% url 'accounts:edit_profile' %}">🎛 Настройки профиля</a></li>
                                     <li><a href="{% url 'shop:cart' %}">🛒 Корзина{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}</a></li>
                                     <li><a href="{% url 'orders:order_list' %}">📦 Заказы</a></li>
+                                    {% if user|is_pro_user %}
+                                    <li><a href="{% url 'hello:billing_plans' %}" title="Тарифы и Pro-функции">💎 Подписка</a></li>
+                                    {% else %}
                                     <li><a href="{% url 'hello:billing_plans' %}" class="nav-upgrade-link" title="Тарифы и Pro-функции">💎 Подписка</a></li>
+                                    {% endif %}
                                     <li><a href="{% url 'hello:two_factor_setup' %}">🔐 2FA и безопасность</a></li>
                                     {% if user.is_staff %}
                                     {% comment %}

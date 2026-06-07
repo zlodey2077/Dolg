@@ -52,8 +52,8 @@ def _send_email_verification(request, user):
             fail_silently=False,
         )
     except Exception as exc:
-        _logger.warning('Email-verification письмо не отправлено для %s: %s',
-                        user.email, exc)
+        _logger.warning('Email-verification письмо не отправлено для %s: %s', user.email, exc)
+
 
 # Лимиты для пользовательских строк профиля — Django CharField не enforce-ит
 # их при прямом присваивании, поэтому слайсим на стороне view.
@@ -80,12 +80,14 @@ def _max_upload_for_user(user) -> int:
     """
     try:
         from Dolg_APP.quotas import get_limit
+
         mb = get_limit(user, 'max_upload_mb')
         if mb is None:
             return 100 * 1024 * 1024
         return int(mb) * 1024 * 1024
     except Exception:
         return MAX_AVATAR_SIZE
+
 
 # Защита от brute-force на login: 5 неудачных попыток подряд → lockout
 # на 60 секунд (хранится в сессии). Этого хватит, чтобы прогон по
@@ -104,7 +106,13 @@ def _parse_address_fields(post_data):
     country = post_data.get('country', 'Россия').strip()
     if not all([title, addr, city, postal_code]):
         return None, 'Заполните все обязательные поля адреса'
-    return {'title': title, 'address': addr, 'city': city, 'postal_code': postal_code, 'country': country}, None
+    return {
+        'title': title,
+        'address': addr,
+        'city': city,
+        'postal_code': postal_code,
+        'country': country,
+    }, None
 
 
 def register(request):
@@ -150,7 +158,7 @@ def register(request):
         messages.success(
             request,
             'Аккаунт создан. На указанный e-mail отправлено письмо для подтверждения. '
-            'Войдите с вашими данными — подтверждение можно сделать позже из профиля.'
+            'Войдите с вашими данными — подтверждение можно сделать позже из профиля.',
         )
         return redirect('accounts:login')
 
@@ -184,7 +192,7 @@ def verify_email(request, token):
     return redirect('accounts:profile' if request.user.is_authenticated else 'accounts:login')
 
 
-RESEND_VERIFY_COOLDOWN_SEC = 5 * 60   # 5 минут — спам-protection для SMTP
+RESEND_VERIFY_COOLDOWN_SEC = 5 * 60  # 5 минут — спам-protection для SMTP
 
 
 @login_required(login_url='accounts:login')
@@ -255,6 +263,7 @@ def login_view(request):
     has_sso = False
     try:
         from allauth.socialaccount.models import SocialApp
+
         has_sso = SocialApp.objects.exists()
     except Exception:
         pass
@@ -275,6 +284,7 @@ def profile(request):
     # Live-сводка лимитов и текущего использования — для прогресс-баров
     # и tier-badge в шаблоне.
     from Dolg_APP.quotas import usage_summary
+
     quota = usage_summary(request.user)
     orders_count = 0
     try:
@@ -318,9 +328,13 @@ def edit_profile(request):
         profile.bio = (request.POST.get('bio') or '').strip()[:MAX_BIO_LEN]
         profile.display_name = (request.POST.get('display_name') or '').strip()[:80]
         profile.headline = (request.POST.get('headline') or '').strip()[:120]
-        profile.preferred_theme = _profile_choice(profile, 'preferred_theme', request.POST.get('preferred_theme'))
+        profile.preferred_theme = _profile_choice(
+            profile, 'preferred_theme', request.POST.get('preferred_theme')
+        )
         profile.accent_color = _profile_choice(profile, 'accent_color', request.POST.get('accent_color'))
-        profile.default_unit_system = _profile_choice(profile, 'default_unit_system', request.POST.get('default_unit_system'))
+        profile.default_unit_system = _profile_choice(
+            profile, 'default_unit_system', request.POST.get('default_unit_system')
+        )
         profile.start_page = _profile_choice(profile, 'start_page', request.POST.get('start_page'))
         profile.ai_tone = _profile_choice(profile, 'ai_tone', request.POST.get('ai_tone'))
         profile.show_profile_public = request.POST.get('show_profile_public') == 'on'
@@ -336,7 +350,7 @@ def edit_profile(request):
                     request,
                     f'Размер файла не должен превышать {limit_mb} МБ для tier '
                     f'«{request.user.is_authenticated and "free"}». '
-                    'Активируйте Pro для 25 МБ (4K-аватарки).'
+                    'Активируйте Pro для 25 МБ (4K-аватарки).',
                 )
                 return redirect('accounts:edit_profile')
             if avatar.content_type not in ALLOWED_AVATAR_TYPES:
@@ -348,15 +362,21 @@ def edit_profile(request):
         if 'pro_logo' in request.FILES:
             try:
                 from Dolg_APP.quotas import get_user_tier
+
                 is_pro = get_user_tier(request.user) in ('pro', 'unlimited')
             except Exception:
                 is_pro = request.user.is_staff
             if not is_pro:
-                messages.error(request, '🔒 Загрузка логотипа доступна Pro-юзерам. Активируйте Pro в /billing/.')
+                messages.error(
+                    request, '🔒 Загрузка логотипа доступна Pro-юзерам. Активируйте Pro в /billing/.'
+                )
                 return redirect('accounts:edit_profile')
             logo = request.FILES['pro_logo']
             if logo.size > _max_upload_for_user(request.user):
-                messages.error(request, f'Логотип превышает лимит {_max_upload_for_user(request.user) // (1024 * 1024)} МБ.')
+                messages.error(
+                    request,
+                    f'Логотип превышает лимит {_max_upload_for_user(request.user) // (1024 * 1024)} МБ.',
+                )
                 return redirect('accounts:edit_profile')
             if logo.content_type not in ALLOWED_AVATAR_TYPES:
                 messages.error(request, 'Логотип: JPEG/PNG/GIF/WebP.')
@@ -368,7 +388,7 @@ def edit_profile(request):
 
         # Все длины капируются: раньше можно было сохранить first_name на 5000
         # символов, переполнить таблицу и сломать админку отображения.
-        email_changed = (new_email != request.user.email)
+        email_changed = new_email != request.user.email
         request.user.email = new_email
         request.user.first_name = (request.POST.get('first_name') or '').strip()[:MAX_NAME_LEN]
         request.user.last_name = (request.POST.get('last_name') or '').strip()[:MAX_NAME_LEN]
@@ -411,7 +431,9 @@ def add_address(request):
         # окажется два is_default=True или ни одного.
         with transaction.atomic():
             address = Address.objects.create(
-                user=request.user, **fields, is_default=is_default,
+                user=request.user,
+                **fields,
+                is_default=is_default,
             )
             if is_default:
                 request.user.addresses.exclude(id=address.id).update(is_default=False)

@@ -15,12 +15,7 @@ def is_pro_user(user) -> bool:
     """True если у юзера активный Pro-доступ (включая staff/superuser)."""
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
-    if user.is_staff or user.is_superuser:
-        return True
-    try:
-        return bool(user.subscription.is_pro_active())
-    except Exception:
-        return False
+    return user_tier(user) in {'pro', 'enterprise', 'unlimited'}
 
 
 @register.filter(name='user_tier')

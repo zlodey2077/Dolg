@@ -1,0 +1,30 @@
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+
+[mcp_servers.context7]
+command = "npx.cmd"
+args = ["-y", "@upstash/context7-mcp"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+[mcp_servers.playwright]
+command = "npx.cmd"
+args = ["-y", "@playwright/mcp@latest"]
+startup_timeout_sec = 45
+tool_timeout_sec = 120
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.yt-transcript]
+command = ".venv\\Scripts\\python.exe"
+args = ["scripts\\yt_mcp_server.py"]
+cwd = "."
+enabled = true
+enabled_tools = ["get_youtube_transcript", "list_youtube_languages"]
+startup_timeout_sec = 30
+tool_timeout_sec = 180
+
+[mcp_servers.yt-transcript.env]
+PYTHONUTF8 = "1"
+PYTHONIOENCODING = "utf-8"

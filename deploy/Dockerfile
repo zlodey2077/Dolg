@@ -18,7 +18,9 @@ RUN apt-get update \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    DJANGO_SETTINGS_MODULE=Dolg_PR.settings
+    DJANGO_SETTINGS_MODULE=Dolg_PR.settings_prod \
+    MPLCONFIGDIR=/tmp/matplotlib \
+    XDG_CACHE_HOME=/tmp/.cache
 
 WORKDIR /app
 
@@ -36,9 +38,10 @@ COPY accounts/    accounts/
 COPY orders/      orders/
 COPY shop/        shop/
 COPY knowledge/   knowledge/
+COPY moderation/  moderation/
 COPY scripts/     scripts/
 COPY manage.py    ./
-COPY entrypoint.sh ./
+COPY deploy/entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
 # Нерут-юзер — best practice для прод-контейнеров.

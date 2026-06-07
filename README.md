@@ -628,6 +628,21 @@ Future killer-фичи
 • "check_demo_ready --json" проверяет "legal_sources_stack": source retrieval, rule bibliography, search smoke, source-backed learning tasks и training metadata. "check_data_integrity --json" валидирует https URL и все source_ids в rules/tasks/training examples.
 • Правило для диплома и AI: внешние подборки книг используются только как ориентир по темам/названиям; корпус строится на официальной документации, открытых учебниках, datasheet, demo-проектах и opt-in пользовательских схемах.
 
+2026-06-03: Admin Monitoring Center
+• "/staff/ops/" пересобран в операционный центр: health status, alerts, runtime metrics, disk, business, AI/ML, project, moderation и security snapshots.
+• Главная Django admin "/admin/" получила компактный мониторинговый блок над списком моделей; метрики догружаются через AJAX из staff-only snapshot API, поэтому админка открывается быстро.
+• Добавлен service-layer "Dolg_APP/services/ops_metrics.py"; он собирает единый snapshot для Django admin, JSON API, будущих Prometheus custom metrics и export-отчетов.
+• Добавлен "psutil==7.2.2" для RSS/CPU/threads/uptime и storage checks; если пакет недоступен, мониторинг деградирует до "unknown", а не ломает админку.
+• Добавлен staff-only endpoint "/staff/ops/api/snapshot/".
+• На nginx-границе закрыты публичные "/metrics" и "/metrics/" через 403; Prometheus внутри Docker продолжает scrape "web:8000/metrics/".
+• "check_demo_ready --json" теперь проверяет "admin_monitoring_stack": psutil, snapshot sections, staff routes и nginx-защиту metrics endpoint.
+
+2026-06-02: MLJob и Staff Ops Dashboard
+• Добавлена модель "MLJob" и миграция "Dolg_APP.0018_mljob": постоянная история импорта датасетов, обучения tiny PyTorch, validation/export/promotion jobs с прогрессом, heartbeat, counters, stdout/error tail и параметрами запуска.
+• "/staff/ml-training/" и "/staff/ml-training/import/" теперь создают MLJob; status-endpoints возвращают "latest_job", а reset помечает активные jobs как "cancelled".
+• Добавлен staff cockpit "/staff/ops/": счетчики каталога, проектов, review, AITrainingExample, artifacts, moderation и ML status/type counters. В Django admin добавлен "MLJobAdmin".
+• AITrainingExample.features получил стандартизированные "dataset_kind", "graph_training_ready" и "training_role"; команда "normalize_ai_dataset_metadata" разделяет корпус на graph-training и retrieval-context. Текущая база: 36 graph-ready схемных примеров и 36 text-only source/learning examples.
+
 2026-05-19: Media Quality Gate
 Первый новый пакет после import/review закрывает проблему качества изображений каталога без возврата к Wikimedia/Commons.
 

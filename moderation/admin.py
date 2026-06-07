@@ -25,7 +25,9 @@ def restore_cases(modeladmin, request, queryset):
 @admin.action(description='Reject selected reports')
 def reject_cases(modeladmin, request, queryset):
     for case in queryset:
-        apply_action(case=case, actor=request.user, action_type='reject_report', reason='Bulk reject from admin')
+        apply_action(
+            case=case, actor=request.user, action_type='reject_report', reason='Bulk reject from admin'
+        )
 
 
 @admin.register(ModerationCase)
@@ -67,7 +69,15 @@ class ModerationActionAdmin(admin.ModelAdmin):
 
 @admin.register(UserRestriction)
 class UserRestrictionAdmin(admin.ModelAdmin):
-    list_display = ('user', 'restriction_type', 'scope', 'organization', 'starts_at', 'expires_at', 'lifted_at')
+    list_display = (
+        'user',
+        'restriction_type',
+        'scope',
+        'organization',
+        'starts_at',
+        'expires_at',
+        'lifted_at',
+    )
     list_filter = ('restriction_type', 'scope', 'created_at', 'lifted_at')
     search_fields = ('user__username', 'user__email', 'reason')
     readonly_fields = ('created_at',)

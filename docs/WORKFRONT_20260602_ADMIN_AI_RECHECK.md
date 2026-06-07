@@ -4,6 +4,18 @@
 
 Контекст: пользователь уточнил, что часть ранее предложенного уже реализована, симулятор пока не трогать, а основной фокус перенести на нейронку, датасеты и админ-панель.
 
+## Закрыто в коде 2026-06-02
+
+- Добавлена модель `MLJob` и миграция `Dolg_APP.0018_mljob`: постоянная история ML/import/training jobs со статусом, прогрессом, heartbeat, counters, stdout/error tail и параметрами запуска.
+- `/staff/ml-training/` и `/staff/ml-training/import/` теперь создают `MLJob`; status endpoints возвращают `latest_job`; reset помечает активные jobs как `cancelled`.
+- Добавлен `MLJobAdmin` с фильтрами, поиском, timestamps и bulk-действиями `cancelled/stale/success`.
+- Добавлен staff cockpit `/staff/ops/`: счетчики каталога, проектов, review, AITrainingExample, artifacts, moderation, ML status/type counters, последние jobs и live cache snapshot.
+- Обновлены staff ML templates ссылками на `/staff/ops/`, `/staff/ml-dataset/` и `/admin/Dolg_APP/mljob/`.
+- Проверки: `Dolg_APP.tests_ml_admin` — 6/6 OK, `makemigrations --check --dry-run` — No changes detected, `manage.py check` — 0 issues, миграция `0018` применена локально.
+- Закрыт первый слой качества AI-датасета: `features.dataset_kind`, `graph_training_ready`, `training_role`, команда `normalize_ai_dataset_metadata`, фильтр graph-ready в `curated_training_schemes`, карточки dataset kind в `/staff/ml-dataset/` и колонки `dataset_kind/graph_ready` в `AITrainingExampleAdmin`.
+- В `AITrainingExampleAdmin` добавлены первые actions review queue: `Normalize dataset metadata` и `Exclude selected from graph training`.
+- Текущая БД после нормализации: `AITrainingExample=72`, `graph_training_ready=36`, `text_only=36`, `review_backed=28`, `scheme_backed=8`; `validate_ai_dataset --validated-only --limit 120 --json` — 0 errors, 0 warnings.
+
 ## Ограничение итерации
 
 Симулятор в этой итерации не дорабатываем.
@@ -247,6 +259,8 @@ Acceptance:
 - 36 text-only examples перестают считаться проблемой для текстового AI, но исключаются из graph training;
 - dataset quality dashboard явно показывает баланс.
 
+Статус 2026-06-02: закрыто в коде. `text_only` examples остаются для retrieval/answer style, а `curated_training_schemes()` отдает только `graph_training_ready=true`.
+
 ### P0. Dataset import hardening
 
 Цель: добить зависания импортов.
@@ -432,4 +446,3 @@ Acceptance:
 3. **Dataset quality и разделение text-only/scheme-backed.**
 4. **Защита dataset import от зависаний.**
 5. **Нейронка умнее за счет curated examples, похожих случаев и trace, без правок симулятора.**
-

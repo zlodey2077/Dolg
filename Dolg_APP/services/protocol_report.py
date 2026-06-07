@@ -26,30 +26,30 @@ def _as_list(value: Any) -> list:
 def _finding_line(item: Any) -> str:
     """Одна строка finding'а: принимает str или dict (rule findings)."""
     if isinstance(item, str):
-        return f"- {item}"
+        return f'- {item}'
     if not isinstance(item, dict):
-        return f"- {item}"
+        return f'- {item}'
     title = item.get('title') or item.get('message') or item.get('text') or item.get('rule_id') or 'finding'
     severity = item.get('severity_label') or item.get('severity') or item.get('level')
     rule_id = item.get('rule_id')
     detail = item.get('message') if item.get('title') else None
     recommendation = item.get('recommendation') or item.get('fix') or item.get('advice')
-    prefix = f"`{rule_id}` " if rule_id else ''
-    head = f"- {prefix}**{title}**"
+    prefix = f'`{rule_id}` ' if rule_id else ''
+    head = f'- {prefix}**{title}**'
     if severity:
-        head += f" _({severity})_"
+        head += f' _({severity})_'
     if detail and detail != title:
-        head += f" — {detail}"
+        head += f' — {detail}'
     if recommendation:
-        head += f"\n  - Рекомендация: {recommendation}"
+        head += f'\n  - Рекомендация: {recommendation}'
     return head
 
 
 def _section(title: str, items: list, *, empty: str | None = None) -> list[str]:
     items = _as_list(items)
     if not items:
-        return [] if empty is None else [f"### {title}", '', f"_{empty}_", '']
-    out = [f"### {title}", '']
+        return [] if empty is None else [f'### {title}', '', f'_{empty}_', '']
+    out = [f'### {title}', '']
     out.extend(_finding_line(it) for it in items)
     out.append('')
     return out
@@ -58,7 +58,7 @@ def _section(title: str, items: list, *, empty: str | None = None) -> list[str]:
 def render_review_markdown(review_display: dict, project: Any = None) -> str:
     """review_display = результат _review_to_dict(review). Возвращает .md-строку."""
     rd = review_display or {}
-    name = getattr(project, 'name', None) or rd.get('project_name') or f"проект #{rd.get('project_id', '?')}"
+    name = getattr(project, 'name', None) or rd.get('project_name') or f'проект #{rd.get("project_id", "?")}'
     created = rd.get('created') or ''
     score = rd.get('score')
     status = rd.get('status_label') or rd.get('status') or ''
@@ -75,22 +75,22 @@ def render_review_markdown(review_display: dict, project: Any = None) -> str:
     L: list[str] = []
     L.append('# Протокол инженерной проверки схемы')
     L.append('')
-    L.append(f"**Проект:** {name}  ")
+    L.append(f'**Проект:** {name}  ')
     if created:
-        L.append(f"**Дата:** {created}  ")
+        L.append(f'**Дата:** {created}  ')
     if score is not None:
-        L.append(f"**Итоговая оценка:** {score}/100 — {status}")
+        L.append(f'**Итоговая оценка:** {score}/100 — {status}')
     else:
-        L.append(f"**Статус:** {status}")
+        L.append(f'**Статус:** {status}')
     L.append('')
 
     # 1. Сводка
     L.append('## 1. Сводка')
     L.append('')
-    L.append(f"- Ошибок: {len(errors)}")
-    L.append(f"- Предупреждений: {len(warnings)}")
-    L.append(f"- Неисправностей: {len(faults)}")
-    L.append(f"- Экспертных замечаний: {len(expert)}")
+    L.append(f'- Ошибок: {len(errors)}')
+    L.append(f'- Предупреждений: {len(warnings)}')
+    L.append(f'- Неисправностей: {len(faults)}')
+    L.append(f'- Экспертных замечаний: {len(expert)}')
     summary = rd.get('summary')
     if isinstance(summary, str) and summary.strip():
         L.append('')
@@ -105,7 +105,7 @@ def render_review_markdown(review_display: dict, project: Any = None) -> str:
         L.append('|---|---|')
         for r in metric_rows:
             if isinstance(r, dict):
-                L.append(f"| {r.get('label') or r.get('key', '')} | {r.get('value', '')} |")
+                L.append(f'| {r.get("label") or r.get("key", "")} | {r.get("value", "")} |')
         L.append('')
 
     # 3. Измерения
@@ -118,8 +118,10 @@ def render_review_markdown(review_display: dict, project: Any = None) -> str:
             if isinstance(r, dict):
                 val = r.get('value', '')
                 unit = r.get('unit', '') or ''
-                vu = f"{val} {unit}".strip()
-                L.append(f"| {r.get('label') or r.get('metric', '')} | {vu} | {r.get('expected', '') or ''} | {r.get('status', '') or ''} |")
+                vu = f'{val} {unit}'.strip()
+                L.append(
+                    f'| {r.get("label") or r.get("metric", "")} | {vu} | {r.get("expected", "") or ""} | {r.get("status", "") or ""} |'
+                )
         L.append('')
 
     # 4. Найденные проблемы
@@ -145,9 +147,9 @@ def render_review_markdown(review_display: dict, project: Any = None) -> str:
         for it in learning:
             if isinstance(it, dict):
                 title = it.get('title') or it.get('name') or it.get('lesson') or 'урок'
-                L.append(f"- {title}")
+                L.append(f'- {title}')
             else:
-                L.append(f"- {it}")
+                L.append(f'- {it}')
         L.append('')
 
     L.append('---')

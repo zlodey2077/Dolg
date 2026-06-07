@@ -6,7 +6,7 @@
 #   1. Обновляет систему
 #   2. Ставит Docker + Docker Compose + Git
 #   3. Клонирует репо
-#   4. Создаёт .env (требует ввода SECRET_KEY и пароля Postgres)
+#   4. Создаёт .env (генерирует SECRET_KEY, пароли Postgres/Grafana)
 #   5. Запускает docker compose up -d
 #   6. Конфигурирует UFW (firewall) — открывает 80, 443, 22
 #   7. Создаёт systemd unit для auto-restart при перезагрузке VM
@@ -77,11 +77,14 @@ if [[ ! -f .env ]]; then
     cp .env.example .env
     SECRET=$(openssl rand -base64 48 | tr -d '\n')
     PG_PASS=$(openssl rand -base64 24 | tr -d '/+=\n' | head -c 32)
+    GF_PASS=$(openssl rand -base64 24 | tr -d '/+=\n' | head -c 32)
     sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$SECRET|" .env
     sed -i "s|^DEBUG=.*|DEBUG=False|" .env
     sed -i "s|^POSTGRES_DB=.*|POSTGRES_DB=dolg|" .env
     sed -i "s|^POSTGRES_USER=.*|POSTGRES_USER=dolg|" .env
     sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$PG_PASS|" .env
+    sed -i "s|^EMAIL_BACKEND=.*|EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend|" .env
+    sed -i "s|^GRAFANA_ADMIN_PASSWORD=.*|GRAFANA_ADMIN_PASSWORD=$GF_PASS|" .env
     if [[ -n "$DOMAIN" ]]; then
         sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|" .env
         sed -i "s|^CSRF_TRUSTED_ORIGINS=.*|CSRF_TRUSTED_ORIGINS=https://$DOMAIN|" .env
@@ -89,7 +92,7 @@ if [[ ! -f .env ]]; then
         PUBLIC_IP=$(curl -s ifconfig.me || echo "127.0.0.1")
         sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$PUBLIC_IP,localhost,127.0.0.1|" .env
     fi
-    log "  Сгенерированы случайный SECRET_KEY и пароль Postgres (см. .env)"
+    log "  Сгенерированы SECRET_KEY, пароль Postgres и пароль Grafana (см. .env)"
 else
     log "  .env уже существует, не перезаписываю"
 fi
@@ -121,7 +124,7 @@ sudo systemctl enable --now dolg.service
 log "✓ Готово!"
 echo
 echo "  Проверь:"
-echo "    docker ps                                   # 3 контейнера: dolg_db, dolg_web, dolg_nginx"
+echo "    docker ps                                   # db, redis, web, asgi, worker, nginx + observability"
 echo "    curl -i http://localhost/                   # должен ответить Django"
 echo "    docker logs dolg_web --tail 50              # логи приложения"
 echo

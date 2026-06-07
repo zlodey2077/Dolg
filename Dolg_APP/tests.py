@@ -1620,3 +1620,7 @@ class ShareTokenTests(TestCase):
     def test_invalid_share_token_404(self):
         resp = self.client.get(reverse('hello:shared_scheme', kwargs={'token': 'invalidtoken123'}))
         self.assertEqual(resp.status_code, 404)
+
+    def test_malformed_share_token_404(self):
+        resp = self.client.get(reverse('hello:shared_scheme', kwargs={'token': 'short'}))
+        self.assertEqual(resp.status_code, 404)

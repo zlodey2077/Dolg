@@ -52,6 +52,7 @@ DEFAULT_INSECURE_SECRET_KEY = 'django-insecure-local-development-key-change-me'
 SECRET_KEY = os.getenv('SECRET_KEY', DEFAULT_INSECURE_SECRET_KEY)
 
 DEBUG = env_bool('DEBUG', True)
+ALLOW_MOCK_SSO = env_bool('ALLOW_MOCK_SSO', DEBUG or IS_TESTING)
 
 ALLOWED_HOSTS = env_list(
     'ALLOWED_HOSTS',
@@ -292,16 +293,37 @@ WSGI_APPLICATION = 'Dolg_PR.wsgi.application'
 # /ws/ маршруты через Dolg_APP/routing.py.
 ASGI_APPLICATION = 'Dolg_PR.asgi.application'
 
-# CHANNEL_LAYERS — транспорт для group_send/group_add. На dev и для дипломной
-# нагрузки достаточно in-memory (один процесс, всё в одной памяти). В prod
-# понадобится channels-redis (`pip install channels-redis`), тогда:
-#   CHANNEL_LAYERS = {'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#                                  'CONFIG': {'hosts': [('redis', 6379)]}}}
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# Redis — общий инфраструктурный слой для production: Channels groups,
+# Celery broker/result backend и будущие distributed locks. В dev/test без
+# REDIS_URL оставляем in-memory fallback, чтобы локальный старт был простым.
+REDIS_URL = os.getenv('REDIS_URL', '').strip()
+
+# CHANNEL_LAYERS — транспорт для group_send/group_add. InMemory корректен
+# только для одного процесса; при нескольких web/asgi replicas обязательно
+# задавайте REDIS_URL=redis://redis:6379/0.
+if REDIS_URL and not IS_TESTING:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [REDIS_URL]},
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+
+# Celery — foundation для async ML/import/PDF/batch-sim jobs. Конкретные
+# долгие задачи мигрируются постепенно; worker уже можно поднимать в Docker.
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL or 'memory://')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', REDIS_URL or 'cache+memory://')
+CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_TASK_ALWAYS_EAGER', IS_TESTING)
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = 'Europe/Moscow'
 
 
 # Database

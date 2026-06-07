@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from django.contrib.auth.models import Group
 
-
 GROUP_SITE_ADMIN = 'site_admin'
 GROUP_SITE_MODERATOR = 'site_moderator'
 GROUP_CATALOG_EDITOR = 'catalog_editor'

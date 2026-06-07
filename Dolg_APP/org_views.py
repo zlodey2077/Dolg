@@ -548,16 +548,16 @@ def org_api_token_create(request, org_slug):
     if not name:
         messages.error(request, 'Имя обязательно')
         return redirect('hello:org_api_tokens', org_slug=org.slug)
-    token = 'dolg_' + secrets.token_urlsafe(40)
+    raw_token = OrganizationApiToken.make_raw_token()
     OrganizationApiToken.objects.create(
         organization=org,
         name=name,
-        token=token,
+        token=OrganizationApiToken.hash_token(raw_token),
         scope=[s.strip() for s in scope if s.strip()],
         created_by=request.user,
     )
     # Один раз показываем сырой token (потом только маска)
-    request.session['_just_created_token'] = token
+    request.session['_just_created_token'] = raw_token
     AuditLog.log(
         actor=request.user,
         action='api.token.create',

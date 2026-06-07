@@ -10,7 +10,7 @@
 #   django_model_inserts_total / updates / deletes — мутации моделей
 #
 # Раскрутить ровно через docker compose -f deploy/docker-compose.yml up -d
-# → Grafana на http://localhost:3000 (admin/admin при первом входе),
+# → Grafana на http://localhost:3000 (admin + GRAFANA_ADMIN_PASSWORD из .env),
 # Prometheus на http://localhost:9090.
 
 global:
@@ -19,7 +19,7 @@ global:
 
 scrape_configs:
   - job_name: 'dolg-django'
-    metrics_path: '/metrics/'
+    metrics_path: '/metrics'
     static_configs:
       - targets: ['web:8000']
         labels:

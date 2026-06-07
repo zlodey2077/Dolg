@@ -1,0 +1,55 @@
+# Gitleaks конфиг — наследуем дефолтный набор правил + локальные исключения.
+[extend]
+useDefault = true
+
+# Исключаем бинарные/Office-локи из истории (исторически закоммичены,
+# в работе сейчас их нет — снесли в 837a59c).
+[allowlist]
+description = "Allowed files in history"
+paths = [
+    # 3rd-party код — у них могут быть legitimate ключи в test-фикстурах,
+    # к нам не относится.
+    '''.*\.venv/.*''',
+    '''.*venv/.*''',
+    '''.*node_modules/.*''',
+    '''.*\.cache/.*''',
+    '''.*\.pytest_cache/.*''',
+    '''.*\.ruff_cache/.*''',
+    '''.*\.mypy_cache/.*''',
+    '''.*site-packages/.*''',
+    '''.*__pycache__/.*''',
+    # Бинарные/Office — gitleaks их и так пропускает с warning
+    '''.*\.docx$''',
+    '''.*\.pptx$''',
+    '''.*\.xlsx$''',
+    '''~\$.*''',
+    '''.*\.exe$''',
+    '''.*\.png$''',
+    '''.*\.jpg$''',
+    '''.*\.svg$''',
+    '''.*\.ico$''',
+    '''.*\.woff2?$''',
+    '''.*\.pdf$''',
+    '''.*\.zip$''',
+    '''.*\.tar\.gz$''',
+    '''.*\.parquet$''',
+    '''.*\.pt$''',
+    '''.*\.onnx$''',
+    '''.*\.safetensors$''',
+    # Тестовые файлы могут содержать «фейковые» key/token строки для проверки
+    '''.*tests?_.*\.py$''',
+    '''.*/tests?/.*\.py$''',
+    '''.*tests\.py$''',
+    # ML-датасеты — содержат тексты со схемами, не наши секреты
+    '''.*Dolg_APP/ml/dataset/.*''',
+    '''.*media/ml/.*''',
+]
+
+# Регексы, которые ловят псевдо-секреты не настоящие
+regexTarget = "match"
+regexes = [
+    # ci-only-secret-key из .github/workflows/django.yml — не реальный
+    '''ci-only-secret-key''',
+    # django-insecure-local-development-key — наш guard-стрelka в settings.py
+    '''django-insecure-local-development-key-change-me''',
+]

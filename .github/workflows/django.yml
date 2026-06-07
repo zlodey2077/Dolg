@@ -16,12 +16,12 @@ jobs:
       # local и CI расходятся по правилам форматирования (видели в run #16-18).
       - run: pip install 'ruff==0.15.13'
       - name: Ruff lint
-        run: ruff check Dolg_APP shop accounts orders knowledge Dolg_PR
+        run: ruff check Dolg_APP shop accounts orders knowledge moderation Dolg_PR
       - name: Ruff format check
         run: |
           mkdir -p _ci_logs
           ruff --version | tee _ci_logs/ruff-version.txt
-          ruff format --check --diff Dolg_APP shop accounts orders knowledge Dolg_PR 2>&1 | tee _ci_logs/ruff-format-diff.txt
+          ruff format --check --diff Dolg_APP shop accounts orders knowledge moderation Dolg_PR 2>&1 | tee _ci_logs/ruff-format-diff.txt
           status=${PIPESTATUS[0]}
           exit $status
       - name: Upload lint logs
@@ -106,7 +106,7 @@ jobs:
 
       - name: Tests with coverage
         run: |
-          coverage run manage.py test accounts shop orders Dolg_APP knowledge
+          coverage run manage.py test accounts shop orders Dolg_APP knowledge moderation
           coverage report -m --fail-under=40
           coverage html -d coverage_html
 
@@ -117,3 +117,58 @@ jobs:
           name: coverage-html
           path: coverage_html/
           retention-days: 14
+
+  container:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    env:
+      SECRET_KEY: "ci-only-container-secret-key-with-enough-length"
+      DEBUG: "False"
+      POSTGRES_DB: "dolg"
+      POSTGRES_USER: "dolg"
+      POSTGRES_PASSWORD: "ci-postgres-password"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,web,asgi"
+      CSRF_TRUSTED_ORIGINS: "https://localhost"
+      EMAIL_BACKEND: "django.core.mail.backends.locmem.EmailBackend"
+      GRAFANA_ADMIN_PASSWORD: "ci-grafana-password"
+      DJANGO_SUPERUSER_USERNAME: ""
+      DJANGO_SUPERUSER_PASSWORD: ""
+      DJANGO_SUPERUSER_EMAIL: ""
+      HTTP_BIND: "127.0.0.1"
+      HTTP_PORT: "8080"
+      PROMETHEUS_BIND: "127.0.0.1"
+      PROMETHEUS_PORT: "9090"
+      GRAFANA_BIND: "127.0.0.1"
+      GRAFANA_PORT: "3000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker compose config
+        run: docker compose -f deploy/docker-compose.yml config
+
+      - name: Docker build
+        run: docker build -f deploy/Dockerfile -t dolg-ci:latest .
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.34.0
+        with:
+          image-ref: "dolg-ci:latest"
+          format: "table"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Docker smoke start
+        run: |
+          docker compose -f deploy/docker-compose.yml up -d --build db redis web
+          docker compose -f deploy/docker-compose.yml ps
+          docker compose -f deploy/docker-compose.yml exec -T web curl -fsS http://localhost:8000/healthz/
+
+      - name: Docker logs
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml logs --tail=120 web db redis
+
+      - name: Docker cleanup
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down -v --remove-orphans

@@ -3,4 +3,5 @@
 
 gunicorn==23.0.0          # WSGI-сервер для прода (вместо runserver)
 psycopg2-binary==2.9.10   # PostgreSQL-драйвер (binary — без C-toolchain в образе)
-sentry-sdk==2.23.1        # Отчёты об ошибках; включается через env SENTRY_DSN
+sentry-sdk==2.45.0        # Отчёты об ошибках; включается через env SENTRY_DSN
+psutil==7.2.2             # Runtime process metrics for staff/admin monitoring

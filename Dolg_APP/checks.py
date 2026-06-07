@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -22,7 +23,37 @@ from django.core.checks import register
 # Тот же regex, что в scripts/check_django_comments.py — держим источник
 # истины в одном месте. Если нужно — вынесем в shared helper.
 _MULTI_LINE_COMMENT_RE = re.compile(r'\{#(?:(?!#\}).)*?\n(?:(?!#\}).)*?#\}', re.DOTALL)
-_SKIP_DIRS = ('.venv', 'site-packages', 'htmlcov', 'node_modules', 'release/', 'backups/')
+_SKIP_DIRS = (
+    '.git/',
+    '.codex/',
+    '.claude/',
+    '.venv/',
+    '__pycache__/',
+    'backups/',
+    'coverage_html/',
+    'docs/archive/',
+    'htmlcov/',
+    'media/',
+    'node_modules/',
+    'release/',
+    'site-packages/',
+    'staticfiles/',
+)
+_SKIP_DIR_NAMES = {
+    '.codex',
+    '.claude',
+    '.git',
+    '.venv',
+    '__pycache__',
+    'backups',
+    'coverage_html',
+    'htmlcov',
+    'media',
+    'node_modules',
+    'release',
+    'site-packages',
+    'staticfiles',
+}
 
 
 @register()
@@ -36,7 +67,14 @@ def check_multi_line_django_comments(app_configs, **kwargs):
     """
     project_root = Path(getattr(settings, 'BASE_DIR', '.'))
     problems = []
-    for tpl in project_root.rglob('*.html'):
+    html_files = []
+    for root, dirs, files in os.walk(project_root):
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIR_NAMES]
+        for name in files:
+            if name.endswith('.html'):
+                html_files.append(Path(root) / name)
+
+    for tpl in html_files:
         rel = str(tpl.relative_to(project_root)).replace('\\', '/')
         if any(skip in rel for skip in _SKIP_DIRS):
             continue

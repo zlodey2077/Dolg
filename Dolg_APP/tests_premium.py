@@ -279,6 +279,7 @@ class CommentsTests(TestCase):
         self.pro = _make_user('pro_cmt')
         activate_trial(self.pro)
         self.project = SchematicProject.objects.create(user=self.free, name='for-comments')
+        self.pro_project = SchematicProject.objects.create(user=self.pro, name='for-pro-comments')
 
     def _post(self, user, body, project_id=None):
         self.client.force_login(user)
@@ -301,7 +302,7 @@ class CommentsTests(TestCase):
         self.assertNotIn('<h1>', html)
 
     def test_pro_comment_is_rich(self):
-        r = self._post(self.pro, '# Title\n\n**bold**', project_id=self.project.id)
+        r = self._post(self.pro, '# Title\n\n**bold**', project_id=self.pro_project.id)
         self.assertEqual(r.status_code, 200)
         c = Comment.objects.get(id=r.json()['comment']['id'])
         self.assertTrue(c.is_rich)
@@ -313,7 +314,7 @@ class CommentsTests(TestCase):
         """bleach удаляет опасные теги, текст оставляет как plain.
         Браузер не выполнит JS из <p>alert(1)</p> — это безопасно.
         """
-        r = self._post(self.pro, '<script>alert(1)</script>**ok**', project_id=self.project.id)
+        r = self._post(self.pro, '<script>alert(1)</script>**ok**', project_id=self.pro_project.id)
         self.assertEqual(r.status_code, 200)
         c = Comment.objects.get(id=r.json()['comment']['id'])
         html = c.render_html()
@@ -331,7 +332,7 @@ class CommentsTests(TestCase):
 
     def test_pro_comment_up_to_5000(self):
         body = 'x' * 4999
-        r = self._post(self.pro, body, project_id=self.project.id)
+        r = self._post(self.pro, body, project_id=self.pro_project.id)
         self.assertEqual(r.status_code, 200)
 
 

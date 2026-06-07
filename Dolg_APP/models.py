@@ -1,3 +1,7 @@
+import hashlib
+import hmac
+import secrets
+
 from django.conf import settings
 from django.conf import settings as django_settings
 from django.db import models
@@ -413,6 +417,9 @@ class OrganizationApiToken(models.Model):
     Scope — список разрешённых действий (например ['projects.read', 'bom.read']).
     """
 
+    TOKEN_PREFIX = 'dolg_'
+    HASH_LENGTH = 64
+
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
@@ -437,6 +444,33 @@ class OrganizationApiToken(models.Model):
 
     def __str__(self):
         return f'{self.organization.slug}: {self.name}'
+
+    @classmethod
+    def make_raw_token(cls) -> str:
+        return cls.TOKEN_PREFIX + secrets.token_urlsafe(40)
+
+    @classmethod
+    def hash_token(cls, raw_token: str) -> str:
+        if not raw_token:
+            raise ValueError('API token cannot be empty')
+        return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+
+    @classmethod
+    def is_hashed_token(cls, token: str) -> bool:
+        return len(token) == cls.HASH_LENGTH and all(ch in '0123456789abcdef' for ch in token)
+
+    def set_raw_token(self, raw_token: str) -> None:
+        self.token = self.hash_token(raw_token)
+
+    def matches(self, raw_token: str) -> bool:
+        if not raw_token:
+            return False
+        return hmac.compare_digest(self.token, self.hash_token(raw_token))
+
+    def save(self, *args, **kwargs):
+        if self.token and not self.is_hashed_token(self.token):
+            self.token = self.hash_token(self.token)
+        super().save(*args, **kwargs)
 
     def is_active(self) -> bool:
         return self.revoked_at is None

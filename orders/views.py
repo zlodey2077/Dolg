@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -235,6 +236,9 @@ def checkout(request):
 
 def guest_track(request, token):
     """Read-only страница заказа по guest_token. Доступна без аутентификации."""
+    if len(token) != 32 or any(ch not in '0123456789abcdef' for ch in token):
+        raise Http404('Invalid guest tracking token')
+
     order = get_object_or_404(
         Order.objects.select_related('status').prefetch_related('items__product'),
         guest_token=token,

@@ -39,12 +39,7 @@ class UserProfile(models.Model):
     phone = models.CharField(
         max_length=20,
         blank=True,
-        validators=[
-            RegexValidator(
-                regex=r'^\+?1?\d{9,15}$',
-                message='Введите корректный номер телефона'
-            )
-        ]
+        validators=[RegexValidator(regex=r'^\+?1?\d{9,15}$', message='Введите корректный номер телефона')],
     )
     address = models.CharField(max_length=300, blank=True)
     city = models.CharField(max_length=100, blank=True)
@@ -78,7 +73,7 @@ class UserProfile(models.Model):
         verbose_name_plural = 'Профили пользователей'
 
     def __str__(self):
-        return f"Профиль {self.user.username}"
+        return f'Профиль {self.user.username}'
 
     @property
     def full_address(self):
@@ -102,4 +97,4 @@ class Address(models.Model):
         ordering = ['-is_default', '-created_at']
 
     def __str__(self):
-        return f"{self.title} - {self.address}"
+        return f'{self.title} - {self.address}'

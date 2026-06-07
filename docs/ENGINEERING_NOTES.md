@@ -4,12 +4,29 @@
 видео, статей, разборов — с привязкой к проекту DOLG. Пополняется по мере изучения
 материалов (видео тянутся через `scripts/yt_transcript.py` / MCP `yt-transcript`).
 
+## Закреплённые видео-источники
+
+- **DevOps / деплой / инфраструктура:** канал [Просто Devops](https://www.youtube.com/@prosto_devops).
+  Пользовательская ссылка `https://www.youtube.com/@prosto_devop` проверена 2026-06-07 и даёт 404;
+  рабочий handle канала — `@prosto_devops`.
+- **AutoCAD / САПР-функции для будущих конспектов:** [Autodesk AutoCAD: базовый уровень. Занятие №1](https://youtu.be/bsz_mFMpb7Y?si=YtaSgzuYCoGkKBrb).
+  Транскрипт доступен через `scripts/yt_transcript.py`; основные главы: интерфейс, лицензия, сброс настроек,
+  навигация, выбор объектов, `Line`/`Polyline`, прямоугольник, круг, сохранение DWG.
+
+## Правила работы (best practices)
+
+- **Мультимодальный поиск информации.** Когда ищешь инфу в интернете — использовать НЕ
+  только текст, но и другие модальности: **видео** (транскрипт через `yt_transcript` →
+  конспект), доки библиотек (context7), при необходимости аудио/кадры. Текст — не
+  единственный источник; видео часто отражает практику и «суть» лучше статьи.
+
 ## Содержание
 - [Видео-конспекты: DevOps / инфраструктура](#видео-конспекты-devops--инфраструктура)
   - [1. Что такое деплой? (Kubernetes)](#1-что-такое-деплой-kubernetes)
   - [2. Всё про Docker (best practices)](#2-всё-про-docker-best-practices)
   - [3. NGINX](#3-nginx)
   - [4. Всё про базы данных](#4-всё-про-базы-данных)
+  - [5. DevOps Roadmap 2026](#5-devops-roadmap-2026)
 
 ---
 
@@ -17,6 +34,17 @@
 
 Источник: канал [Просто Devops](https://www.youtube.com/@prosto_devops). Видео отобраны
 по релевантности стеку DOLG (Django + Docker + nginx + переход на Postgres + контейнеризация движков).
+
+### Очередь на расширение конспектов
+
+Свежая выборка с канала `@prosto_devops` через `yt-dlp` 2026-06-07:
+
+- [NETWORKING IN KUBERNETES](https://www.youtube.com/watch?v=1MlOpq06kg0) — приоритет для будущего K8s/Service/Ingress блока.
+- [DEVOPS ROADMAP 2026](https://www.youtube.com/watch?v=a68hSZz0gAQ) — приоритет для дорожной карты развития DOLG DevOps.
+- [Why is IT infrastructure so complex?](https://www.youtube.com/watch?v=glT-zyYf4Iw) — полезно для архитектурного SWAT/SWOT-разбора.
+- [EVERYTHING YOU NEED TO KNOW ABOUT NETWORKS](https://www.youtube.com/watch?v=a55ecIWIkVc) — база для сетевого слоя Docker/nginx/ASGI.
+- [EVERYTHING YOU NEED TO KNOW ABOUT LINUX](https://www.youtube.com/watch?v=eBqMWeVVzXE) — база для VM/YC/bootstrap/runbook.
+- [WHICH LINUX TO CHOOSE?](https://www.youtube.com/watch?v=-1gm8-1FwkE) — опционально для выбора серверной ОС.
 
 ### 1. Что такое деплой? (Kubernetes)
 [видео, 13:00](https://www.youtube.com/watch?v=n5Yk-9hZgXw)
@@ -153,3 +181,45 @@ service mesh (mTLS между сервисами, трейсинг, ретраи
   алёрт на возраст бэкапа, PgBouncer при росте соединений.
 - Реплика/Patroni — оверкилл для диплома (один сервер), но знать для защиты («как бы масштабировал»).
 - Redis у нас уже есть в планах (кэш/Channels) — ровно роль «ускорителя».
+
+### 5. DevOps Roadmap 2026
+[видео, 35:50](https://www.youtube.com/watch?v=a68hSZz0gAQ)
+
+**TL;DR:** практичный DevOps-путь строится не от абстрактного списка технологий, а от рабочих задач:
+версионировать конфиги, жить в Linux, понимать процессы/ресурсы/сеть, упаковывать приложения в Docker,
+собирать CI/CD, затем переходить к Ansible, Kubernetes, мониторингу, логам и IaC.
+
+**Порядок обучения из видео:**
+- **Git** — начинать с него, потому что конфиги, pipeline, манифесты и документация тоже код.
+- **Linux** — не просто читать, а жить в системе: терминал, файлы, права, редактор, сервисы.
+- **Processes** — `ps`, PID, signals, zombie/orphan, `systemd`, unit-файлы, OOM killer, `/proc`.
+- **Resource monitoring** — `top`/`htop`, load average, CPU, memory, `iowait`.
+- **Disk** — `df`, `du`, inode exhaustion, ротация логов, поиск раздувшихся файлов.
+- **Networking** — базовые модели, порты, DNS, маршрутизация, firewall; без этого Docker/K8s становятся магией.
+- **Docker** — image/container, Dockerfile, volumes, networks, compose, registry, healthcheck.
+- **CI/CD** — идеального pipeline нет: зависит от проекта, ветвления, окружений, тестов, релизной стратегии.
+- **Ansible / IaC** — конфигурация серверов через idempotent playbooks, inventory, roles.
+- **Kubernetes** — control plane, worker node, pod, deployment, statefulset, daemonset, jobs, configmap/secret,
+  probes, requests/limits, services, ingress, PV/PVC, Helm.
+- **Monitoring/logging** — Prometheus/Grafana, exporters, PromQL, dashboards, alerting; для логов ELK/OpenSearch или Loki.
+- **Clouds/Terraform** — в конце, когда уже понятны Linux/Docker/CI/K8s; state хранить удалённо, например в S3.
+
+**Релевантность DOLG после containerization-прохода:**
+- Уже закрыто: Git/Markdown как рабочая дисциплина, Dockerfile, Compose, `web/asgi/worker`, Redis,
+  nginx edge, Prometheus/Grafana, CI container job, production preflight.
+- Следующий практический слой: локально поднять Docker Desktop/WSL2 и прогнать `docker compose config`,
+  `docker build`, `docker compose up db redis web`, затем `curl /healthz/`.
+- После Docker runtime: добавить hadolint/Trivy policy в CI, backup/PITR runbook для Postgres,
+  Ansible bootstrap для VM вместо ручного `yc-bootstrap.sh`.
+- Kubernetes пока не нужен для дипломного production, но roadmap полезен для защиты: можно объяснить,
+  как DOLG эволюционирует от одного Compose-хоста к Helm/GitOps, не таща БД в кластер преждевременно.
+
+**Локальный статус Docker на 2026-06-07:**
+- `where docker` не находит Docker CLI.
+- Docker Desktop не найден в `C:\Program Files\Docker\Docker`.
+- VS Code установлен, но это не равно Docker Engine; Docker extension без daemon не даст `docker build`.
+- `winget search Docker.DockerDesktop` видит пакет Docker Desktop 4.76.0, но установка из текущей Codex-сессии
+  невозможна без UAC/admin (`IsAdmin=False`), installer зависает и был остановлен.
+- Корректный следующий шаг: запустить терминал/installer от администратора, установить Docker Desktop,
+  включить WSL2/VirtualMachinePlatform при запросе Windows, перезагрузить машину, затем проверить:
+  `docker version`, `docker run --rm hello-world`, `docker compose version`.

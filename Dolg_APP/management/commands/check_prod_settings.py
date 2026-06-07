@@ -67,11 +67,11 @@ class Command(BaseCommand):
 
         # Вывод
         for w in warnings:
-            self.stdout.write(self.style.WARNING('⚠ ' + w))
+            self.stdout.write(self.style.WARNING('WARNING: ' + w))
 
         if errors:
             self.stdout.write(
-                self.style.ERROR(f'\n❌ Production-config непригоден ({len(errors)} ошибок):\n')
+                self.style.ERROR(f'\nERROR: Production-config непригоден ({len(errors)} ошибок):\n')
             )
             for i, err in enumerate(errors, 1):
                 self.stdout.write(self.style.ERROR(f' {i}. {err}\n'))
@@ -91,4 +91,4 @@ class Command(BaseCommand):
                 return
             sys.exit(1)
 
-        self.stdout.write(self.style.SUCCESS('✓ Production config OK.'))
+        self.stdout.write(self.style.SUCCESS('OK: Production config OK.'))

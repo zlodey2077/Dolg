@@ -50,6 +50,7 @@ if getattr(settings, '_HAS_PROMETHEUS', False):
     from Dolg_APP.metrics_guard import protected_metrics
 
     urlpatterns.append(path('metrics', protected_metrics, name='prometheus-django-metrics'))
+    urlpatterns.append(path('metrics/', protected_metrics))
 
 # Silk profiler: /silk/ доступен только staff (см. SILKY_PERMISSIONS).
 if getattr(settings, '_HAS_SILK', False):
