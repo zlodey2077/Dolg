@@ -14,6 +14,9 @@ spec:
         app.kubernetes.io/component: migrate
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: dolg:local
@@ -39,6 +42,8 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: media
           persistentVolumeClaim:
@@ -84,6 +89,9 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: web
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: web
           image: dolg:local
@@ -141,6 +149,9 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: media
           persistentVolumeClaim:
@@ -186,6 +197,9 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: asgi
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: asgi
           image: dolg:local
@@ -240,6 +254,9 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: media
           persistentVolumeClaim:
@@ -269,6 +286,9 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: worker
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: worker
           image: dolg:local
@@ -300,6 +320,9 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: media
           persistentVolumeClaim:

@@ -56,6 +56,9 @@ spec:
         app.kubernetes.io/name: prometheus
         app.kubernetes.io/component: metrics
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: prometheus
           image: prom/prometheus:v3.7.5
@@ -83,6 +86,8 @@ spec:
               mountPath: /prometheus
           securityContext:
             allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: config
           configMap:
@@ -124,6 +129,9 @@ spec:
         app.kubernetes.io/name: grafana
         app.kubernetes.io/component: dashboards
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: grafana
           image: grafana/grafana:11.4.0
@@ -156,6 +164,8 @@ spec:
               mountPath: /var/lib/grafana
           securityContext:
             allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: data
           persistentVolumeClaim:

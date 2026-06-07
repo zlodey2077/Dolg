@@ -189,6 +189,7 @@ def main() -> int:
         'django.yaml',
         'nginx.yaml',
         'monitoring.yaml',
+        'networkpolicy.yaml',
     ]
     for rel in k8s_files:
         path = K8S / rel
@@ -203,6 +204,7 @@ def main() -> int:
                 ('configMapGenerator:', 'local Kubernetes config generator'),
                 ('dolg-secret', 'Django secret object'),
                 ('dolg-config', 'Django config object'),
+                ('networkpolicy.yaml', 'Kubernetes NetworkPolicy layer'),
             ],
         )
 

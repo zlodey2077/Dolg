@@ -10,6 +10,7 @@ resources:
   - django.yaml
   - nginx.yaml
   - monitoring.yaml
+  - networkpolicy.yaml
 
 generatorOptions:
   disableNameSuffixHash: true

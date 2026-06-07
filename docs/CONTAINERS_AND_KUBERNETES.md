@@ -109,6 +109,12 @@ fails fast on missing secrets.
 - Replace `dolg:local` with an immutable registry tag.
 - Keep `METRICS_TOKEN` synchronized between Django and Prometheus.
 - Run migrations as an explicit release job before scaling web replicas.
+- The base namespace enforces Pod Security `baseline` and warns/audits
+  `restricted`. Workloads drop Linux capabilities and use `RuntimeDefault`
+  seccomp.
+- `deploy/k8s/networkpolicy.yaml` starts with default-deny and opens only the
+  DOLG flows needed for nginx, Django, ASGI, Postgres, Redis, Prometheus, and
+  Grafana.
 
 ## 6. What remains
 
@@ -120,4 +126,5 @@ fails fast on missing secrets.
   run `kubectl apply -k deploy/k8s`.
 - Production hardening: replace local literals with a real secret manager,
   publish immutable images to a registry, add Helm values per environment,
-  define NetworkPolicy/PodSecurity, and document Postgres backup/PITR.
+  move from Pod Security `baseline` to `restricted` after runtime smoke, and
+  document Postgres backup/PITR.

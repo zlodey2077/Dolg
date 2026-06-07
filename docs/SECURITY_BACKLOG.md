@@ -127,9 +127,9 @@
 | 6.7 | Health checks (`HEALTHCHECK` в Dockerfile, `/healthz` endpoint) | ✅ Dockerfile, compose и K8s probes используют `/healthz` | — | — |
 | 6.8 | Resource limits (cpu/memory limits в compose) | ✅ compose limits + K8s requests/limits | — | — |
 | 6.9 | Read-only root filesystem | 🟡 включено для app/nginx контейнеров; stateful/monitoring сервисы требуют отдельной политики | 🟢 | 30 мин |
-| 6.10 | Drop capabilities (`cap_drop: [ALL]`) | 🟡 включено в compose для app/nginx; для K8s нужен отдельный securityContext/capabilities pass | 🟢 | 30 мин |
+| 6.10 | Drop capabilities (`cap_drop: [ALL]`) | ✅ compose и K8s workloads drop `ALL` capabilities | — | — |
 | 6.11 | K8s manifests (Deployment + Service + Ingress) | 🟡 base `deploy/k8s` добавлен: Deployment/Service/nginx edge; Ingress/Helm оставлены следующим слоем | 🟢 | post-runtime |
-| 6.12 | K8s NetworkPolicy / PodSecurityPolicy | ❌ NetworkPolicy + PodSecurity admission не добавлены | 📚 | 1 день |
+| 6.12 | K8s NetworkPolicy / PodSecurityPolicy | 🟡 `deploy/k8s/networkpolicy.yaml` + Pod Security baseline/warn-restricted добавлены; полный restricted enforce после runtime smoke | 🟢 | post-runtime |
 
 ## 7. Network / инфраструктура
 
@@ -321,8 +321,8 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 | 16.7 | Альтернатива 16.6 — **ExternalSecrets Operator** + AWS SM/Azure KV/GCP SM (если не хотим self-host Vault) | ❌ | 📚 | — |
 | 16.8 | **Sealed Secrets** (Bitnami) — простой вариант для маленького кластера, ключ encryption-at-rest шифрует секреты внутри git | ❌ | 📚 | 2 ч |
 | 16.9 | HPA (Horizontal Pod Autoscaler) | ❌ | 📚 | — |
-| 16.10 | NetworkPolicy default-deny | ❌ | 📚 | — |
-| 16.11 | PodSecurityStandard `restricted` | ❌ | 📚 | — |
+| 16.10 | NetworkPolicy default-deny | ✅ default-deny + allow-list для nginx/web/asgi/db/redis/prometheus/grafana | — | — |
+| 16.11 | PodSecurityStandard `restricted` | 🟡 namespace enforces `baseline`, warns/audits `restricted`; workloads drop caps + RuntimeDefault seccomp | 🟢 | post-runtime |
 | 16.12 | **Falco** (см § 14.3) — eBPF runtime security для контейнеров | ❌ | 📚 | post-K8s |
 | 16.13 | **Trivy / Grype** container image scan в CI | ✅ Trivy image scan добавлен в container job | — | — |
 | 16.14 | **Cosign / Sigstore** image signing | ❌ | 📚 | — |
@@ -349,7 +349,7 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 
 - 1.14, 1.15 (rate limit + JSON size limit)
 - 4.3, 4.5 (GDPR cascading delete + log scrubbing)
-- 6.6, 6.9, 6.10, 6.12 (secret supply + read-only/capabilities polish + K8s policy)
+- 6.6, 6.9, 6.12 (secret supply + read-only polish + restricted enforce after runtime)
 - 7.4 (nginx hardening)
 - 8.3 (Grafana metrics export)
 - 9.7 (branch protection)
@@ -358,7 +358,7 @@ DOLG сейчас закрыт django-axes (только login). Расширя�
 
 ### 📚 NICE-TO-HAVE (post-defense, production-readiness)
 
-- Helm/GitOps/secrets слой для K8s + NetworkPolicy/PodSecurity + 6.9-6.10 polish.
+- Helm/GitOps/secrets слой для K8s + full restricted PodSecurity after smoke + 6.9 polish.
 - 4.1, 4.2, 4.6, 4.8 (PII inventory + DSR + cookie consent + audit trail).
 - 8.5, 8.6, 8.8 (alerting + log aggregation + anomaly detection).
 - 3.7, 3.8 (DB encryption at rest, encrypted backups).

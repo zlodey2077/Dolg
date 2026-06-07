@@ -31,6 +31,9 @@ spec:
         app.kubernetes.io/name: postgres
         app.kubernetes.io/component: database
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -68,6 +71,8 @@ spec:
             timeoutSeconds: 3
           securityContext:
             allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

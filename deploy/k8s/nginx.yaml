@@ -91,6 +91,9 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: edge
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: nginx
           image: nginx:1.27-alpine
@@ -145,6 +148,11 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: nginx-config
           configMap:

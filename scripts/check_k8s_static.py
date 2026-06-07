@@ -20,6 +20,7 @@ REQUIRED_FILES = [
     'django.yaml',
     'nginx.yaml',
     'monitoring.yaml',
+    'networkpolicy.yaml',
     'README.md',
 ]
 
@@ -47,6 +48,16 @@ REQUIRED_KINDS = {
     ('Job', 'dolg-migrate'),
     ('ConfigMap', 'nginx-config'),
     ('ConfigMap', 'prometheus-config'),
+    ('NetworkPolicy', 'default-deny'),
+    ('NetworkPolicy', 'allow-dns-egress'),
+    ('NetworkPolicy', 'allow-edge-ingress'),
+    ('NetworkPolicy', 'allow-edge-to-django'),
+    ('NetworkPolicy', 'allow-edge-to-asgi'),
+    ('NetworkPolicy', 'allow-django-to-stateful'),
+    ('NetworkPolicy', 'allow-stateful-from-django'),
+    ('NetworkPolicy', 'allow-edge-egress'),
+    ('NetworkPolicy', 'allow-prometheus-scrape'),
+    ('NetworkPolicy', 'allow-grafana-to-prometheus'),
 }
 
 
@@ -71,6 +82,10 @@ def iter_containers(doc: dict[str, Any]) -> list[dict[str, Any]]:
     template = doc.get('spec', {}).get('template', {})
     spec = template.get('spec', {})
     return list(spec.get('containers', [])) + list(spec.get('initContainers', []))
+
+
+def pod_spec(doc: dict[str, Any]) -> dict[str, Any]:
+    return doc.get('spec', {}).get('template', {}).get('spec', {})
 
 
 def main() -> int:
@@ -112,6 +127,50 @@ def main() -> int:
                     image,
                 ):
                     failed += 1
+
+    print('\n=== pod security ===')
+    namespace = next(
+        (
+            doc
+            for doc in docs
+            if doc.get('kind') == 'Namespace' and doc.get('metadata', {}).get('name') == 'dolg'
+        ),
+        {},
+    )
+    labels = namespace.get('metadata', {}).get('labels', {})
+    if not check(
+        labels.get('pod-security.kubernetes.io/enforce') == 'baseline', 'namespace enforces baseline PSS'
+    ):
+        failed += 1
+    if not check(
+        labels.get('pod-security.kubernetes.io/warn') == 'restricted', 'namespace warns on restricted PSS'
+    ):
+        failed += 1
+    if not check(
+        labels.get('pod-security.kubernetes.io/audit') == 'restricted', 'namespace audits restricted PSS'
+    ):
+        failed += 1
+
+    workload_kinds = {'Deployment', 'Job'}
+    for doc in docs:
+        if doc.get('kind') not in workload_kinds:
+            continue
+        name = doc.get('metadata', {}).get('name', '<unknown>')
+        spec = pod_spec(doc)
+        seccomp_type = spec.get('securityContext', {}).get('seccompProfile', {}).get('type')
+        if not check(seccomp_type == 'RuntimeDefault', f'{name} uses RuntimeDefault seccomp'):
+            failed += 1
+        for container in iter_containers(doc):
+            security = container.get('securityContext', {})
+            cname = container.get('name')
+            if not check(
+                security.get('allowPrivilegeEscalation') is False,
+                f'{name}/{cname} forbids privilege escalation',
+            ):
+                failed += 1
+            drops = set(security.get('capabilities', {}).get('drop', []))
+            if not check('ALL' in drops, f'{name}/{cname} drops all Linux capabilities'):
+                failed += 1
 
     print('\n=== django workload checks ===')
     django_names = {'dolg-web', 'dolg-asgi', 'dolg-worker', 'dolg-migrate'}
