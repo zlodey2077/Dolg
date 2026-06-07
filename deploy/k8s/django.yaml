@@ -1,0 +1,311 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dolg-migrate
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: migrate
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dolg
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: dolg:local
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - >
+              python manage.py check_prod_settings &&
+              python manage.py migrate --noinput &&
+              python manage.py collectstatic --noinput
+          envFrom:
+            - configMapRef:
+                name: dolg-config
+            - secretRef:
+                name: dolg-secret
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+            - name: staticfiles
+              mountPath: /app/staticfiles
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: django-media
+        - name: staticfiles
+          persistentVolumeClaim:
+            claimName: django-staticfiles
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dolg-web
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: web
+spec:
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: web
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dolg-web
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dolg
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dolg
+        app.kubernetes.io/component: web
+    spec:
+      containers:
+        - name: web
+          image: dolg:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: RUN_MIGRATIONS
+              value: "0"
+            - name: RUN_COLLECTSTATIC
+              value: "0"
+            - name: RUN_CREATE_SUPERUSER
+              value: "0"
+          envFrom:
+            - configMapRef:
+                name: dolg-config
+            - secretRef:
+                name: dolg-secret
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+            - name: staticfiles
+              mountPath: /app/staticfiles
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: django-media
+        - name: staticfiles
+          persistentVolumeClaim:
+            claimName: django-staticfiles
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dolg-asgi
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: asgi
+spec:
+  ports:
+    - name: http
+      port: 8001
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: asgi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dolg-asgi
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: asgi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dolg
+      app.kubernetes.io/component: asgi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dolg
+        app.kubernetes.io/component: asgi
+    spec:
+      containers:
+        - name: asgi
+          image: dolg:local
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - python manage.py check_prod_settings &&
+              daphne -b 0.0.0.0 -p 8001 Dolg_PR.asgi:application
+          ports:
+            - name: http
+              containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: dolg-config
+            - secretRef:
+                name: dolg-secret
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 150m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+            - name: staticfiles
+              mountPath: /app/staticfiles
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: django-media
+        - name: staticfiles
+          persistentVolumeClaim:
+            claimName: django-staticfiles
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dolg-worker
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dolg
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dolg
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: worker
+          image: dolg:local
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - python manage.py check_prod_settings &&
+              celery -A Dolg_PR worker --loglevel=INFO --concurrency=2
+          envFrom:
+            - configMapRef:
+                name: dolg-config
+            - secretRef:
+                name: dolg-secret
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+            - name: staticfiles
+              mountPath: /app/staticfiles
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: django-media
+        - name: staticfiles
+          persistentVolumeClaim:
+            claimName: django-staticfiles
+        - name: tmp
+          emptyDir: {}

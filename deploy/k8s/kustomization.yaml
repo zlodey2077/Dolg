@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dolg
+
+resources:
+  - namespace.yaml
+  - storage.yaml
+  - postgres.yaml
+  - redis.yaml
+  - django.yaml
+  - nginx.yaml
+  - monitoring.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: dolg-config
+    literals:
+      - DJANGO_SETTINGS_MODULE=Dolg_PR.settings_prod
+      - DEBUG=False
+      - ALLOWED_HOSTS=localhost,127.0.0.1,dolg.local,.dolg.local,dolg-web,dolg-asgi
+      - CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1,http://dolg.local
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - DEFAULT_FROM_EMAIL=DOLG <noreply@dolg.local>
+      - EMAIL_BACKEND=django.core.mail.backends.locmem.EmailBackend
+      - LOG_LEVEL=INFO
+      - USE_MANIFEST_STATIC=1
+      - SERVE_MEDIA=0
+      - POSTGRES_DB=dolg
+      - POSTGRES_USER=dolg
+
+secretGenerator:
+  - name: dolg-secret
+    literals:
+      - SECRET_KEY=change-me-local-k8s-secret-key-with-at-least-32-chars
+      - POSTGRES_PASSWORD=change-me-local-postgres-password
+      - DATABASE_URL=postgresql://dolg:change-me-local-postgres-password@postgres:5432/dolg
+      - METRICS_TOKEN=local-metrics-token-change-me
+      - GRAFANA_ADMIN_USER=admin
+      - GRAFANA_ADMIN_PASSWORD=change-me-local-grafana-password

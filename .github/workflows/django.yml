@@ -138,11 +138,22 @@ jobs:
       HTTP_PORT: "8080"
       PROMETHEUS_BIND: "127.0.0.1"
       PROMETHEUS_PORT: "9090"
+      METRICS_TOKEN: "local-metrics-token-change-me"
       GRAFANA_BIND: "127.0.0.1"
       GRAFANA_PORT: "3000"
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Container static checks
+        run: |
+          pip install PyYAML
+          python scripts/check_docker_static.py
+          python scripts/check_k8s_static.py
 
       - name: Docker compose config
         run: docker compose -f deploy/docker-compose.yml config

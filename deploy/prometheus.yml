@@ -20,6 +20,10 @@ global:
 scrape_configs:
   - job_name: 'dolg-django'
     metrics_path: '/metrics'
+    authorization:
+      # Local/demo token. Keep it in sync with METRICS_TOKEN for Django.
+      # For production, replace this config through your secret supply.
+      credentials: 'local-metrics-token-change-me'
     static_configs:
       - targets: ['web:8000']
         labels:

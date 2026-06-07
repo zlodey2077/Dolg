@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dolg
+  labels:
+    app.kubernetes.io/name: dolg
+    app.kubernetes.io/part-of: dolg-platform

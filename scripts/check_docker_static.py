@@ -20,6 +20,7 @@ ENTRYPOINT = DEPLOY / 'entrypoint.sh'
 NGINX_CONF = DEPLOY / 'nginx.conf'
 PROMETHEUS = DEPLOY / 'prometheus.yml'
 CI_WORKFLOW = ROOT / '.github' / 'workflows' / 'django.yml'
+K8S = DEPLOY / 'k8s'
 
 
 def section(title: str) -> None:
@@ -51,7 +52,7 @@ def main() -> int:
     failed = 0
 
     section('required files')
-    for path in [COMPOSE, DOCKERFILE, ENTRYPOINT, NGINX_CONF, PROMETHEUS, CI_WORKFLOW]:
+    for path in [COMPOSE, DOCKERFILE, ENTRYPOINT, NGINX_CONF, PROMETHEUS, CI_WORKFLOW, K8S]:
         if not check(path.exists(), str(path.relative_to(ROOT))):
             failed += 1
 
@@ -71,6 +72,7 @@ def main() -> int:
             ('  grafana:', 'Grafana service'),
             ('redis://redis:6379/0', 'Redis URL for Channels'),
             ('CELERY_BROKER_URL', 'Celery broker configured'),
+            ('METRICS_TOKEN', 'Prometheus token passed to Django'),
             ('condition: service_healthy', 'health-gated dependencies'),
             ('read_only: true', 'read-only app containers'),
             ('cap_drop:', 'capability drop configured'),
@@ -153,6 +155,8 @@ def main() -> int:
         prometheus,
         [
             ("metrics_path: '/metrics'", 'Django metrics path without slash'),
+            ('authorization:', 'Prometheus authenticates to protected /metrics'),
+            ('local-metrics-token-change-me', 'local metrics token is explicit'),
             ("targets: ['web:8000']", 'Prometheus scrapes internal web service'),
         ],
     )
@@ -163,6 +167,7 @@ def main() -> int:
         ci,
         [
             ('container:', 'container job present'),
+            ('scripts/check_k8s_static.py', 'Kubernetes static validation in CI'),
             ('docker compose -f deploy/docker-compose.yml config', 'compose config validation'),
             ('docker build -f deploy/Dockerfile -t dolg-ci:latest .', 'Docker build validation'),
             ('aquasecurity/trivy-action', 'Trivy image scan'),
@@ -173,6 +178,33 @@ def main() -> int:
             ('moderation Dolg_PR', 'moderation included in lint/test paths'),
         ],
     )
+
+    section('Kubernetes base')
+    k8s_files = [
+        'kustomization.yaml',
+        'namespace.yaml',
+        'storage.yaml',
+        'postgres.yaml',
+        'redis.yaml',
+        'django.yaml',
+        'nginx.yaml',
+        'monitoring.yaml',
+    ]
+    for rel in k8s_files:
+        path = K8S / rel
+        if not check(path.exists(), f'deploy/k8s/{rel}'):
+            failed += 1
+    if K8S.exists():
+        kustomization = read(K8S / 'kustomization.yaml')
+        failed += require_contains(
+            kustomization,
+            [
+                ('secretGenerator:', 'local Kubernetes secret generator'),
+                ('configMapGenerator:', 'local Kubernetes config generator'),
+                ('dolg-secret', 'Django secret object'),
+                ('dolg-config', 'Django config object'),
+            ],
+        )
 
     print(f'\n{"=" * 50}')
     if failed == 0:

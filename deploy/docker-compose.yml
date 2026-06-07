@@ -2,10 +2,11 @@
 # Postgres + Redis + nginx + Prometheus/Grafana.
 #
 # Usage from repo root:
-#   1. Copy .env.example -> .env and fill SECRET_KEY, POSTGRES_PASSWORD,
-#      EMAIL_BACKEND and GRAFANA_ADMIN_PASSWORD.
-#   2. docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
-#   3. http://localhost/ -> DOLG through nginx.
+#   1. Local: scripts/docker_compose_up.ps1
+#   2. Manual: copy .env.example -> .env and fill SECRET_KEY, POSTGRES_PASSWORD,
+#      EMAIL_BACKEND, METRICS_TOKEN and GRAFANA_ADMIN_PASSWORD.
+#   3. docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+#   4. http://localhost/ -> DOLG through nginx.
 
 x-django-build: &django-build
   context: ..
@@ -24,6 +25,7 @@ x-django-env: &django-env
   ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
   HF_TOKEN: "${HF_TOKEN:-}"
   SENTRY_DSN: "${SENTRY_DSN:-}"
+  METRICS_TOKEN: "${METRICS_TOKEN:-local-metrics-token-change-me}"
   DEFAULT_FROM_EMAIL: "${DEFAULT_FROM_EMAIL:-DOLG <noreply@dolg.local>}"
   EMAIL_BACKEND: "${EMAIL_BACKEND:?need non-console EMAIL_BACKEND in .env}"
   LOG_LEVEL: "${LOG_LEVEL:-INFO}"
