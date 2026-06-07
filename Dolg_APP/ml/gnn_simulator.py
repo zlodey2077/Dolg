@@ -1,29 +1,34 @@
 """GNN Neural Circuit Simulator — Block A1 (master plan 3 weeks).
 
-Skeleton MVP: GraphNN на ~50k параметров, который предсказывает напряжения узлов
-по топологии и параметрам компонентов. Цель — 10× speedup над ngspice при <5%
-relative error для типовых схем (резистивные делители, RC-filters, op-amp).
+Graph Neural Network, предсказывающий напряжения УЗЛОВ (электрических сетей) по
+топологии и параметрам компонентов. Цель — быстрый сурогат DC-анализа: 10×+
+speedup над MNA при <5% relative error на типовых линейных схемах.
 
-Архитектура (Phase 1 — MVP):
-    Вход: feature-vectors на узлах (degree, neighbour-types) и edges (R/L/C value).
-    Слои: 3× GraphConv → MLP head → predicted voltages per node.
-    Train: на нашем 3060 датасете + ngspice-предсказания (offline labels).
+Формулировка (физически корректная для цепей):
+    - УЗЛЫ графа = электрические сети (как в MNA), net 0 = ground.
+    - РЁБРА = компоненты (R/C/L/V/D), соединяющие две сети; их параметры —
+      признаки ребра.
+    - Метки (ground truth) = напряжения сетей из `monte_carlo.solve_dc` (NumPy MNA).
 
-Phase 2 (post-defense): расширение на токи ветвей + transient (RNN-aware GNN).
+Это совпадает с узловым определением MNA, поэтому метки берутся напрямую из
+solve_dc — без рассинхронизации «компонент vs сеть».
+
+Архитектура: node-embed → 3× GraphConv (from scratch, без torch_geometric) →
+per-node voltage head. Train: MSE(GNN_voltages, MNA_voltages).
 
 Использование:
     from Dolg_APP.ml.gnn_simulator import GNNSimulator
-    sim = GNNSimulator.load(model_path='media/ml/gnn_v1.pt')
-    voltages = sim.predict(scheme_data)
-    # voltages = {'node_1': 3.21, 'node_2': 0.0, ...}
+    sim = GNNSimulator.load('media/ml/gnn_v1.pt')
+    voltages = sim.predict(scheme_data)   # {net_idx: voltage}, net 0 = ground = 0
 
-Fallback: если torch не установлен или модель не загружена — возвращаем None
-и caller использует ngspice как обычно.
+Fallback: если torch не установлен / модель не загружена — predict() → None,
+caller использует MNA как обычно.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -41,136 +46,100 @@ def _require_torch():
 
 
 # Размерности feature-векторов
-NODE_FEATURE_DIM = 16  # degree + типы соседей + has_source + is_ground + ...
-EDGE_FEATURE_DIM = 8  # R/L/C/V values normalized + component type one-hot
+NODE_FEATURE_DIM = 12  # is_ground, degree, счётчики типов (R/C/L/V/D), touches_source, log(minR), ...
+EDGE_FEATURE_DIM = 8  # type one-hot (R/C/L/V/D) + normalized value + reserved
 HIDDEN_DIM = 64
 NUM_GRAPH_CONV_LAYERS = 3
-MAX_NODES = 256  # cap for batch processing
+MAX_NODES = 256
+# Нормировка напряжений: цели делим на это при обучении, умножаем при predict —
+# MSE-loss становится хорошо масштабированным (генератор использует V ≤ 24).
+VOLTAGE_SCALE = 24.0
+
+# Тип элемента (из monte_carlo.scheme_to_circuit) → индекс one-hot.
+_TYPE_IDX = {'R': 0, 'C': 1, 'L': 2, 'V': 3, 'D': 4}
 
 
-def build_node_features(scheme_data: dict) -> tuple[list[list[float]], dict[str, int]]:
-    """Преобразует scheme_data в матрицу node-features и mapping node→index.
-
-    Каждая нода — это либо component_id, либо named net. Features:
-        [0]    degree (число соединений)
-        [1]    is_ground (1 если земля)
-        [2]    is_source (1 если источник)
-        [3]    is_passive (R/L/C)
-        [4]    is_active (transistor/opamp)
-        [5..9] component_type one-hot (R, C, L, D, V/GND)
-        [10..15] reserved
-    """
-    components = scheme_data.get('components') or []
-    connections = scheme_data.get('connections') or []
-
-    # Step 1: map each component to a node index
-    node_map = {}
-    for i, c in enumerate(components):
-        cid = c.get('id') or f'comp_{i}'
-        node_map[cid] = i
-
-    n_nodes = len(node_map)
-    if n_nodes == 0:
-        return [], {}
-
-    # Step 2: count degrees
-    degrees = [0] * n_nodes
-    for conn in connections:
-        f_id = (conn.get('from') or {}).get('compId')
-        t_id = (conn.get('to') or {}).get('compId')
-        if f_id in node_map:
-            degrees[node_map[f_id]] += 1
-        if t_id in node_map:
-            degrees[node_map[t_id]] += 1
-
-    # Step 3: build features per node
-    features = []
-    type_to_onehot = {
-        'resistor': 0,
-        'capacitor': 1,
-        'inductor': 2,
-        'diode': 3,
-        'battery': 4,
-        'ground': 4,
-    }
-    for c in components:
-        cid = c.get('id') or ''
-        ctype = (c.get('type') or '').lower()
-        idx = node_map.get(cid, 0)
-        deg = degrees[idx]
-        is_ground = 1.0 if ctype == 'ground' else 0.0
-        is_source = 1.0 if ctype in ('battery', 'current_source') else 0.0
-        is_passive = 1.0 if ctype in ('resistor', 'capacitor', 'inductor') else 0.0
-        is_active = 1.0 if ctype in ('npn', 'pnp', 'opamp', 'mosfet') else 0.0
-        # one-hot — 5 slots
-        onehot = [0.0] * 5
-        if ctype in type_to_onehot:
-            onehot[type_to_onehot[ctype]] = 1.0
-        feat = [
-            float(deg),
-            is_ground,
-            is_source,
-            is_passive,
-            is_active,
-            *onehot,
-            *([0.0] * 6),  # reserved (degree squared, neighbour sum, etc.)
-        ]
-        features.append(feat[:NODE_FEATURE_DIM])
-    return features, node_map
-
-
-def build_edge_features(
-    scheme_data: dict, node_map: dict[str, int]
-) -> tuple[list[tuple[int, int]], list[list[float]]]:
-    """Edge index + features. Каждый edge — connection между двумя компонентами.
-
-    Edge features:
-        [0]    resistance (normalized log10)
-        [1]    capacitance (normalized log10)
-        [2]    inductance (normalized log10)
-        [3]    voltage (normalized)
-        [4..7] reserved
-    """
-    components_by_id = {(c.get('id') or ''): c for c in scheme_data.get('components') or []}
-    connections = scheme_data.get('connections') or []
-    edges = []
-    edge_features = []
-    for conn in connections:
-        f_id = (conn.get('from') or {}).get('compId')
-        t_id = (conn.get('to') or {}).get('compId')
-        if f_id not in node_map or t_id not in node_map:
-            continue
-        edges.append((node_map[f_id], node_map[t_id]))
-        # Берём параметры edge — у соединения нет своих, но используем R/C/L from connecting comps
-        f_comp = components_by_id.get(f_id) or {}
-        r = float(f_comp.get('resistance') or 0)
-        c = float(f_comp.get('capacitance') or 0)
-        ind = float(f_comp.get('inductance') or 0)
-        v = float(f_comp.get('voltage') or 0)
-        feat = [
-            _safe_log10(r),
-            _safe_log10(c * 1e-6),  # uF → F
-            _safe_log10(ind * 1e-3),  # mH → H
-            v / 50.0,  # voltage normalized по ~50В range
-            *([0.0] * 4),
-        ]
-        edge_features.append(feat[:EDGE_FEATURE_DIM])
-    return edges, edge_features
-
-
-def _safe_log10(v):
-    if v <= 0:
+def _safe_log10(value: float) -> float:
+    if value <= 0:
         return -10.0
-    import math
+    return math.log10(value) / 10.0  # normalize to ~[-1, 1]
 
-    return math.log10(v) / 10.0  # normalize to ~[-1, 1]
+
+def _norm_edge_value(elem_type: str, value: float) -> float:
+    """Нормализованное значение параметра ребра под тип компонента."""
+    if elem_type == 'R':
+        return _safe_log10(value)
+    if elem_type == 'V':
+        return float(value) / 50.0
+    if elem_type in ('C', 'L'):
+        return _safe_log10(value)
+    return 0.0
+
+
+def build_graph_from_circuit(circuit: dict):
+    """Из MNA-circuit (monte_carlo.scheme_to_circuit) строит граф для GNN.
+
+    Returns (node_features, edges, edge_features, n_nodes) либо None если узлов
+    нет / только ground / слишком большой граф."""
+    n_nodes = int(circuit.get('n_nodes') or 0)
+    elements = circuit.get('elements') or []
+    if n_nodes <= 1 or n_nodes > MAX_NODES:
+        return None
+
+    node_features = [[0.0] * NODE_FEATURE_DIM for _ in range(n_nodes)]
+    for net in range(n_nodes):
+        node_features[net][0] = 1.0 if net == 0 else 0.0  # is_ground
+
+    edges: list[tuple[int, int]] = []
+    edge_features: list[list[float]] = []
+    min_r = [math.inf] * n_nodes
+
+    for elem in elements:
+        a, b = elem['nodes']
+        etype = elem['type']
+        value = float(elem.get('value') or 0.0)
+        for net in (a, b):
+            if 0 <= net < n_nodes:
+                node_features[net][1] += 1.0  # degree
+                if etype in _TYPE_IDX:
+                    node_features[net][2 + _TYPE_IDX[etype]] += 1.0  # счётчик по типу (2..6)
+                if etype == 'V':
+                    node_features[net][7] = 1.0  # сеть касается источника
+                if etype == 'R' and value > 0:
+                    min_r[net] = min(min_r[net], value)
+        if etype == 'V':
+            # Величина источника прямо в node-features: V(a)-V(b)=value (MNA).
+            if 0 <= a < n_nodes:
+                node_features[a][9] += float(value) / 50.0
+            if 0 <= b < n_nodes:
+                node_features[b][9] -= float(value) / 50.0
+        if a == b:
+            continue  # self-loop не даёт ребра
+        onehot = [0.0] * 5
+        if etype in _TYPE_IDX:
+            onehot[_TYPE_IDX[etype]] = 1.0
+        feat = [*onehot, _norm_edge_value(etype, value), 0.0, 0.0]
+        edges.append((a, b))
+        edge_features.append(feat[:EDGE_FEATURE_DIM])
+
+    for net in range(n_nodes):
+        node_features[net][8] = _safe_log10(min_r[net]) if min_r[net] != math.inf else 0.0
+
+    return node_features, edges, edge_features, n_nodes
+
+
+def build_graph(scheme_data: dict):
+    """scheme_data → граф для GNN (через monte_carlo.scheme_to_circuit)."""
+    from Dolg_APP.services import monte_carlo
+
+    circuit = monte_carlo.scheme_to_circuit(scheme_data)
+    return build_graph_from_circuit(circuit)
 
 
 def build_model():
-    """Phase 1 GNN architecture — простая GraphConv → predict per-node voltage.
+    """GraphConv-сеть (from scratch): node-embed → 3× GraphConv → voltage head.
 
-    GraphConv от scratch (без torch_geometric — оставляем зависимости лёгкими):
-    h^(l+1)_i = ReLU(W * h^l_i + sum_{j in N(i)} V * (h^l_j || edge_features_ij))
+    h^(l+1)_i = ReLU(W·h^l_i + Σ_{j∈N(i)} V·(h^l_j ⊕ edge_ij))
     """
     torch, nn = _require_torch()
 
@@ -181,20 +150,23 @@ def build_model():
             self.lin_neigh = nn.Linear(in_dim + edge_dim, out_dim)
             self.activation = nn.ReLU()
 
-        def forward(self, h, edges, edge_features):
-            """h: (n_nodes, in_dim). edges: list of (i,j). edge_features: (n_edges, edge_dim)."""
+        def forward(self, h, edge_index, edge_features):
+            """h: (n,in). edge_index: (2,E) long. edge_features: (E,edge_dim)."""
             self_msg = self.lin_self(h)
             neigh_msg = torch.zeros_like(self_msg)
-            if edges:
-                for k, (i, j) in enumerate(edges):
-                    if i >= h.shape[0] or j >= h.shape[0]:
-                        continue
-                    ef = edge_features[k]
-                    msg = self.lin_neigh(torch.cat([h[j], ef], dim=-1))
-                    neigh_msg[i] = neigh_msg[i] + msg
-                    msg_back = self.lin_neigh(torch.cat([h[i], ef], dim=-1))
-                    neigh_msg[j] = neigh_msg[j] + msg_back
-            return self.activation(self_msg + neigh_msg)
+            if edge_index.numel():
+                src, dst = edge_index[0], edge_index[1]
+                # неориентированно: сообщения в обе стороны
+                msg_fwd = self.lin_neigh(torch.cat([h[src], edge_features], dim=-1))
+                neigh_msg = neigh_msg.index_add(0, dst, msg_fwd)
+                msg_bwd = self.lin_neigh(torch.cat([h[dst], edge_features], dim=-1))
+                neigh_msg = neigh_msg.index_add(0, src, msg_bwd)
+            out = self.activation(self_msg + neigh_msg)
+            # Residual против over-smoothing (на малых графах 3 раунда message-
+            # passing гомогенизируют узлы → коллапс к среднему).
+            if out.shape == h.shape:
+                out = out + h
+            return out
 
     class GNNCircuitNet(nn.Module):
         def __init__(self):
@@ -203,26 +175,149 @@ def build_model():
             self.gconv1 = GraphConvLayer(HIDDEN_DIM, HIDDEN_DIM)
             self.gconv2 = GraphConvLayer(HIDDEN_DIM, HIDDEN_DIM)
             self.gconv3 = GraphConvLayer(HIDDEN_DIM, HIDDEN_DIM)
-            # Per-node head: предсказываем voltage
+            # Голова видит и GNN-эмбеддинг, и СЫРЫЕ node-features (skip) — чтобы
+            # source-magnitude доходил до читалки напрямую (узел источника = V).
             self.voltage_head = nn.Sequential(
-                nn.Linear(HIDDEN_DIM, 32),
+                nn.Linear(HIDDEN_DIM + NODE_FEATURE_DIM, 32),
                 nn.ReLU(),
                 nn.Linear(32, 1),
             )
 
-        def forward(self, node_features, edges, edge_features):
+        def forward(self, node_features, edge_index, edge_features):
             h = self.node_embed(node_features)
-            h = self.gconv1(h, edges, edge_features)
-            h = self.gconv2(h, edges, edge_features)
-            h = self.gconv3(h, edges, edge_features)
+            h = self.gconv1(h, edge_index, edge_features)
+            h = self.gconv2(h, edge_index, edge_features)
+            h = self.gconv3(h, edge_index, edge_features)
+            h = torch.cat([h, node_features], dim=-1)
             voltages = self.voltage_head(h).squeeze(-1)
+            # net 0 = ground = 0 В: жёстко зануляем (физическое ограничение).
+            if voltages.numel():
+                mask = torch.ones_like(voltages)
+                mask[0] = 0.0
+                voltages = voltages * mask
             return voltages
 
     return GNNCircuitNet()
 
 
+def _to_tensors(graph):
+    """graph → (x, edge_index, edge_features) тензоры."""
+    torch, _ = _require_torch()
+    node_features, edges, edge_features, _ = graph
+    x = torch.tensor(node_features, dtype=torch.float32)
+    if edges:
+        edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
+        ef = torch.tensor(edge_features, dtype=torch.float32)
+    else:
+        edge_index = torch.zeros((2, 0), dtype=torch.long)
+        ef = torch.zeros((0, EDGE_FEATURE_DIM), dtype=torch.float32)
+    return x, edge_index, ef
+
+
+def _build_training_samples(schemes):
+    """schemes → [(graph, label_voltages_list)] для решаемых MNA схем."""
+    from Dolg_APP.services import monte_carlo
+
+    samples = []
+    for scheme in schemes:
+        circuit = monte_carlo.scheme_to_circuit(scheme)
+        graph = build_graph_from_circuit(circuit)
+        if graph is None:
+            continue
+        try:
+            voltages = monte_carlo.solve_dc(circuit)['voltages']
+        except ValueError:
+            continue  # вырожденная матрица — пропускаем
+        n_nodes = graph[3]
+        labels = [float(voltages.get(net, 0.0)) for net in range(n_nodes)]
+        samples.append((graph, labels))
+    return samples
+
+
+def train_gnn(
+    schemes,
+    *,
+    epochs: int = 60,
+    lr: float = 0.01,
+    seed: int = 42,
+    val_split: float = 0.15,
+) -> tuple:
+    """Обучает GNN предсказывать напряжения узлов (MSE vs MNA solve_dc).
+
+    Returns (model, metrics). metrics: {samples, train_loss, val_loss, history, ...}.
+    """
+    torch, nn = _require_torch()
+    torch.manual_seed(seed)
+
+    samples = _build_training_samples(schemes)
+    if len(samples) < 4:
+        raise ValueError(f'too few solvable schemes for training: {len(samples)}')
+
+    tensors = [
+        (_to_tensors(g), torch.tensor([v / VOLTAGE_SCALE for v in y], dtype=torch.float32))
+        for g, y in samples
+    ]
+    n_val = max(1, int(len(tensors) * val_split))
+    val_set = tensors[:n_val]
+    train_set = tensors[n_val:]
+
+    model = build_model()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    loss_fn = nn.MSELoss()
+
+    history = []
+    best_val = math.inf
+    best_state = None
+    for epoch in range(epochs):
+        model.train()
+        total = 0.0
+        for (x, ei, ef), y in train_set:
+            optimizer.zero_grad()
+            pred = model(x, ei, ef)
+            loss = loss_fn(pred, y)
+            loss.backward()
+            optimizer.step()
+            total += float(loss.item())
+        scheduler.step()
+
+        model.eval()
+        vtotal = 0.0
+        with torch.no_grad():
+            for (x, ei, ef), y in val_set:
+                vtotal += float(loss_fn(model(x, ei, ef), y).item())
+        train_loss = total / max(1, len(train_set))
+        val_loss = vtotal / max(1, len(val_set))
+        history.append(
+            {'epoch': epoch + 1, 'train_loss': round(train_loss, 5), 'val_loss': round(val_loss, 5)}
+        )
+        if val_loss < best_val:
+            best_val = val_loss
+            best_state = {k: v.clone() for k, v in model.state_dict().items()}
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    metrics = {
+        'samples': len(samples),
+        'train_samples': len(train_set),
+        'val_samples': len(val_set),
+        'epochs': epochs,
+        'final_train_loss': history[-1]['train_loss'] if history else None,
+        'best_val_loss': round(best_val, 5),
+        'history': history,
+    }
+    return model, metrics
+
+
+def save_model(model, model_path: str | Path) -> None:
+    torch, _ = _require_torch()
+    path = Path(model_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), str(path))
+
+
 class GNNSimulator:
-    """Public-facing wrapper. Load + predict + (later) train."""
+    """Public-facing wrapper: load + predict."""
 
     def __init__(self, model=None):
         self.model = model
@@ -241,58 +336,144 @@ class GNNSimulator:
                 logger.warning('GNN model load failed (%s) — using fresh init', exc)
         return cls(model)
 
-    def predict(self, scheme_data: dict) -> dict[str, float] | None:
-        """Возвращает dict node_id → predicted voltage. None если нет модели."""
+    def predict(self, scheme_data: dict) -> dict[int, float] | None:
+        """{net_idx: predicted voltage} (net 0 = ground = 0). None если нет модели/графа."""
         if self.model is None:
             return None
         torch, _ = _require_torch()
         try:
-            features, node_map = build_node_features(scheme_data)
-            if not features:
+            graph = build_graph(scheme_data)
+            if graph is None:
                 return None
-            edges, edge_feats = build_edge_features(scheme_data, node_map)
-            x = torch.tensor(features, dtype=torch.float32)
-            ef = (
-                torch.tensor(edge_feats, dtype=torch.float32)
-                if edge_feats
-                else torch.zeros((0, EDGE_FEATURE_DIM))
-            )
+            x, ei, ef = _to_tensors(graph)
             with torch.no_grad():
-                voltages = self.model(x, edges, ef)
-            # Map back to component IDs
-            inv_map = {v: k for k, v in node_map.items()}
-            return {inv_map[i]: float(voltages[i].item()) for i in range(len(features))}
+                voltages = self.model(x, ei, ef)
+            return {net: float(voltages[net].item()) * VOLTAGE_SCALE for net in range(graph[3])}
         except Exception as exc:
             logger.warning('GNN predict failed: %s', exc)
             return None
 
 
-def benchmark_against_ngspice(
-    scheme_data: dict, ngspice_voltages: dict[str, float], model: GNNSimulator
-) -> dict:
-    """Сравнение GNN-предсказаний с ngspice baseline.
+def benchmark_against_mna(scheme_data: dict, model: GNNSimulator) -> dict:
+    """Сравнение GNN-предсказаний с MNA (solve_dc) + замер времени.
 
-    Возвращает: {mean_abs_err, max_abs_err, mean_rel_err}
+    Returns {mean_abs_err, max_abs_err, mean_rel_err, n_nodes, mna_ms, gnn_ms, speedup}.
     """
+    import time
+
+    from Dolg_APP.services import monte_carlo
+
+    circuit = monte_carlo.scheme_to_circuit(scheme_data)
+    t0 = time.perf_counter_ns()
+    try:
+        mna = monte_carlo.solve_dc(circuit)['voltages']
+    except ValueError:
+        return {'error': 'singular_matrix'}
+    mna_ms = (time.perf_counter_ns() - t0) / 1e6
+
+    t0 = time.perf_counter_ns()
     pred = model.predict(scheme_data)
+    gnn_ms = (time.perf_counter_ns() - t0) / 1e6
     if pred is None:
         return {'error': 'no_prediction'}
-    common = set(pred.keys()) & set(ngspice_voltages.keys())
+
+    common = set(pred) & set(mna)
     if not common:
         return {'error': 'no_common_nodes'}
-    errors = []
-    rel_errors = []
-    for k in common:
-        diff = abs(pred[k] - ngspice_voltages[k])
-        errors.append(diff)
-        if abs(ngspice_voltages[k]) > 1e-6:
-            rel_errors.append(diff / abs(ngspice_voltages[k]))
-    mean_abs = sum(errors) / len(errors) if errors else 0
-    max_abs = max(errors) if errors else 0
-    mean_rel = sum(rel_errors) / len(rel_errors) if rel_errors else 0
+    abs_errs, rel_errs = [], []
+    for net in common:
+        diff = abs(pred[net] - mna[net])
+        abs_errs.append(diff)
+        if abs(mna[net]) > 1e-6:
+            rel_errs.append(diff / abs(mna[net]))
     return {
-        'mean_abs_err': mean_abs,
-        'max_abs_err': max_abs,
-        'mean_rel_err': mean_rel,
+        'mean_abs_err': round(sum(abs_errs) / len(abs_errs), 5),
+        'max_abs_err': round(max(abs_errs), 5),
+        'mean_rel_err': round(sum(rel_errs) / len(rel_errs), 5) if rel_errs else 0.0,
         'n_nodes': len(common),
+        'mna_ms': round(mna_ms, 4),
+        'gnn_ms': round(gnn_ms, 4),
+        'speedup': round(mna_ms / gnn_ms, 2) if gnn_ms > 0 else None,
     }
+
+
+# ─── Процедурный генератор обучающих схем (резистивные DC-цепи) ───────────
+def generate_resistive_schemes(count: int = 200, *, seed: int = 42) -> list[dict]:
+    """Генерирует разнообразные DC-схемы (делители, лестницы, последовательные
+    цепочки) со случайными номиналами — все решаемы MNA. Для обучения GNN."""
+    import random
+
+    rng = random.Random(seed)
+    schemes: list[dict] = []
+    r_values = [100, 220, 470, 1000, 2200, 4700, 10000, 22000, 47000, 100000]
+
+    for _ in range(count):
+        kind = rng.choice(['divider', 'ladder', 'series'])
+        v = rng.choice([3.3, 5.0, 9.0, 12.0, 24.0])
+        if kind == 'divider':
+            r1, r2 = rng.choice(r_values), rng.choice(r_values)
+            schemes.append(_divider_scheme(v, r1, r2))
+        elif kind == 'series':
+            k = rng.randint(2, 4)
+            schemes.append(_series_scheme(v, [rng.choice(r_values) for _ in range(k)]))
+        else:
+            schemes.append(_ladder_scheme(v, [rng.choice(r_values) for _ in range(rng.randint(3, 5))]))
+    return schemes
+
+
+def _divider_scheme(v, r1, r2):
+    return {
+        'components': [
+            {'id': 'V1', 'type': 'battery', 'voltage': v, 'ports': [{'id': '+'}, {'id': '-'}]},
+            {'id': 'R1', 'type': 'resistor', 'resistance': r1, 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'R2', 'type': 'resistor', 'resistance': r2, 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'G', 'type': 'ground', 'ports': [{'id': '1'}]},
+        ],
+        'connections': [
+            {'from': {'compId': 'V1', 'portId': '+'}, 'to': {'compId': 'R1', 'portId': '1'}},
+            {'from': {'compId': 'R1', 'portId': '2'}, 'to': {'compId': 'R2', 'portId': '1'}},
+            {'from': {'compId': 'R2', 'portId': '2'}, 'to': {'compId': 'G', 'portId': '1'}},
+            {'from': {'compId': 'V1', 'portId': '-'}, 'to': {'compId': 'G', 'portId': '1'}},
+        ],
+    }
+
+
+def _series_scheme(v, resistors):
+    comps = [{'id': 'V1', 'type': 'battery', 'voltage': v, 'ports': [{'id': '+'}, {'id': '-'}]}]
+    conns = []
+    prev = ('V1', '+')
+    for i, r in enumerate(resistors):
+        rid = f'R{i + 1}'
+        comps.append({'id': rid, 'type': 'resistor', 'resistance': r, 'ports': [{'id': '1'}, {'id': '2'}]})
+        conns.append({'from': {'compId': prev[0], 'portId': prev[1]}, 'to': {'compId': rid, 'portId': '1'}})
+        prev = (rid, '2')
+    comps.append({'id': 'G', 'type': 'ground', 'ports': [{'id': '1'}]})
+    conns.append({'from': {'compId': prev[0], 'portId': prev[1]}, 'to': {'compId': 'G', 'portId': '1'}})
+    conns.append({'from': {'compId': 'V1', 'portId': '-'}, 'to': {'compId': 'G', 'portId': '1'}})
+    return {'components': comps, 'connections': conns}
+
+
+def _ladder_scheme(v, resistors):
+    """Лестница: последовательные R сверху + шунты на землю на каждом узле."""
+    comps = [{'id': 'V1', 'type': 'battery', 'voltage': v, 'ports': [{'id': '+'}, {'id': '-'}]}]
+    conns = []
+    prev = ('V1', '+')
+    half = max(1, len(resistors) // 2)
+    series_rs, shunt_rs = resistors[:half], resistors[half:] or [resistors[-1]]
+    nodes = []
+    for i, r in enumerate(series_rs):
+        rid = f'RS{i + 1}'
+        comps.append({'id': rid, 'type': 'resistor', 'resistance': r, 'ports': [{'id': '1'}, {'id': '2'}]})
+        conns.append({'from': {'compId': prev[0], 'portId': prev[1]}, 'to': {'compId': rid, 'portId': '1'}})
+        prev = (rid, '2')
+        nodes.append(rid)
+    comps.append({'id': 'G', 'type': 'ground', 'ports': [{'id': '1'}]})
+    for i, r in enumerate(shunt_rs):
+        rid = f'RP{i + 1}'
+        anchor = nodes[min(i, len(nodes) - 1)]
+        comps.append({'id': rid, 'type': 'resistor', 'resistance': r, 'ports': [{'id': '1'}, {'id': '2'}]})
+        conns.append({'from': {'compId': anchor, 'portId': '2'}, 'to': {'compId': rid, 'portId': '1'}})
+        conns.append({'from': {'compId': rid, 'portId': '2'}, 'to': {'compId': 'G', 'portId': '1'}})
+    conns.append({'from': {'compId': prev[0], 'portId': prev[1]}, 'to': {'compId': 'G', 'portId': '1'}})
+    conns.append({'from': {'compId': 'V1', 'portId': '-'}, 'to': {'compId': 'G', 'portId': '1'}})
+    return {'components': comps, 'connections': conns}
