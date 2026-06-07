@@ -368,6 +368,21 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            # Без этих OPTIONS SQLite под Daphne/Channels (async, конкурентные
+            # запросы браузера) ловит «database is locked» и ВИСНЕТ: один писатель
+            # блокирует всех читателей → после «тяжёлой» страницы (каталог +
+            # context-processors cart/compare на каждой странице) сервер жив, но
+            # не отвечает ни на одну страницу. Лечится так:
+            #   WAL          — читатели не блокируют писателя и наоборот;
+            #   busy timeout — писатель ЖДЁТ блокировку (до 20с), а не падает сразу;
+            #   IMMEDIATE    — меньше дедлоков на параллельных транзакциях (Django 5.1+).
+            'OPTIONS': {
+                'timeout': 20,
+                'transaction_mode': 'IMMEDIATE',
+                'init_command': (
+                    'PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;'
+                ),
+            },
         }
     }
 
