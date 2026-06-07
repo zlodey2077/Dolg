@@ -40,11 +40,17 @@ class ServerController:
     def __init__(self):
         self.proc: subprocess.Popen | None = None
         self._lock = threading.Lock()
+        self._mode = ''
         self._on_change: Callable[[], None] = lambda: None
+        self._notify: Callable[[str], None] = lambda msg: None
 
     def bind_change(self, callback: Callable[[], None]) -> None:
         """Колбэк для обновления меню трея при смене состояния."""
         self._on_change = callback
+
+    def bind_notify(self, callback: Callable[[str], None]) -> None:
+        """Колбэк всплывающих уведомлений (balloon), чтобы тихий сбой был виден."""
+        self._notify = callback
 
     def is_running(self) -> bool:
         if self.proc is not None and self.proc.poll() is None:
@@ -69,22 +75,32 @@ class ServerController:
                 if open_browser:
                     webbrowser.open(LOCAL_URL)
                 return
+            # Самолечение (как в start_server): снять орфаны прошлых сессий + порт.
+            srv.kill_orphans()
             if srv.port_in_use('127.0.0.1', PORT):
                 srv.free_port(PORT)
                 time.sleep(0.5)
             py = srv.find_python()
-            cmd, _hot = srv.build_django_cmd(py, hot=True)
-            log = open(LOG_PATH, 'w', encoding='utf-8', buffering=1)
-            self.proc = subprocess.Popen(
-                cmd, cwd=str(ROOT), env=self._env(), stdout=log, stderr=subprocess.STDOUT
-            )
+            self.proc, self._mode = srv._start_django(py, self._env(), True, LOG_PATH)
         threading.Thread(target=self._wait_and_open, args=(open_browser,), daemon=True).start()
 
     def _wait_and_open(self, open_browser: bool) -> None:
-        up = srv.wait_tcp('127.0.0.1', PORT, timeout=120)
+        up = srv.wait_tcp('127.0.0.1', PORT, timeout=90)
+        if not up and self._mode == 'hot':
+            # Fallback hot(jurigged) -> plain.
+            srv._kill_proc(self.proc)
+            srv.free_port(PORT)
+            time.sleep(1.0)
+            with self._lock:
+                self.proc, self._mode = srv._start_django(srv.find_python(), self._env(), False, LOG_PATH)
+            up = srv.wait_tcp('127.0.0.1', PORT, timeout=90)
         self._on_change()
-        if up and open_browser:
-            webbrowser.open(LOCAL_URL)
+        if up:
+            self._notify(f'DOLG сервер запущен ({self._mode}) — 127.0.0.1:{PORT}')
+            if open_browser:
+                webbrowser.open(LOCAL_URL)
+        else:
+            self._notify('DOLG: сервер НЕ поднялся. Открой лог: .tmp_django.log')
 
     def stop(self) -> None:
         with self._lock:
@@ -211,6 +227,14 @@ def _exit(icon, controller: ServerController):
         icon.stop()
 
 
+def _safe_notify(icon, msg):
+    """Balloon-уведомление трея; молча игнорируем, если платформа не поддерживает."""
+    try:
+        icon.notify(msg, 'DOLG')
+    except Exception:
+        pass
+
+
 def make_icon_image():
     """Иконка трея: монограмма D на сине-циановом круге (Pillow)."""
     from PIL import Image, ImageDraw
@@ -256,6 +280,7 @@ def main() -> int:
     controller = ServerController()
     icon = pystray.Icon('DOLG', icon=make_icon_image(), title='DOLG — dev сервер')
     controller.bind_change(lambda: icon.update_menu())
+    controller.bind_notify(lambda msg: _safe_notify(icon, msg))
     icon.menu = build_menu(controller)
 
     # Автозапуск сервера + авто-открытие вкладки.
