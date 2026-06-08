@@ -39,6 +39,97 @@ function Enable-WindowsFeatureIfNeeded($FeatureName) {
     return [bool]$result.RestartNeeded
 }
 
+function Invoke-CommandWithTimeout($FileName, $Arguments, [int]$TimeoutMs = 120000) {
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FileName
+    $startInfo.Arguments = $Arguments
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.UseShellExecute = $false
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if (-not $process.WaitForExit($TimeoutMs)) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        return @{ Ok = $false; ExitCode = -1; Output = "$FileName $Arguments timed out" }
+    }
+    $out = $process.StandardOutput.ReadToEnd().Trim()
+    $err = $process.StandardError.ReadToEnd().Trim()
+    return @{ Ok = ($process.ExitCode -eq 0); ExitCode = $process.ExitCode; Output = (($out, $err) -join " ").Trim() }
+}
+
+function Install-WslKernelMsi($IsAdmin) {
+    $msi = Join-Path $env:TEMP "wsl_update_x64.msi"
+    $uris = @(
+        "https://aka.ms/wsl2kernel",
+        "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
+    )
+
+    foreach ($uri in $uris) {
+        Write-Warning "Downloading WSL2 kernel MSI from $uri"
+        Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue
+        $progressPreferenceBefore = $ProgressPreference
+        $ProgressPreference = "SilentlyContinue"
+        try {
+            Invoke-WebRequest -Uri $uri -OutFile $msi -UseBasicParsing -TimeoutSec 120 -ErrorAction Stop
+            if ((Test-Path $msi) -and (Get-Item $msi).Length -gt 1MB) {
+                break
+            }
+            Write-Warning "Downloaded MSI is missing or too small."
+        }
+        catch {
+            Write-Warning "Could not download WSL2 kernel MSI from ${uri}: $($_.Exception.Message)"
+        }
+        finally {
+            $ProgressPreference = $progressPreferenceBefore
+        }
+    }
+
+    if (-not (Test-Path $msi) -or (Get-Item $msi).Length -le 1MB) {
+        throw "WSL2 kernel MSI was not downloaded. Open https://aka.ms/wsl2kernel in a browser, install the x64 MSI, restart Windows, then run this script again."
+    }
+
+    if ($IsAdmin) {
+        $process = Start-Process msiexec.exe -ArgumentList @("/i", "`"$msi`"", "/quiet", "/norestart") -Wait -PassThru
+    }
+    else {
+        $process = Start-Process msiexec.exe -Verb RunAs -ArgumentList @("/i", "`"$msi`"", "/passive", "/norestart") -Wait -PassThru
+    }
+
+    if ($process.ExitCode -notin @(0, 3010)) {
+        throw "WSL2 kernel MSI failed with exit code $($process.ExitCode)."
+    }
+    if ($process.ExitCode -eq 3010) {
+        Write-Warning "WSL2 kernel MSI installed and Windows asks for a restart."
+    }
+}
+
+function Update-WslKernelIfNeeded($IsAdmin) {
+    Write-Step "Checking WSL2 kernel update state"
+    $status = Invoke-CommandWithTimeout "wsl.exe" "--status" 30000
+    if ($status.Ok -and $status.Output -notmatch "wsl --update|WSL 2.*not found|wsl2kernel|0x800") {
+        Write-Host "WSL status: OK"
+        return
+    }
+
+    Write-Warning "WSL reports that the WSL2 kernel needs an update."
+    if ($status.Output) {
+        Write-Host $status.Output
+    }
+
+    foreach ($args in @("--update", "--update --web-download", "--update --inbox")) {
+        Write-Host "Trying: wsl $args"
+        $result = Invoke-CommandWithTimeout "wsl.exe" $args 180000
+        if ($result.Ok) {
+            Write-Host "WSL update completed with: wsl $args"
+            wsl --shutdown 2>$null
+            return
+        }
+        Write-Warning "wsl $args failed: $($result.Output)"
+    }
+
+    Install-WslKernelMsi $IsAdmin
+    wsl --shutdown 2>$null
+}
+
 function Repair-WslBackendIfNeeded($IsAdmin) {
     $requiredServices = @("LxssManager", "vmcompute", "hns")
     $missingServices = @(
@@ -146,6 +237,7 @@ Write-Host "Admin shell: $isAdmin"
 
 Write-Step "Checking WSL2/VM backend prerequisites"
 Repair-WslBackendIfNeeded $isAdmin
+Update-WslKernelIfNeeded $isAdmin
 
 Write-Step "Checking docker-users membership"
 $members = (cmd /c "net localgroup docker-users" 2>$null) -join "`n"
