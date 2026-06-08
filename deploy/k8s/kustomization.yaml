@@ -11,6 +11,7 @@ resources:
   - nginx.yaml
   - monitoring.yaml
   - networkpolicy.yaml
+  - pdb.yaml
 
 generatorOptions:
   disableNameSuffixHash: true

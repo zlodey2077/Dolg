@@ -9,11 +9,7 @@ Local flow from the repository root:
 
 ```powershell
 scripts/bootstrap_docker_desktop.ps1
-docker build -f deploy/Dockerfile -t dolg:local .
-kubectl kustomize deploy/k8s
-kubectl apply -k deploy/k8s
-kubectl -n dolg wait --for=condition=complete job/dolg-migrate --timeout=180s
-kubectl -n dolg rollout status deploy/dolg-web
+scripts/k8s_local_up.ps1
 kubectl -n dolg port-forward svc/dolg-nginx 8080:80
 ```
 
@@ -25,6 +21,8 @@ Important production notes:
   external Secret manager, SealedSecret, SOPS, or cluster-native secret supply.
 - Build and push a real image tag, then replace `dolg:local`.
 - The local Prometheus token is a demo value. Rotate it for any non-local
-  environment and keep Prometheus config in sync with `METRICS_TOKEN`.
+  environment. Prometheus reads it from the `dolg-secret` mounted file.
 - The migration Job is simple and explicit. For GitOps/Helm, make the Job name
   release-specific or manage it as a hook.
+- `dolg-web` has a PodDisruptionBudget and app pods use startup/readiness/
+  liveness probes for safer rollouts.

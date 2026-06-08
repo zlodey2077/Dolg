@@ -21,6 +21,9 @@ NGINX_CONF = DEPLOY / 'nginx.conf'
 PROMETHEUS = DEPLOY / 'prometheus.yml'
 CI_WORKFLOW = ROOT / '.github' / 'workflows' / 'django.yml'
 K8S = DEPLOY / 'k8s'
+ROOT_DOCKERIGNORE = ROOT / '.dockerignore'
+K8S_LOCAL_UP = ROOT / 'scripts' / 'k8s_local_up.ps1'
+K8S_LOCAL_DOWN = ROOT / 'scripts' / 'k8s_local_down.ps1'
 
 
 def section(title: str) -> None:
@@ -52,9 +55,34 @@ def main() -> int:
     failed = 0
 
     section('required files')
-    for path in [COMPOSE, DOCKERFILE, ENTRYPOINT, NGINX_CONF, PROMETHEUS, CI_WORKFLOW, K8S]:
+    for path in [
+        COMPOSE,
+        DOCKERFILE,
+        ENTRYPOINT,
+        NGINX_CONF,
+        PROMETHEUS,
+        CI_WORKFLOW,
+        K8S,
+        ROOT_DOCKERIGNORE,
+        K8S_LOCAL_UP,
+        K8S_LOCAL_DOWN,
+    ]:
         if not check(path.exists(), str(path.relative_to(ROOT))):
             failed += 1
+
+    section('root .dockerignore')
+    dockerignore = read(ROOT_DOCKERIGNORE)
+    failed += require_contains(
+        dockerignore,
+        [
+            ('.git', 'git metadata excluded from build context'),
+            ('.venv/', 'local virtualenv excluded from build context'),
+            ('docs/', 'heavy docs excluded from runtime image context'),
+            ('deploy/.env*', 'local Docker env files excluded'),
+            ('deploy/cloudflared.exe', 'local cloudflared binary excluded'),
+            ('deploy/*.exe', 'local Windows binaries excluded'),
+        ],
+    )
 
     section('docker-compose.yml')
     compose = read(COMPOSE)
@@ -205,6 +233,7 @@ def main() -> int:
                 ('dolg-secret', 'Django secret object'),
                 ('dolg-config', 'Django config object'),
                 ('networkpolicy.yaml', 'Kubernetes NetworkPolicy layer'),
+                ('pdb.yaml', 'Kubernetes PodDisruptionBudget layer'),
             ],
         )
 

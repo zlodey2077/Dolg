@@ -15,6 +15,11 @@ spec:
     spec:
       restartPolicy: OnFailure
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -42,6 +47,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
       volumes:
@@ -79,6 +85,8 @@ metadata:
     app.kubernetes.io/component: web
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
+  minReadySeconds: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: dolg
@@ -89,7 +97,13 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: web
     spec:
+      terminationGracePeriodSeconds: 60
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -120,6 +134,16 @@ spec:
                   value: localhost
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            failureThreshold: 30
+            periodSeconds: 5
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
@@ -187,6 +211,8 @@ metadata:
     app.kubernetes.io/component: asgi
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
+  minReadySeconds: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: dolg
@@ -197,7 +223,13 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: asgi
     spec:
+      terminationGracePeriodSeconds: 60
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -225,6 +257,16 @@ spec:
                   value: localhost
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            failureThreshold: 30
+            periodSeconds: 5
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
@@ -276,6 +318,7 @@ metadata:
     app.kubernetes.io/component: worker
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: dolg
@@ -286,7 +329,13 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: worker
     spec:
+      terminationGracePeriodSeconds: 60
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:

@@ -29,6 +29,9 @@ db.sqlite3
 *.log
 tmp/
 .cache/
+deploy/.env*
+deploy/cloudflared.exe
+deploy/*.exe
 
 # Secrets / env (НЕ тащим в образ)
 .env

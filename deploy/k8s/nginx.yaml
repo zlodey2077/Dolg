@@ -81,6 +81,8 @@ metadata:
     app.kubernetes.io/component: edge
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
   selector:
     matchLabels:
       app.kubernetes.io/name: dolg
@@ -91,6 +93,7 @@ spec:
         app.kubernetes.io/name: dolg
         app.kubernetes.io/component: edge
     spec:
+      terminationGracePeriodSeconds: 30
       securityContext:
         seccompProfile:
           type: RuntimeDefault
@@ -110,6 +113,16 @@ spec:
                   value: localhost
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            failureThreshold: 24
+            periodSeconds: 5
             timeoutSeconds: 5
           livenessProbe:
             httpGet:

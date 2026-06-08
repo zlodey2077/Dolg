@@ -12,7 +12,7 @@ data:
       - job_name: dolg-django
         metrics_path: /metrics
         authorization:
-          credentials: local-metrics-token-change-me
+          credentials_file: /etc/prometheus/secrets/metrics-token
         static_configs:
           - targets: ["dolg-web:8000"]
             labels:
@@ -77,10 +77,27 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            failureThreshold: 24
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus/prometheus.yml
               subPath: prometheus.yml
+              readOnly: true
+            - name: metrics-token
+              mountPath: /etc/prometheus/secrets
               readOnly: true
             - name: data
               mountPath: /prometheus
@@ -92,6 +109,12 @@ spec:
         - name: config
           configMap:
             name: prometheus-config
+        - name: metrics-token
+          secret:
+            secretName: dolg-secret
+            items:
+              - key: METRICS_TOKEN
+                path: metrics-token
         - name: data
           persistentVolumeClaim:
             claimName: prometheus-data
@@ -158,6 +181,20 @@ spec:
               port: http
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            failureThreshold: 24
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
             timeoutSeconds: 5
           volumeMounts:
             - name: data

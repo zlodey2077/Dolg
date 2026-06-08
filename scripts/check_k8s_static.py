@@ -21,6 +21,7 @@ REQUIRED_FILES = [
     'nginx.yaml',
     'monitoring.yaml',
     'networkpolicy.yaml',
+    'pdb.yaml',
     'README.md',
 ]
 
@@ -48,6 +49,7 @@ REQUIRED_KINDS = {
     ('Job', 'dolg-migrate'),
     ('ConfigMap', 'nginx-config'),
     ('ConfigMap', 'prometheus-config'),
+    ('PodDisruptionBudget', 'dolg-web-pdb'),
     ('NetworkPolicy', 'default-deny'),
     ('NetworkPolicy', 'allow-dns-egress'),
     ('NetworkPolicy', 'allow-edge-ingress'),
@@ -86,6 +88,13 @@ def iter_containers(doc: dict[str, Any]) -> list[dict[str, Any]]:
 
 def pod_spec(doc: dict[str, Any]) -> dict[str, Any]:
     return doc.get('spec', {}).get('template', {}).get('spec', {})
+
+
+def find_doc(docs: list[dict[str, Any]], kind: str, name: str) -> dict[str, Any]:
+    for doc in docs:
+        if doc.get('kind') == kind and doc.get('metadata', {}).get('name') == name:
+            return doc
+    return {}
 
 
 def main() -> int:
@@ -187,6 +196,49 @@ def main() -> int:
                 failed += 1
             if not check(has_secret, f'{name}/{container.get("name")} uses dolg-secret'):
                 failed += 1
+
+    print('\n=== runtime probes ===')
+    required_probe_names = {
+        'dolg-web': {'readinessProbe', 'startupProbe', 'livenessProbe'},
+        'dolg-asgi': {'readinessProbe', 'startupProbe', 'livenessProbe'},
+        'dolg-nginx': {'readinessProbe', 'startupProbe', 'livenessProbe'},
+        'prometheus': {'readinessProbe', 'startupProbe', 'livenessProbe'},
+        'grafana': {'readinessProbe', 'startupProbe', 'livenessProbe'},
+    }
+    for workload_name, probe_names in sorted(required_probe_names.items()):
+        doc = find_doc(docs, 'Deployment', workload_name)
+        containers = iter_containers(doc)
+        if not containers:
+            check(False, f'{workload_name} has containers')
+            failed += 1
+            continue
+        for probe_name in sorted(probe_names):
+            if not check(
+                any(probe_name in container for container in containers),
+                f'{workload_name} defines {probe_name}',
+            ):
+                failed += 1
+
+    print('\n=== prometheus secret handling ===')
+    prometheus_config = find_doc(docs, 'ConfigMap', 'prometheus-config')
+    prometheus_yaml = prometheus_config.get('data', {}).get('prometheus.yml', '')
+    if not check(
+        'credentials_file: /etc/prometheus/secrets/metrics-token' in prometheus_yaml,
+        'Prometheus reads metrics token from mounted secret file',
+    ):
+        failed += 1
+    prometheus_deploy = find_doc(docs, 'Deployment', 'prometheus')
+    prometheus_spec = pod_spec(prometheus_deploy)
+    prometheus_volumes = prometheus_spec.get('volumes', [])
+    if not check(
+        any(
+            volume.get('name') == 'metrics-token'
+            and volume.get('secret', {}).get('secretName') == 'dolg-secret'
+            for volume in prometheus_volumes
+        ),
+        'Prometheus mounts METRICS_TOKEN from dolg-secret',
+    ):
+        failed += 1
 
     print('\n=== kustomization references ===')
     kustomization = yaml.safe_load((K8S / 'kustomization.yaml').read_text(encoding='utf-8'))

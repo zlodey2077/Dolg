@@ -61,31 +61,46 @@ scripts/docker_compose_down.ps1 -Volumes
 
 ## 3. Kubernetes local run
 
-Build a local image visible to the cluster:
+One-command local flow:
 
 ```powershell
-docker build -f deploy/Dockerfile -t dolg:local .
+scripts/k8s_local_up.ps1
 ```
 
-Validate and apply:
+The script validates Kubernetes manifests, builds `dolg:local`, applies
+`deploy/k8s`, waits for the migration Job and rollouts, then prints the current
+pods/services/PVCs.
+
+Open the app through port-forwarding:
 
 ```powershell
-python scripts/check_k8s_static.py
-kubectl kustomize deploy/k8s
-kubectl apply -k deploy/k8s
-kubectl -n dolg wait --for=condition=complete job/dolg-migrate --timeout=180s
-kubectl -n dolg rollout status deploy/dolg-web
-kubectl -n dolg rollout status deploy/dolg-asgi
-kubectl -n dolg rollout status deploy/dolg-worker
 kubectl -n dolg port-forward svc/dolg-nginx 8080:80
 ```
 
 Then open `http://localhost:8080/`.
 
+To start the port-forward inside the same foreground script run:
+
+```powershell
+scripts/k8s_local_up.ps1 -PortForward
+```
+
 For kind, load the image before applying:
 
 ```powershell
-kind load docker-image dolg:local
+scripts/k8s_local_up.ps1 -KindCluster <cluster-name>
+```
+
+Stop Kubernetes objects:
+
+```powershell
+scripts/k8s_local_down.ps1
+```
+
+Stop workloads but keep PVC data:
+
+```powershell
+scripts/k8s_local_down.ps1 -KeepPvcs
 ```
 
 ## 4. Static checks
@@ -112,6 +127,12 @@ fails fast on missing secrets.
 - The base namespace enforces Pod Security `baseline` and warns/audits
   `restricted`. Workloads drop Linux capabilities and use `RuntimeDefault`
   seccomp.
+- Django pods run as uid/gid `1000`, mount writable PVCs through `fsGroup`, and
+  use startup/readiness/liveness probes.
+- Prometheus reads `METRICS_TOKEN` through a mounted Kubernetes Secret file,
+  not a literal token in the Prometheus ConfigMap.
+- `dolg-web` has a PodDisruptionBudget so voluntary disruptions keep at least
+  one web replica available.
 - `deploy/k8s/networkpolicy.yaml` starts with default-deny and opens only the
   DOLG flows needed for nginx, Django, ASGI, Postgres, Redis, Prometheus, and
   Grafana.
@@ -123,7 +144,7 @@ fails fast on missing secrets.
 - Runtime smoke: run `scripts/docker_compose_up.ps1` and verify the app,
   Prometheus, and Grafana URLs.
 - Kubernetes smoke: enable Docker Desktop Kubernetes or use kind/minikube, then
-  run `kubectl apply -k deploy/k8s`.
+  run `scripts/k8s_local_up.ps1`.
 - Production hardening: replace local literals with a real secret manager,
   publish immutable images to a registry, add Helm values per environment,
   move from Pod Security `baseline` to `restricted` after runtime smoke, and
