@@ -12,9 +12,6 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 PRODUCTS_PER_PAGE = 24  # 4×6 grid; страница меньше 1 МБ HTML на текущих 72 товарах
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
 from .component_validation import (
     missing_spice_model_warning,
@@ -1470,6 +1467,10 @@ def api_bom_match(request):
 @require_POST
 def api_bom_export_xlsx(request):
     """Build an Excel-compatible BOM workbook for the current schematic."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError, ValueError:

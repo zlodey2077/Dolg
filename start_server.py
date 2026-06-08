@@ -191,15 +191,15 @@ def build_django_cmd(py, hot):
     """Komanda zapuska Django. hot=True -> cherez jurigged (zhivoy hot-reload
     bez restarta: pravki tel funktsiy primenyayutsya za <1 sek). Strukturnye
     pravki (URL/model/settings) vse ravno trebuyut restarta."""
-    base = ['manage.py', 'runserver', '127.0.0.1:%d' % DJANGO_PORT, '--skip-checks']
+    base = ['manage.py', 'runserver', '127.0.0.1:%d' % DJANGO_PORT, '--skip-checks', '--noreload']
     if hot and jurigged_available():
         watch = []
         for app in ('Dolg_APP', 'shop', 'accounts', 'orders', 'knowledge', 'Dolg_PR'):
             d = ROOT / app
             if d.exists():
                 watch += ['--watch', str(d)]
-        # --noreload: shtatnyy Django-reloader vyklyuchen, perezagruzku vedet jurigged.
-        return [py, '-m', 'jurigged'] + watch + base + ['--noreload'], True
+        # Django reloader is disabled here: jurigged owns hot patching.
+        return [py, '-m', 'jurigged'] + watch + base, True
     return [py] + base, False
 
 
@@ -273,19 +273,24 @@ def port_holder(port):
     return 'unknown'
 
 
-def pending_migrations(py, env):
-    """True, если есть непринятые миграции (manage.py migrate --check != 0)."""
+def migration_state(py, env):
+    """Return ('ok'|'pending'|'error', detail) for migration preflight."""
     try:
         r = subprocess.run(
             [py, 'manage.py', 'migrate', '--check'],
             cwd=str(ROOT),
             env=env,
             capture_output=True,
+            text=True,
             timeout=60,
         )
-        return r.returncode != 0
-    except Exception:
-        return False
+        if r.returncode == 0:
+            return 'ok', ''
+        return 'pending', (r.stderr or r.stdout or '').strip()
+    except subprocess.TimeoutExpired:
+        return 'error', 'manage.py migrate --check timed out after 60s'
+    except Exception as exc:
+        return 'error', 'manage.py migrate --check failed: %s' % exc
 
 
 def _start_django(py, env, hot, log_path):
@@ -341,6 +346,7 @@ def _abort(report):
 def main():
     local_only = ('--local' in sys.argv) or ('--no-tunnel' in sys.argv)
     hot = ('--hot' in sys.argv) and ('--no-hot' not in sys.argv)
+    no_browser = '--no-browser' in sys.argv
 
     report = []
 
@@ -402,15 +408,31 @@ def main():
     else:
         rep('OK', 'Порт %d свободен' % DJANGO_PORT)
 
-    if pending_migrations(py, env):
+    migrate_state, migrate_detail = migration_state(py, env)
+    if migrate_state == 'error':
+        rep('ERR', migrate_detail)
+        return _abort(report)
+    if migrate_state == 'pending':
         rep('WARN', 'Есть непринятые миграции — применяю...')
-        mr = subprocess.run(
-            [py, 'manage.py', 'migrate', '--noinput'], cwd=str(ROOT), env=env, capture_output=True, text=True
-        )
+        try:
+            mr = subprocess.run(
+                [py, 'manage.py', 'migrate', '--noinput'],
+                cwd=str(ROOT),
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            migrate_output = mr.stderr or mr.stdout or ''
+        except subprocess.TimeoutExpired:
+            rep('ERR', 'manage.py migrate --noinput timed out after 180s')
+            return _abort(report)
         rep(
             'FIX' if mr.returncode == 0 else 'ERR',
-            'migrate: ' + ('применены' if mr.returncode == 0 else (mr.stderr or mr.stdout or '')[-300:]),
+            'migrate: ' + ('применены' if mr.returncode == 0 else migrate_output[-300:]),
         )
+        if mr.returncode != 0:
+            return _abort(report)
     else:
         rep('OK', 'Миграции применены')
 
@@ -452,12 +474,13 @@ def main():
         p('')
         p('       ' + local_url)
         p('')
-        p('   Auto-reload AKTIVEN (.py / urls.py). Ctrl+C ili zakroyte okno dlya ostanovki.')
+        p('   Plain stable mode bez Django autoreload. Ctrl+C ili zakroyte okno dlya ostanovki.')
         p('')
-        try:
-            webbrowser.open(local_url)
-        except Exception:
-            pass
+        if not no_browser:
+            try:
+                webbrowser.open(local_url)
+            except Exception:
+                pass
     else:
         p('')
         p('[2/3] Zapuskayu Cloudflare Quick Tunnel...')
@@ -521,12 +544,12 @@ def main():
 
         # Открываем в браузере только если propagated — иначе юзер сразу
         # увидит ошибку 1033 и расстроится.
-        if propagated:
+        if propagated and not no_browser:
             try:
                 webbrowser.open(public_url)
             except Exception:
                 pass
-        else:
+        elif not propagated:
             p('   Brauzer NE otkryl avtomaticheski (tunnel eshe greetsya).')
             p('   Skoporiy URL vyshe i otkroy vruchnuyu cherez 30-60 sek.')
             p('')
