@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="42" y="34" fill="#101010" font-family="Arial, sans-serif" font-size="22" font-weight="700" text-anchor="start" dominant-baseline="auto">NE555 internal functional subcircuit - pins 1-8</text>
+<text x="43" y="64" fill="#555555" font-family="Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" dominant-baseline="auto">Internal sheet: functional 555 model with divider, comparators, SR latch, discharge transistor and output driver.</text>
+<line x1="90" y1="105" x2="1410" y2="105" stroke="#123f91" stroke-width="3" stroke-linecap="round"/>
+<text x="100" y="81" fill="#123f91" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">VCC / pin 8</text>
+<line x1="90" y1="770" x2="1410" y2="770" stroke="#157347" stroke-width="3" stroke-linecap="round"/>
+<text x="100" y="782" fill="#157347" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">GND / pin 1</text>
+<circle cx="110" cy="295" r="6" fill="white" stroke="#101010" stroke-width="2"/>
+<text x="120" y="287" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">6 THR</text>
+<circle cx="110" cy="430" r="6" fill="white" stroke="#101010" stroke-width="2"/>
+<text x="120" y="422" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">2 TRIG</text>
+<circle cx="110" cy="240" r="6" fill="white" stroke="#101010" stroke-width="2"/>
+<text x="120" y="232" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">5 CTRL</text>
+<circle cx="110" cy="560" r="6" fill="white" stroke="#101010" stroke-width="2"/>
+<text x="120" y="552" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">4 RESET</text>
+<circle cx="1390" cy="560" r="6" fill="white" stroke="#101010" stroke-width="2"/>
+<text x="1400" y="552" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">7 DISCH</text>
+<circle cx="1390" cy="400" r="6" fill="white" stroke="#101010" stroke-width="2"/>
+<text x="1400" y="392" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">3 OUT</text>
+<line x1="365" y1="105" x2="365" y2="148" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="365" y1="216" x2="365" y2="260" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<rect x="331" y="148" width="68" height="68" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<text x="365" y="170" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R</text>
+<text x="365" y="186" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">5k</text>
+<line x1="365" y1="260" x2="365" y2="306" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="365" y1="374" x2="365" y2="420" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<rect x="331" y="306" width="68" height="68" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<text x="365" y="328" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R</text>
+<text x="365" y="344" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">5k</text>
+<line x1="365" y1="420" x2="365" y2="561" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="365" y1="629" x2="365" y2="770" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<rect x="331" y="561" width="68" height="68" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<text x="365" y="583" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R</text>
+<text x="365" y="599" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">5k</text>
+<circle cx="365" cy="260" r="4" fill="#101010" stroke="#101010"/>
+<circle cx="365" cy="420" r="4" fill="#101010" stroke="#101010"/>
+<text x="387" y="246" fill="#555555" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" dominant-baseline="auto">2/3 VCC</text>
+<text x="387" y="406" fill="#555555" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" dominant-baseline="auto">1/3 VCC</text>
+<polyline points="110,240 260,240 260,260 365,260" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="560" y="245" width="150" height="78" rx="5" fill="#fff7e6" stroke="#101010" stroke-width="2"/>
+<text x="635" y="263" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="auto">Threshold</text>
+<text x="635" y="281" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">comparator</text>
+<text x="548" y="274" fill="#101010" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" dominant-baseline="auto">+</text>
+<text x="548" y="304" fill="#101010" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" dominant-baseline="auto">-</text>
+<rect x="560" y="392" width="150" height="78" rx="5" fill="#fff7e6" stroke="#101010" stroke-width="2"/>
+<text x="635" y="410" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="auto">Trigger</text>
+<text x="635" y="428" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">comparator</text>
+<text x="548" y="421" fill="#101010" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" dominant-baseline="auto">+</text>
+<text x="548" y="451" fill="#101010" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" dominant-baseline="auto">-</text>
+<polyline points="110,295 505,295 505,274 560,274" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="365,260 500,260 500,304 560,304" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="365,420 500,420 500,421 560,421" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="110,430 505,430 505,451 560,451" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="825" y="330" width="130" height="105" rx="5" fill="#fff7e6" stroke="#101010" stroke-width="2"/>
+<text x="890" y="348" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="auto">SR latch</text>
+<text x="890" y="366" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">set/reset memory</text>
+<text x="812" y="360" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">R</text>
+<text x="812" y="412" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">S</text>
+<polyline points="710,284 770,284 770,360 825,360" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="710,431 770,431 770,412 825,412" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="110,560 760,560 760,392 825,392" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="1070" y="345" width="150" height="92" rx="5" fill="#fff7e6" stroke="#101010" stroke-width="2"/>
+<text x="1145" y="363" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="auto">Output</text>
+<text x="1145" y="381" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">push-pull driver</text>
+<polyline points="955,382 1070,382" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="1220,392 1390,400" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="1120,105 1120,345" fill="none" stroke="#123f91" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="1120" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
+<polyline points="1120,437 1120,770" fill="none" stroke="#157347" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="1120" cy="770" r="4" fill="#157347" stroke="#157347"/>
+<circle cx="1070" cy="590" r="40" fill="white" stroke="#101010" stroke-width="2"/>
+<line x1="1008" y1="590" x2="1056" y2="590" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="1056" y1="590" x2="1088" y2="565" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="1056" y1="590" x2="1088" y2="615" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="1088" y1="565" x2="1088" y2="518" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="1088" y1="615" x2="1088" y2="662" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<line x1="1079" y1="602" x2="1092" y2="616" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
+<text x="1034" y="640" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">discharge NPN</text>
+<polyline points="955,415 1010,415 1010,590 1008,590" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="1390,560 1230,560 1230,518 1088,518" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="1088,662 1088,770" fill="none" stroke="#157347" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="1088" cy="770" r="4" fill="#157347" stroke="#157347"/>
+<rect x="42" y="812" width="720" height="50" rx="5" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+<text x="58" y="826" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="start" dominant-baseline="auto">Functional abstraction:</text>
+<text x="58" y="845" fill="#444444" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" dominant-baseline="auto">this is the readable subcircuit a simulator/editor should expand from the NE555 symbol, not a literal chip-die schematic.</text>
+<line x1="1142" y1="785" x2="1178" y2="785" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
+<line x1="1148" y1="792" x2="1172" y2="792" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
+<line x1="1154" y1="799" x2="1166" y2="799" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
+<text x="1184" y="781" fill="#157347" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" dominant-baseline="auto">pin 1 reference</text>
+</svg>

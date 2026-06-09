@@ -2234,8 +2234,16 @@ def api_cad_scheme_operations_preview(request):
     )
     scheme_data = result.get('scheme_data') or {}
     drc = _validate_scheme_data(scheme_data)
+    layout_quality = {}
+    layout_quality_error = ''
     topology = {}
     topology_error = ''
+    try:
+        from .services.schematic_layout_quality import analyze_schematic_layout
+
+        layout_quality = analyze_schematic_layout(scheme_data)
+    except Exception as exc:
+        layout_quality_error = str(exc)
     try:
         from .services.schematic_graph import analyze_graph_topology
 
@@ -2244,13 +2252,16 @@ def api_cad_scheme_operations_preview(request):
         topology_error = str(exc)
 
     payload = {
-        'ok': bool(result.get('ok')) and bool(drc.get('ok')),
+        'ok': bool(result.get('ok')) and bool(drc.get('ok')) and bool(layout_quality.get('ok', True)),
         'operations_ok': bool(result.get('ok')),
         'scheme_data': scheme_data,
         'operation_report': result.get('report') or {},
         'drc': drc,
+        'layout_quality': layout_quality,
         'topology': topology,
     }
+    if layout_quality_error:
+        payload['layout_quality_error'] = layout_quality_error
     if topology_error:
         payload['topology_error'] = topology_error
     status = 200 if payload['operations_ok'] else 400
