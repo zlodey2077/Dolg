@@ -149,9 +149,12 @@ Altium + текущее состояние DOLG. Цель: превратить 
 ### 🔧 Phase 4 — Library system (5-6 дней)
 
 #### 4.1. Symbol editor (УГО) (2 дня)
-- Создание новых УГО (graphic + pins)
+- Создание новых УГО (graphic + pins) только как `draft`-активов
 - ГОСТ 2.728-74 примитивы (резистор-прямоугольник, индуктор-зигзаг и т.д.)
-- Сохранение в Catalog модель как `symbol_svg` JSON
+- Сохранение не как произвольный `symbol_svg`, а через `assets/eskd/registry.yml`
+  с `asset_id`, версией, портами, bbox, hash и golden snapshot
+- ЕСКД-экспорт разрешает только `verified`/`certified` активы после проверок и
+  ручного review; подробный план: `docs/ESKD_CERTIFIED_ASSET_PLAN.md`
 
 #### 4.2. Footprint editor (2 дня)
 - Pad placement (SMD/through-hole)
