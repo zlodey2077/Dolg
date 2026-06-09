@@ -26,12 +26,12 @@ H = 900
 
 BLACK = '#101010'
 WIRE = '#161616'
-VCC = '#123f91'
-GND = '#157347'
-FILL = '#f7fbff'
-IC_FILL = '#fffdf4'
-BLOCK_FILL = '#fff7e6'
-NOTE_FILL = '#f8fafc'
+VCC = BLACK
+GND = BLACK
+FILL = '#ffffff'
+IC_FILL = '#ffffff'
+BLOCK_FILL = '#ffffff'
+NOTE_FILL = '#ffffff'
 
 
 def font(size: int, bold: bool = False) -> ImageFont.ImageFont:
@@ -207,15 +207,15 @@ def draw_external() -> None:
     rail_y = 105
     gnd_y = 765
     c.line(70, rail_y, 1430, rail_y, VCC, 3)
-    c.text(78, rail_y - 24, 'VCC 9-12V', 13, VCC, bold=True)
+    c.text(78, rail_y - 24, '+9...12 В', 13, VCC, bold=True)
     c.line(70, gnd_y, 1430, gnd_y, GND, 3)
     c.text(78, gnd_y + 12, 'GND', 13, GND, bold=True)
 
     # NE555 symbol.
     ix, iy, iw, ih = 620, 245, 280, 360
     c.rect(ix, iy, iw, ih, IC_FILL, width=3, radius=8)
-    c.text(ix + iw // 2, iy + 42, 'NE555', 24, anchor='middle', bold=True)
-    c.text(ix + iw // 2, iy + 72, 'subcircuit', 12, anchor='middle', fill='#555555')
+    c.text(ix + iw // 2, iy + 36, 'DA1', 22, anchor='middle', bold=True)
+    c.text(ix + iw // 2, iy + 64, 'NE555', 15, anchor='middle')
     pins = {
         '2': (ix, 335),
         '6': (ix, 420),
@@ -253,16 +253,16 @@ def draw_external() -> None:
     # Left trigger/timing networks.
     trig = (270, 335)
     timing = (430, 420)
-    c.resistor_v(trig[0], rail_y, trig[1], 'R2', '100k')
+    c.resistor_v(trig[0], rail_y, trig[1], 'R2', '100 кОм')
     c.node(trig[0], rail_y, VCC)
     c.node(*trig)
     c.poly([trig, (560, trig[1]), pins['2']])
-    c.switch_to_ground(trig[0], trig[1], 185, gnd_y, 'S1')
+    c.switch_to_ground(trig[0], trig[1], 185, gnd_y, 'SB1')
 
-    c.resistor_v(timing[0], rail_y, timing[1], 'R1', '5M', variable=True)
+    c.resistor_v(timing[0], rail_y, timing[1], 'R1', '5 МОм', variable=True)
     c.node(timing[0], rail_y, VCC)
     c.node(*timing)
-    c.capacitor_v(timing[0], timing[1], gnd_y, 'C1', '47uF')
+    c.capacitor_v(timing[0], timing[1], gnd_y, 'C1', '47 мкФ')
     c.node(timing[0], gnd_y, GND)
     c.poly([timing, (555, timing[1]), pins['6']])
     c.poly([timing, (500, timing[1]), (500, pins['7'][1]), pins['7']])
@@ -271,7 +271,7 @@ def draw_external() -> None:
 
     # Control pin.
     c.poly([pins['5'], (970, pins['5'][1]), (970, 565)])
-    c.capacitor_v(970, 565, gnd_y, 'C2', '10nF')
+    c.capacitor_v(970, 565, gnd_y, 'C2', '10 нФ')
     c.node(970, gnd_y, GND)
 
     # Output load.
@@ -280,28 +280,28 @@ def draw_external() -> None:
     c.node(*out_node)
     c.open_node(out_node[0], out_node[1] - 45, 'OUT')
     c.line(out_node[0], out_node[1] - 39, out_node[0], out_node[1])
-    c.resistor_h(out_node[0], out_node[1], 1110, 'R3', '1k')
-    q = c.npn(1210, 455, 'T1 NPN')
+    c.resistor_h(out_node[0], out_node[1], 1110, 'R3', '1 кОм')
+    q = c.npn(1210, 455, 'VT1')
     c.poly([(1110, out_node[1]), (1148, out_node[1]), (1148, q['base'][1]), q['base']])
     c.poly([q['emitter'], (q['emitter'][0], gnd_y)], GND)
     c.node(q['emitter'][0], gnd_y, GND)
     collector_bus = (q['collector'][0], 305)
     c.poly([q['collector'], collector_bus])
     c.node(*collector_bus)
-    c.led_v(collector_bus[0], rail_y, 205, 'LED1')
-    c.resistor_v(collector_bus[0], 205, collector_bus[1], 'R4', '1.5k')
+    c.led_v(collector_bus[0], rail_y, 205, 'HL1')
+    c.resistor_v(collector_bus[0], 205, collector_bus[1], 'R4', '1,5 кОм')
     c.node(collector_bus[0], rail_y, VCC)
 
     # Decoupling and connector.
-    c.capacitor_v(1340, rail_y, gnd_y, 'C3', '100nF')
+    c.capacitor_v(1340, rail_y, gnd_y, 'C3', '100 нФ')
     c.node(1340, rail_y, VCC)
     c.node(1340, gnd_y, GND)
-    c.capacitor_v(1420, rail_y, gnd_y, 'C4', '100uF')
+    c.capacitor_v(1420, rail_y, gnd_y, 'C4', '100 мкФ')
     c.node(1420, rail_y, VCC)
     c.node(1420, gnd_y, GND)
     c.rect(1272, 48, 86, 48, '#eaf8ef', width=2)
-    c.text(1315, 64, 'POWER', 11, anchor='middle', bold=True)
-    c.text(1315, 80, '9-12V', 10, anchor='middle')
+    c.text(1315, 64, 'XP1', 11, anchor='middle', bold=True)
+    c.text(1315, 80, '+9...12 В', 10, anchor='middle')
     c.poly([(1272, 72), (1228, 72), (1228, rail_y)], VCC)
     c.node(1228, rail_y, VCC)
 
@@ -549,11 +549,23 @@ def build_hierarchical_scheme():
             'title': 'NE555 astable/load schematic with hierarchical NE555 subcircuit',
             'generated_by': 'scripts/generate_ne555_simulator_preview.py',
             'layout_contract': 'orthogonal-schematic-v1',
+            'standard_profile': 'eskd',
+            'eskd': {
+                'basis': ['ГОСТ 2.701', 'ГОСТ 2.702', 'ГОСТ 2.710', 'ГОСТ 2.721', 'ГОСТ 2.728'],
+                'note': 'Automated ESKD-style quality gate; not a substitute for certified norm control.',
+            },
         },
         'sheets': [
             {
                 'id': 'external_astable_load',
                 'title': 'External NE555 astable/load sheet',
+                'metadata': {
+                    'standard_profile': 'eskd',
+                    'eskd': {
+                        'scheme_code': 'Э3',
+                        'scope_kind': 'principle',
+                    },
+                },
                 'components': external_components,
                 'connections': external_connections,
             }
@@ -562,6 +574,13 @@ def build_hierarchical_scheme():
             {
                 'id': 'NE555_FUNC',
                 'title': 'NE555 functional internal subcircuit',
+                'metadata': {
+                    'standard_profile': 'eskd',
+                    'eskd': {
+                        'scheme_code': 'Э2',
+                        'scope_kind': 'functional',
+                    },
+                },
                 'ports': ['1', '2', '3', '4', '5', '6', '7', '8'],
                 'components': internal_components,
                 'connections': internal_connections,
@@ -570,9 +589,33 @@ def build_hierarchical_scheme():
     }
 
 
+def apply_eskd_component_metadata(scheme: dict) -> dict:
+    external = (scheme.get('sheets') or [{}])[0]
+    components = {item['id']: item for item in external.get('components') or [] if isinstance(item, dict)}
+    patch = {
+        'U1': {'refdes': 'DA1', 'label': 'DA1', 'type_label': 'NE555', 'symbol_standard': 'ГОСТ 2.721'},
+        'R2': {'refdes': 'R2', 'label': 'R2', 'value_label': '100 кОм', 'symbol_standard': 'ГОСТ 2.728'},
+        'R1': {'refdes': 'R1', 'label': 'R1', 'value_label': '5 МОм', 'symbol_standard': 'ГОСТ 2.728'},
+        'C1': {'refdes': 'C1', 'label': 'C1', 'value_label': '47 мкФ', 'symbol_standard': 'ГОСТ 2.728'},
+        'S1': {'refdes': 'SB1', 'label': 'SB1', 'symbol_standard': 'ГОСТ 2.755'},
+        'C2': {'refdes': 'C2', 'label': 'C2', 'value_label': '10 нФ', 'symbol_standard': 'ГОСТ 2.728'},
+        'R3': {'refdes': 'R3', 'label': 'R3', 'value_label': '1 кОм', 'symbol_standard': 'ГОСТ 2.728'},
+        'T1': {'refdes': 'VT1', 'label': 'VT1', 'symbol_standard': 'ГОСТ 2.730'},
+        'LED1': {'refdes': 'HL1', 'label': 'HL1', 'symbol_standard': 'ГОСТ 2.730'},
+        'R4': {'refdes': 'R4', 'label': 'R4', 'value_label': '1,5 кОм', 'symbol_standard': 'ГОСТ 2.728'},
+        'C3': {'refdes': 'C3', 'label': 'C3', 'value_label': '100 нФ', 'symbol_standard': 'ГОСТ 2.728'},
+        'C4': {'refdes': 'C4', 'label': 'C4', 'value_label': '100 мкФ', 'symbol_standard': 'ГОСТ 2.728'},
+        'POWER': {'refdes': 'XP1', 'label': 'XP1', 'value_label': '+9...12 В', 'symbol_standard': 'ГОСТ 2.755'},
+    }
+    for component_id, values in patch.items():
+        if component_id in components:
+            components[component_id].update(values)
+    return scheme
+
+
 def write_hierarchical_quality_outputs() -> dict:
-    scheme = build_hierarchical_scheme()
-    quality = analyze_schematic_layout(scheme)
+    scheme = apply_eskd_component_metadata(build_hierarchical_scheme())
+    quality = analyze_schematic_layout(scheme, profile='eskd')
     HIERARCHICAL_SCHEME_JSON.write_text(json.dumps({'scheme_data': scheme}, ensure_ascii=False, indent=2), encoding='utf-8')
     QUALITY_REPORT_JSON.write_text(json.dumps(quality, ensure_ascii=False, indent=2), encoding='utf-8')
     if not quality['ok']:

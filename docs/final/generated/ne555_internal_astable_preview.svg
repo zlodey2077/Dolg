@@ -3,13 +3,13 @@
 <rect width="100%" height="100%" fill="#ffffff"/>
 <text x="42" y="34" fill="#101010" font-family="Arial, sans-serif" font-size="22" font-weight="700" text-anchor="start" dominant-baseline="auto">NE555 astable/load schematic - simulator target view</text>
 <text x="43" y="64" fill="#555555" font-family="Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" dominant-baseline="auto">External sheet: NE555 is a subcircuit symbol; pins, rails and parts are explicit and orthogonal.</text>
-<line x1="70" y1="105" x2="1430" y2="105" stroke="#123f91" stroke-width="3" stroke-linecap="round"/>
-<text x="78" y="81" fill="#123f91" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">VCC 9-12V</text>
-<line x1="70" y1="765" x2="1430" y2="765" stroke="#157347" stroke-width="3" stroke-linecap="round"/>
-<text x="78" y="777" fill="#157347" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">GND</text>
-<rect x="620" y="245" width="280" height="360" rx="8" fill="#fffdf4" stroke="#101010" stroke-width="3"/>
-<text x="760" y="287" fill="#101010" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle" dominant-baseline="auto">NE555</text>
-<text x="760" y="317" fill="#555555" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="middle" dominant-baseline="auto">subcircuit</text>
+<line x1="70" y1="105" x2="1430" y2="105" stroke="#101010" stroke-width="3" stroke-linecap="round"/>
+<text x="78" y="81" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">+9...12 В</text>
+<line x1="70" y1="765" x2="1430" y2="765" stroke="#101010" stroke-width="3" stroke-linecap="round"/>
+<text x="78" y="777" fill="#101010" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" dominant-baseline="auto">GND</text>
+<rect x="620" y="245" width="280" height="360" rx="8" fill="#ffffff" stroke="#101010" stroke-width="3"/>
+<text x="760" y="281" fill="#101010" font-family="Arial, sans-serif" font-size="22" font-weight="700" text-anchor="middle" dominant-baseline="auto">DA1</text>
+<text x="760" y="309" fill="#101010" font-family="Arial, sans-serif" font-size="15" font-weight="400" text-anchor="middle" dominant-baseline="auto">NE555</text>
 <circle cx="620" cy="335" r="4" fill="#101010" stroke="#101010"/>
 <text x="630" y="327" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" dominant-baseline="auto">2 TRIG</text>
 <circle cx="620" cy="420" r="4" fill="#101010" stroke="#101010"/>
@@ -26,43 +26,43 @@
 <text x="785" y="257" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" dominant-baseline="auto">8 VCC</text>
 <circle cx="760" cy="605" r="4" fill="#101010" stroke="#101010"/>
 <text x="734" y="579" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" dominant-baseline="auto">1 GND</text>
-<polyline points="710,105 710,245" fill="none" stroke="#123f91" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="810,105 810,245" fill="none" stroke="#123f91" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="710" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
-<circle cx="810" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
-<polyline points="760,605 760,765" fill="none" stroke="#157347" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="760" cy="765" r="4" fill="#157347" stroke="#157347"/>
+<polyline points="710,105 710,245" fill="none" stroke="#101010" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="810,105 810,245" fill="none" stroke="#101010" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="710" cy="105" r="4" fill="#101010" stroke="#101010"/>
+<circle cx="810" cy="105" r="4" fill="#101010" stroke="#101010"/>
+<polyline points="760,605 760,765" fill="none" stroke="#101010" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="760" cy="765" r="4" fill="#101010" stroke="#101010"/>
 <line x1="270" y1="105" x2="270" y2="186" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="270" y1="254" x2="270" y2="335" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<rect x="236" y="186" width="68" height="68" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<rect x="236" y="186" width="68" height="68" rx="5" fill="#ffffff" stroke="#101010" stroke-width="2"/>
 <text x="270" y="208" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R2</text>
-<text x="270" y="224" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">100k</text>
-<circle cx="270" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
+<text x="270" y="224" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">100 кОм</text>
+<circle cx="270" cy="105" r="4" fill="#101010" stroke="#101010"/>
 <circle cx="270" cy="335" r="4" fill="#101010" stroke="#101010"/>
 <polyline points="270,335 560,335 620,335" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <polyline points="270,335 225,335" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <line x1="225" y1="335" x2="200" y2="365" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="170" y1="373" x2="140" y2="373" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<line x1="140" y1="373" x2="140" y2="765" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
-<circle cx="140" cy="765" r="4" fill="#157347" stroke="#157347"/>
-<text x="123" y="350" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="start" dominant-baseline="auto">S1</text>
+<line x1="140" y1="373" x2="140" y2="765" stroke="#101010" stroke-width="2" stroke-linecap="round"/>
+<circle cx="140" cy="765" r="4" fill="#101010" stroke="#101010"/>
+<text x="123" y="350" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="start" dominant-baseline="auto">SB1</text>
 <line x1="430" y1="105" x2="430" y2="228" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="430" y1="296" x2="430" y2="420" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<rect x="396" y="228" width="68" height="68" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<rect x="396" y="228" width="68" height="68" rx="5" fill="#ffffff" stroke="#101010" stroke-width="2"/>
 <text x="430" y="250" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R1</text>
-<text x="430" y="266" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">5M</text>
+<text x="430" y="266" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">5 МОм</text>
 <line x1="382" y1="297" x2="475" y2="227" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="475" y1="227" x2="467" y2="245" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="475" y1="227" x2="456" y2="228" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<circle cx="430" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
+<circle cx="430" cy="105" r="4" fill="#101010" stroke="#101010"/>
 <circle cx="430" cy="420" r="4" fill="#101010" stroke="#101010"/>
 <line x1="430" y1="420" x2="430" y2="574" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="430" y1="610" x2="430" y2="765" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="410" y1="584" x2="450" y2="584" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <line x1="410" y1="600" x2="450" y2="600" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <text x="458" y="574" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">C1</text>
-<text x="458" y="590" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">47uF</text>
-<circle cx="430" cy="765" r="4" fill="#157347" stroke="#157347"/>
+<text x="458" y="590" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">47 мкФ</text>
+<circle cx="430" cy="765" r="4" fill="#101010" stroke="#101010"/>
 <polyline points="430,420 555,420 620,420" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <polyline points="430,420 500,420 500,495 620,495" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <text x="448" y="402" fill="#555555" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" dominant-baseline="auto">timing node</text>
@@ -73,8 +73,8 @@
 <line x1="950" y1="657" x2="990" y2="657" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <line x1="950" y1="673" x2="990" y2="673" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <text x="998" y="647" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">C2</text>
-<text x="998" y="663" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">10nF</text>
-<circle cx="970" cy="765" r="4" fill="#157347" stroke="#157347"/>
+<text x="998" y="663" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">10 нФ</text>
+<circle cx="970" cy="765" r="4" fill="#101010" stroke="#101010"/>
 <polyline points="900,335 980,335" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="980" cy="335" r="4" fill="#101010" stroke="#101010"/>
 <circle cx="980" cy="290" r="6" fill="white" stroke="#101010" stroke-width="2"/>
@@ -82,9 +82,9 @@
 <line x1="980" y1="296" x2="980" y2="335" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="980" y1="335" x2="1011" y2="335" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1079" y1="335" x2="1110" y2="335" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<rect x="1011" y="318" width="68" height="34" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<rect x="1011" y="318" width="68" height="34" rx="5" fill="#ffffff" stroke="#101010" stroke-width="2"/>
 <text x="1045" y="323" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R3</text>
-<text x="1045" y="337" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">1k</text>
+<text x="1045" y="337" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">1 кОм</text>
 <circle cx="1210" cy="455" r="40" fill="white" stroke="#101010" stroke-width="2"/>
 <line x1="1148" y1="455" x2="1196" y2="455" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1196" y1="455" x2="1228" y2="430" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
@@ -92,10 +92,10 @@
 <line x1="1228" y1="430" x2="1228" y2="383" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1228" y1="480" x2="1228" y2="527" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1219" y1="467" x2="1232" y2="481" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<text x="1174" y="505" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">T1 NPN</text>
+<text x="1174" y="505" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">VT1</text>
 <polyline points="1110,335 1148,335 1148,455 1148,455" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="1228,527 1228,765" fill="none" stroke="#157347" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="1228" cy="765" r="4" fill="#157347" stroke="#157347"/>
+<polyline points="1228,527 1228,765" fill="none" stroke="#101010" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="1228" cy="765" r="4" fill="#101010" stroke="#101010"/>
 <polyline points="1228,383 1228,305" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="1228" cy="305" r="4" fill="#101010" stroke="#101010"/>
 <line x1="1228" y1="105" x2="1228" y2="133" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
@@ -104,39 +104,39 @@
 <line x1="1210" y1="171" x2="1246" y2="171" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1250" y1="132" x2="1266" y2="116" stroke="#161616" stroke-width="1" stroke-linecap="round"/>
 <line x1="1255" y1="147" x2="1271" y2="131" stroke="#161616" stroke-width="1" stroke-linecap="round"/>
-<text x="1276" y="139" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">LED1</text>
+<text x="1276" y="139" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">HL1</text>
 <line x1="1228" y1="205" x2="1228" y2="221" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1228" y1="289" x2="1228" y2="305" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
-<rect x="1194" y="221" width="68" height="68" rx="5" fill="#f7fbff" stroke="#101010" stroke-width="2"/>
+<rect x="1194" y="221" width="68" height="68" rx="5" fill="#ffffff" stroke="#101010" stroke-width="2"/>
 <text x="1228" y="243" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">R4</text>
-<text x="1228" y="259" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">1.5k</text>
-<circle cx="1228" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
+<text x="1228" y="259" fill="#101010" font-family="Arial, sans-serif" font-size="9" font-weight="400" text-anchor="middle" dominant-baseline="auto">1,5 кОм</text>
+<circle cx="1228" cy="105" r="4" fill="#101010" stroke="#101010"/>
 <line x1="1340" y1="105" x2="1340" y2="417" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1340" y1="453" x2="1340" y2="765" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1320" y1="427" x2="1360" y2="427" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <line x1="1320" y1="443" x2="1360" y2="443" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <text x="1368" y="417" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">C3</text>
-<text x="1368" y="433" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">100nF</text>
-<circle cx="1340" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
-<circle cx="1340" cy="765" r="4" fill="#157347" stroke="#157347"/>
+<text x="1368" y="433" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">100 нФ</text>
+<circle cx="1340" cy="105" r="4" fill="#101010" stroke="#101010"/>
+<circle cx="1340" cy="765" r="4" fill="#101010" stroke="#101010"/>
 <line x1="1420" y1="105" x2="1420" y2="417" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1420" y1="453" x2="1420" y2="765" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <line x1="1400" y1="427" x2="1440" y2="427" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <line x1="1400" y1="443" x2="1440" y2="443" stroke="#161616" stroke-width="3" stroke-linecap="round"/>
 <text x="1448" y="417" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">C4</text>
-<text x="1448" y="433" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">100uF</text>
-<circle cx="1420" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
-<circle cx="1420" cy="765" r="4" fill="#157347" stroke="#157347"/>
+<text x="1448" y="433" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="start" dominant-baseline="auto">100 мкФ</text>
+<circle cx="1420" cy="105" r="4" fill="#101010" stroke="#101010"/>
+<circle cx="1420" cy="765" r="4" fill="#101010" stroke="#101010"/>
 <rect x="1272" y="48" width="86" height="48" rx="5" fill="#eaf8ef" stroke="#101010" stroke-width="2"/>
-<text x="1315" y="64" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">POWER</text>
-<text x="1315" y="80" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">9-12V</text>
-<polyline points="1272,72 1228,72 1228,105" fill="none" stroke="#123f91" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<circle cx="1228" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
-<rect x="42" y="812" width="640" height="50" rx="5" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+<text x="1315" y="64" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="auto">XP1</text>
+<text x="1315" y="80" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">+9...12 В</text>
+<polyline points="1272,72 1228,72 1228,105" fill="none" stroke="#101010" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="1228" cy="105" r="4" fill="#101010" stroke="#101010"/>
+<rect x="42" y="812" width="640" height="50" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
 <text x="58" y="826" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="start" dominant-baseline="auto">Correct construction rule:</text>
 <text x="58" y="845" fill="#444444" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" dominant-baseline="auto">external schematic uses the NE555 subcircuit symbol; internal structure belongs on a separate sheet with matching ports 1-8.</text>
-<line x1="1162" y1="780" x2="1198" y2="780" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
-<line x1="1168" y1="787" x2="1192" y2="787" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
-<line x1="1174" y1="794" x2="1186" y2="794" stroke="#157347" stroke-width="2" stroke-linecap="round"/>
-<text x="1204" y="776" fill="#157347" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" dominant-baseline="auto">main ground</text>
+<line x1="1162" y1="780" x2="1198" y2="780" stroke="#101010" stroke-width="2" stroke-linecap="round"/>
+<line x1="1168" y1="787" x2="1192" y2="787" stroke="#101010" stroke-width="2" stroke-linecap="round"/>
+<line x1="1174" y1="794" x2="1186" y2="794" stroke="#101010" stroke-width="2" stroke-linecap="round"/>
+<text x="1204" y="776" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" dominant-baseline="auto">main ground</text>
 </svg>

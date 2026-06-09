@@ -17,7 +17,8 @@
         "crossing_count": 0,
         "overlap_count": 0,
         "missing_coordinate_count": 0,
-        "requires_hierarchy": false
+        "requires_hierarchy": false,
+        "profile": "eskd"
       },
       "subcircuit:NE555_FUNC": {
         "component_count": 18,
@@ -30,7 +31,8 @@
         "crossing_count": 0,
         "overlap_count": 0,
         "missing_coordinate_count": 0,
-        "requires_hierarchy": false
+        "requires_hierarchy": false,
+        "profile": "eskd"
       }
     },
     "component_count": 37,
@@ -42,6 +44,7 @@
     "overlap_count": 0,
     "missing_coordinate_count": 0,
     "requires_hierarchy": false,
+    "profile": "eskd",
     "diagonal_segment_ratio": 0.0,
     "direct_diagonal_connection_ratio": 0.0
   }

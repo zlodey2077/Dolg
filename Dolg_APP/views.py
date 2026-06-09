@@ -2233,6 +2233,9 @@ def api_cad_scheme_operations_preview(request):
         atomic=bool(data.get('atomic')),
     )
     scheme_data = result.get('scheme_data') or {}
+    layout_profile = data.get('layout_profile') or data.get('standard_profile') or (
+        (scheme_data.get('metadata') or {}).get('standard_profile') if isinstance(scheme_data, dict) else None
+    )
     drc = _validate_scheme_data(scheme_data)
     layout_quality = {}
     layout_quality_error = ''
@@ -2241,7 +2244,7 @@ def api_cad_scheme_operations_preview(request):
     try:
         from .services.schematic_layout_quality import analyze_schematic_layout
 
-        layout_quality = analyze_schematic_layout(scheme_data)
+        layout_quality = analyze_schematic_layout(scheme_data, profile=layout_profile)
     except Exception as exc:
         layout_quality_error = str(exc)
     try:
@@ -2258,6 +2261,7 @@ def api_cad_scheme_operations_preview(request):
         'operation_report': result.get('report') or {},
         'drc': drc,
         'layout_quality': layout_quality,
+        'layout_profile': layout_profile or 'generic',
         'topology': topology,
     }
     if layout_quality_error:

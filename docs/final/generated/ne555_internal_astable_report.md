@@ -27,7 +27,7 @@ Modeling note: this is a functional NE555 internal schematic, not a manufacturer
 
 Layout note: the first generated graph preview was intentionally replaced. A readable schematic needs a schematic-layout layer, not a generic node-link graph layout.
 
-Latest layout quality self-check:
+Latest layout quality self-check (`eskd` profile):
 
 - scopes: 2 (`sheet:external_astable_load`, `subcircuit:NE555_FUNC`)
 - components: 37
@@ -38,3 +38,4 @@ Latest layout quality self-check:
 - component overlaps: 0
 - missing coordinates: 0
 - warnings: 0
+- ESKD refdes/unit/symbol-standard errors: 0

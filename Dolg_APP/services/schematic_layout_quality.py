@@ -55,21 +55,63 @@ SIZE_BY_TYPE = {
     'output_driver': (110, 64),
 }
 
+ESKD_REF_PREFIXES = {
+    'resistor': ('R',),
+    'potentiometer': ('R',),
+    'capacitor': ('C',),
+    'inductor': ('L',),
+    'battery': ('GB', 'G'),
+    'current_source': ('G',),
+    'diode': ('VD',),
+    'led': ('HL', 'VD'),
+    'transistor': ('VT',),
+    'button': ('SB',),
+    'switch': ('S', 'SA', 'SB'),
+    'connector': ('X', 'XP', 'XS'),
+    'ic': ('DA', 'DD', 'D'),
+    'relay': ('K',),
+}
 
-def analyze_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, Any]:
+ESKD_SYMBOL_STANDARDS = {
+    'resistor': ('ГОСТ 2.728', 'GOST 2.728'),
+    'potentiometer': ('ГОСТ 2.728', 'GOST 2.728'),
+    'capacitor': ('ГОСТ 2.728', 'GOST 2.728'),
+    'diode': ('ГОСТ 2.730', 'GOST 2.730'),
+    'led': ('ГОСТ 2.730', 'GOST 2.730'),
+    'transistor': ('ГОСТ 2.730', 'GOST 2.730'),
+    'button': ('ГОСТ 2.755', 'GOST 2.755'),
+    'switch': ('ГОСТ 2.755', 'GOST 2.755'),
+    'connector': ('ГОСТ 2.755', 'GOST 2.755'),
+    'battery': ('ГОСТ 2.768', 'GOST 2.768'),
+    'ic': ('ГОСТ 2.743', 'GOST 2.743', 'ГОСТ 2.721', 'GOST 2.721'),
+}
+
+ESKD_VALUE_REQUIRED_TYPES = {
+    'resistor': ('Ом', 'кОм', 'МОм', 'ohm', 'kohm', 'mohm'),
+    'potentiometer': ('Ом', 'кОм', 'МОм', 'ohm', 'kohm', 'mohm'),
+    'capacitor': ('пФ', 'нФ', 'мкФ', 'Ф', 'pf', 'nf', 'uf'),
+    'inductor': ('мкГн', 'мГн', 'Гн', 'uh', 'mh'),
+    'battery': ('В', 'V'),
+}
+
+ESKD_BLACK_COLORS = {'', 'black', '#000', '#000000', '#111', '#111111', 'none'}
+
+
+def analyze_schematic_layout(scheme_data: dict[str, Any] | None, *, profile: str | None = None) -> dict[str, Any]:
+    profile = _resolve_profile(scheme_data, profile)
     scopes = _layout_scopes(scheme_data)
     if not scopes:
-        return _analyze_flat_schematic_layout(scheme_data)
+        return _analyze_flat_schematic_layout(scheme_data, profile=profile)
 
     scoped_reports = []
     if _components(scheme_data) or _connections(scheme_data):
-        scoped_reports.append(('root', _analyze_flat_schematic_layout(scheme_data)))
+        scoped_reports.append(('root', _analyze_flat_schematic_layout(scheme_data, profile=profile)))
     for scope_name, scope_data in scopes:
-        scoped_reports.append((scope_name, _analyze_flat_schematic_layout(scope_data)))
-    return _merge_scoped_reports(scoped_reports)
+        scoped_reports.append((scope_name, _analyze_flat_schematic_layout(scope_data, profile=profile)))
+    return _merge_scoped_reports(scoped_reports, profile=profile)
 
 
-def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, Any]:
+def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None, *, profile: str = 'generic') -> dict[str, Any]:
     components = _components(scheme_data)
     connections = _connections(scheme_data)
     by_id = {str(item.get('id')): item for item in components if item.get('id') is not None}
@@ -198,6 +240,9 @@ def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[s
             hub_findings,
         )
 
+    if _is_eskd_profile(profile, scheme_data):
+        _append_eskd_findings(findings, components, connections, scheme_data)
+
     errors = [item['message'] for item in findings if item['severity'] == 'error']
     warnings = [item['message'] for item in findings if item['severity'] == 'warning']
     return {
@@ -217,8 +262,20 @@ def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[s
             'overlap_count': len(overlaps),
             'missing_coordinate_count': len(missing_coordinates),
             'requires_hierarchy': bool(hierarchy_problem),
+            'profile': profile,
         },
     }
+
+
+def _resolve_profile(scheme_data: dict[str, Any] | None, profile: str | None) -> str:
+    if profile:
+        return str(profile).strip().lower()
+    if isinstance(scheme_data, dict):
+        metadata = scheme_data.get('metadata') if isinstance(scheme_data.get('metadata'), dict) else {}
+        value = metadata.get('standard_profile') or metadata.get('standard') or ''
+        if value:
+            return str(value).strip().lower()
+    return 'generic'
 
 
 def _layout_scopes(scheme_data: dict[str, Any] | None) -> list[tuple[str, dict[str, Any]]]:
@@ -238,7 +295,7 @@ def _layout_scopes(scheme_data: dict[str, Any] | None) -> list[tuple[str, dict[s
     return scopes
 
 
-def _merge_scoped_reports(scoped_reports: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
+def _merge_scoped_reports(scoped_reports: list[tuple[str, dict[str, Any]]], *, profile: str = 'generic') -> dict[str, Any]:
     findings = []
     metrics = {
         'scope_count': len(scoped_reports),
@@ -252,6 +309,7 @@ def _merge_scoped_reports(scoped_reports: list[tuple[str, dict[str, Any]]]) -> d
         'overlap_count': 0,
         'missing_coordinate_count': 0,
         'requires_hierarchy': False,
+        'profile': profile,
     }
     for scope_name, report in scoped_reports:
         scope_metrics = report.get('metrics') or {}
@@ -526,6 +584,231 @@ def _hub_without_bus_routes(connections: list[dict[str, Any]]) -> list[dict[str,
         if data['degree'] >= 8 and data['unrouted'] >= 5:
             out.append({'component': cid, **data})
     return out[:10]
+
+
+def _is_eskd_profile(profile: str, scheme_data: dict[str, Any] | None) -> bool:
+    text = (profile or '').lower()
+    if 'eskd' in text or 'гост' in text or 'gost' in text:
+        return True
+    if isinstance(scheme_data, dict):
+        metadata = scheme_data.get('metadata') if isinstance(scheme_data.get('metadata'), dict) else {}
+        value = str(metadata.get('standard_profile') or metadata.get('standard') or '').lower()
+        return 'eskd' in value or 'гост' in value or 'gost' in value
+    return False
+
+
+def _append_eskd_findings(
+    findings: list[dict[str, Any]],
+    components: list[dict[str, Any]],
+    connections: list[dict[str, Any]],
+    scheme_data: dict[str, Any] | None,
+) -> None:
+    metadata = scheme_data.get('metadata') if isinstance(scheme_data, dict) and isinstance(scheme_data.get('metadata'), dict) else {}
+    eskd = metadata.get('eskd') if isinstance(metadata.get('eskd'), dict) else {}
+    scope_kind = str(eskd.get('scope_kind') or metadata.get('scope_kind') or 'principle').lower()
+
+    if not eskd.get('scheme_code') and scope_kind in {'principle', 'external'}:
+        _finding(
+            findings,
+            'warning',
+            'eskd_missing_scheme_code',
+            'ESKD sheet should declare scheme_code, for example E3/Э3 for an electrical schematic.',
+            metadata,
+        )
+
+    if scope_kind in {'functional', 'internal_functional'}:
+        _append_functional_eskd_findings(findings, components)
+        return
+
+    ref_errors = []
+    value_errors = []
+    symbol_errors = []
+    style_errors = []
+
+    for component in components:
+        ctype = normalize_component_type(component.get('type'))
+        if ctype in {'node', 'ground', 'pin'}:
+            continue
+
+        refdes = _component_refdes(component)
+        allowed_prefixes = ESKD_REF_PREFIXES.get(ctype)
+        if allowed_prefixes and not _refdes_matches(refdes, allowed_prefixes):
+            ref_errors.append(
+                {
+                    'id': component.get('id'),
+                    'type': ctype,
+                    'refdes': refdes,
+                    'expected_prefix': allowed_prefixes,
+                }
+            )
+
+        required_units = ESKD_VALUE_REQUIRED_TYPES.get(ctype)
+        if required_units and not _has_value_with_unit(component, required_units):
+            value_errors.append(
+                {
+                    'id': component.get('id'),
+                    'refdes': refdes,
+                    'type': ctype,
+                    'expected_units': required_units,
+                }
+            )
+
+        expected_standards = ESKD_SYMBOL_STANDARDS.get(ctype)
+        if expected_standards and not _has_symbol_standard(component, expected_standards):
+            symbol_errors.append(
+                {
+                    'id': component.get('id'),
+                    'refdes': refdes,
+                    'type': ctype,
+                    'expected': expected_standards,
+                }
+            )
+
+        bad_style = _bad_eskd_style(component)
+        if bad_style:
+            style_errors.append({'id': component.get('id'), 'refdes': refdes, **bad_style})
+
+    if ref_errors:
+        _finding(
+            findings,
+            'error',
+            'eskd_refdes_prefix_mismatch',
+            'Component reference designators do not match ESKD-style letter prefixes.',
+            ref_errors[:30],
+        )
+    if value_errors:
+        _finding(
+            findings,
+            'error',
+            'eskd_missing_nominal_units',
+            'Nominal values must be written with units for ESKD-style electrical schematics.',
+            value_errors[:30],
+        )
+    if symbol_errors:
+        _finding(
+            findings,
+            'error',
+            'eskd_missing_symbol_standard',
+            'Components must declare the GOST/ESKD symbol standard used by their UGO.',
+            symbol_errors[:30],
+        )
+    if style_errors:
+        _finding(
+            findings,
+            'error',
+            'eskd_non_monochrome_style',
+            'ESKD output must not depend on simulator colors for electrical connections or symbols.',
+            style_errors[:30],
+        )
+
+    missing_net_labels = [
+        index
+        for index, connection in enumerate(connections)
+        if not (connection.get('net_label') or connection.get('net') or connection.get('label'))
+    ]
+    if missing_net_labels:
+        _finding(
+            findings,
+            'warning',
+            'eskd_unlabeled_connections',
+            'Named nets are recommended for ESKD review/export; unlabeled connections make checking harder.',
+            missing_net_labels[:30],
+        )
+
+
+def _append_functional_eskd_findings(findings: list[dict[str, Any]], components: list[dict[str, Any]]) -> None:
+    unnamed_blocks = []
+    for component in components:
+        ctype = normalize_component_type(component.get('type'))
+        if ctype in {'node', 'ground'}:
+            continue
+        label = str(component.get('label') or component.get('name') or '').strip()
+        if not label:
+            unnamed_blocks.append({'id': component.get('id'), 'type': ctype})
+    if unnamed_blocks:
+        _finding(
+            findings,
+            'error',
+            'eskd_functional_block_without_name',
+            'Functional ESKD-style sheets may use rectangles, but every functional block must be named.',
+            unnamed_blocks[:30],
+        )
+
+
+def _component_refdes(component: dict[str, Any]) -> str:
+    return str(component.get('refdes') or component.get('ref') or component.get('reference') or component.get('label') or component.get('id') or '').strip()
+
+
+def _refdes_matches(refdes: str, prefixes: tuple[str, ...]) -> bool:
+    if not refdes:
+        return False
+    upper = refdes.upper().replace(' ', '')
+    for prefix in sorted(prefixes, key=len, reverse=True):
+        if upper.startswith(prefix) and upper[len(prefix): len(prefix) + 1].isdigit():
+            return True
+    return False
+
+
+def _has_value_with_unit(component: dict[str, Any], units: tuple[str, ...]) -> bool:
+    candidates = [
+        component.get('value_label'),
+        component.get('nominal_label'),
+        component.get('display_value'),
+        component.get('value'),
+        component.get('resistance'),
+        component.get('capacitance'),
+        component.get('inductance'),
+        component.get('voltage'),
+    ]
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        text = str(candidate).strip()
+        if not text:
+            continue
+        lower = text.lower().replace(' ', '')
+        if any(unit.lower().replace(' ', '') in lower for unit in units):
+            return True
+    return False
+
+
+def _has_symbol_standard(component: dict[str, Any], expected: tuple[str, ...]) -> bool:
+    values = []
+    for key in ('symbol_standard', 'ugo_standard', 'standard'):
+        value = component.get(key)
+        if value:
+            values.append(str(value))
+    metadata = component.get('metadata') if isinstance(component.get('metadata'), dict) else {}
+    for key in ('symbol_standard', 'ugo_standard', 'standard'):
+        value = metadata.get(key)
+        if value:
+            values.append(str(value))
+    normalized_values = [value.lower().replace(' ', '') for value in values]
+    for expected_item in expected:
+        normalized_expected = expected_item.lower().replace(' ', '')
+        if any(normalized_expected in value for value in normalized_values):
+            return True
+    return False
+
+
+def _bad_eskd_style(component: dict[str, Any]) -> dict[str, Any] | None:
+    style = component.get('style') if isinstance(component.get('style'), dict) else {}
+    colors = []
+    for key in ('color', 'stroke', 'fill'):
+        value = component.get(key)
+        if value is not None:
+            colors.append((key, str(value)))
+        style_value = style.get(key)
+        if style_value is not None:
+            colors.append((f'style.{key}', str(style_value)))
+    bad = [
+        {'field': key, 'value': value}
+        for key, value in colors
+        if value.strip().lower() not in ESKD_BLACK_COLORS
+    ]
+    if bad:
+        return {'bad_colors': bad}
+    return None
 
 
 def _finding(findings: list[dict[str, Any]], severity: str, code: str, message: str, evidence: Any) -> None:

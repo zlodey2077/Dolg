@@ -4,12 +4,30 @@
     "metadata": {
       "title": "NE555 astable/load schematic with hierarchical NE555 subcircuit",
       "generated_by": "scripts/generate_ne555_simulator_preview.py",
-      "layout_contract": "orthogonal-schematic-v1"
+      "layout_contract": "orthogonal-schematic-v1",
+      "standard_profile": "eskd",
+      "eskd": {
+        "basis": [
+          "ГОСТ 2.701",
+          "ГОСТ 2.702",
+          "ГОСТ 2.710",
+          "ГОСТ 2.721",
+          "ГОСТ 2.728"
+        ],
+        "note": "Automated ESKD-style quality gate; not a substitute for certified norm control."
+      }
     },
     "sheets": [
       {
         "id": "external_astable_load",
         "title": "External NE555 astable/load sheet",
+        "metadata": {
+          "standard_profile": "eskd",
+          "eskd": {
+            "scheme_code": "Э3",
+            "scope_kind": "principle"
+          }
+        },
         "components": [
           {
             "id": "VCC_RAIL",
@@ -98,7 +116,7 @@
           {
             "id": "U1",
             "type": "ic",
-            "label": "NE555",
+            "label": "DA1",
             "x": 760,
             "y": 425,
             "width": 280,
@@ -146,12 +164,15 @@
               }
             ],
             "spice_model": "NE555",
-            "subcircuit": "NE555_FUNC"
+            "subcircuit": "NE555_FUNC",
+            "refdes": "DA1",
+            "type_label": "NE555",
+            "symbol_standard": "ГОСТ 2.721"
           },
           {
             "id": "R2",
             "type": "resistor",
-            "label": "R2 100k",
+            "label": "R2",
             "x": 270,
             "y": 220,
             "width": 68,
@@ -168,12 +189,15 @@
                 "y": 335
               }
             ],
-            "resistance": 100000
+            "resistance": 100000,
+            "refdes": "R2",
+            "value_label": "100 кОм",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "R1",
             "type": "potentiometer",
-            "label": "R1 5M",
+            "label": "R1",
             "x": 430,
             "y": 250,
             "width": 78,
@@ -195,12 +219,15 @@
                 "y": 420
               }
             ],
-            "resistance": 5000000
+            "resistance": 5000000,
+            "refdes": "R1",
+            "value_label": "5 МОм",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "C1",
             "type": "capacitor",
-            "label": "C1 47uF",
+            "label": "C1",
             "x": 430,
             "y": 610,
             "width": 54,
@@ -217,12 +244,15 @@
                 "y": 765
               }
             ],
-            "capacitance": 47
+            "capacitance": 47,
+            "refdes": "C1",
+            "value_label": "47 мкФ",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "S1",
             "type": "button",
-            "label": "S1",
+            "label": "SB1",
             "x": 185,
             "y": 460,
             "width": 82,
@@ -238,12 +268,14 @@
                 "x": 140,
                 "y": 765
               }
-            ]
+            ],
+            "refdes": "SB1",
+            "symbol_standard": "ГОСТ 2.755"
           },
           {
             "id": "C2",
             "type": "capacitor",
-            "label": "C2 10nF",
+            "label": "C2",
             "x": 970,
             "y": 640,
             "width": 54,
@@ -260,12 +292,15 @@
                 "y": 765
               }
             ],
-            "capacitance": "0.01"
+            "capacitance": "0.01",
+            "refdes": "C2",
+            "value_label": "10 нФ",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "R3",
             "type": "resistor",
-            "label": "R3 1k",
+            "label": "R3",
             "x": 1060,
             "y": 335,
             "width": 78,
@@ -282,12 +317,15 @@
                 "y": 335
               }
             ],
-            "resistance": 1000
+            "resistance": 1000,
+            "refdes": "R3",
+            "value_label": "1 кОм",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "T1",
             "type": "transistor",
-            "label": "T1 NPN",
+            "label": "VT1",
             "x": 1210,
             "y": 455,
             "width": 86,
@@ -309,12 +347,14 @@
                 "y": 527
               }
             ],
-            "spice_model": "QNPN"
+            "spice_model": "QNPN",
+            "refdes": "VT1",
+            "symbol_standard": "ГОСТ 2.730"
           },
           {
             "id": "LED1",
             "type": "led",
-            "label": "LED1",
+            "label": "HL1",
             "x": 1228,
             "y": 155,
             "width": 72,
@@ -331,12 +371,14 @@
                 "y": 205
               }
             ],
-            "spice_model": "DLED"
+            "spice_model": "DLED",
+            "refdes": "HL1",
+            "symbol_standard": "ГОСТ 2.730"
           },
           {
             "id": "R4",
             "type": "resistor",
-            "label": "R4 1.5k",
+            "label": "R4",
             "x": 1228,
             "y": 255,
             "width": 78,
@@ -353,12 +395,15 @@
                 "y": 383
               }
             ],
-            "resistance": 1500
+            "resistance": 1500,
+            "refdes": "R4",
+            "value_label": "1,5 кОм",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "C3",
             "type": "capacitor",
-            "label": "C3 100nF",
+            "label": "C3",
             "x": 1340,
             "y": 435,
             "width": 54,
@@ -375,12 +420,15 @@
                 "y": 765
               }
             ],
-            "capacitance": "0.1"
+            "capacitance": "0.1",
+            "refdes": "C3",
+            "value_label": "100 нФ",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "C4",
             "type": "capacitor",
-            "label": "C4 100uF",
+            "label": "C4",
             "x": 1420,
             "y": 435,
             "width": 54,
@@ -397,12 +445,15 @@
                 "y": 765
               }
             ],
-            "capacitance": 100
+            "capacitance": 100,
+            "refdes": "C4",
+            "value_label": "100 мкФ",
+            "symbol_standard": "ГОСТ 2.728"
           },
           {
             "id": "POWER",
             "type": "connector",
-            "label": "POWER 9-12V",
+            "label": "XP1",
             "x": 1315,
             "y": 72,
             "width": 86,
@@ -418,7 +469,10 @@
                 "x": 1383,
                 "y": 765
               }
-            ]
+            ],
+            "refdes": "XP1",
+            "value_label": "+9...12 В",
+            "symbol_standard": "ГОСТ 2.755"
           }
         ],
         "connections": [
@@ -965,6 +1019,13 @@
       {
         "id": "NE555_FUNC",
         "title": "NE555 functional internal subcircuit",
+        "metadata": {
+          "standard_profile": "eskd",
+          "eskd": {
+            "scheme_code": "Э2",
+            "scope_kind": "functional"
+          }
+        },
         "ports": [
           "1",
           "2",

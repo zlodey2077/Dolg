@@ -198,3 +198,91 @@ class SchematicLayoutQualityTests(SimpleTestCase):
         report = analyze_schematic_layout(scheme)
 
         self.assertTrue(any(item['code'] == 'component_overlaps' for item in report['findings']), report)
+
+    def test_eskd_profile_rejects_nonstandard_reference_designators(self):
+        scheme = {
+            'metadata': {'standard_profile': 'eskd', 'eskd': {'scheme_code': 'Э3'}},
+            'components': [
+                {
+                    'id': 'LED1',
+                    'type': 'led',
+                    'label': 'LED1',
+                    'x': 0,
+                    'y': 0,
+                    'value_label': 'красный',
+                    'symbol_standard': 'ГОСТ 2.730',
+                },
+                {
+                    'id': 'T1',
+                    'type': 'transistor',
+                    'label': 'T1',
+                    'x': 120,
+                    'y': 0,
+                    'spice_model': 'QNPN',
+                    'symbol_standard': 'ГОСТ 2.730',
+                },
+            ],
+            'connections': [],
+        }
+
+        report = analyze_schematic_layout(scheme)
+
+        self.assertFalse(report['ok'])
+        self.assertTrue(any(item['code'] == 'eskd_refdes_prefix_mismatch' for item in report['findings']), report)
+
+    def test_eskd_profile_accepts_standard_refdes_units_and_ugo_standards(self):
+        scheme = {
+            'metadata': {'standard_profile': 'eskd', 'eskd': {'scheme_code': 'Э3'}},
+            'components': [
+                {
+                    'id': 'R1',
+                    'type': 'resistor',
+                    'refdes': 'R1',
+                    'label': 'R1',
+                    'value_label': '1 кОм',
+                    'symbol_standard': 'ГОСТ 2.728',
+                    'x': 0,
+                    'y': 0,
+                    'ports': [{'id': '1', 'x': -40, 'y': 0}, {'id': '2', 'x': 40, 'y': 0}],
+                },
+                {
+                    'id': 'C1',
+                    'type': 'capacitor',
+                    'refdes': 'C1',
+                    'label': 'C1',
+                    'value_label': '10 нФ',
+                    'symbol_standard': 'ГОСТ 2.728',
+                    'x': 120,
+                    'y': 0,
+                    'ports': [{'id': '1', 'x': 80, 'y': 0}, {'id': '2', 'x': 160, 'y': 0}],
+                },
+            ],
+            'connections': [
+                {
+                    'from': {'compId': 'R1', 'portId': '2'},
+                    'to': {'compId': 'C1', 'portId': '1'},
+                    'net_label': 'RC',
+                }
+            ],
+        }
+
+        report = analyze_schematic_layout(scheme)
+
+        self.assertTrue(report['ok'], report)
+        self.assertFalse(report['errors'], report)
+
+    def test_eskd_profile_rejects_missing_nominal_units_and_symbol_standard(self):
+        scheme = {
+            'metadata': {'standard_profile': 'eskd', 'eskd': {'scheme_code': 'Э3'}},
+            'components': [
+                {'id': 'R1', 'type': 'resistor', 'refdes': 'R1', 'label': 'R1', 'resistance': 1000, 'x': 0, 'y': 0},
+            ],
+            'connections': [],
+        }
+
+        report = analyze_schematic_layout(scheme)
+
+        self.assertFalse(report['ok'])
+        codes = {item['code'] for item in report['findings']}
+        self.assertIn('eskd_missing_nominal_units', codes)
+        self.assertIn('eskd_missing_symbol_standard', codes)
