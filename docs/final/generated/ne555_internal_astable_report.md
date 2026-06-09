@@ -16,6 +16,9 @@ Artifacts:
 
 - `ne555_internal_astable_operations.json` - operation log for the programmatic mode.
 - `ne555_internal_astable_scheme.json` - importable `scheme_data` package with DRC/topology report.
-- `ne555_internal_astable_preview.svg` - static visual preview.
+- `ne555_internal_astable_preview.svg` - simulator-style SVG preview with fixed pins, rails and orthogonal wiring.
+- `ne555_internal_astable_simulator_preview.png` - raster preview of the same simulator-style layout.
 
 Modeling note: this is a functional NE555 internal schematic, not a manufacturer-specific transistor-level die netlist.
+
+Layout note: the first generated graph preview was intentionally replaced. A readable schematic needs a schematic-layout layer, not a generic node-link graph layout.
