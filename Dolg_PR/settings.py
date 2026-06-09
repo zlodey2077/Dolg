@@ -53,6 +53,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', DEFAULT_INSECURE_SECRET_KEY)
 
 DEBUG = env_bool('DEBUG', True)
 ALLOW_MOCK_SSO = env_bool('ALLOW_MOCK_SSO', DEBUG or IS_TESTING)
+SKIP_OPTIONAL_APP_PROBES = env_bool('DOLG_SKIP_OPTIONAL_APP_PROBES', False)
 
 ALLOWED_HOSTS = env_list(
     'ALLOWED_HOSTS',
@@ -138,6 +139,8 @@ INSTALLED_APPS = [
 # Если пакет не установлен — пропускаем регистрацию (сервер не падает).
 # Grafana stack подцепляется через docker-compose в deploy/.
 try:
+    if SKIP_OPTIONAL_APP_PROBES:
+        raise ImportError
     import django_prometheus  # noqa: F401
 
     INSTALLED_APPS.append('django_prometheus')
@@ -155,6 +158,8 @@ METRICS_TOKEN = os.environ.get('METRICS_TOKEN', '')
 # Если включить без миграций → ЛЮБОЙ view ломается → blank page.
 # Default ВСЕГДА False; включается явно через env-var ПОСЛЕ `manage.py migrate`.
 try:
+    if SKIP_OPTIONAL_APP_PROBES:
+        raise ImportError
     import axes  # noqa: F401
 
     _HAS_AXES = env_bool('ENABLE_AXES', False)
@@ -164,6 +169,8 @@ except ImportError:
     _HAS_AXES = False
 
 try:
+    if SKIP_OPTIONAL_APP_PROBES:
+        raise ImportError
     import csp  # noqa: F401
 
     _HAS_CSP = env_bool('ENABLE_CSP', False)
@@ -171,6 +178,8 @@ except ImportError:
     _HAS_CSP = False
 
 try:
+    if SKIP_OPTIONAL_APP_PROBES:
+        raise ImportError
     import silk  # noqa: F401
 
     _HAS_SILK = env_bool('ENABLE_SILK', False)
@@ -181,6 +190,8 @@ except ImportError:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Fast liveness/readiness path before URLConf imports heavy app routes.
+    'Dolg_APP.middleware.HealthzMiddleware',
     # 2026-06-01 v22: WhiteNoise — статика напрямую из приложения (Render не
     # запускает nginx). Должен быть СРАЗУ после SecurityMiddleware.
     'whitenoise.middleware.WhiteNoiseMiddleware',

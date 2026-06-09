@@ -116,7 +116,7 @@ mypy==1.18.2
 django-stubs==5.2.5
 pre-commit==4.6.0
 # jurigged — hot-reload: правки тел функций применяются в живом процессе
-# за <1с без рестарта (start_local.bat --hot). Работает на Py3.14 (reloadium —
+# за <1с без рестарта (manual: start_server.py --local --hot). Работает на Py3.14 (reloadium —
 # только <=3.11). Структурные правки (URL/model/settings) всё равно требуют рестарт.
 jurigged==0.6.1
 # pystray — трей-лаунчер dolg_tray.py (DOLG.vbs): управление dev-сервером из

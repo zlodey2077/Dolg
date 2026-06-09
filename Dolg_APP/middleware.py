@@ -17,6 +17,22 @@ AnonSessionExpiryMiddleware — для guest-сессий ставит TTL = 24 
 import json
 
 
+class HealthzMiddleware:
+    """Return health probes before URLConf imports the whole application."""
+
+    PROBE_PATHS = {'/healthz', '/healthz/', '/readyz', '/readyz/'}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path_info in self.PROBE_PATHS:
+            from .health import healthz
+
+            return healthz(request)
+        return self.get_response(request)
+
+
 def _parse_consent(request):
     """Возвращает dict с consent или {} если не задано."""
     raw = request.COOKIES.get('dolg_cookie_consent')

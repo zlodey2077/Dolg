@@ -17,10 +17,6 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
 
 from shop.models import Product
 
@@ -61,7 +57,6 @@ from .services.review_i18n import (
     localize_review_report,
     status_label_ru,
 )
-from .services.rule_ai import build_ai_scheme_context, build_rule_based_reply
 from .simulation_quota import quota_dict
 
 logger = logging.getLogger(__name__)
@@ -72,6 +67,16 @@ def _simulation_analysis():
     from .services import simulation_analysis
 
     return simulation_analysis
+
+
+def _reportlab_pdf():
+    """Import PDF stack only for endpoints that really render PDFs."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen import canvas
+
+    return A4, pdfmetrics, TTFont, canvas
 
 
 # ---------------------------------------------------------------------------
@@ -2114,6 +2119,7 @@ def project_review_page(request, review_id):
 
 @login_required(login_url='accounts:login')
 def project_review_pdf(request, review_id):
+    A4, pdfmetrics, TTFont, canvas = _reportlab_pdf()
     review = _review_for_read(request.user, review_id)
     buffer = BytesIO()
     for pdf_font_name, pdf_font_path in (
@@ -2313,6 +2319,7 @@ def api_lithium_import_preview(request):
 @require_POST
 @enforce_daily_quota('simulations')
 def api_export_scheme_pdf(request):
+    A4, pdfmetrics, TTFont, canvas = _reportlab_pdf()
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError, ValueError:
@@ -2447,6 +2454,8 @@ def _scheme_from_ai_payload(data, mode):
 @login_required(login_url='accounts:login')
 @require_POST
 def api_ai_context(request):
+    from .services.rule_ai import build_ai_scheme_context
+
     denied = feature_denied_response(request.user, 'ai_scheme_context')
     if denied:
         return denied
@@ -2684,6 +2693,7 @@ def api_engineering_review(request):
 @enforce_daily_quota('ai_requests')
 def api_ai_chat(request):
     from . import ai_assistant
+    from .services.rule_ai import build_rule_based_reply
 
     try:
         data = json.loads(request.body)

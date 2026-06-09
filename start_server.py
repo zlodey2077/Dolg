@@ -40,6 +40,22 @@ if not CLOUDFLARED.exists():
     if legacy.exists():
         CLOUDFLARED = legacy
 URL_PATTERN = re.compile(r'https://[a-z0-9-]+\.trycloudflare\.com')
+FAST_MIGRATION_PROBE = r"""
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Dolg_PR.settings')
+os.environ.setdefault('DOLG_SKIP_ASGI', '1')
+import django
+django.setup()
+from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.migrations.executor import MigrationExecutor
+executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])
+targets = executor.loader.graph.leaf_nodes()
+plan = executor.migration_plan(targets)
+if plan:
+    print('pending migrations: %d' % len(plan))
+    raise SystemExit(1)
+raise SystemExit(0)
+"""
 
 
 def find_python():
@@ -122,6 +138,21 @@ def wait_tcp(host, port, timeout=25):
         except OSError:
             time.sleep(0.4)
     return False
+
+
+def wait_django_ready(proc, host, port, timeout=25):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            return False, 'process exited with code %s' % proc.returncode
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return True, ''
+        except OSError:
+            time.sleep(0.4)
+    if proc.poll() is not None:
+        return False, 'process exited with code %s' % proc.returncode
+    return False, 'timeout after %ss' % timeout
 
 
 def probe_url(url, timeout=8):
@@ -276,12 +307,12 @@ def port_holder(port):
 def migration_state(py, env):
     """Return ('ok'|'pending'|'timeout'|'error', detail) for migration preflight."""
     try:
-        timeout = int(env.get('DOLG_MIGRATION_CHECK_TIMEOUT', '30'))
+        timeout = int(env.get('DOLG_MIGRATION_CHECK_TIMEOUT', '10'))
     except ValueError:
-        timeout = 30
+        timeout = 10
     try:
         r = subprocess.run(
-            [py, 'manage.py', 'migrate', '--check'],
+            [py, '-c', FAST_MIGRATION_PROBE],
             cwd=str(ROOT),
             env=env,
             capture_output=True,
@@ -292,17 +323,20 @@ def migration_state(py, env):
             return 'ok', ''
         return 'pending', (r.stderr or r.stdout or '').strip()
     except subprocess.TimeoutExpired:
-        return 'timeout', 'manage.py migrate --check timed out after %ss' % timeout
+        return 'timeout', 'fast migration probe timed out after %ss' % timeout
     except Exception as exc:
-        return 'error', 'manage.py migrate --check failed: %s' % exc
+        return 'error', 'fast migration probe failed: %s' % exc
 
 
 def _start_django(py, env, hot, log_path):
     """Запустить Django; вернуть (proc, 'hot'|'plain')."""
     django_cmd, hot_active = build_django_cmd(py, hot)
-    log = open(log_path, 'w', encoding='utf-8', buffering=1)
+    mode = 'hot' if hot_active else 'plain'
+    log = open(log_path, 'a', encoding='utf-8', buffering=1)
+    log.write('\n--- %s Django start (%s) ---\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), mode))
+    log.write('cmd: %s\n' % subprocess.list2cmdline(django_cmd))
     proc = subprocess.Popen(django_cmd, cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT)
-    return proc, ('hot' if hot_active else 'plain')
+    return proc, mode
 
 
 def _kill_proc(proc):
@@ -387,6 +421,13 @@ def main():
     env['PYTHONIOENCODING'] = 'utf-8'
     env['PYTHONUNBUFFERED'] = '1'
     env['PYTHONUTF8'] = '1'  # UTF-8 mode: чинит hot-reload (jurigged + cp1251 на рус. Windows)
+    env['TERM'] = 'dumb'
+    env['NO_COLOR'] = '1'
+    env['PY_COLORS'] = '0'
+    env['CLICOLOR'] = '0'
+    env['CLICOLOR_FORCE'] = '0'
+    env['DOLG_SKIP_ASGI'] = '1'
+    env['DOLG_SKIP_OPTIONAL_APP_PROBES'] = '1'
     strict_migrations = env.get('DOLG_LAUNCHER_STRICT_MIGRATIONS') == '1'
 
     # cloudflared — отдельная группа процессов (CTRL_BREAK_EVENT для чистой остановки).
@@ -423,7 +464,7 @@ def main():
         rep('WARN', 'Есть непринятые миграции — применяю...')
         try:
             mr = subprocess.run(
-                [py, 'manage.py', 'migrate', '--noinput'],
+                [py, 'manage.py', 'migrate', '--noinput', '--skip-checks'],
                 cwd=str(ROOT),
                 env=env,
                 capture_output=True,
@@ -448,22 +489,30 @@ def main():
         )
         if mr is not None and mr.returncode != 0 and strict_migrations:
             return _abort(report)
-    else:
+    elif migrate_state == 'ok':
         rep('OK', 'Миграции применены')
 
     # --- Старт Django с авто-fallback hot(jurigged) -> plain ---
     django_log_path = ROOT / '.tmp_django.log'
+    try:
+        django_log_path.write_text('', encoding='utf-8')
+    except Exception:
+        pass
     django, mode = _start_django(py, env, hot, django_log_path)
     rep('INFO', 'Старт Django (%s), жду готовности (до 90с)...' % mode)
-    if not wait_tcp('127.0.0.1', DJANGO_PORT, timeout=90):
+    ok, ready_detail = wait_django_ready(django, '127.0.0.1', DJANGO_PORT, timeout=90)
+    if not ok:
         ok = False
         if mode == 'hot':
-            rep('WARN', 'hot/jurigged не поднялся за 90с — fallback на обычный режим...')
+            rep('WARN', 'hot/jurigged не поднялся (%s) — fallback на обычный режим...' % ready_detail)
             _kill_proc(django)
-            free_port(DJANGO_PORT)
+            leftover = kill_orphans()
+            freed = free_port(DJANGO_PORT)
+            if leftover or freed:
+                rep('FIX', 'hot cleanup: сняты PID %s' % ', '.join(map(str, leftover + freed)))
             time.sleep(1.0)
             django, mode = _start_django(py, env, False, django_log_path)
-            ok = wait_tcp('127.0.0.1', DJANGO_PORT, timeout=90)
+            ok, ready_detail = wait_django_ready(django, '127.0.0.1', DJANGO_PORT, timeout=90)
         if not ok:
             tail = ''
             try:
@@ -471,7 +520,7 @@ def main():
                     tail = f.read()[-1200:]
             except Exception:
                 pass
-            rep('ERR', 'Django не поднялся. Хвост лога:\n' + tail)
+            rep('ERR', 'Django не поднялся (%s). Хвост лога:\n%s' % (ready_detail, tail))
             _kill_proc(django)
             return _abort(report)
 
