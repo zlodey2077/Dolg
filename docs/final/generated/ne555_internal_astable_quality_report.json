@@ -1,0 +1,48 @@
+{
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "findings": [],
+  "metrics": {
+    "scope_count": 2,
+    "scopes": {
+      "sheet:external_astable_load": {
+        "component_count": 19,
+        "connection_count": 31,
+        "segment_count": 35,
+        "diagonal_segment_count": 0,
+        "diagonal_segment_ratio": 0.0,
+        "direct_diagonal_connection_count": 0,
+        "direct_diagonal_connection_ratio": 0.0,
+        "crossing_count": 0,
+        "overlap_count": 0,
+        "missing_coordinate_count": 0,
+        "requires_hierarchy": false
+      },
+      "subcircuit:NE555_FUNC": {
+        "component_count": 18,
+        "connection_count": 21,
+        "segment_count": 40,
+        "diagonal_segment_count": 0,
+        "diagonal_segment_ratio": 0.0,
+        "direct_diagonal_connection_count": 0,
+        "direct_diagonal_connection_ratio": 0.0,
+        "crossing_count": 0,
+        "overlap_count": 0,
+        "missing_coordinate_count": 0,
+        "requires_hierarchy": false
+      }
+    },
+    "component_count": 37,
+    "connection_count": 52,
+    "segment_count": 75,
+    "diagonal_segment_count": 0,
+    "direct_diagonal_connection_count": 0,
+    "crossing_count": 0,
+    "overlap_count": 0,
+    "missing_coordinate_count": 0,
+    "requires_hierarchy": false,
+    "diagonal_segment_ratio": 0.0,
+    "direct_diagonal_connection_ratio": 0.0
+  }
+}

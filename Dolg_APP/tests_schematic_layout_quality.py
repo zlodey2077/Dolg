@@ -120,3 +120,81 @@ class SchematicLayoutQualityTests(SimpleTestCase):
             all(item['code'] != 'hierarchical_subcircuit_required' for item in report['findings']),
             report,
         )
+
+    def test_bad_child_sheet_fails_hierarchical_document(self):
+        scheme = {
+            'sheets': [
+                {
+                    'id': 'bad_external',
+                    'components': [
+                        {'id': 'A', 'type': 'node', 'x': 0, 'y': 0},
+                        {'id': 'B', 'type': 'node', 'x': 360, 'y': 240},
+                        {'id': 'C', 'type': 'node', 'x': 0, 'y': 240},
+                        {'id': 'D', 'type': 'node', 'x': 360, 'y': 0},
+                        {'id': 'E', 'type': 'node', 'x': 60, 'y': 420},
+                        {'id': 'F', 'type': 'node', 'x': 420, 'y': 120},
+                    ],
+                    'connections': [
+                        {'from': {'compId': 'A'}, 'to': {'compId': 'B'}},
+                        {'from': {'compId': 'C'}, 'to': {'compId': 'D'}},
+                        {'from': {'compId': 'E'}, 'to': {'compId': 'F'}},
+                    ],
+                }
+            ],
+            'subcircuits': [],
+        }
+
+        report = analyze_schematic_layout(scheme)
+
+        self.assertFalse(report['ok'])
+        self.assertTrue(report['metrics']['scopes']['sheet:bad_external'])
+        self.assertTrue(
+            any(
+                item['scope'] == 'sheet:bad_external' and item['code'] == 'unrouted_direct_diagonal_wires'
+                for item in report['findings']
+            ),
+            report,
+        )
+
+    def test_port_coordinates_are_used_instead_of_component_centers(self):
+        scheme = {
+            'components': [
+                {
+                    'id': 'U1',
+                    'type': 'ic',
+                    'x': 300,
+                    'y': 300,
+                    'width': 220,
+                    'height': 180,
+                    'ports': [{'id': 'out', 'x': 410, 'y': 300}],
+                },
+                {
+                    'id': 'R1',
+                    'type': 'resistor',
+                    'x': 520,
+                    'y': 300,
+                    'ports': [{'id': '1', 'x': 479, 'y': 300}],
+                },
+            ],
+            'connections': [
+                {'from': {'compId': 'U1', 'portId': 'out'}, 'to': {'compId': 'R1', 'portId': '1'}},
+            ],
+        }
+
+        report = analyze_schematic_layout(scheme)
+
+        self.assertTrue(report['ok'], report)
+        self.assertEqual(report['metrics']['direct_diagonal_connection_count'], 0)
+
+    def test_explicit_component_sizes_are_used_for_overlap_checks(self):
+        scheme = {
+            'components': [
+                {'id': 'U1', 'type': 'ic', 'x': 100, 'y': 100, 'width': 240, 'height': 160},
+                {'id': 'R1', 'type': 'resistor', 'x': 210, 'y': 100, 'width': 80, 'height': 40},
+            ],
+            'connections': [],
+        }
+
+        report = analyze_schematic_layout(scheme)
+
+        self.assertTrue(any(item['code'] == 'component_overlaps' for item in report['findings']), report)

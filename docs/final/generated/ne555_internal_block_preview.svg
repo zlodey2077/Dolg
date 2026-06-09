@@ -65,7 +65,7 @@
 <text x="1145" y="363" fill="#101010" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="auto">Output</text>
 <text x="1145" y="381" fill="#101010" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="middle" dominant-baseline="auto">push-pull driver</text>
 <polyline points="955,382 1070,382" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="1220,392 1390,400" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="1220,392 1300,392 1300,400 1390,400" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <polyline points="1120,105 1120,345" fill="none" stroke="#123f91" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="1120" cy="105" r="4" fill="#123f91" stroke="#123f91"/>
 <polyline points="1120,437 1120,770" fill="none" stroke="#157347" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
@@ -79,7 +79,7 @@
 <line x1="1079" y1="602" x2="1092" y2="616" stroke="#161616" stroke-width="2" stroke-linecap="round"/>
 <text x="1034" y="640" fill="#101010" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="auto">discharge NPN</text>
 <polyline points="955,415 1010,415 1010,590 1008,590" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="1390,560 1230,560 1230,518 1088,518" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="1390,560 1300,560 1300,430 1088,430 1088,518" fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <polyline points="1088,662 1088,770" fill="none" stroke="#157347" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <circle cx="1088" cy="770" r="4" fill="#157347" stroke="#157347"/>
 <rect x="42" y="812" width="720" height="50" rx="5" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>

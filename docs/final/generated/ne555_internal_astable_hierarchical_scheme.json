@@ -1,0 +1,1725 @@
+{
+  "scheme_data": {
+    "version": 2,
+    "metadata": {
+      "title": "NE555 astable/load schematic with hierarchical NE555 subcircuit",
+      "generated_by": "scripts/generate_ne555_simulator_preview.py",
+      "layout_contract": "orthogonal-schematic-v1"
+    },
+    "sheets": [
+      {
+        "id": "external_astable_load",
+        "title": "External NE555 astable/load sheet",
+        "components": [
+          {
+            "id": "VCC_RAIL",
+            "type": "node",
+            "label": "VCC",
+            "x": 70,
+            "y": 105,
+            "ports": [
+              {
+                "id": "a",
+                "x": 70,
+                "y": 105
+              }
+            ]
+          },
+          {
+            "id": "GND_RAIL",
+            "type": "ground",
+            "label": "GND",
+            "x": 70,
+            "y": 765,
+            "ports": [
+              {
+                "id": "a",
+                "x": 70,
+                "y": 765
+              }
+            ]
+          },
+          {
+            "id": "TRIGGER_NODE",
+            "type": "node",
+            "label": "trigger",
+            "x": 270,
+            "y": 335,
+            "ports": [
+              {
+                "id": "a",
+                "x": 270,
+                "y": 335
+              }
+            ]
+          },
+          {
+            "id": "TIMING_NODE",
+            "type": "node",
+            "label": "timing",
+            "x": 430,
+            "y": 420,
+            "ports": [
+              {
+                "id": "a",
+                "x": 430,
+                "y": 420
+              }
+            ]
+          },
+          {
+            "id": "DISCH_NODE",
+            "type": "node",
+            "label": "disch",
+            "x": 500,
+            "y": 495,
+            "ports": [
+              {
+                "id": "a",
+                "x": 500,
+                "y": 495
+              }
+            ]
+          },
+          {
+            "id": "OUT_NODE",
+            "type": "node",
+            "label": "OUT",
+            "x": 980,
+            "y": 335,
+            "ports": [
+              {
+                "id": "a",
+                "x": 980,
+                "y": 335
+              }
+            ]
+          },
+          {
+            "id": "U1",
+            "type": "ic",
+            "label": "NE555",
+            "x": 760,
+            "y": 425,
+            "width": 280,
+            "height": 360,
+            "ports": [
+              {
+                "id": "2",
+                "x": 620,
+                "y": 335
+              },
+              {
+                "id": "6",
+                "x": 620,
+                "y": 420
+              },
+              {
+                "id": "7",
+                "x": 620,
+                "y": 495
+              },
+              {
+                "id": "4",
+                "x": 710,
+                "y": 245
+              },
+              {
+                "id": "8",
+                "x": 810,
+                "y": 245
+              },
+              {
+                "id": "1",
+                "x": 760,
+                "y": 605
+              },
+              {
+                "id": "3",
+                "x": 900,
+                "y": 335
+              },
+              {
+                "id": "5",
+                "x": 900,
+                "y": 485
+              }
+            ],
+            "spice_model": "NE555",
+            "subcircuit": "NE555_FUNC"
+          },
+          {
+            "id": "R2",
+            "type": "resistor",
+            "label": "R2 100k",
+            "x": 270,
+            "y": 220,
+            "width": 68,
+            "height": 68,
+            "ports": [
+              {
+                "id": "1",
+                "x": 270,
+                "y": 186
+              },
+              {
+                "id": "2",
+                "x": 270,
+                "y": 335
+              }
+            ],
+            "resistance": 100000
+          },
+          {
+            "id": "R1",
+            "type": "potentiometer",
+            "label": "R1 5M",
+            "x": 430,
+            "y": 250,
+            "width": 78,
+            "height": 78,
+            "ports": [
+              {
+                "id": "top",
+                "x": 430,
+                "y": 211
+              },
+              {
+                "id": "wiper",
+                "x": 430,
+                "y": 420
+              },
+              {
+                "id": "bottom",
+                "x": 430,
+                "y": 420
+              }
+            ],
+            "resistance": 5000000
+          },
+          {
+            "id": "C1",
+            "type": "capacitor",
+            "label": "C1 47uF",
+            "x": 430,
+            "y": 610,
+            "width": 54,
+            "height": 84,
+            "ports": [
+              {
+                "id": "1",
+                "x": 430,
+                "y": 420
+              },
+              {
+                "id": "2",
+                "x": 430,
+                "y": 765
+              }
+            ],
+            "capacitance": 47
+          },
+          {
+            "id": "S1",
+            "type": "button",
+            "label": "S1",
+            "x": 185,
+            "y": 460,
+            "width": 82,
+            "height": 42,
+            "ports": [
+              {
+                "id": "1",
+                "x": 270,
+                "y": 335
+              },
+              {
+                "id": "2",
+                "x": 140,
+                "y": 765
+              }
+            ]
+          },
+          {
+            "id": "C2",
+            "type": "capacitor",
+            "label": "C2 10nF",
+            "x": 970,
+            "y": 640,
+            "width": 54,
+            "height": 84,
+            "ports": [
+              {
+                "id": "1",
+                "x": 970,
+                "y": 565
+              },
+              {
+                "id": "2",
+                "x": 970,
+                "y": 765
+              }
+            ],
+            "capacitance": "0.01"
+          },
+          {
+            "id": "R3",
+            "type": "resistor",
+            "label": "R3 1k",
+            "x": 1060,
+            "y": 335,
+            "width": 78,
+            "height": 34,
+            "ports": [
+              {
+                "id": "1",
+                "x": 1012,
+                "y": 335
+              },
+              {
+                "id": "2",
+                "x": 1110,
+                "y": 335
+              }
+            ],
+            "resistance": 1000
+          },
+          {
+            "id": "T1",
+            "type": "transistor",
+            "label": "T1 NPN",
+            "x": 1210,
+            "y": 455,
+            "width": 86,
+            "height": 96,
+            "ports": [
+              {
+                "id": "b",
+                "x": 1148,
+                "y": 455
+              },
+              {
+                "id": "c",
+                "x": 1228,
+                "y": 383
+              },
+              {
+                "id": "e",
+                "x": 1228,
+                "y": 527
+              }
+            ],
+            "spice_model": "QNPN"
+          },
+          {
+            "id": "LED1",
+            "type": "led",
+            "label": "LED1",
+            "x": 1228,
+            "y": 155,
+            "width": 72,
+            "height": 54,
+            "ports": [
+              {
+                "id": "a",
+                "x": 1228,
+                "y": 105
+              },
+              {
+                "id": "k",
+                "x": 1228,
+                "y": 205
+              }
+            ],
+            "spice_model": "DLED"
+          },
+          {
+            "id": "R4",
+            "type": "resistor",
+            "label": "R4 1.5k",
+            "x": 1228,
+            "y": 255,
+            "width": 78,
+            "height": 68,
+            "ports": [
+              {
+                "id": "1",
+                "x": 1228,
+                "y": 205
+              },
+              {
+                "id": "2",
+                "x": 1228,
+                "y": 383
+              }
+            ],
+            "resistance": 1500
+          },
+          {
+            "id": "C3",
+            "type": "capacitor",
+            "label": "C3 100nF",
+            "x": 1340,
+            "y": 435,
+            "width": 54,
+            "height": 84,
+            "ports": [
+              {
+                "id": "1",
+                "x": 1340,
+                "y": 105
+              },
+              {
+                "id": "2",
+                "x": 1340,
+                "y": 765
+              }
+            ],
+            "capacitance": "0.1"
+          },
+          {
+            "id": "C4",
+            "type": "capacitor",
+            "label": "C4 100uF",
+            "x": 1420,
+            "y": 435,
+            "width": 54,
+            "height": 84,
+            "ports": [
+              {
+                "id": "1",
+                "x": 1420,
+                "y": 105
+              },
+              {
+                "id": "2",
+                "x": 1420,
+                "y": 765
+              }
+            ],
+            "capacitance": 100
+          },
+          {
+            "id": "POWER",
+            "type": "connector",
+            "label": "POWER 9-12V",
+            "x": 1315,
+            "y": 72,
+            "width": 86,
+            "height": 48,
+            "ports": [
+              {
+                "id": "+",
+                "x": 1228,
+                "y": 105
+              },
+              {
+                "id": "-",
+                "x": 1383,
+                "y": 765
+              }
+            ]
+          }
+        ],
+        "connections": [
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "R2",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 270,
+                "y": 105
+              },
+              {
+                "x": 270,
+                "y": 186
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "R1",
+              "portId": "top"
+            },
+            "waypoints": [
+              {
+                "x": 430,
+                "y": 105
+              },
+              {
+                "x": 430,
+                "y": 211
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "U1",
+              "portId": "4"
+            },
+            "waypoints": [
+              {
+                "x": 710,
+                "y": 105
+              },
+              {
+                "x": 710,
+                "y": 245
+              }
+            ],
+            "net_label": "RESET"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "U1",
+              "portId": "8"
+            },
+            "waypoints": [
+              {
+                "x": 810,
+                "y": 105
+              },
+              {
+                "x": 810,
+                "y": 245
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "LED1",
+              "portId": "a"
+            },
+            "waypoints": [
+              {
+                "x": 1228,
+                "y": 105
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C3",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 1340,
+                "y": 105
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C4",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 1420,
+                "y": 105
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "VCC_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "POWER",
+              "portId": "+"
+            },
+            "waypoints": [
+              {
+                "x": 1228,
+                "y": 105
+              }
+            ],
+            "net_label": "VCC"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "U1",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 760,
+                "y": 765
+              },
+              {
+                "x": 760,
+                "y": 605
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C1",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 430,
+                "y": 765
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "S1",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 140,
+                "y": 765
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C2",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 970,
+                "y": 765
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "T1",
+              "portId": "e"
+            },
+            "waypoints": [
+              {
+                "x": 1228,
+                "y": 765
+              },
+              {
+                "x": 1228,
+                "y": 527
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C3",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 1340,
+                "y": 765
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C4",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 1420,
+                "y": 765
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "GND_RAIL",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "POWER",
+              "portId": "-"
+            },
+            "waypoints": [
+              {
+                "x": 1383,
+                "y": 765
+              }
+            ],
+            "net_label": "GND"
+          },
+          {
+            "from": {
+              "compId": "R2",
+              "portId": "2"
+            },
+            "to": {
+              "compId": "TRIGGER_NODE",
+              "portId": "a"
+            },
+            "waypoints": [],
+            "net_label": "TRIGGER"
+          },
+          {
+            "from": {
+              "compId": "TRIGGER_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "U1",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 560,
+                "y": 335
+              },
+              {
+                "x": 620,
+                "y": 335
+              }
+            ],
+            "net_label": "TRIGGER"
+          },
+          {
+            "from": {
+              "compId": "TRIGGER_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "S1",
+              "portId": "1"
+            },
+            "waypoints": [],
+            "net_label": "TRIGGER"
+          },
+          {
+            "from": {
+              "compId": "R1",
+              "portId": "wiper"
+            },
+            "to": {
+              "compId": "TIMING_NODE",
+              "portId": "a"
+            },
+            "waypoints": [],
+            "net_label": "TIMING"
+          },
+          {
+            "from": {
+              "compId": "R1",
+              "portId": "bottom"
+            },
+            "to": {
+              "compId": "TIMING_NODE",
+              "portId": "a"
+            },
+            "waypoints": [],
+            "net_label": "TIMING"
+          },
+          {
+            "from": {
+              "compId": "TIMING_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "C1",
+              "portId": "1"
+            },
+            "waypoints": [],
+            "net_label": "TIMING"
+          },
+          {
+            "from": {
+              "compId": "TIMING_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "U1",
+              "portId": "6"
+            },
+            "waypoints": [
+              {
+                "x": 560,
+                "y": 420
+              },
+              {
+                "x": 620,
+                "y": 420
+              }
+            ],
+            "net_label": "TIMING"
+          },
+          {
+            "from": {
+              "compId": "TIMING_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "DISCH_NODE",
+              "portId": "a"
+            },
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 420
+              },
+              {
+                "x": 500,
+                "y": 495
+              }
+            ],
+            "net_label": "TIMING_DISCH"
+          },
+          {
+            "from": {
+              "compId": "DISCH_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "U1",
+              "portId": "7"
+            },
+            "waypoints": [
+              {
+                "x": 620,
+                "y": 495
+              }
+            ],
+            "net_label": "DISCH"
+          },
+          {
+            "from": {
+              "compId": "U1",
+              "portId": "5"
+            },
+            "to": {
+              "compId": "C2",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 970,
+                "y": 485
+              },
+              {
+                "x": 970,
+                "y": 565
+              }
+            ],
+            "net_label": "CONTROL"
+          },
+          {
+            "from": {
+              "compId": "U1",
+              "portId": "3"
+            },
+            "to": {
+              "compId": "OUT_NODE",
+              "portId": "a"
+            },
+            "waypoints": [],
+            "net_label": "OUT"
+          },
+          {
+            "from": {
+              "compId": "OUT_NODE",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "R3",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 1012,
+                "y": 335
+              }
+            ],
+            "net_label": "OUT"
+          },
+          {
+            "from": {
+              "compId": "R3",
+              "portId": "2"
+            },
+            "to": {
+              "compId": "T1",
+              "portId": "b"
+            },
+            "waypoints": [
+              {
+                "x": 1148,
+                "y": 335
+              },
+              {
+                "x": 1148,
+                "y": 455
+              }
+            ],
+            "net_label": "BASE_DRIVE"
+          },
+          {
+            "from": {
+              "compId": "T1",
+              "portId": "c"
+            },
+            "to": {
+              "compId": "R4",
+              "portId": "2"
+            },
+            "waypoints": [
+              {
+                "x": 1228,
+                "y": 383
+              }
+            ],
+            "net_label": "LED_SINK"
+          },
+          {
+            "from": {
+              "compId": "LED1",
+              "portId": "k"
+            },
+            "to": {
+              "compId": "R4",
+              "portId": "1"
+            },
+            "waypoints": [],
+            "net_label": "LED_CHAIN"
+          }
+        ]
+      }
+    ],
+    "subcircuits": [
+      {
+        "id": "NE555_FUNC",
+        "title": "NE555 functional internal subcircuit",
+        "ports": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "components": [
+          {
+            "id": "VCC8",
+            "type": "node",
+            "label": "VCC / pin 8",
+            "x": 90,
+            "y": 105,
+            "ports": [
+              {
+                "id": "a",
+                "x": 90,
+                "y": 105
+              }
+            ]
+          },
+          {
+            "id": "GND1",
+            "type": "ground",
+            "label": "GND / pin 1",
+            "x": 90,
+            "y": 770,
+            "ports": [
+              {
+                "id": "a",
+                "x": 90,
+                "y": 770
+              }
+            ]
+          },
+          {
+            "id": "P5_CTRL",
+            "type": "pin",
+            "label": "5 CTRL",
+            "x": 110,
+            "y": 240,
+            "ports": [
+              {
+                "id": "p",
+                "x": 110,
+                "y": 240
+              }
+            ]
+          },
+          {
+            "id": "P6_THR",
+            "type": "pin",
+            "label": "6 THR",
+            "x": 110,
+            "y": 295,
+            "ports": [
+              {
+                "id": "p",
+                "x": 110,
+                "y": 295
+              }
+            ]
+          },
+          {
+            "id": "P2_TRIG",
+            "type": "pin",
+            "label": "2 TRIG",
+            "x": 110,
+            "y": 430,
+            "ports": [
+              {
+                "id": "p",
+                "x": 110,
+                "y": 430
+              }
+            ]
+          },
+          {
+            "id": "P4_RESET",
+            "type": "pin",
+            "label": "4 RESET",
+            "x": 110,
+            "y": 560,
+            "ports": [
+              {
+                "id": "p",
+                "x": 110,
+                "y": 560
+              }
+            ]
+          },
+          {
+            "id": "P3_OUT",
+            "type": "pin",
+            "label": "3 OUT",
+            "x": 1390,
+            "y": 400,
+            "ports": [
+              {
+                "id": "p",
+                "x": 1390,
+                "y": 400
+              }
+            ]
+          },
+          {
+            "id": "P7_DISCH",
+            "type": "pin",
+            "label": "7 DISCH",
+            "x": 1390,
+            "y": 560,
+            "ports": [
+              {
+                "id": "p",
+                "x": 1390,
+                "y": 560
+              }
+            ]
+          },
+          {
+            "id": "RINT_TOP",
+            "type": "resistor",
+            "label": "5k top",
+            "x": 365,
+            "y": 182,
+            "width": 68,
+            "height": 68,
+            "ports": [
+              {
+                "id": "1",
+                "x": 365,
+                "y": 105
+              },
+              {
+                "id": "2",
+                "x": 365,
+                "y": 260
+              }
+            ],
+            "resistance": 5000
+          },
+          {
+            "id": "RINT_MID",
+            "type": "resistor",
+            "label": "5k mid",
+            "x": 365,
+            "y": 340,
+            "width": 68,
+            "height": 68,
+            "ports": [
+              {
+                "id": "1",
+                "x": 365,
+                "y": 260
+              },
+              {
+                "id": "2",
+                "x": 365,
+                "y": 420
+              }
+            ],
+            "resistance": 5000
+          },
+          {
+            "id": "RINT_BOT",
+            "type": "resistor",
+            "label": "5k bottom",
+            "x": 365,
+            "y": 596,
+            "width": 68,
+            "height": 68,
+            "ports": [
+              {
+                "id": "1",
+                "x": 365,
+                "y": 420
+              },
+              {
+                "id": "2",
+                "x": 365,
+                "y": 770
+              }
+            ],
+            "resistance": 5000
+          },
+          {
+            "id": "REF_HIGH",
+            "type": "node",
+            "label": "2/3 VCC",
+            "x": 365,
+            "y": 260,
+            "ports": [
+              {
+                "id": "a",
+                "x": 365,
+                "y": 260
+              }
+            ]
+          },
+          {
+            "id": "REF_LOW",
+            "type": "node",
+            "label": "1/3 VCC",
+            "x": 365,
+            "y": 420,
+            "ports": [
+              {
+                "id": "a",
+                "x": 365,
+                "y": 420
+              }
+            ]
+          },
+          {
+            "id": "CMP_THRESH",
+            "type": "comparator",
+            "label": "Threshold comparator",
+            "x": 635,
+            "y": 284,
+            "width": 150,
+            "height": 78,
+            "ports": [
+              {
+                "id": "+",
+                "x": 560,
+                "y": 274
+              },
+              {
+                "id": "-",
+                "x": 560,
+                "y": 304
+              },
+              {
+                "id": "out",
+                "x": 710,
+                "y": 284
+              }
+            ]
+          },
+          {
+            "id": "CMP_TRIG",
+            "type": "comparator",
+            "label": "Trigger comparator",
+            "x": 635,
+            "y": 431,
+            "width": 150,
+            "height": 78,
+            "ports": [
+              {
+                "id": "+",
+                "x": 560,
+                "y": 421
+              },
+              {
+                "id": "-",
+                "x": 560,
+                "y": 451
+              },
+              {
+                "id": "out",
+                "x": 710,
+                "y": 431
+              }
+            ]
+          },
+          {
+            "id": "SR_LATCH",
+            "type": "sr_latch",
+            "label": "SR latch",
+            "x": 890,
+            "y": 382,
+            "width": 130,
+            "height": 105,
+            "ports": [
+              {
+                "id": "R",
+                "x": 825,
+                "y": 360
+              },
+              {
+                "id": "S",
+                "x": 825,
+                "y": 412
+              },
+              {
+                "id": "RESET",
+                "x": 825,
+                "y": 392
+              },
+              {
+                "id": "Q",
+                "x": 955,
+                "y": 382
+              },
+              {
+                "id": "nQ",
+                "x": 955,
+                "y": 415
+              }
+            ]
+          },
+          {
+            "id": "OUT_DRIVER",
+            "type": "output_driver",
+            "label": "Output driver",
+            "x": 1145,
+            "y": 391,
+            "width": 150,
+            "height": 92,
+            "ports": [
+              {
+                "id": "in",
+                "x": 1070,
+                "y": 382
+              },
+              {
+                "id": "out",
+                "x": 1220,
+                "y": 392
+              },
+              {
+                "id": "vcc",
+                "x": 1120,
+                "y": 345
+              },
+              {
+                "id": "gnd",
+                "x": 1120,
+                "y": 437
+              }
+            ]
+          },
+          {
+            "id": "Q_DISCH",
+            "type": "transistor",
+            "label": "Discharge NPN",
+            "x": 1070,
+            "y": 590,
+            "width": 86,
+            "height": 96,
+            "ports": [
+              {
+                "id": "b",
+                "x": 1008,
+                "y": 590
+              },
+              {
+                "id": "c",
+                "x": 1088,
+                "y": 518
+              },
+              {
+                "id": "e",
+                "x": 1088,
+                "y": 662
+              }
+            ],
+            "spice_model": "QNPN"
+          }
+        ],
+        "connections": [
+          {
+            "from": {
+              "compId": "VCC8",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "RINT_TOP",
+              "portId": "1"
+            },
+            "waypoints": [
+              {
+                "x": 365,
+                "y": 105
+              }
+            ],
+            "net_label": "VCC_INTERNAL"
+          },
+          {
+            "from": {
+              "compId": "RINT_TOP",
+              "portId": "2"
+            },
+            "to": {
+              "compId": "REF_HIGH",
+              "portId": "a"
+            },
+            "waypoints": [],
+            "net_label": "REF_2_3"
+          },
+          {
+            "from": {
+              "compId": "REF_HIGH",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "RINT_MID",
+              "portId": "1"
+            },
+            "waypoints": [],
+            "net_label": "REF_2_3"
+          },
+          {
+            "from": {
+              "compId": "RINT_MID",
+              "portId": "2"
+            },
+            "to": {
+              "compId": "REF_LOW",
+              "portId": "a"
+            },
+            "waypoints": [],
+            "net_label": "REF_1_3"
+          },
+          {
+            "from": {
+              "compId": "REF_LOW",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "RINT_BOT",
+              "portId": "1"
+            },
+            "waypoints": [],
+            "net_label": "REF_1_3"
+          },
+          {
+            "from": {
+              "compId": "RINT_BOT",
+              "portId": "2"
+            },
+            "to": {
+              "compId": "GND1",
+              "portId": "a"
+            },
+            "waypoints": [
+              {
+                "x": 365,
+                "y": 770
+              }
+            ],
+            "net_label": "GND_INTERNAL"
+          },
+          {
+            "from": {
+              "compId": "P5_CTRL",
+              "portId": "p"
+            },
+            "to": {
+              "compId": "REF_HIGH",
+              "portId": "a"
+            },
+            "waypoints": [
+              {
+                "x": 260,
+                "y": 240
+              },
+              {
+                "x": 260,
+                "y": 260
+              }
+            ],
+            "net_label": "CONTROL_REF"
+          },
+          {
+            "from": {
+              "compId": "P6_THR",
+              "portId": "p"
+            },
+            "to": {
+              "compId": "CMP_THRESH",
+              "portId": "+"
+            },
+            "waypoints": [
+              {
+                "x": 505,
+                "y": 295
+              },
+              {
+                "x": 505,
+                "y": 274
+              }
+            ],
+            "net_label": "THRESHOLD_SENSE"
+          },
+          {
+            "from": {
+              "compId": "REF_HIGH",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "CMP_THRESH",
+              "portId": "-"
+            },
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 260
+              },
+              {
+                "x": 500,
+                "y": 304
+              }
+            ],
+            "net_label": "REF_2_3"
+          },
+          {
+            "from": {
+              "compId": "REF_LOW",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "CMP_TRIG",
+              "portId": "+"
+            },
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 420
+              },
+              {
+                "x": 500,
+                "y": 421
+              }
+            ],
+            "net_label": "REF_1_3"
+          },
+          {
+            "from": {
+              "compId": "P2_TRIG",
+              "portId": "p"
+            },
+            "to": {
+              "compId": "CMP_TRIG",
+              "portId": "-"
+            },
+            "waypoints": [
+              {
+                "x": 505,
+                "y": 430
+              },
+              {
+                "x": 505,
+                "y": 451
+              }
+            ],
+            "net_label": "TRIGGER_SENSE"
+          },
+          {
+            "from": {
+              "compId": "CMP_THRESH",
+              "portId": "out"
+            },
+            "to": {
+              "compId": "SR_LATCH",
+              "portId": "R"
+            },
+            "waypoints": [
+              {
+                "x": 770,
+                "y": 284
+              },
+              {
+                "x": 770,
+                "y": 360
+              }
+            ],
+            "net_label": "LATCH_RESET"
+          },
+          {
+            "from": {
+              "compId": "CMP_TRIG",
+              "portId": "out"
+            },
+            "to": {
+              "compId": "SR_LATCH",
+              "portId": "S"
+            },
+            "waypoints": [
+              {
+                "x": 770,
+                "y": 431
+              },
+              {
+                "x": 770,
+                "y": 412
+              }
+            ],
+            "net_label": "LATCH_SET"
+          },
+          {
+            "from": {
+              "compId": "P4_RESET",
+              "portId": "p"
+            },
+            "to": {
+              "compId": "SR_LATCH",
+              "portId": "RESET"
+            },
+            "waypoints": [
+              {
+                "x": 760,
+                "y": 560
+              },
+              {
+                "x": 760,
+                "y": 392
+              }
+            ],
+            "net_label": "RESET"
+          },
+          {
+            "from": {
+              "compId": "SR_LATCH",
+              "portId": "Q"
+            },
+            "to": {
+              "compId": "OUT_DRIVER",
+              "portId": "in"
+            },
+            "waypoints": [],
+            "net_label": "OUTPUT_STATE"
+          },
+          {
+            "from": {
+              "compId": "OUT_DRIVER",
+              "portId": "out"
+            },
+            "to": {
+              "compId": "P3_OUT",
+              "portId": "p"
+            },
+            "waypoints": [
+              {
+                "x": 1300,
+                "y": 392
+              },
+              {
+                "x": 1300,
+                "y": 400
+              }
+            ],
+            "net_label": "PIN3_OUT"
+          },
+          {
+            "from": {
+              "compId": "VCC8",
+              "portId": "a"
+            },
+            "to": {
+              "compId": "OUT_DRIVER",
+              "portId": "vcc"
+            },
+            "waypoints": [
+              {
+                "x": 1120,
+                "y": 105
+              },
+              {
+                "x": 1120,
+                "y": 345
+              }
+            ],
+            "net_label": "VCC_INTERNAL"
+          },
+          {
+            "from": {
+              "compId": "OUT_DRIVER",
+              "portId": "gnd"
+            },
+            "to": {
+              "compId": "GND1",
+              "portId": "a"
+            },
+            "waypoints": [
+              {
+                "x": 1120,
+                "y": 770
+              }
+            ],
+            "net_label": "GND_INTERNAL"
+          },
+          {
+            "from": {
+              "compId": "SR_LATCH",
+              "portId": "nQ"
+            },
+            "to": {
+              "compId": "Q_DISCH",
+              "portId": "b"
+            },
+            "waypoints": [
+              {
+                "x": 1010,
+                "y": 415
+              },
+              {
+                "x": 1010,
+                "y": 590
+              }
+            ],
+            "net_label": "DISCHARGE_DRIVE"
+          },
+          {
+            "from": {
+              "compId": "P7_DISCH",
+              "portId": "p"
+            },
+            "to": {
+              "compId": "Q_DISCH",
+              "portId": "c"
+            },
+            "waypoints": [
+              {
+                "x": 1300,
+                "y": 560
+              },
+              {
+                "x": 1300,
+                "y": 430
+              },
+              {
+                "x": 1088,
+                "y": 430
+              },
+              {
+                "x": 1088,
+                "y": 518
+              }
+            ],
+            "net_label": "DISCHARGE_COLLECTOR"
+          },
+          {
+            "from": {
+              "compId": "Q_DISCH",
+              "portId": "e"
+            },
+            "to": {
+              "compId": "GND1",
+              "portId": "a"
+            },
+            "waypoints": [
+              {
+                "x": 1088,
+                "y": 770
+              }
+            ],
+            "net_label": "GND_INTERNAL"
+          }
+        ]
+      }
+    ]
+  }
+}

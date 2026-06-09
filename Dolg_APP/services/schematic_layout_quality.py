@@ -57,6 +57,19 @@ SIZE_BY_TYPE = {
 
 
 def analyze_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, Any]:
+    scopes = _layout_scopes(scheme_data)
+    if not scopes:
+        return _analyze_flat_schematic_layout(scheme_data)
+
+    scoped_reports = []
+    if _components(scheme_data) or _connections(scheme_data):
+        scoped_reports.append(('root', _analyze_flat_schematic_layout(scheme_data)))
+    for scope_name, scope_data in scopes:
+        scoped_reports.append((scope_name, _analyze_flat_schematic_layout(scope_data)))
+    return _merge_scoped_reports(scoped_reports)
+
+
+def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, Any]:
     components = _components(scheme_data)
     connections = _connections(scheme_data)
     by_id = {str(item.get('id')): item for item in components if item.get('id') is not None}
@@ -103,7 +116,8 @@ def analyze_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, An
             if _is_diagonal(left, right):
                 diagonal_segments.append(segment)
 
-    crossings = _count_crossings(segments)
+    crossing_pairs = _wire_crossings(segments)
+    crossings = len(crossing_pairs)
     overlaps = _component_overlaps(components)
     hierarchy_problem = _detect_flattened_hierarchy(components, scheme_data)
     diagonal_ratio = len(diagonal_segments) / len(segments) if segments else 0
@@ -154,7 +168,7 @@ def analyze_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, An
             'error',
             'too_many_wire_crossings',
             'The schematic has too many avoidable wire crossings for a simulator/editor preview.',
-            crossings,
+            crossing_pairs[:20],
         )
     elif crossings:
         _finding(
@@ -162,7 +176,7 @@ def analyze_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, An
             'warning',
             'wire_crossings',
             'There are wire crossings; verify junction dots and reroute where possible.',
-            crossings,
+            crossing_pairs[:20],
         )
 
     if overlaps:
@@ -207,6 +221,77 @@ def analyze_schematic_layout(scheme_data: dict[str, Any] | None) -> dict[str, An
     }
 
 
+def _layout_scopes(scheme_data: dict[str, Any] | None) -> list[tuple[str, dict[str, Any]]]:
+    if not isinstance(scheme_data, dict):
+        return []
+    scopes = []
+    for index, sheet in enumerate(scheme_data.get('sheets') or []):
+        if not isinstance(sheet, dict):
+            continue
+        name = sheet.get('id') or sheet.get('name') or sheet.get('title') or f'sheet_{index + 1}'
+        scopes.append((f'sheet:{name}', sheet))
+    for index, subcircuit in enumerate(scheme_data.get('subcircuits') or []):
+        if not isinstance(subcircuit, dict):
+            continue
+        name = subcircuit.get('id') or subcircuit.get('name') or subcircuit.get('title') or f'subcircuit_{index + 1}'
+        scopes.append((f'subcircuit:{name}', subcircuit))
+    return scopes
+
+
+def _merge_scoped_reports(scoped_reports: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
+    findings = []
+    metrics = {
+        'scope_count': len(scoped_reports),
+        'scopes': {},
+        'component_count': 0,
+        'connection_count': 0,
+        'segment_count': 0,
+        'diagonal_segment_count': 0,
+        'direct_diagonal_connection_count': 0,
+        'crossing_count': 0,
+        'overlap_count': 0,
+        'missing_coordinate_count': 0,
+        'requires_hierarchy': False,
+    }
+    for scope_name, report in scoped_reports:
+        scope_metrics = report.get('metrics') or {}
+        metrics['scopes'][scope_name] = scope_metrics
+        for key in (
+            'component_count',
+            'connection_count',
+            'segment_count',
+            'diagonal_segment_count',
+            'direct_diagonal_connection_count',
+            'crossing_count',
+            'overlap_count',
+            'missing_coordinate_count',
+        ):
+            metrics[key] += int(scope_metrics.get(key) or 0)
+        metrics['requires_hierarchy'] = metrics['requires_hierarchy'] or bool(scope_metrics.get('requires_hierarchy'))
+        for finding in report.get('findings') or []:
+            item = dict(finding)
+            item['scope'] = scope_name
+            item['message'] = f'{scope_name}: {item.get("message", "")}'
+            findings.append(item)
+
+    segment_count = metrics['segment_count'] or 1
+    connection_count = metrics['connection_count'] or 1
+    metrics['diagonal_segment_ratio'] = round(metrics['diagonal_segment_count'] / segment_count, 3)
+    metrics['direct_diagonal_connection_ratio'] = round(
+        metrics['direct_diagonal_connection_count'] / connection_count,
+        3,
+    )
+    errors = [item['message'] for item in findings if item['severity'] == 'error']
+    warnings = [item['message'] for item in findings if item['severity'] == 'warning']
+    return {
+        'ok': not errors,
+        'errors': errors,
+        'warnings': warnings,
+        'findings': findings,
+        'metrics': metrics,
+    }
+
+
 def _components(scheme_data: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(scheme_data, dict):
         return []
@@ -227,12 +312,14 @@ def _center(component: dict[str, Any]) -> tuple[float, float] | None:
 
 
 def _wire_points(connection: dict[str, Any], by_id: dict[str, dict[str, Any]]) -> tuple[list[tuple[float, float]], str, str] | None:
-    source_id = _endpoint_id(connection.get('from'))
-    target_id = _endpoint_id(connection.get('to'))
+    source_endpoint = connection.get('from')
+    target_endpoint = connection.get('to')
+    source_id = _endpoint_id(source_endpoint)
+    target_id = _endpoint_id(target_endpoint)
     if source_id not in by_id or target_id not in by_id:
         return None
-    source = _center(by_id[source_id])
-    target = _center(by_id[target_id])
+    source = _endpoint_point(source_endpoint, by_id)
+    target = _endpoint_point(target_endpoint, by_id)
     if source is None or target is None:
         return None
     waypoints = []
@@ -253,6 +340,47 @@ def _endpoint_id(endpoint: Any) -> str | None:
     return str(value) if value is not None else None
 
 
+def _endpoint_point(endpoint: Any, by_id: dict[str, dict[str, Any]]) -> tuple[float, float] | None:
+    if not isinstance(endpoint, dict):
+        return None
+    if endpoint.get('x') is not None and endpoint.get('y') is not None:
+        try:
+            return float(endpoint['x']), float(endpoint['y'])
+        except (TypeError, ValueError):
+            return None
+    component_id = _endpoint_id(endpoint)
+    if component_id not in by_id:
+        return None
+    component = by_id[component_id]
+    center = _center(component)
+    if center is None:
+        return None
+    port_id = endpoint.get('portId') or endpoint.get('port') or endpoint.get('pin') or endpoint.get('terminal')
+    if port_id is None:
+        return center
+    port = _find_port(component, str(port_id))
+    if not port:
+        return center
+    if port.get('x') is not None and port.get('y') is not None:
+        try:
+            return float(port['x']), float(port['y'])
+        except (TypeError, ValueError):
+            return center
+    if port.get('dx') is not None and port.get('dy') is not None:
+        try:
+            return center[0] + float(port['dx']), center[1] + float(port['dy'])
+        except (TypeError, ValueError):
+            return center
+    return center
+
+
+def _find_port(component: dict[str, Any], port_id: str) -> dict[str, Any] | None:
+    for port in component.get('ports') or []:
+        if isinstance(port, dict) and str(port.get('id')) == port_id:
+            return port
+    return None
+
+
 def _is_diagonal(a: tuple[float, float], b: tuple[float, float]) -> bool:
     return abs(a[0] - b[0]) > WIRE_TOLERANCE and abs(a[1] - b[1]) > WIRE_TOLERANCE
 
@@ -261,16 +389,23 @@ def _distance(a: tuple[float, float], b: tuple[float, float]) -> float:
     return hypot(a[0] - b[0], a[1] - b[1])
 
 
-def _count_crossings(segments: list[dict[str, Any]]) -> int:
-    count = 0
+def _wire_crossings(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    crossings = []
     for left, right in combinations(segments, 2):
         if left['connection_index'] == right['connection_index']:
             continue
         if {left['source_id'], left['target_id']} & {right['source_id'], right['target_id']}:
             continue
         if _segments_intersect(left['a'], left['b'], right['a'], right['b']):
-            count += 1
-    return count
+            crossings.append(
+                {
+                    'left_connection_index': left['connection_index'],
+                    'right_connection_index': right['connection_index'],
+                    'left_endpoints': [left['source_id'], left['target_id']],
+                    'right_endpoints': [right['source_id'], right['target_id']],
+                }
+            )
+    return crossings
 
 
 def _segments_intersect(a, b, c, d) -> bool:
@@ -316,7 +451,7 @@ def _component_overlaps(components: list[dict[str, Any]]) -> list[dict[str, str]
         if center is None:
             continue
         ctype = normalize_component_type(component.get('type'))
-        width, height = SIZE_BY_TYPE.get(ctype, (76, 42))
+        width, height = _component_size(component, ctype)
         if ctype in {'node', 'ground'}:
             continue
         x, y = center
@@ -340,6 +475,21 @@ def _component_overlaps(components: list[dict[str, Any]]) -> list[dict[str, str]
         ):
             overlaps.append({'left': left['id'], 'right': right['id']})
     return overlaps
+
+
+def _component_size(component: dict[str, Any], component_type: str) -> tuple[float, float]:
+    layout = component.get('layout') if isinstance(component.get('layout'), dict) else {}
+    width = component.get('width') or layout.get('width')
+    height = component.get('height') or layout.get('height')
+    try:
+        if width is not None and height is not None:
+            parsed_width = float(width)
+            parsed_height = float(height)
+            if parsed_width > 0 and parsed_height > 0:
+                return parsed_width, parsed_height
+    except (TypeError, ValueError):
+        pass
+    return SIZE_BY_TYPE.get(component_type, (76, 42))
 
 
 def _detect_flattened_hierarchy(components: list[dict[str, Any]], scheme_data: dict[str, Any] | None) -> dict[str, int] | None:

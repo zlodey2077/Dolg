@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import sys
 
 from PIL import Image, ImageDraw, ImageFont
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from Dolg_APP.services.schematic_layout_quality import analyze_schematic_layout
 
 
 OUT_DIR = Path('docs/final/generated')
@@ -10,6 +18,8 @@ EXTERNAL_SVG = OUT_DIR / 'ne555_internal_astable_preview.svg'
 EXTERNAL_PNG = OUT_DIR / 'ne555_internal_astable_simulator_preview.png'
 INTERNAL_SVG = OUT_DIR / 'ne555_internal_block_preview.svg'
 INTERNAL_PNG = OUT_DIR / 'ne555_internal_block_preview.png'
+HIERARCHICAL_SCHEME_JSON = OUT_DIR / 'ne555_internal_astable_hierarchical_scheme.json'
+QUALITY_REPORT_JSON = OUT_DIR / 'ne555_internal_astable_quality_report.json'
 
 W = 1500
 H = 900
@@ -361,7 +371,7 @@ def draw_internal() -> None:
 
     c.block(1070, 345, 150, 92, 'Output', 'push-pull driver')
     c.poly([(955, 382), (1070, 382)])
-    c.poly([(1220, 392), ports['3 OUT']])
+    c.poly([(1220, 392), (1300, 392), (1300, 400), ports['3 OUT']])
     c.poly([(1120, rail_y), (1120, 345)], VCC)
     c.node(1120, rail_y, VCC)
     c.poly([(1120, 437), (1120, gnd_y)], GND)
@@ -369,7 +379,7 @@ def draw_internal() -> None:
 
     q = c.npn(1070, 590, 'discharge NPN')
     c.poly([(955, 415), (1010, 415), (1010, q['base'][1]), q['base']])
-    c.poly([ports['7 DISCH'], (1230, ports['7 DISCH'][1]), (1230, q['collector'][1]), q['collector']])
+    c.poly([ports['7 DISCH'], (1300, ports['7 DISCH'][1]), (1300, 430), (q['collector'][0], 430), q['collector']])
     c.poly([q['emitter'], (q['emitter'][0], gnd_y)], GND)
     c.node(q['emitter'][0], gnd_y, GND)
 
@@ -380,13 +390,207 @@ def draw_internal() -> None:
     c.save(INTERNAL_SVG, INTERNAL_PNG)
 
 
+def _component(component_id, component_type, x, y, label='', width=None, height=None, ports=None, **props):
+    item = {
+        'id': component_id,
+        'type': component_type,
+        'label': label or component_id,
+        'x': x,
+        'y': y,
+    }
+    if width is not None:
+        item['width'] = width
+    if height is not None:
+        item['height'] = height
+    if ports:
+        item['ports'] = [
+            {'id': port_id, 'x': px, 'y': py}
+            for port_id, (px, py) in ports.items()
+        ]
+    if props:
+        item.update(props)
+    return item
+
+
+def _wire(source, source_port, target, target_port, *waypoints, net=''):
+    item = {
+        'from': {'compId': source, 'portId': source_port},
+        'to': {'compId': target, 'portId': target_port},
+        'waypoints': [{'x': x, 'y': y} for x, y in waypoints],
+    }
+    if net:
+        item['net_label'] = net
+    return item
+
+
+def build_hierarchical_scheme():
+    external_components = [
+        _component('VCC_RAIL', 'node', 70, 105, 'VCC', ports={'a': (70, 105)}),
+        _component('GND_RAIL', 'ground', 70, 765, 'GND', ports={'a': (70, 765)}),
+        _component('TRIGGER_NODE', 'node', 270, 335, 'trigger', ports={'a': (270, 335)}),
+        _component('TIMING_NODE', 'node', 430, 420, 'timing', ports={'a': (430, 420)}),
+        _component('DISCH_NODE', 'node', 500, 495, 'disch', ports={'a': (500, 495)}),
+        _component('OUT_NODE', 'node', 980, 335, 'OUT', ports={'a': (980, 335)}),
+        _component(
+            'U1',
+            'ic',
+            760,
+            425,
+            'NE555',
+            width=280,
+            height=360,
+            spice_model='NE555',
+            subcircuit='NE555_FUNC',
+            ports={
+                '2': (620, 335),
+                '6': (620, 420),
+                '7': (620, 495),
+                '4': (710, 245),
+                '8': (810, 245),
+                '1': (760, 605),
+                '3': (900, 335),
+                '5': (900, 485),
+            },
+        ),
+        _component('R2', 'resistor', 270, 220, 'R2 100k', width=68, height=68, resistance=100000, ports={'1': (270, 186), '2': (270, 335)}),
+        _component('R1', 'potentiometer', 430, 250, 'R1 5M', width=78, height=78, resistance=5000000, ports={'top': (430, 211), 'wiper': (430, 420), 'bottom': (430, 420)}),
+        _component('C1', 'capacitor', 430, 610, 'C1 47uF', width=54, height=84, capacitance=47, ports={'1': (430, 420), '2': (430, 765)}),
+        _component('S1', 'button', 185, 460, 'S1', width=82, height=42, ports={'1': (270, 335), '2': (140, 765)}),
+        _component('C2', 'capacitor', 970, 640, 'C2 10nF', width=54, height=84, capacitance='0.01', ports={'1': (970, 565), '2': (970, 765)}),
+        _component('R3', 'resistor', 1060, 335, 'R3 1k', width=78, height=34, resistance=1000, ports={'1': (1012, 335), '2': (1110, 335)}),
+        _component('T1', 'transistor', 1210, 455, 'T1 NPN', width=86, height=96, spice_model='QNPN', ports={'b': (1148, 455), 'c': (1228, 383), 'e': (1228, 527)}),
+        _component('LED1', 'led', 1228, 155, 'LED1', width=72, height=54, spice_model='DLED', ports={'a': (1228, 105), 'k': (1228, 205)}),
+        _component('R4', 'resistor', 1228, 255, 'R4 1.5k', width=78, height=68, resistance=1500, ports={'1': (1228, 205), '2': (1228, 383)}),
+        _component('C3', 'capacitor', 1340, 435, 'C3 100nF', width=54, height=84, capacitance='0.1', ports={'1': (1340, 105), '2': (1340, 765)}),
+        _component('C4', 'capacitor', 1420, 435, 'C4 100uF', width=54, height=84, capacitance=100, ports={'1': (1420, 105), '2': (1420, 765)}),
+        _component('POWER', 'connector', 1315, 72, 'POWER 9-12V', width=86, height=48, ports={'+': (1228, 105), '-': (1383, 765)}),
+    ]
+    external_connections = [
+        _wire('VCC_RAIL', 'a', 'R2', '1', (270, 105), (270, 186), net='VCC'),
+        _wire('VCC_RAIL', 'a', 'R1', 'top', (430, 105), (430, 211), net='VCC'),
+        _wire('VCC_RAIL', 'a', 'U1', '4', (710, 105), (710, 245), net='RESET'),
+        _wire('VCC_RAIL', 'a', 'U1', '8', (810, 105), (810, 245), net='VCC'),
+        _wire('VCC_RAIL', 'a', 'LED1', 'a', (1228, 105), net='VCC'),
+        _wire('VCC_RAIL', 'a', 'C3', '1', (1340, 105), net='VCC'),
+        _wire('VCC_RAIL', 'a', 'C4', '1', (1420, 105), net='VCC'),
+        _wire('VCC_RAIL', 'a', 'POWER', '+', (1228, 105), net='VCC'),
+        _wire('GND_RAIL', 'a', 'U1', '1', (760, 765), (760, 605), net='GND'),
+        _wire('GND_RAIL', 'a', 'C1', '2', (430, 765), net='GND'),
+        _wire('GND_RAIL', 'a', 'S1', '2', (140, 765), net='GND'),
+        _wire('GND_RAIL', 'a', 'C2', '2', (970, 765), net='GND'),
+        _wire('GND_RAIL', 'a', 'T1', 'e', (1228, 765), (1228, 527), net='GND'),
+        _wire('GND_RAIL', 'a', 'C3', '2', (1340, 765), net='GND'),
+        _wire('GND_RAIL', 'a', 'C4', '2', (1420, 765), net='GND'),
+        _wire('GND_RAIL', 'a', 'POWER', '-', (1383, 765), net='GND'),
+        _wire('R2', '2', 'TRIGGER_NODE', 'a', net='TRIGGER'),
+        _wire('TRIGGER_NODE', 'a', 'U1', '2', (560, 335), (620, 335), net='TRIGGER'),
+        _wire('TRIGGER_NODE', 'a', 'S1', '1', net='TRIGGER'),
+        _wire('R1', 'wiper', 'TIMING_NODE', 'a', net='TIMING'),
+        _wire('R1', 'bottom', 'TIMING_NODE', 'a', net='TIMING'),
+        _wire('TIMING_NODE', 'a', 'C1', '1', net='TIMING'),
+        _wire('TIMING_NODE', 'a', 'U1', '6', (560, 420), (620, 420), net='TIMING'),
+        _wire('TIMING_NODE', 'a', 'DISCH_NODE', 'a', (500, 420), (500, 495), net='TIMING_DISCH'),
+        _wire('DISCH_NODE', 'a', 'U1', '7', (620, 495), net='DISCH'),
+        _wire('U1', '5', 'C2', '1', (970, 485), (970, 565), net='CONTROL'),
+        _wire('U1', '3', 'OUT_NODE', 'a', net='OUT'),
+        _wire('OUT_NODE', 'a', 'R3', '1', (1012, 335), net='OUT'),
+        _wire('R3', '2', 'T1', 'b', (1148, 335), (1148, 455), net='BASE_DRIVE'),
+        _wire('T1', 'c', 'R4', '2', (1228, 383), net='LED_SINK'),
+        _wire('LED1', 'k', 'R4', '1', net='LED_CHAIN'),
+    ]
+
+    internal_components = [
+        _component('VCC8', 'node', 90, 105, 'VCC / pin 8', ports={'a': (90, 105)}),
+        _component('GND1', 'ground', 90, 770, 'GND / pin 1', ports={'a': (90, 770)}),
+        _component('P5_CTRL', 'pin', 110, 240, '5 CTRL', ports={'p': (110, 240)}),
+        _component('P6_THR', 'pin', 110, 295, '6 THR', ports={'p': (110, 295)}),
+        _component('P2_TRIG', 'pin', 110, 430, '2 TRIG', ports={'p': (110, 430)}),
+        _component('P4_RESET', 'pin', 110, 560, '4 RESET', ports={'p': (110, 560)}),
+        _component('P3_OUT', 'pin', 1390, 400, '3 OUT', ports={'p': (1390, 400)}),
+        _component('P7_DISCH', 'pin', 1390, 560, '7 DISCH', ports={'p': (1390, 560)}),
+        _component('RINT_TOP', 'resistor', 365, 182, '5k top', width=68, height=68, resistance=5000, ports={'1': (365, 105), '2': (365, 260)}),
+        _component('RINT_MID', 'resistor', 365, 340, '5k mid', width=68, height=68, resistance=5000, ports={'1': (365, 260), '2': (365, 420)}),
+        _component('RINT_BOT', 'resistor', 365, 596, '5k bottom', width=68, height=68, resistance=5000, ports={'1': (365, 420), '2': (365, 770)}),
+        _component('REF_HIGH', 'node', 365, 260, '2/3 VCC', ports={'a': (365, 260)}),
+        _component('REF_LOW', 'node', 365, 420, '1/3 VCC', ports={'a': (365, 420)}),
+        _component('CMP_THRESH', 'comparator', 635, 284, 'Threshold comparator', width=150, height=78, ports={'+': (560, 274), '-': (560, 304), 'out': (710, 284)}),
+        _component('CMP_TRIG', 'comparator', 635, 431, 'Trigger comparator', width=150, height=78, ports={'+': (560, 421), '-': (560, 451), 'out': (710, 431)}),
+        _component('SR_LATCH', 'sr_latch', 890, 382, 'SR latch', width=130, height=105, ports={'R': (825, 360), 'S': (825, 412), 'RESET': (825, 392), 'Q': (955, 382), 'nQ': (955, 415)}),
+        _component('OUT_DRIVER', 'output_driver', 1145, 391, 'Output driver', width=150, height=92, ports={'in': (1070, 382), 'out': (1220, 392), 'vcc': (1120, 345), 'gnd': (1120, 437)}),
+        _component('Q_DISCH', 'transistor', 1070, 590, 'Discharge NPN', width=86, height=96, spice_model='QNPN', ports={'b': (1008, 590), 'c': (1088, 518), 'e': (1088, 662)}),
+    ]
+    internal_connections = [
+        _wire('VCC8', 'a', 'RINT_TOP', '1', (365, 105), net='VCC_INTERNAL'),
+        _wire('RINT_TOP', '2', 'REF_HIGH', 'a', net='REF_2_3'),
+        _wire('REF_HIGH', 'a', 'RINT_MID', '1', net='REF_2_3'),
+        _wire('RINT_MID', '2', 'REF_LOW', 'a', net='REF_1_3'),
+        _wire('REF_LOW', 'a', 'RINT_BOT', '1', net='REF_1_3'),
+        _wire('RINT_BOT', '2', 'GND1', 'a', (365, 770), net='GND_INTERNAL'),
+        _wire('P5_CTRL', 'p', 'REF_HIGH', 'a', (260, 240), (260, 260), net='CONTROL_REF'),
+        _wire('P6_THR', 'p', 'CMP_THRESH', '+', (505, 295), (505, 274), net='THRESHOLD_SENSE'),
+        _wire('REF_HIGH', 'a', 'CMP_THRESH', '-', (500, 260), (500, 304), net='REF_2_3'),
+        _wire('REF_LOW', 'a', 'CMP_TRIG', '+', (500, 420), (500, 421), net='REF_1_3'),
+        _wire('P2_TRIG', 'p', 'CMP_TRIG', '-', (505, 430), (505, 451), net='TRIGGER_SENSE'),
+        _wire('CMP_THRESH', 'out', 'SR_LATCH', 'R', (770, 284), (770, 360), net='LATCH_RESET'),
+        _wire('CMP_TRIG', 'out', 'SR_LATCH', 'S', (770, 431), (770, 412), net='LATCH_SET'),
+        _wire('P4_RESET', 'p', 'SR_LATCH', 'RESET', (760, 560), (760, 392), net='RESET'),
+        _wire('SR_LATCH', 'Q', 'OUT_DRIVER', 'in', net='OUTPUT_STATE'),
+        _wire('OUT_DRIVER', 'out', 'P3_OUT', 'p', (1300, 392), (1300, 400), net='PIN3_OUT'),
+        _wire('VCC8', 'a', 'OUT_DRIVER', 'vcc', (1120, 105), (1120, 345), net='VCC_INTERNAL'),
+        _wire('OUT_DRIVER', 'gnd', 'GND1', 'a', (1120, 770), net='GND_INTERNAL'),
+        _wire('SR_LATCH', 'nQ', 'Q_DISCH', 'b', (1010, 415), (1010, 590), net='DISCHARGE_DRIVE'),
+        _wire('P7_DISCH', 'p', 'Q_DISCH', 'c', (1300, 560), (1300, 430), (1088, 430), (1088, 518), net='DISCHARGE_COLLECTOR'),
+        _wire('Q_DISCH', 'e', 'GND1', 'a', (1088, 770), net='GND_INTERNAL'),
+    ]
+
+    return {
+        'version': 2,
+        'metadata': {
+            'title': 'NE555 astable/load schematic with hierarchical NE555 subcircuit',
+            'generated_by': 'scripts/generate_ne555_simulator_preview.py',
+            'layout_contract': 'orthogonal-schematic-v1',
+        },
+        'sheets': [
+            {
+                'id': 'external_astable_load',
+                'title': 'External NE555 astable/load sheet',
+                'components': external_components,
+                'connections': external_connections,
+            }
+        ],
+        'subcircuits': [
+            {
+                'id': 'NE555_FUNC',
+                'title': 'NE555 functional internal subcircuit',
+                'ports': ['1', '2', '3', '4', '5', '6', '7', '8'],
+                'components': internal_components,
+                'connections': internal_connections,
+            }
+        ],
+    }
+
+
+def write_hierarchical_quality_outputs() -> dict:
+    scheme = build_hierarchical_scheme()
+    quality = analyze_schematic_layout(scheme)
+    HIERARCHICAL_SCHEME_JSON.write_text(json.dumps({'scheme_data': scheme}, ensure_ascii=False, indent=2), encoding='utf-8')
+    QUALITY_REPORT_JSON.write_text(json.dumps(quality, ensure_ascii=False, indent=2), encoding='utf-8')
+    if not quality['ok']:
+        raise SystemExit(json.dumps({'layout_quality': quality}, ensure_ascii=False, indent=2))
+    return quality
+
+
 def main() -> None:
     draw_external()
     draw_internal()
+    quality = write_hierarchical_quality_outputs()
     print(EXTERNAL_SVG)
     print(EXTERNAL_PNG)
     print(INTERNAL_SVG)
     print(INTERNAL_PNG)
+    print(HIERARCHICAL_SCHEME_JSON)
+    print(QUALITY_REPORT_JSON)
+    print(json.dumps({'layout_quality_ok': quality['ok'], 'metrics': quality['metrics']}, ensure_ascii=False))
 
 
 if __name__ == '__main__':
