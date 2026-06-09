@@ -124,6 +124,11 @@ urlpatterns = [
     ),
     path('simulation/api/export/pdf/', views.api_export_scheme_pdf, name='api_export_scheme_pdf'),
     path('cad/api/convert-dwg/', views.api_cad_convert_dwg, name='api_cad_convert_dwg'),
+    path(
+        'cad/api/scheme/operations/preview/',
+        views.api_cad_scheme_operations_preview,
+        name='api_cad_scheme_operations_preview',
+    ),
     path('cad/api/import/', views.api_cad_import_preview, name='api_cad_import_preview'),
     path('cad/api/lithium-import/', views.api_lithium_import_preview, name='api_lithium_import_preview'),
     # AI-ассистент DOLG (чат с Claude)

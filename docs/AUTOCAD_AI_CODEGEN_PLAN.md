@@ -311,3 +311,33 @@ MVP для проекта:
 4. Подключить validator: геометрия, соединения, слои, пустые/висячие nets.
 5. Добавить первые 10-20 тестовых операций для схем и CAD-примитивов.
 6. После этого подключать AI как генератор операций, а не как свободного "балабола".
+
+## Реализованный baseline: программные операции схем
+
+Первый backend-мост уже добавлен:
+
+- `Dolg_APP/services/schematic_operations.py` безопасно применяет operation log к каноническому `scheme_data`;
+- `cad/api/scheme/operations/preview/` показывает результат без сохранения проекта;
+- ответ включает обновленный `scheme_data`, отчет операций, DRC и graph/topology analysis;
+- MVP-операции: `add_component`, `add_wire`, `move_component`, `rotate_component`, `set_property`, `set_net`, `delete_wire`, `delete_component`, `validate`;
+- `atomic=true` откатывает весь batch, если хотя бы одна операция отклонена.
+
+Пример запроса:
+
+```json
+{
+  "atomic": true,
+  "scheme_data": {"components": [], "connections": []},
+  "operations": [
+    {"operation": "add_component", "type": "battery", "id": "V1", "voltage": 9},
+    {"operation": "add_component", "type": "resistor", "id": "R1", "resistance": 1000},
+    {
+      "operation": "add_wire",
+      "from": {"component": "V1", "port": "+"},
+      "to": {"component": "R1", "port": "1"}
+    }
+  ]
+}
+```
+
+Это текущая точка подключения AI: модель сначала генерирует ограниченный список операций, backend валидирует и применяет их, а уже затем векторный редактор отображает или сохраняет результат.

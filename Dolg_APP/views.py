@@ -57,6 +57,7 @@ from .services.review_i18n import (
     localize_review_report,
     status_label_ru,
 )
+from .services.schematic_operations import apply_schematic_operations
 from .simulation_quota import quota_dict
 
 logger = logging.getLogger(__name__)
@@ -2214,6 +2215,46 @@ def project_review_md(request, review_id):
     response = HttpResponse(markdown, content_type='text/markdown; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="dolg_protocol_{review.id}.md"'
     return response
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_cad_scheme_operations_preview(request):
+    """Apply programmatic CAD/schematic operations without saving a project."""
+
+    data = _read_json_payload(request)
+    operations = data.get('operations', data.get('operation'))
+    if operations is None:
+        return _json_error('operations or operation is required')
+
+    result = apply_schematic_operations(
+        data.get('scheme_data') or data.get('scheme') or {},
+        operations,
+        atomic=bool(data.get('atomic')),
+    )
+    scheme_data = result.get('scheme_data') or {}
+    drc = _validate_scheme_data(scheme_data)
+    topology = {}
+    topology_error = ''
+    try:
+        from .services.schematic_graph import analyze_graph_topology
+
+        topology = analyze_graph_topology(scheme_data)
+    except Exception as exc:
+        topology_error = str(exc)
+
+    payload = {
+        'ok': bool(result.get('ok')) and bool(drc.get('ok')),
+        'operations_ok': bool(result.get('ok')),
+        'scheme_data': scheme_data,
+        'operation_report': result.get('report') or {},
+        'drc': drc,
+        'topology': topology,
+    }
+    if topology_error:
+        payload['topology_error'] = topology_error
+    status = 200 if payload['operations_ok'] else 400
+    return JsonResponse(payload, status=status)
 
 
 @login_required(login_url='accounts:login')
