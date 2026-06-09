@@ -143,6 +143,14 @@ function Repair-WslBackendIfNeeded($IsAdmin) {
     if ($missingServices.Count -eq 0) {
         foreach ($name in $requiredServices) {
             $service = Get-Service -Name $name -ErrorAction SilentlyContinue
+            if ($service.Status -ne "Running") {
+                if (-not $IsAdmin) {
+                    Invoke-ElevatedSelf "Windows WSL/VM backend service ${name} is $($service.Status); starting it requires UAC/Admin."
+                }
+                Write-Warning "${name}: $($service.Status); starting it now."
+                Start-Service -Name $name -ErrorAction Stop
+                $service = Get-Service -Name $name -ErrorAction SilentlyContinue
+            }
             Write-Host "${name}: $($service.Status)"
         }
         return

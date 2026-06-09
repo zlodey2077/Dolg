@@ -1,5 +1,6 @@
 param(
     [string]$EnvFile = "deploy/.env.docker.local",
+    [switch]$ConfigOnly,
     [switch]$NoBuild,
     [switch]$NoSmoke,
     [int]$HealthTimeoutSeconds = 180
@@ -12,7 +13,13 @@ $EnvPath = Join-Path $RepoRoot $EnvFile
 
 function New-Token([int]$Bytes = 32) {
     $data = [byte[]]::new($Bytes)
-    [Security.Cryptography.RandomNumberGenerator]::Fill($data)
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($data)
+    }
+    finally {
+        $rng.Dispose()
+    }
     return ([Convert]::ToBase64String($data)).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
@@ -70,6 +77,12 @@ DJANGO_SUPERUSER_PASSWORD=
 DJANGO_SUPERUSER_EMAIL=
 "@ | Set-Content -Path $EnvPath -Encoding UTF8
     Write-Host "Created local Docker env: $EnvFile"
+}
+
+if ($ConfigOnly) {
+    docker compose --env-file $EnvFile -f $ComposeFile config | Out-Null
+    Write-Host "Docker Compose config is valid for $EnvFile."
+    exit 0
 }
 
 if (-not (Test-DockerReady)) {

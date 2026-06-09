@@ -41,6 +41,13 @@ The script creates ignored local secrets in `deploy/.env.docker.local`, validate
 the compose file, builds the image, starts Postgres/Redis/Django/nginx/
 Prometheus/Grafana, and waits for `/healthz`.
 
+To only create the local env file and validate Compose without a running Docker
+daemon:
+
+```powershell
+scripts/docker_compose_up.ps1 -ConfigOnly
+```
+
 URLs:
 
 - App: `http://localhost:8080/`
@@ -141,6 +148,10 @@ fails fast on missing secrets.
 
 - OS/runtime: start `com.docker.service` through UAC/admin once and confirm
   `docker info` returns the server version.
+- If Docker Desktop hangs while the Docker service is stopped or `vmcompute` is
+  stopped, run `scripts/bootstrap_docker_desktop.ps1 -StartVisible` and accept
+  the UAC prompt. The bootstrap checks WSL, `vmcompute`, `hns`,
+  `LxssManager`, `docker-users`, and the Docker Desktop service.
 - Runtime smoke: run `scripts/docker_compose_up.ps1` and verify the app,
   Prometheus, and Grafana URLs.
 - Kubernetes smoke: enable Docker Desktop Kubernetes or use kind/minikube, then
