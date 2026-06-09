@@ -936,6 +936,263 @@
     .cad-hover-popover .chp-meta {
         color: #94a3b8; font-size: 10.5px;
     }
+
+    /* 2026-06-10 urgent CAD UI cleanup:
+       спокойная инженерная компоновка вместо неоновой витрины. */
+    #app-container {
+        --cad-bg: #eef2f6;
+        --cad-panel: #f8fafc;
+        --cad-panel-strong: #ffffff;
+        --cad-border: #c8d3df;
+        --cad-border-strong: #8ea3b8;
+        --cad-text: #1f2933;
+        --cad-muted: #64748b;
+        --cad-accent: #0f766e;
+        --cad-accent-strong: #0b5f59;
+        --cad-warn: #b45309;
+        background: var(--cad-bg);
+        color: var(--cad-text);
+        border: 1px solid var(--cad-border);
+        border-radius: 10px;
+        padding: 10px;
+        box-shadow: 0 12px 30px rgba(31, 41, 51, 0.10);
+        height: calc(100vh - 160px);
+        min-height: 540px;
+    }
+
+    .cad-mode-tabs,
+    .top-controls,
+    .tools-panel,
+    .canvas-area,
+    .right-panel,
+    .cad-drc-panel {
+        background: var(--cad-panel);
+        border: 1px solid var(--cad-border);
+        box-shadow: none;
+    }
+
+    .cad-mode-tabs {
+        padding: 6px;
+        margin-bottom: 0;
+        border-radius: 8px;
+    }
+
+    .cad-mode-tab,
+    .btn-small,
+    .tool-btn,
+    .cad-view-tab {
+        background: var(--cad-panel-strong);
+        border: 1px solid var(--cad-border);
+        color: var(--cad-text);
+        box-shadow: none;
+    }
+
+    .cad-mode-tab {
+        min-height: 34px;
+        border-radius: 6px;
+    }
+
+    .cad-mode-tab:hover,
+    .btn-small:hover,
+    .tool-btn:hover,
+    .cad-view-tab:hover {
+        background: #eef8f7;
+        border-color: #84bcb6;
+        color: var(--cad-accent-strong);
+        box-shadow: none;
+    }
+
+    .cad-mode-tab.active,
+    .btn-small.primary,
+    .tool-btn.active,
+    .cad-view-tab.active {
+        background: var(--cad-accent);
+        border-color: var(--cad-accent-strong);
+        color: #ffffff;
+        box-shadow: none;
+        font-weight: 700;
+    }
+
+    .cad-mode-hint,
+    .cad-view-info,
+    .control-label,
+    .property-label {
+        color: var(--cad-muted);
+    }
+
+    .top-controls {
+        border-radius: 8px;
+        padding: 8px 10px;
+        align-items: center;
+        flex-wrap: nowrap;
+        max-height: 54px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
+
+    .top-controls > .control-group + .control-group {
+        border-left-color: #d8e0e8;
+    }
+
+    .top-controls .control-group {
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+    }
+
+    .top-controls > .control-group[style*="margin-left: auto"] {
+        margin-left: 0 !important;
+    }
+
+    .top-controls input,
+    .top-controls select,
+    .property-input {
+        background: #ffffff !important;
+        border: 1px solid var(--cad-border) !important;
+        color: var(--cad-text) !important;
+        border-radius: 5px !important;
+    }
+
+    .top-controls label {
+        color: var(--cad-muted) !important;
+    }
+
+    .cad-toolbar-divider {
+        background: #d8e0e8;
+    }
+
+    .cad-layout {
+        gap: 8px;
+        min-height: 0;
+    }
+
+    .tools-panel {
+        width: 74px;
+        padding: 6px;
+        gap: 5px;
+        border-radius: 8px;
+    }
+
+    .tool-btn {
+        min-height: 36px;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    .canvas-area {
+        background: #dbe3ec;
+        border-radius: 8px;
+        min-height: 0;
+    }
+
+    .canvas-header,
+    .cad-view-tabs {
+        background: #ffffff;
+        border-bottom: 1px solid var(--cad-border);
+        color: var(--cad-text);
+    }
+
+    .canvas-header {
+        min-height: 36px;
+    }
+
+    #canvas {
+        background: #fbfdff;
+        border-top: 1px solid #e4eaf0;
+        display: block;
+    }
+
+    .right-panel {
+        width: 280px;
+        padding: 8px;
+        gap: 8px;
+        border-radius: 8px;
+        color: var(--cad-text);
+    }
+
+    .panel-section {
+        background: #ffffff;
+        border: 1px solid var(--cad-border);
+        border-radius: 7px;
+        box-shadow: none;
+    }
+
+    .panel-section-title,
+    .cad-drc-panel > summary {
+        background: #f1f5f9;
+        border-bottom: 1px solid var(--cad-border);
+        color: var(--cad-text);
+        letter-spacing: 0;
+    }
+
+    .panel-section-content,
+    .cad-mini-card,
+    .cad-drc-list {
+        color: var(--cad-text);
+    }
+
+    .cad-mini-card {
+        background: #f8fafc;
+        border: 1px solid #d8e0e8;
+        border-radius: 6px;
+    }
+
+    .cad-chip {
+        background: #e0f2f1;
+        border-color: #99d5ce;
+        color: #0f5f59;
+    }
+
+    .cad-drc-panel {
+        border-radius: 8px;
+        max-height: 180px;
+    }
+
+    .cad-drc-counter {
+        background: #ffffff;
+        color: var(--cad-muted);
+        border: 1px solid var(--cad-border);
+    }
+
+    .layer-item,
+    .pcb-layer-row {
+        background: #ffffff;
+        border-color: var(--cad-border);
+        color: var(--cad-text);
+    }
+
+    .layer-item.active,
+    .pcb-layer-row.active {
+        background: #e0f2f1;
+        border-color: #5fb3aa;
+        box-shadow: none;
+    }
+
+    .cad-hover-popover {
+        background: rgba(255, 255, 255, 0.98);
+        border-color: var(--cad-border-strong);
+        color: var(--cad-text);
+        box-shadow: 0 10px 24px rgba(31, 41, 51, 0.18);
+    }
+
+    .cad-hover-popover .chp-type,
+    .cad-hover-popover .chp-ref {
+        color: var(--cad-accent-strong);
+    }
+
+    .cad-hover-popover .chp-value {
+        color: var(--cad-warn);
+    }
+
+    @media (max-width: 1200px) {
+        .right-panel { width: 250px; }
+        #app-container {
+            height: calc(100vh - 150px);
+            min-height: 520px;
+        }
+        .top-controls { max-height: 54px; }
+    }
 </style>
 {% endblock %}
 
@@ -3591,8 +3848,16 @@ function render() {
 
 function resizeCanvas() {
     const parent = State.canvas.parentElement;
-    State.canvas.width = parent.clientWidth;
-    State.canvas.height = parent.clientHeight - document.querySelector('.canvas-header').offsetHeight;
+    const occupied = Array.from(parent.children).reduce((sum, child) => {
+        if (child === State.canvas || child.hidden) return sum;
+        const style = getComputedStyle(child);
+        if (style.display === 'none' || style.position === 'absolute' || style.position === 'fixed') {
+            return sum;
+        }
+        return sum + child.getBoundingClientRect().height;
+    }, 0);
+    State.canvas.width = Math.max(320, Math.floor(parent.clientWidth));
+    State.canvas.height = Math.max(260, Math.floor(parent.clientHeight - occupied));
     render();
 }
 

@@ -1308,12 +1308,14 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
        Scope+Gen+MM карточки полосками. 200px = заголовок + 160px на контент,
        чего хватает на canvas сверху и controls снизу. Канвас теряет 60px, но
        это компромисс по просьбе юзера ("можешь чуть уменьшить поле редактора"). */
-    /* v17b: row 2 = 0 (sim-dock убран), row 4 = auto (analysis по содержимому). */
-    grid-template-rows: auto 0 1fr auto;
+    /* v22: нижняя analysis-панель больше не диктует высоту по содержимому.
+       Она занимает фиксированный row через --analysis-height, а внутренние
+       карточки скроллятся/сжимаются внутри своих слотов. */
+    grid-template-rows: auto 0 minmax(320px, 1fr) auto;
     gap: 6px;
     margin-top: 0;  /* v16: tools-header убран, контейнер начинается сразу */
-    /* v16: 80px — только header сайта + чуть. Контейнер растягивается максимально. */
-    min-height: max(1100px, calc(100vh - 60px));  /* v17c: больше — 478px analysis + ≥500 канвас */
+    height: calc(100vh - 60px);
+    min-height: 640px;
     background: linear-gradient(135deg, rgba(10, 14, 39, 0.95), rgba(26, 39, 68, 0.95));
     border: 2px solid var(--accent-cyan);
     border-radius: 16px;
@@ -1355,12 +1357,12 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
    Default 36px (только заголовок), расширяется юзером по необходимости.
    Канвас приоритетнее в дефолте. */
 .analysis-bottom-panel {
-    /* 2026-06-01 v14: 200px = header + 160px на 3 карточки. Иначе gen/mm полосками. */
     display: flex;
     flex-direction: column;
     min-height: 36px;
-    height: auto;  /* v17b: растягивается по содержимому, ниже фикс. размеры карточек */
-    max-height: 65vh;
+    height: var(--analysis-height, clamp(240px, 28vh, 280px));
+    max-height: min(44vh, 360px);
+    flex: 0 0 var(--analysis-height, clamp(240px, 28vh, 280px));
     overflow: hidden;
     animation: analysisBottomSlideIn 0.4s ease-out;
     background: linear-gradient(135deg, rgba(10, 14, 39, 0.95), rgba(20, 30, 60, 0.95));
@@ -1369,9 +1371,11 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     position: relative;
     overflow: hidden;
     transition: height 0.18s ease-out;
+    contain: layout paint;
 }
 .analysis-bottom-panel.minimized {
     height: 36px;
+    flex-basis: 36px;
     overflow: hidden;
 }
 .analysis-bottom-panel.minimized .analysis-bottom-content { display: none; }
@@ -1497,28 +1501,15 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
 .dolg-lab-grid.lab-hide-scope > .dolg-lab-scope,
 .dolg-lab-grid.lab-hide-mm    > .dolg-lab-mm,
 .dolg-lab-grid.lab-hide-gen   > .dolg-lab-gen {
-    display: none !important;
-}
-/* Если scope скрыт — gen+mm занимают всю ширину */
-.dolg-lab-grid.lab-hide-scope {
-    grid-template-columns: 1fr 1fr !important;
-    grid-template-areas: "gen mm" !important;
-}
-/* Если gen скрыт — scope большой + mm */
-.dolg-lab-grid.lab-hide-gen:not(.lab-hide-mm) {
-    grid-template-rows: 1fr !important;
-    grid-template-areas: "scope mm" !important;
-}
-/* Если mm скрыт — scope большой + gen */
-.dolg-lab-grid.lab-hide-mm:not(.lab-hide-gen) {
-    grid-template-rows: 1fr !important;
-    grid-template-areas: "scope gen" !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 /* Если scope + что-то ещё скрыто */
 .dolg-lab-grid.lab-hide-scope.lab-hide-gen:not(.lab-hide-mm),
 .dolg-lab-grid.lab-hide-scope.lab-hide-mm:not(.lab-hide-gen) {
-    grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr !important;
+    grid-template-columns: 2fr 1fr !important;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-areas: "scope gen" "scope mm" !important;
 }
 /* Все скрыты — пустая панель с подсказкой через ::before */
 .dolg-lab-grid.lab-hide-scope.lab-hide-mm.lab-hide-gen::before {
@@ -1528,6 +1519,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     padding: 12px;
     display: block;
     text-align: center;
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
 }
 
 /* 2026-06-01 recovery v9: на узком экране (<900px) карточки идут вертикально,
@@ -1545,9 +1538,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
         min-height: 90px;
         max-height: none;
     }
-    .analysis-bottom-panel {
-        height: var(--analysis-height, 360px) !important;
-    }
+    .analysis-bottom-panel { --analysis-height: 320px; }
     .dolg-lab-scope-canvas {
         max-height: 140px;
     }
@@ -1627,8 +1618,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
 .analysis-bottom-content {
     flex: 1;
     min-height: 0;
-    overflow: auto;
-    padding: 10px;
+    overflow: hidden;
+    padding: 8px;
 }
 /* Лаба внутри permanent-панели: scope-доминантный layout (см. ниже в .dolg-lab-grid).
    Override grid-template-columns УБРАН — он ломал v3 areas. */
@@ -1636,6 +1627,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     background: transparent;
     padding: 0;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* Top-toolbar: components-panel становится горизонтальной полосой 64-90px.
@@ -15780,21 +15773,21 @@ body.dolg-3d-active > footer {
    Gen = 220px (controls без preview), MM = 220px (display+controls без gauge).
    Analysis-panel растягивается по сумме = ~480px + header. */
 .dolg-lab-grid {
-    /* v18: компактные строки 160px (раньше 220). Scope 328 двойной, Gen/MM по 160.
-       Analysis panel ~360px вместо 478 → канвас +118px. */
     display: grid; gap: 6px;
     grid-template-columns: 2fr 1fr;
-    /* v21: ФИКСИРОВАННЫЕ Gen 180px / MM 260px (юзер просил).
-       analysis-bottom-panel { height: auto } растягивается под сумму = ~480px. */
-    grid-template-rows: 180px 260px;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas: "scope gen" "scope mm";
     margin: 0;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 @media (max-width: 900px) {
     .dolg-lab-grid {
         grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto;
+        grid-template-rows: minmax(120px, 1fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr);
         grid-template-areas: "scope" "gen" "mm";
+        overflow: auto;
     }
 }
 .dolg-lab-scope { grid-area: scope; }
@@ -15810,6 +15803,7 @@ body.dolg-3d-active > footer {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    height: 100%;
     font-size: 12px;
     container-type: size;
     container-name: lab-card;
@@ -16427,12 +16421,17 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
 
     // Resize: drag вверх → растим панель
     const resizeHandle = document.getElementById('analysisBottomResize');
+    const refitAfterPanelChange = () => {
+        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 80);
+    };
     if (resizeHandle) {
         let startY = 0, startHeight = 0;
         const onMove = (e) => {
             const dy = startY - e.clientY;
-            const newH = Math.max(80, Math.min(window.innerHeight * 0.55, startHeight + dy));
+            const newH = Math.max(140, Math.min(Math.min(window.innerHeight * 0.44, 360), startHeight + dy));
             panel.style.setProperty('--analysis-height', newH + 'px');
+            refitAfterPanelChange();
         };
         const onUp = () => {
             document.removeEventListener('mousemove', onMove);
@@ -16441,6 +16440,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                 const h = parseFloat(getComputedStyle(panel).height);
                 if (h > 0) localStorage.setItem('dolg.analysisHeight', h);
             } catch (e) {}
+            refitAfterPanelChange();
         };
         resizeHandle.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -16451,14 +16451,14 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         });
     }
 
-    // 2026-06-01 recovery v9: восстановление сохранённой высоты с safety cap.
-    // Раньше юзер мог растянуть до 350px — потом канвас зажат. Теперь:
-    // если saved > 260px → reset (вернуть к 180px default), иначе восстановить.
+    // 2026-06-10 v22: восстановление сохранённой высоты с safety cap.
+    // Нижняя панель фиксирована, но не должна съедать больше 360px/44vh.
     try {
         const saved = parseFloat(localStorage.getItem('dolg.analysisHeight'));
-        if (saved > 80 && saved <= 260) {
+        const maxSaved = Math.min(window.innerHeight * 0.44, 360);
+        if (saved >= 140 && saved <= maxSaved) {
             panel.style.setProperty('--analysis-height', saved + 'px');
-        } else if (saved > 260) {
+        } else if (saved > maxSaved) {
             localStorage.removeItem('dolg.analysisHeight');
         }
     } catch (e) {}
@@ -16467,6 +16467,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         resizeHandle.addEventListener('dblclick', () => {
             panel.style.removeProperty('--analysis-height');
             try { localStorage.removeItem('dolg.analysisHeight'); } catch (_e) {}
+            refitAfterPanelChange();
         });
     }
 
@@ -16478,7 +16479,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
             if (currentH < 60) {
                 // Сейчас свёрнут — развернуть
                 const saved = parseFloat(localStorage.getItem('dolg.analysisHeight'));
-                const targetH = (saved > 80) ? saved : Math.round(window.innerHeight * 0.20);
+                const targetH = (saved >= 140) ? saved : Math.round(Math.min(window.innerHeight * 0.28, 280));
                 panel.style.setProperty('--analysis-height', targetH + 'px');
                 minBtn.textContent = '▾';
                 minBtn.title = 'Свернуть';
@@ -16488,6 +16489,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                 minBtn.textContent = '▴';
                 minBtn.title = 'Развернуть';
             }
+            refitAfterPanelChange();
         });
     }
     // Клик по самому header (кроме кнопок) — тоже разворачивает
@@ -16498,9 +16500,10 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
             const currentH = parseFloat(getComputedStyle(panel).height);
             if (currentH < 60) {
                 const saved = parseFloat(localStorage.getItem('dolg.analysisHeight'));
-                const targetH = (saved > 80) ? saved : Math.round(window.innerHeight * 0.20);
+                const targetH = (saved >= 140) ? saved : Math.round(Math.min(window.innerHeight * 0.28, 280));
                 panel.style.setProperty('--analysis-height', targetH + 'px');
                 if (minBtn) minBtn.textContent = '▾';
+                refitAfterPanelChange();
             }
         });
         headerEl.style.cursor = 'pointer';
@@ -16542,7 +16545,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
 {# ================= AI-АССИСТЕНТ DOLG (чат с Claude) ================= #}
 <style>
 .dolg-ai-fab {
-    position: fixed; right: 20px; bottom: 20px; width: 56px; height: 56px;
+    position: fixed; right: 20px; top: 128px; bottom: auto; width: 56px; height: 56px;
     border-radius: 50%; border: none; cursor: pointer;
     /* z-index выше любого footer/header сайта (типично < 1000) и выше
        3D-overlay (120000) держим panel ниже на 1, чтобы 3D перекрывал AI. */
@@ -16557,14 +16560,14 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
 .dolg-ai-fab.active { background: linear-gradient(135deg, #ff5b6e, #ff9457); }
 
 .dolg-ai-panel {
-    position: fixed; right: 20px; bottom: 90px;
+    position: fixed; right: 20px; top: 196px; bottom: auto;
     /* Дефолт стартового размера + границы resize. Пользователь может
        растянуть панель за угол. min/max выставлены так, чтобы не выйти
        за границы экрана и не схлопнуть до невидимости. */
     width: 480px; height: 560px;
     min-width: 320px; min-height: 360px;
     max-width: calc(100vw - 40px);
-    max-height: calc(100vh - 120px);
+    max-height: calc(100vh - 220px);
     resize: both;
     display: none; flex-direction: column;
     background: #1a1f2e; color: #e6e9ef; border: 1px solid #2a3145;
@@ -16588,8 +16591,8 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
     pointer-events: none;
 }
 @media (max-width: 480px) {
-    .dolg-ai-panel { right: 10px; left: 10px; bottom: 80px; max-width: none; width: auto; height: 70vh; resize: vertical; }
-    .dolg-ai-fab { right: 12px; bottom: 12px; }
+    .dolg-ai-panel { right: 10px; left: 10px; top: 96px; bottom: auto; max-width: none; width: auto; height: 58vh; resize: vertical; }
+    .dolg-ai-fab { right: 12px; top: 24px; bottom: auto; }
 }
 
 /* Pipeline strip — горизонтальная полоса быстрых ML-кнопок над чатом.
