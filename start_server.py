@@ -274,7 +274,11 @@ def port_holder(port):
 
 
 def migration_state(py, env):
-    """Return ('ok'|'pending'|'error', detail) for migration preflight."""
+    """Return ('ok'|'pending'|'timeout'|'error', detail) for migration preflight."""
+    try:
+        timeout = int(env.get('DOLG_MIGRATION_CHECK_TIMEOUT', '30'))
+    except ValueError:
+        timeout = 30
     try:
         r = subprocess.run(
             [py, 'manage.py', 'migrate', '--check'],
@@ -282,13 +286,13 @@ def migration_state(py, env):
             env=env,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout,
         )
         if r.returncode == 0:
             return 'ok', ''
         return 'pending', (r.stderr or r.stdout or '').strip()
     except subprocess.TimeoutExpired:
-        return 'error', 'manage.py migrate --check timed out after 60s'
+        return 'timeout', 'manage.py migrate --check timed out after %ss' % timeout
     except Exception as exc:
         return 'error', 'manage.py migrate --check failed: %s' % exc
 
@@ -383,6 +387,7 @@ def main():
     env['PYTHONIOENCODING'] = 'utf-8'
     env['PYTHONUNBUFFERED'] = '1'
     env['PYTHONUTF8'] = '1'  # UTF-8 mode: чинит hot-reload (jurigged + cp1251 на рус. Windows)
+    strict_migrations = env.get('DOLG_LAUNCHER_STRICT_MIGRATIONS') == '1'
 
     # cloudflared — отдельная группа процессов (CTRL_BREAK_EVENT для чистой остановки).
     creation_flags_cf = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
@@ -409,9 +414,11 @@ def main():
         rep('OK', 'Порт %d свободен' % DJANGO_PORT)
 
     migrate_state, migrate_detail = migration_state(py, env)
-    if migrate_state == 'error':
-        rep('ERR', migrate_detail)
-        return _abort(report)
+    if migrate_state in {'timeout', 'error'}:
+        detail = migrate_detail + '; continuing local startup'
+        rep('ERR' if strict_migrations else 'WARN', detail)
+        if strict_migrations:
+            return _abort(report)
     if migrate_state == 'pending':
         rep('WARN', 'Есть непринятые миграции — применяю...')
         try:
@@ -425,13 +432,21 @@ def main():
             )
             migrate_output = mr.stderr or mr.stdout or ''
         except subprocess.TimeoutExpired:
-            rep('ERR', 'manage.py migrate --noinput timed out after 180s')
-            return _abort(report)
+            rep('ERR' if strict_migrations else 'WARN', 'manage.py migrate --noinput timed out after 180s')
+            if strict_migrations:
+                return _abort(report)
+            migrate_output = ''
+            mr = None
         rep(
-            'FIX' if mr.returncode == 0 else 'ERR',
-            'migrate: ' + ('применены' if mr.returncode == 0 else migrate_output[-300:]),
+            'FIX' if mr is not None and mr.returncode == 0 else ('ERR' if strict_migrations else 'WARN'),
+            'migrate: '
+            + (
+                'применены'
+                if mr is not None and mr.returncode == 0
+                else (migrate_output[-300:] or 'skipped/failed; continuing local startup')
+            ),
         )
-        if mr.returncode != 0:
+        if mr is not None and mr.returncode != 0 and strict_migrations:
             return _abort(report)
     else:
         rep('OK', 'Миграции применены')
