@@ -956,8 +956,8 @@
         border-radius: 10px;
         padding: 10px;
         box-shadow: 0 12px 30px rgba(31, 41, 51, 0.10);
-        height: calc(100vh - 160px);
-        min-height: 540px;
+        height: auto;
+        min-height: max(680px, calc(100vh - 140px));
     }
 
     .cad-mode-tabs,
@@ -975,6 +975,8 @@
         padding: 6px;
         margin-bottom: 0;
         border-radius: 8px;
+        background: linear-gradient(180deg, #f6fcff, #e5f2f8);
+        border-color: #a8c6d6;
     }
 
     .cad-mode-tab,
@@ -990,6 +992,13 @@
     .cad-mode-tab {
         min-height: 34px;
         border-radius: 6px;
+    }
+
+    .top-controls .btn-small {
+        min-height: 32px;
+        padding: 5px 9px;
+        font-size: 0.82rem;
+        line-height: 1.1;
     }
 
     .cad-mode-tab:hover,
@@ -1022,14 +1031,17 @@
 
     .top-controls {
         border-radius: 8px;
-        padding: 8px 10px;
+        padding: 6px 8px;
         align-items: center;
-        flex-wrap: nowrap;
-        max-height: 54px;
-        overflow-x: auto;
-        overflow-y: hidden;
+        align-content: flex-start;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-height: none;
+        overflow: visible;
         overscroll-behavior: contain;
         scrollbar-width: thin;
+        background: linear-gradient(180deg, #f2fbff, #deedf7);
+        border-color: #a8c6d6;
     }
 
     .top-controls > .control-group + .control-group {
@@ -1039,10 +1051,30 @@
     .top-controls .control-group {
         flex: 0 0 auto;
         flex-wrap: nowrap;
+        gap: 5px;
+        min-height: 38px;
+        padding: 4px 7px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid #c9d9e5;
+        border-radius: 7px;
+    }
+
+    .top-controls .cad-actions-group {
+        flex: 1 1 620px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        max-width: 100%;
+        background: linear-gradient(180deg, #ffffff, #ecf8f7);
+        border-color: #b6d8d3;
     }
 
     .top-controls > .control-group[style*="margin-left: auto"] {
         margin-left: 0 !important;
+    }
+
+    .top-controls .control-label {
+        min-width: auto;
+        font-size: 0.78rem;
     }
 
     .top-controls input,
@@ -1052,6 +1084,18 @@
         border: 1px solid var(--cad-border) !important;
         color: var(--cad-text) !important;
         border-radius: 5px !important;
+    }
+
+    .top-controls input[type="range"] {
+        width: 76px !important;
+    }
+
+    .top-controls input[type="number"] {
+        width: 50px !important;
+    }
+
+    .top-controls select {
+        max-width: 118px;
     }
 
     .top-controls label {
@@ -1064,7 +1108,8 @@
 
     .cad-layout {
         gap: 8px;
-        min-height: 0;
+        min-height: 520px;
+        flex: 1 1 520px;
     }
 
     .tools-panel {
@@ -1188,10 +1233,13 @@
     @media (max-width: 1200px) {
         .right-panel { width: 250px; }
         #app-container {
-            height: calc(100vh - 150px);
-            min-height: 520px;
+            height: auto;
+            min-height: max(660px, calc(100vh - 130px));
         }
-        .top-controls { max-height: 54px; }
+        .top-controls { max-height: none; }
+        .top-controls .cad-actions-group {
+            justify-content: flex-start;
+        }
     }
 </style>
 {% endblock %}
@@ -1240,21 +1288,21 @@
         </div>
 
         <div class="control-group">
-            <button id="fitCanvasBtn" class="btn-small">По размеру</button>
-            <button id="resetViewBtn" class="btn-small">Восстановить</button>
-            <button id="cadFullscreenBtn" class="btn-small" title="Полноэкранный режим (Esc — выход)">⛶ Во весь экран</button>
+            <button id="fitCanvasBtn" class="btn-small" title="Вписать чертёж в рабочую область">Вписать</button>
+            <button id="resetViewBtn" class="btn-small" title="Вернуть масштаб и панорамирование">Сброс</button>
+            <button id="cadFullscreenBtn" class="btn-small" title="Полноэкранный режим (Esc — выход)">⛶</button>
         </div>
 
         <div class="control-group">
-            <button id="undoBtn" class="btn-small">↶ Отмена</button>
-            <button id="redoBtn" class="btn-small">↷ Повтор</button>
+            <button id="undoBtn" class="btn-small" title="Отменить">↶</button>
+            <button id="redoBtn" class="btn-small" title="Повторить">↷</button>
         </div>
 
         <div class="control-group">
-            <button id="templatesBtn" class="btn-small primary" title="Рамки листов ГОСТ 2.104">📋 Шаблоны ГОСТ</button>
-            <button id="componentsBtn" class="btn-small" title="Готовые компоненты (DIP, PCB, разъёмы)">🔩 Компоненты</button>
-            <button id="testScenariosBtn" class="btn-small" title="Готовые чертежи для проверки всех режимов CAD">🧪 Тест-сценарии</button>
-            <button id="clearBtn" class="btn-small" style="color: #ff6464; border-color: #ff6464;">🗑️ Очистить</button>
+            <button id="templatesBtn" class="btn-small primary" title="Рамки листов ГОСТ 2.104">📋 ГОСТ</button>
+            <button id="componentsBtn" class="btn-small" title="Готовые компоненты (DIP, PCB, разъёмы)">🔩 Компон.</button>
+            <button id="testScenariosBtn" class="btn-small" title="Готовые чертежи для проверки всех режимов CAD">🧪 Тесты</button>
+            <button id="clearBtn" class="btn-small" style="color: #ff6464; border-color: #ff6464;" title="Очистить чертёж">🗑</button>
 
             {% load tier_tags %}
             {% comment %}
@@ -1305,22 +1353,22 @@
             </label>
         </div>
 
-        <div class="control-group" style="margin-left: auto;">
+        <div class="control-group cad-actions-group" style="margin-left: auto;">
             {# 2026-06-02 fix: группы кнопок с дивайдерами + переименование дубля #}
             {# Группа 1: Анализ #}
-            <button id="runDrcBtn" class="btn-small primary" title="Проверить электрические узлы, GND и неподключенные выводы">🔍 Проверка</button>
+            <button id="runDrcBtn" class="btn-small primary" title="Проверить электрические узлы, GND и неподключенные выводы">🔍 DRC</button>
             <button id="bomBtn" class="btn-small" title="Собрать спецификацию по компонентам (BOM)">📋 BOM</button>
-            <button id="cadToSimBtn" class="btn-small" title="Передать семантическую схему в симулятор">⚡ В симулятор</button>
-            <button id="insertSpecBtn" class="btn-small" title="Вставить таблицу спецификации прямо на лист чертежа">📊 Таблица</button>
+            <button id="cadToSimBtn" class="btn-small" title="Передать семантическую схему в симулятор">⚡ Сим</button>
+            <button id="insertSpecBtn" class="btn-small" title="Вставить таблицу спецификации прямо на лист чертежа">📊 Спец.</button>
             <span class="cad-toolbar-divider"></span>
             {# Группа 2: Файл #}
-            <button id="exportA3Btn" class="btn-small" title="Печать/сохранение PDF на листе A3">📄 PDF A3</button>
+            <button id="exportA3Btn" class="btn-small" title="Печать/сохранение PDF на листе A3">📄 A3</button>
             <button id="saveBtn" class="btn-small primary"
-                    {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы сохранять проекты"{% endif %}>💾 Сохранить</button>
+                    {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы сохранять проекты"{% else %}title="Сохранить проект"{% endif %}>💾 Сохр.</button>
             <button id="loadBtn" class="btn-small"
-                    {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы открывать свои проекты"{% endif %}>📂 Загрузить</button>
+                    {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы открывать свои проекты"{% else %}title="Загрузить проект"{% endif %}>📂 Откр.</button>
             <button id="importCadBtn" class="btn-small" title="{% if is_guest %}Войдите, чтобы импортировать в свои проекты{% else %}Импорт DOLG JSON, SVG, DXF, SPICE .cir/.net{% endif %}"
-                    {% if is_guest %}data-guest-locked="1"{% endif %}>📥 Импорт</button>
+                    {% if is_guest %}data-guest-locked="1"{% endif %}>📥 Имп.</button>
             <span class="cad-toolbar-divider"></span>
             {# Группа 3: Экспорт #}
             <button id="exportCadJsonBtn" class="btn-small" title="Сохранить редактируемый CAD JSON">JSON</button>
@@ -1330,7 +1378,7 @@
             <span class="cad-toolbar-divider"></span>
             {# Группа 4: Визуализация и навигация #}
             <button id="cad3DBtn" class="btn-small" title="3D-предпросмотр CAD-чертежа (Three.js). Электрические компоненты схемы поднимаются на 3D-плату.">🎬 3D</button>
-            <a href="{% url 'shop:index' %}" class="btn-small" style="color: #ff9900; border-color: #ff9900; text-decoration: none; display: inline-flex; align-items: center;">🏠 Магазин</a>
+            <a href="{% url 'shop:index' %}" class="btn-small" style="color: #ff9900; border-color: #ff9900; text-decoration: none; display: inline-flex; align-items: center;" title="Вернуться в магазин">🏠 Shop</a>
         </div>
         <input id="cadImportFile" type="file" hidden
                accept=".json,.dolg,.svg,.dxf,.dwg,.cir,.net,.spice,.txt,application/json,image/svg+xml">
