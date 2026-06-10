@@ -138,10 +138,8 @@
 
     #canvas {
         flex: 1;
-        /* Светлый «бумажный» фон — тёмные чертёжные элементы читаются лучше.
-           Сетка рисуется в render() на канвасе, а не через CSS, чтобы её можно
-           было настраивать (размер/видимость). */
-        background: #f4f7fb;
+        /* Фон и сетка рисуются в render(), чтобы темы CAD менялись без перезагрузки. */
+        background: #0b1728;
         cursor: crosshair;
     }
 
@@ -938,19 +936,22 @@
     }
 
     /* 2026-06-10 urgent CAD UI cleanup:
-       спокойная инженерная компоновка вместо неоновой витрины. */
+       фирменная DOLG-компоновка без белой toolbar-плашки. */
     #app-container {
-        --cad-bg: #eef2f6;
-        --cad-panel: #f8fafc;
-        --cad-panel-strong: #ffffff;
-        --cad-border: #c8d3df;
-        --cad-border-strong: #8ea3b8;
-        --cad-text: #1f2933;
-        --cad-muted: #64748b;
-        --cad-accent: #0f766e;
-        --cad-accent-strong: #0b5f59;
-        --cad-warn: #b45309;
-        background: var(--cad-bg);
+        --cad-bg: #06111f;
+        --cad-panel: rgba(12, 24, 44, 0.94);
+        --cad-panel-strong: rgba(15, 31, 56, 0.98);
+        --cad-panel-soft: rgba(0, 212, 255, 0.08);
+        --cad-border: rgba(0, 212, 255, 0.28);
+        --cad-border-strong: rgba(0, 212, 255, 0.58);
+        --cad-text: #e7f6ff;
+        --cad-muted: #8fb2c7;
+        --cad-accent: #00a8b5;
+        --cad-accent-strong: #22d3ee;
+        --cad-warn: #f5b451;
+        background:
+            radial-gradient(circle at 20% 0%, rgba(0, 212, 255, 0.14), transparent 28%),
+            linear-gradient(135deg, #06111f, #0b1b33 58%, #091225);
         color: var(--cad-text);
         border: 1px solid var(--cad-border);
         border-radius: 10px;
@@ -975,8 +976,8 @@
         padding: 6px;
         margin-bottom: 0;
         border-radius: 8px;
-        background: linear-gradient(180deg, #f6fcff, #e5f2f8);
-        border-color: #a8c6d6;
+        background: linear-gradient(180deg, rgba(14, 31, 57, 0.98), rgba(8, 21, 40, 0.98));
+        border-color: var(--cad-border);
     }
 
     .cad-mode-tab,
@@ -1005,9 +1006,9 @@
     .btn-small:hover,
     .tool-btn:hover,
     .cad-view-tab:hover {
-        background: #eef8f7;
-        border-color: #84bcb6;
-        color: var(--cad-accent-strong);
+        background: rgba(0, 212, 255, 0.15);
+        border-color: var(--cad-border-strong);
+        color: #ffffff;
         box-shadow: none;
     }
 
@@ -1031,7 +1032,7 @@
 
     .top-controls {
         border-radius: 8px;
-        padding: 6px 8px;
+        padding: 8px;
         align-items: center;
         align-content: flex-start;
         flex-wrap: wrap;
@@ -1040,12 +1041,12 @@
         overflow: visible;
         overscroll-behavior: contain;
         scrollbar-width: thin;
-        background: linear-gradient(180deg, #f2fbff, #deedf7);
-        border-color: #a8c6d6;
+        background: linear-gradient(180deg, rgba(9, 24, 45, 0.98), rgba(6, 17, 31, 0.98));
+        border-color: var(--cad-border);
     }
 
     .top-controls > .control-group + .control-group {
-        border-left-color: #d8e0e8;
+        border-left-color: rgba(0, 212, 255, 0.18);
     }
 
     .top-controls .control-group {
@@ -1054,18 +1055,89 @@
         gap: 5px;
         min-height: 38px;
         padding: 4px 7px;
-        background: rgba(255, 255, 255, 0.82);
-        border: 1px solid #c9d9e5;
+        background: rgba(10, 24, 44, 0.88);
+        border: 1px solid rgba(0, 212, 255, 0.22);
         border-radius: 7px;
     }
 
     .top-controls .cad-actions-group {
-        flex: 1 1 620px;
+        flex: 1 1 520px;
         flex-wrap: wrap;
         justify-content: flex-end;
         max-width: 100%;
-        background: linear-gradient(180deg, #ffffff, #ecf8f7);
-        border-color: #b6d8d3;
+        background: linear-gradient(180deg, rgba(10, 32, 56, 0.94), rgba(8, 23, 42, 0.94));
+        border-color: rgba(34, 211, 238, 0.35);
+    }
+
+    .cad-settings-drawer {
+        position: relative;
+        flex: 0 0 auto;
+        border: 0;
+        background: transparent;
+        overflow: visible;
+    }
+
+    .cad-settings-drawer > summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 6px 10px;
+        color: var(--cad-accent-strong);
+        font-size: 0.86rem;
+        font-weight: 700;
+        border: 1px solid rgba(0, 212, 255, 0.34);
+        border-radius: 7px;
+        background: linear-gradient(180deg, rgba(0, 212, 255, 0.10), rgba(0, 212, 255, 0.03));
+    }
+
+    .cad-settings-drawer > summary::-webkit-details-marker { display: none; }
+
+    .cad-settings-drawer > summary::after {
+        content: '▸';
+        margin-left: auto;
+        color: var(--cad-muted);
+        transition: transform 0.15s;
+    }
+
+    .cad-settings-drawer[open] > summary::after {
+        transform: rotate(90deg);
+    }
+
+    .cad-settings-drawer-body {
+        display: none;
+        position: absolute;
+        z-index: 50;
+        top: calc(100% + 8px);
+        right: 0;
+        width: min(880px, calc(100vw - 44px));
+        max-height: min(480px, calc(100vh - 180px));
+        overflow: auto;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        background: linear-gradient(180deg, rgba(8, 22, 42, 0.98), rgba(5, 14, 29, 0.98));
+        border: 1px solid rgba(0, 212, 255, 0.34);
+        border-radius: 8px;
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.46);
+    }
+
+    .cad-settings-drawer[open] .cad-settings-drawer-body {
+        display: flex;
+    }
+
+    @media (max-width: 700px) {
+        .cad-settings-drawer-body {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            left: 12px;
+            width: auto;
+            max-height: calc(100vh - 24px);
+        }
     }
 
     .top-controls > .control-group[style*="margin-left: auto"] {
@@ -1080,14 +1152,46 @@
     .top-controls input,
     .top-controls select,
     .property-input {
-        background: #ffffff !important;
-        border: 1px solid var(--cad-border) !important;
+        background: rgba(4, 12, 24, 0.96) !important;
+        border: 1px solid rgba(0, 212, 255, 0.28) !important;
         color: var(--cad-text) !important;
         border-radius: 5px !important;
     }
 
     .top-controls input[type="range"] {
         width: 76px !important;
+    }
+
+    #app-container input[type="range"] {
+        appearance: none;
+        height: 4px;
+        border: 0 !important;
+        border-radius: 999px !important;
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0.85), rgba(34, 211, 238, 0.22)) !important;
+        accent-color: var(--cad-accent-strong);
+    }
+
+    #app-container input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border: 1px solid rgba(231, 246, 255, 0.9);
+        border-radius: 50%;
+        background: var(--cad-accent-strong);
+        box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+    }
+
+    #app-container input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border: 1px solid rgba(231, 246, 255, 0.9);
+        border-radius: 50%;
+        background: var(--cad-accent-strong);
+        box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+    }
+
+    #app-container input[type="checkbox"] {
+        accent-color: var(--cad-accent-strong);
     }
 
     .top-controls input[type="number"] {
@@ -1103,7 +1207,7 @@
     }
 
     .cad-toolbar-divider {
-        background: #d8e0e8;
+        background: rgba(0, 212, 255, 0.24);
     }
 
     .cad-layout {
@@ -1126,15 +1230,15 @@
     }
 
     .canvas-area {
-        background: #dbe3ec;
+        background: rgba(10, 24, 44, 0.86);
         border-radius: 8px;
         min-height: 0;
     }
 
     .canvas-header,
     .cad-view-tabs {
-        background: #ffffff;
-        border-bottom: 1px solid var(--cad-border);
+        background: linear-gradient(180deg, rgba(13, 29, 53, 0.98), rgba(8, 20, 37, 0.98));
+        border-bottom: 1px solid rgba(0, 212, 255, 0.22);
         color: var(--cad-text);
     }
 
@@ -1143,8 +1247,8 @@
     }
 
     #canvas {
-        background: #fbfdff;
-        border-top: 1px solid #e4eaf0;
+        background: #0b1728;
+        border-top: 1px solid rgba(0, 212, 255, 0.22);
         display: block;
     }
 
@@ -1157,7 +1261,7 @@
     }
 
     .panel-section {
-        background: #ffffff;
+        background: rgba(12, 24, 44, 0.92);
         border: 1px solid var(--cad-border);
         border-radius: 7px;
         box-shadow: none;
@@ -1165,7 +1269,7 @@
 
     .panel-section-title,
     .cad-drc-panel > summary {
-        background: #f1f5f9;
+        background: linear-gradient(180deg, rgba(0, 212, 255, 0.10), rgba(0, 212, 255, 0.03));
         border-bottom: 1px solid var(--cad-border);
         color: var(--cad-text);
         letter-spacing: 0;
@@ -1178,15 +1282,15 @@
     }
 
     .cad-mini-card {
-        background: #f8fafc;
-        border: 1px solid #d8e0e8;
+        background: rgba(5, 14, 28, 0.72);
+        border: 1px solid rgba(0, 212, 255, 0.18);
         border-radius: 6px;
     }
 
     .cad-chip {
-        background: #e0f2f1;
-        border-color: #99d5ce;
-        color: #0f5f59;
+        background: rgba(34, 211, 238, 0.12);
+        border-color: rgba(34, 211, 238, 0.36);
+        color: #9ff6ff;
     }
 
     .cad-drc-panel {
@@ -1195,30 +1299,30 @@
     }
 
     .cad-drc-counter {
-        background: #ffffff;
+        background: rgba(4, 12, 24, 0.72);
         color: var(--cad-muted);
         border: 1px solid var(--cad-border);
     }
 
     .layer-item,
     .pcb-layer-row {
-        background: #ffffff;
+        background: rgba(8, 19, 36, 0.78);
         border-color: var(--cad-border);
         color: var(--cad-text);
     }
 
     .layer-item.active,
     .pcb-layer-row.active {
-        background: #e0f2f1;
-        border-color: #5fb3aa;
+        background: rgba(0, 212, 255, 0.16);
+        border-color: rgba(34, 211, 238, 0.58);
         box-shadow: none;
     }
 
     .cad-hover-popover {
-        background: rgba(255, 255, 255, 0.98);
+        background: rgba(6, 17, 31, 0.98);
         border-color: var(--cad-border-strong);
         color: var(--cad-text);
-        box-shadow: 0 10px 24px rgba(31, 41, 51, 0.18);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
     }
 
     .cad-hover-popover .chp-type,
@@ -1282,12 +1386,6 @@
     <!-- Верхняя панель управления -->
     <div class="top-controls">
         <div class="control-group">
-            <span class="control-label">Масштаб:</span>
-            <input type="range" id="zoomSlider" min="0.1" max="5" step="0.1" value="1" style="width: 100px;">
-            <span id="zoomValue" style="min-width: 40px;">100%</span>
-        </div>
-
-        <div class="control-group">
             <button id="fitCanvasBtn" class="btn-small" title="Вписать чертёж в рабочую область">Вписать</button>
             <button id="resetViewBtn" class="btn-small" title="Вернуть масштаб и панорамирование">Сброс</button>
             <button id="cadFullscreenBtn" class="btn-small" title="Полноэкранный режим (Esc — выход)">⛶</button>
@@ -1302,55 +1400,6 @@
             <button id="templatesBtn" class="btn-small primary" title="Рамки листов ГОСТ 2.104">📋 ГОСТ</button>
             <button id="componentsBtn" class="btn-small" title="Готовые компоненты (DIP, PCB, разъёмы)">🔩 Компон.</button>
             <button id="testScenariosBtn" class="btn-small" title="Готовые чертежи для проверки всех режимов CAD">🧪 Тесты</button>
-            <button id="clearBtn" class="btn-small" style="color: #ff6464; border-color: #ff6464;" title="Очистить чертёж">🗑</button>
-
-            {% load tier_tags %}
-            {% comment %}
-            CAD-тема: Default доступна всем, Blueprint/Sepia/Terminal — только для Pro.
-            JS slate переключает State.bgColor + State.gridColor + State.defaultLineColor.
-            Free-юзер видит select disabled с подсказкой «Pro».
-            {% endcomment %}
-            <select id="cadThemeSelect" class="btn-small" title="Тема холста CAD"
-                    {% if not user|is_pro_user %}disabled data-pro-tooltip="🎨 Темы доступны Pro-юзерам"{% endif %}
-                    style="cursor: {% if user|is_pro_user %}pointer{% else %}not-allowed{% endif %};">
-                <option value="default">🎨 Default</option>
-                <option value="blueprint">📐 Blueprint</option>
-                <option value="sepia">📜 Sepia</option>
-                <option value="terminal">💻 Terminal</option>
-            </select>
-        </div>
-
-        <div class="control-group" title="Настройки сетки">
-            <span class="control-label">Сетка:</span>
-            <label style="display:inline-flex; align-items:center; gap:4px; color:#00d4ff; font-size: 0.85rem;">
-                <input type="checkbox" id="gridVisibleChk" checked> показать
-            </label>
-            <input type="number" id="gridSizeInput" min="2" max="200" step="1" value="20" style="width:60px; background:rgba(10,14,39,0.8); color:#e0e0e0; border:1px solid rgba(0,212,255,0.3); border-radius:3px; padding:4px;">
-            <span style="color:#a0a0a0; font-size:0.75rem;">px</span>
-        </div>
-
-        <div class="control-group" title="Настройки чертежа">
-            <span class="control-label">Линия:</span>
-            <input type="range" id="cadLineWidth" min="1" max="6" step="0.5" value="2" style="width:80px;">
-            <span class="control-label" style="margin-left:6px;">Snap:</span>
-            <select id="cadSnapMode" style="background:rgba(10,14,39,0.8); color:#e0e0e0; border:1px solid rgba(0,212,255,0.3); border-radius:3px; padding:3px 6px;">
-                <option value="grid">К сетке</option>
-                <option value="none">Свободно</option>
-                <option value="ortho">Ортогональный</option>
-                <option value="object">К объектам</option>
-                <option value="polar">Полярный</option>
-            </select>
-            <select id="cadPolarStep" title="Шаг полярного режима" style="display:none; background:rgba(10,14,39,0.8); color:#e0e0e0; border:1px solid rgba(0,212,255,0.3); border-radius:3px; padding:3px 6px;">
-                <option value="15">15°</option>
-                <option value="30">30°</option>
-                <option value="45">45°</option>
-                <option value="90">90°</option>
-            </select>
-            <span class="control-label" style="margin-left:6px;">Фон:</span>
-            <input type="color" id="cadBgColor" value="#f4f7fb" style="width:34px; height:26px; border:1px solid rgba(0,212,255,0.3); border-radius:3px; background:transparent; cursor:pointer;">
-            <label class="control-label" style="margin-left:10px; display:inline-flex; align-items:center; gap:4px;" title="После выбора шаблона — автоматически вписать его в видимую область холста">
-                <input type="checkbox" id="cadAutoFitTpl" checked> Авто-вписывать шаблон
-            </label>
         </div>
 
         <div class="control-group cad-actions-group" style="margin-left: auto;">
@@ -1359,10 +1408,8 @@
             <button id="runDrcBtn" class="btn-small primary" title="Проверить электрические узлы, GND и неподключенные выводы">🔍 DRC</button>
             <button id="bomBtn" class="btn-small" title="Собрать спецификацию по компонентам (BOM)">📋 BOM</button>
             <button id="cadToSimBtn" class="btn-small" title="Передать семантическую схему в симулятор">⚡ Сим</button>
-            <button id="insertSpecBtn" class="btn-small" title="Вставить таблицу спецификации прямо на лист чертежа">📊 Спец.</button>
             <span class="cad-toolbar-divider"></span>
             {# Группа 2: Файл #}
-            <button id="exportA3Btn" class="btn-small" title="Печать/сохранение PDF на листе A3">📄 A3</button>
             <button id="saveBtn" class="btn-small primary"
                     {% if is_guest %}data-guest-locked="1" title="Войдите, чтобы сохранять проекты"{% else %}title="Сохранить проект"{% endif %}>💾 Сохр.</button>
             <button id="loadBtn" class="btn-small"
@@ -1370,16 +1417,81 @@
             <button id="importCadBtn" class="btn-small" title="{% if is_guest %}Войдите, чтобы импортировать в свои проекты{% else %}Импорт DOLG JSON, SVG, DXF, SPICE .cir/.net{% endif %}"
                     {% if is_guest %}data-guest-locked="1"{% endif %}>📥 Имп.</button>
             <span class="cad-toolbar-divider"></span>
-            {# Группа 3: Экспорт #}
-            <button id="exportCadJsonBtn" class="btn-small" title="Сохранить редактируемый CAD JSON">JSON</button>
-            <button id="exportPngBtn" class="btn-small" title="Экспорт видимых слоёв в PNG">PNG</button>
-            <button id="exportSvgBtn" class="btn-small" title="Экспорт видимых слоёв в SVG">SVG</button>
-            <button id="exportPnPBtn" class="btn-small" title="Pick-and-Place CSV: Ref / X / Y / Rotation / Footprint / Layer — стандартный формат для PCBA-сборки">P&amp;P</button>
-            <span class="cad-toolbar-divider"></span>
             {# Группа 4: Визуализация и навигация #}
             <button id="cad3DBtn" class="btn-small" title="3D-предпросмотр CAD-чертежа (Three.js). Электрические компоненты схемы поднимаются на 3D-плату.">🎬 3D</button>
             <a href="{% url 'shop:index' %}" class="btn-small" style="color: #ff9900; border-color: #ff9900; text-decoration: none; display: inline-flex; align-items: center;" title="Вернуться в магазин">🏠 Shop</a>
         </div>
+
+        <details class="cad-settings-drawer">
+            <summary title="Настройки CAD и редкие команды">⚙ Настройки</summary>
+            <div class="cad-settings-drawer-body">
+                <div class="control-group">
+                    <span class="control-label">Масштаб:</span>
+                    <input type="range" id="zoomSlider" min="0.1" max="5" step="0.1" value="1" style="width: 100px;">
+                    <span id="zoomValue" style="min-width: 40px;">100%</span>
+                </div>
+
+                <div class="control-group" title="Настройки сетки">
+                    <span class="control-label">Сетка:</span>
+                    <label style="display:inline-flex; align-items:center; gap:4px; color:#00d4ff; font-size: 0.85rem;">
+                        <input type="checkbox" id="gridVisibleChk" checked> показать
+                    </label>
+                    <input type="number" id="gridSizeInput" min="2" max="200" step="1" value="20" style="width:60px; background:rgba(10,14,39,0.8); color:#e0e0e0; border:1px solid rgba(0,212,255,0.3); border-radius:3px; padding:4px;">
+                    <span style="color:#a0a0a0; font-size:0.75rem;">px</span>
+                </div>
+
+                <div class="control-group" title="Настройки чертежа">
+                    <span class="control-label">Линия:</span>
+                    <input type="range" id="cadLineWidth" min="1" max="6" step="0.5" value="2" style="width:80px;">
+                    <span class="control-label" style="margin-left:6px;">Snap:</span>
+                    <select id="cadSnapMode" style="background:rgba(10,14,39,0.8); color:#e0e0e0; border:1px solid rgba(0,212,255,0.3); border-radius:3px; padding:3px 6px;">
+                        <option value="grid">К сетке</option>
+                        <option value="none">Свободно</option>
+                        <option value="ortho">Ортогональный</option>
+                        <option value="object">К объектам</option>
+                        <option value="polar">Полярный</option>
+                    </select>
+                    <select id="cadPolarStep" title="Шаг полярного режима" style="display:none; background:rgba(10,14,39,0.8); color:#e0e0e0; border:1px solid rgba(0,212,255,0.3); border-radius:3px; padding:3px 6px;">
+                        <option value="15">15°</option>
+                        <option value="30">30°</option>
+                        <option value="45">45°</option>
+                        <option value="90">90°</option>
+                    </select>
+                    <span class="control-label" style="margin-left:6px;">Фон:</span>
+                    <input type="color" id="cadBgColor" value="#0b1728" style="width:34px; height:26px; border:1px solid rgba(0,212,255,0.3); border-radius:3px; background:transparent; cursor:pointer;">
+                    <label class="control-label" style="margin-left:10px; display:inline-flex; align-items:center; gap:4px;" title="После выбора шаблона — автоматически вписать его в видимую область холста">
+                        <input type="checkbox" id="cadAutoFitTpl" checked> Авто-вписывать шаблон
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    {% load tier_tags %}
+                    {% comment %}
+                    CAD-тема: Default доступна всем, Blueprint/Sepia/Terminal — только для Pro.
+                    JS slate переключает State.bgColor + State.gridColor + State.defaultLineColor.
+                    Free-юзер видит select disabled с подсказкой «Pro».
+                    {% endcomment %}
+                    <select id="cadThemeSelect" class="btn-small" title="Тема холста CAD"
+                            {% if not user|is_pro_user %}disabled data-pro-tooltip="🎨 Темы доступны Pro-юзерам"{% endif %}
+                            style="cursor: {% if user|is_pro_user %}pointer{% else %}not-allowed{% endif %};">
+                        <option value="default">🎨 DOLG</option>
+                        <option value="blueprint">📐 Blueprint</option>
+                        <option value="sepia">📜 Sepia</option>
+                        <option value="terminal">💻 Terminal</option>
+                    </select>
+                    <button id="clearBtn" class="btn-small" style="color: #ff8585; border-color: #ff6464;" title="Очистить чертёж">🗑</button>
+                </div>
+
+                <div class="control-group">
+                    <button id="insertSpecBtn" class="btn-small" title="Вставить таблицу спецификации прямо на лист чертежа">📊 Спец.</button>
+                    <button id="exportA3Btn" class="btn-small" title="Печать/сохранение PDF на листе A3">📄 A3</button>
+                    <button id="exportCadJsonBtn" class="btn-small" title="Сохранить редактируемый CAD JSON">JSON</button>
+                    <button id="exportPngBtn" class="btn-small" title="Экспорт видимых слоёв в PNG">PNG</button>
+                    <button id="exportSvgBtn" class="btn-small" title="Экспорт видимых слоёв в SVG">SVG</button>
+                    <button id="exportPnPBtn" class="btn-small" title="Pick-and-Place CSV: Ref / X / Y / Rotation / Footprint / Layer — стандартный формат для PCBA-сборки">P&amp;P</button>
+                </div>
+            </div>
+        </details>
         <input id="cadImportFile" type="file" hidden
                accept=".json,.dolg,.svg,.dxf,.dwg,.cir,.net,.spice,.txt,application/json,image/svg+xml">
     </div>
@@ -1395,7 +1507,10 @@
         }
         function setLabel(on) {
             var btn = document.getElementById('cadFullscreenBtn');
-            if (btn) btn.innerHTML = on ? '⤢ Свернуть' : '⛶ Во весь экран';
+            if (btn) {
+                btn.textContent = on ? '⤢' : '⛶';
+                btn.title = on ? 'Свернуть полноэкранный режим (Esc)' : 'Полноэкранный режим (Esc — выход)';
+            }
         }
         function toggle() {
             var on = document.body.classList.toggle('cad-fullscreen');
@@ -1492,7 +1607,7 @@
                 <div class="panel-section-content">
                     <div class="properties-group">
                         <label class="property-label">Цвет:</label>
-                        <input type="color" id="colorPicker" class="color-input" value="#0a2540">
+                        <input type="color" id="colorPicker" class="color-input" value="#e7f6ff">
                     </div>
                     <div class="properties-group">
                         <label class="property-label">Ширина линии:</label>
@@ -2342,10 +2457,12 @@ const TEST_SCENARIOS = [
 
 const State = {
     canvas: null, ctx: null,
-    tool: 'pointer', color: '#0a2540', lineWidth: 2, fill: 'none', hatchSpacing: 8,
+    tool: 'pointer', color: '#e7f6ff', lineWidth: 2, fill: 'none', hatchSpacing: 8,
     zoom: 1, panX: 0, panY: 0,
     gridSize: 20, gridVisible: true,
-    bgColor: '#f4f7fb', snapMode: 'grid',  // 'grid' | 'none' | 'ortho' | 'object' | 'polar'
+    bgColor: '#0b1728', gridColor: 'rgba(34, 211, 238, 0.18)', gridMajorColor: 'rgba(34, 211, 238, 0.34)',
+    defaultLineColor: '#e7f6ff', defaultTextColor: '#e7f6ff',
+    snapMode: 'grid',  // 'grid' | 'none' | 'ortho' | 'object' | 'polar'
     polarStep: 15,                          // шаг полярного режима в градусах (15/30/45/90)
     autoFitTemplate: true,                  // вписывать шаблон в холст после применения
     objects: [],
@@ -2401,7 +2518,7 @@ function loadCadSettings() {
         if (typeof s.gridSize === 'number')   State.gridSize = s.gridSize;
         if (typeof s.gridVisible === 'boolean') State.gridVisible = s.gridVisible;
         if (typeof s.lineWidth === 'number')  State.lineWidth = s.lineWidth;
-        if (typeof s.bgColor === 'string')    State.bgColor = s.bgColor;
+        if (typeof s.bgColor === 'string')    State.bgColor = s.bgColor === '#f4f7fb' ? '#0b1728' : s.bgColor;
         if (typeof s.snapMode === 'string')   State.snapMode = s.snapMode;
         if (typeof s.polarStep === 'number' && [15, 30, 45, 90].includes(s.polarStep)) {
             State.polarStep = s.polarStep;
@@ -3847,8 +3964,7 @@ function render() {
         renderSelectedObjPanel();
     }
 
-    // Светлый бумажный фон
-    ctx.fillStyle = '#f4f7fb';
+    ctx.fillStyle = State.bgColor || '#0b1728';
     ctx.fillRect(0, 0, cw, ch);
 
     ctx.save();
@@ -3862,7 +3978,7 @@ function render() {
         const gy0 = Math.floor(-State.panY / State.zoom / gs) * gs;
         const gx1 = gx0 + cw / State.zoom + gs * 2;
         const gy1 = gy0 + ch / State.zoom + gs * 2;
-        ctx.strokeStyle = 'rgba(10, 37, 64, 0.14)';
+        ctx.strokeStyle = State.gridColor || 'rgba(34, 211, 238, 0.18)';
         ctx.lineWidth = 1 / State.zoom;
         ctx.beginPath();
         for (let x = gx0; x < gx1; x += gs) { ctx.moveTo(x, gy0); ctx.lineTo(x, gy1); }
@@ -3870,7 +3986,7 @@ function render() {
         ctx.stroke();
         // Усиленная линия каждые 5 клеток
         if (State.zoom >= 0.5) {
-            ctx.strokeStyle = 'rgba(10, 37, 64, 0.28)';
+            ctx.strokeStyle = State.gridMajorColor || 'rgba(34, 211, 238, 0.34)';
             ctx.beginPath();
             for (let x = Math.floor(gx0 / (gs * 5)) * gs * 5; x < gx1; x += gs * 5) { ctx.moveTo(x, gy0); ctx.lineTo(x, gy1); }
             for (let y = Math.floor(gy0 / (gs * 5)) * gs * 5; y < gy1; y += gs * 5) { ctx.moveTo(gx0, y); ctx.lineTo(gx1, y); }
@@ -4552,7 +4668,7 @@ function exportPng() {
     canvas.height = Math.ceil((bounds.maxY - bounds.minY + margin * 2) * scale);
     const ctx = canvas.getContext('2d');
     const oldZoom = State.zoom;
-    ctx.fillStyle = State.bgColor || '#f4f7fb';
+    ctx.fillStyle = State.bgColor || '#0b1728';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.translate((margin - bounds.minX) * scale, (margin - bounds.minY) * scale);
     ctx.scale(scale, scale);
@@ -4634,7 +4750,7 @@ function exportSvg() {
     const body = objects.map(svgObject).join('\n');
     const svg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n` +
-        `<rect width="100%" height="100%" fill="${svgEscape(State.bgColor || '#f4f7fb')}" />\n` +
+        `<rect width="100%" height="100%" fill="${svgEscape(State.bgColor || '#0b1728')}" />\n` +
         `<g transform="translate(${margin - bounds.minX}, ${margin - bounds.minY})">\n${body}\n</g>\n</svg>\n`;
     downloadBlob('dolg-cad-drawing.svg', new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
     document.getElementById('statusText').textContent = '✓ SVG экспортирован';
@@ -5583,8 +5699,8 @@ function init() {
     // Сохраняем выбор в localStorage, восстанавливаем при загрузке.
     const CAD_THEMES = {
         default: {
-            label: 'Default', bg: '#f4f7fb', grid: '#cdd5e0',
-            line: '#0a2540', text: '#0a2540',
+            label: 'DOLG', bg: '#0b1728', grid: 'rgba(34, 211, 238, 0.18)',
+            line: '#e7f6ff', text: '#e7f6ff',
         },
         blueprint: {
             label: 'Blueprint', bg: '#0d3f73', grid: '#3a72b8',
@@ -5604,12 +5720,16 @@ function init() {
         const theme = CAD_THEMES[name] || CAD_THEMES.default;
         State.bgColor = theme.bg;
         State.gridColor = theme.grid;
+        State.gridMajorColor = theme.gridMajor || theme.grid;
         State.defaultLineColor = theme.line;
         State.defaultTextColor = theme.text;
+        State.color = theme.line;
         if (State.canvas) State.canvas.style.background = theme.bg;
         // Color-picker в toolbar тоже обновим
         const bgInp = document.getElementById('cadBgColor');
         if (bgInp) bgInp.value = theme.bg;
+        const colorInp = document.getElementById('colorPicker');
+        if (colorInp) colorInp.value = theme.line;
         try { localStorage.setItem('dolg_cad_theme', name); } catch (e) {}
         if (typeof render === 'function') render();
         const status = document.getElementById('statusText');
