@@ -40,8 +40,9 @@ IC/Inductor/Transistor/Switch/Ground/Node`, иначе `makeTechnicalFallback`.
 3. **Реестр** `package → glb-url` в JS: `_externalModelUrl` резолвит модель по `package_type`
    компонента; нет в реестре → процедурный fallback (уже работает).
 4. **Источники ассетов (лицензия — обязательно проверять):**
-   - **KiCad packages3D** — официальные STEP-модели корпусов, конвертировать STEP→glb (FreeCAD/
-     pythonOCC headless). Лицензия KiCad libs — проверить (CC-BY-SA / отдельная).
+   - **KiCad packages3D** — официальные модели корпусов. **KiCad 9+ экспортирует прямо в GLB**
+     (конвейер STEP→glb НЕ обязателен); KiBot автоматизирует пакетный экспорт GLB/STL/STEP (CLI/CI).
+     Лицензия KiCad libs — проверить (CC-BY-SA / отдельная). Детали ресёрча: [ENGINEERING_NOTES.md §J](ENGINEERING_NOTES.md).
    - CC0-библиотеки (Poly Pizza, Sketchfab CC0), параметрическая генерация glb офлайн.
    - НЕ брать GrabCAD/закрытое без лицензии. Хранить `source`+`license` по каждому ассету.
 5. Оптимизация: glb с draco-сжатием, низкополигональные LOD (на плате компонентов много).

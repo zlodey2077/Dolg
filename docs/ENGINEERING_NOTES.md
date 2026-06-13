@@ -346,3 +346,12 @@ service mesh (mTLS между сервисами, трейсинг, ретраи
 - **Дорожку держать близко к опорной плоскости** (тонкий диэлектрик) → малая петля, низкая индуктивность, меньше помех.
 - **Стек слоёв:** смежность «сигнал-земля»; при переходе сигнала между слоями — **возвратное переходное (stitching via) рядом**; секции (аналог/цифра/ВЧ) разделять **размещением**, а не разрезанием единой земли.
 - → **DOLG (PCB-editor/DRC/автороутер):** новые проверки без новых сущностей — (1) сигнал не пересекает разрыв опорной плоскости; (2) у высокоскоростного сигнала есть сплошная земля под ним; (3) рядом с сигнальным via — возвратное via; (4) совет по стеку (сигнал-земля смежно). Автороутер: штраф за петлю/пересечение зазора (как уже штрафуем повороты в A*-роутере).
+
+### J. 3D-модели корпусов для веба: STEP→glTF / KiCad→GLB
+Веб-материалы (YouTube был недоступен — сетевой таймаут): [KiBot 3D export (BREP/GLB/STL/STEP/XAO)](https://kibot.readthedocs.io/en/latest/configuration/outputs/export_3d.html) · [three.js forum: STEP→glTF](https://discourse.threejs.org/t/how-to-convert-the-format-step-and-stp-in-gltf/27878) · [Discover three.js — загрузка glTF](https://discoverthreejs.com/book/first-steps/load-models/) · [CAD Exchanger — CAD в three.js](https://cadexchanger.com/blog/how-to-load-3d-cad-data-into-three-js/)
+
+- **STEP** — формат обмена CAD-геометрией; **glTF/GLB** — формат для интерактивного 3D в вебе (грузится `GLTFLoader`). Разные ниши: считать в STEP, показывать в GLB.
+- **Главное: KiCad 9+ экспортирует 3D прямо в GLB** (бинарный glTF) — отдельный конвейер STEP→glTF НЕ обязателен. KiBot автоматизирует пакетный экспорт корпусов в GLB/STL/STEP/BREP (CLI/CI).
+- Альтернатива (из STEP): STEP → glTF через FreeCAD/pythonOCC/CAD Exchanger; затем **glTF-pipeline** для оптимизации (GLB↔glTF, Draco-сжатие).
+- В three.js модель грузится `GLTFLoader`; прямого STEP-лоадера нет — только через конвертацию в glTF.
+- → **DOLG (Track B плана [SIM_3D_MODELS_PLAN.md](SIM_3D_MODELS_PLAN.md)):** упрощает «нормальные модельки» — (1) брать **готовые GLB корпусов из KiCad packages3D** (экспорт KiCad/KiBot, а не лепить руками); (2) сложить per-package GLB-библиотеку `static/models/3d/<package>.glb` + реестр `package→url`; (3) **закрыть GAP-1: подключить `GLTFLoader.js`** (сейчас на странице только `GLTFExporter`, поэтому `tryAttachExternalModel` молча не грузит); (4) Draco-сжатие GLB (на плате много компонентов). Лицензию KiCad-моделей сверить. Процедурные модели (Track A) остаются fallback.
