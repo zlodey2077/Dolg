@@ -10580,6 +10580,7 @@ function renderProAnalysisToolbar(result) {
         actions.push(proAnalysisButton('Bode plot', 'runProBode()'));
     }
     actions.push(proAnalysisButton('Monte Carlo', 'runProMonteCarlo()'));
+    actions.push(proAnalysisButton('RF АЧХ (S21/S11)', 'runRfAnalysis()'));
     actions.push(proAnalysisButton('What-if sweep', 'runParameterSweep()'));
     actions.push(proAnalysisButton('Server DC fallback', 'runServerFallbackSolve()'));
     if (currentProject && currentProject.id) {
@@ -10946,6 +10947,159 @@ async function runProMonteCarlo() {
         setProAnalysisOutput(escapeHtml(e.message), 'error');
         showNotification('Monte Carlo: ' + e.message, 'warning');
     }
+}
+
+// RF S-параметрический анализ (scikit-rf, 2-порт, 50 Ом). Бэкенд считает АЧХ
+// фильтра по типу + номиналам R/C/L; фронт рисует S21 (вносимые потери) и S11
+// (возвратные потери) с отметкой частоты среза −3 дБ.
+function _rfPrefillFromScheme() {
+    const out = { r: 1000, c_uf: 0.1, l_mh: 1 };
+    try {
+        const comps = (buildSchemeData().components || []);
+        const r = comps.find(c => c.type === 'resistor' && Number(c.resistance) > 0);
+        const cc = comps.find(c => c.type === 'capacitor' && Number(c.capacitance) > 0);
+        const l = comps.find(c => c.type === 'inductor' && Number(c.inductance) > 0);
+        if (r) out.r = Number(r.resistance);
+        if (cc) out.c_uf = Number(cc.capacitance);   // схема хранит C в мкФ
+        if (l) out.l_mh = Number(l.inductance);       // схема хранит L в мГн
+    } catch (e) { /* нет схемы — дефолты */ }
+    return out;
+}
+
+function runRfAnalysis() {
+    const box = document.getElementById('pro-analysis-output');
+    if (!box) return;
+    const p = _rfPrefillFromScheme();
+    box.innerHTML = `
+        <div style="color:#cfefff;">
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:8px;">
+                <label style="font-size:0.8rem;">Тип фильтра<br>
+                    <select id="rf-kind" style="margin-top:2px;">
+                        <option value="rc_lowpass">RC ФНЧ</option>
+                        <option value="rc_highpass">RC ФВЧ</option>
+                        <option value="lc_lowpass">LC ФНЧ</option>
+                    </select>
+                </label>
+                <label style="font-size:0.8rem;">R, Ом<br>
+                    <input type="number" id="rf-r" value="${p.r}" step="any" style="width:90px; margin-top:2px;"></label>
+                <label style="font-size:0.8rem;">C, мкФ<br>
+                    <input type="number" id="rf-c" value="${p.c_uf}" step="any" style="width:90px; margin-top:2px;"></label>
+                <label style="font-size:0.8rem;">L, мГн<br>
+                    <input type="number" id="rf-l" value="${p.l_mh}" step="any" style="width:90px; margin-top:2px;"></label>
+                <button type="button" onclick="runRfCompute()">Рассчитать</button>
+            </div>
+            <div id="rf-result" style="font-size:0.82rem; margin-bottom:6px;">Номиналы подставлены со схемы (можно поправить). S21 — передача, S11 — отражение, опорный импеданс 50 Ом.</div>
+            <canvas id="rf-graph" width="640" height="240" style="width:100%; background:#0a1020; border:1px solid rgba(0,212,255,0.3); border-radius:4px;"></canvas>
+        </div>`;
+}
+
+async function runRfCompute() {
+    const resEl = document.getElementById('rf-result');
+    try {
+        const kind = (document.getElementById('rf-kind') || {}).value || 'rc_lowpass';
+        const r = parseFloat((document.getElementById('rf-r') || {}).value);
+        const cUf = parseFloat((document.getElementById('rf-c') || {}).value);
+        const lMh = parseFloat((document.getElementById('rf-l') || {}).value);
+        const payload = {
+            kind,
+            r_ohm: Number.isFinite(r) ? r : null,
+            c_farad: Number.isFinite(cUf) ? cUf * 1e-6 : null,   // мкФ → Ф
+            l_henry: Number.isFinite(lMh) ? lMh * 1e-3 : null,    // мГн → Гн
+        };
+        if (resEl) resEl.textContent = 'Считаю S-параметры (scikit-rf)...';
+        const data = await simApiFetch(SIM_ANALYSIS_API.rfAnalysis, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+        if (data.ok === false) throw new Error(data.error || 'RF-анализ не выполнен.');
+        const fmtHz = (hz) => {
+            if (!hz && hz !== 0) return '—';
+            if (hz >= 1e6) return (hz / 1e6).toFixed(2) + ' МГц';
+            if (hz >= 1e3) return (hz / 1e3).toFixed(2) + ' кГц';
+            return hz.toFixed(1) + ' Гц';
+        };
+        if (resEl) {
+            resEl.innerHTML = `Полоса пропускания: <b>${data.passband_db} дБ</b> · `
+                + `срез −3 дБ: <b>${fmtHz(data.cutoff_3db_hz)}</b> · `
+                + `аналитический угол (хол. ход): <b>${fmtHz(data.analytic_corner_hz)}</b><br>`
+                + `<span style="opacity:.75;">${escapeHtml(data.algorithm || '')}</span>`;
+        }
+        drawRfGraph(data.frequencies_hz, data.s21_db, data.s11_db, data.cutoff_3db_hz);
+    } catch (e) {
+        if (resEl) resEl.innerHTML = `<span style="color:#ff9b9b;">${escapeHtml(e.message)}</span>`;
+        showNotification('RF: ' + e.message, 'warning');
+    }
+}
+
+function drawRfGraph(freqs, s21, s11, cutoffHz) {
+    const cv = document.getElementById('rf-graph');
+    if (!cv || !Array.isArray(freqs) || freqs.length < 2) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const padL = 46, padR = 12, padT = 12, padB = 28;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    ctx.fillStyle = '#0a1020';
+    ctx.fillRect(0, 0, W, H);
+
+    const lf = Math.log10;
+    const fMin = Math.max(freqs[0], 1e-3), fMax = freqs[freqs.length - 1];
+    const lfMin = lf(fMin), lfMax = lf(fMax);
+    let dbLo = Infinity, dbHi = -Infinity;
+    for (const arr of [s21, s11]) {
+        for (const v of (arr || [])) { if (isFinite(v)) { if (v < dbLo) dbLo = v; if (v > dbHi) dbHi = v; } }
+    }
+    if (!isFinite(dbLo)) { dbLo = -60; dbHi = 0; }
+    dbLo = Math.max(dbLo, -80);
+    const padv = (dbHi - dbLo) * 0.08 || 1;
+    dbLo -= padv; dbHi += padv;
+
+    const xOf = (hz) => padL + (lf(Math.max(hz, fMin)) - lfMin) / (lfMax - lfMin || 1) * plotW;
+    const yOf = (db) => padT + (dbHi - db) / (dbHi - dbLo || 1) * plotH;
+
+    // Сетка по декадам + подписи частот
+    ctx.strokeStyle = 'rgba(127,219,255,0.12)';
+    ctx.fillStyle = '#7fa8c8';
+    ctx.font = '10px monospace';
+    ctx.lineWidth = 1;
+    for (let e = Math.ceil(lfMin); e <= Math.floor(lfMax); e++) {
+        const x = padL + (e - lfMin) / (lfMax - lfMin || 1) * plotW;
+        ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+        const lbl = e >= 6 ? (10 ** (e - 6)) + 'M' : e >= 3 ? (10 ** (e - 3)) + 'k' : (10 ** e) + '';
+        ctx.fillText(lbl, x - 8, H - 8);
+    }
+    // Горизонтали dB
+    for (let i = 0; i <= 4; i++) {
+        const db = dbHi - (dbHi - dbLo) * i / 4;
+        const y = yOf(db);
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+        ctx.fillText(db.toFixed(0), 6, y + 3);
+    }
+    // Линия среза −3 дБ
+    if (cutoffHz) {
+        const x = xOf(cutoffHz);
+        ctx.strokeStyle = 'rgba(255,153,0,0.6)';
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    const drawCurve = (arr, color) => {
+        ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < freqs.length; i++) {
+            const v = arr[i];
+            if (!isFinite(v)) continue;
+            const x = xOf(freqs[i]), y = yOf(v);
+            if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    };
+    drawCurve(s21, '#33d6ff');  // S21 — передача
+    drawCurve(s11, '#ff9933');  // S11 — отражение
+    // Легенда
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#33d6ff'; ctx.fillText('S21 (передача)', padL + 6, padT + 12);
+    ctx.fillStyle = '#ff9933'; ctx.fillText('S11 (отражение)', padL + 6, padT + 26);
+    ctx.fillStyle = '#7fa8c8'; ctx.fillText('дБ / Гц', padL + plotW - 48, padT + 12);
 }
 
 async function runServerFallbackSolve() {
@@ -11584,6 +11738,7 @@ const SIM_ANALYSIS_API = {
     signalQuality: '{% url "hello:api_simulation_signal_quality" %}',
     parameterSweep: '{% url "hello:api_simulation_parameter_sweep" %}',
     fallbackSolve: '{% url "hello:api_simulation_fallback_solve" %}',
+    rfAnalysis: '{% url "hello:api_rf_analysis" %}',
 };
 
 function getSimCsrfToken() {
