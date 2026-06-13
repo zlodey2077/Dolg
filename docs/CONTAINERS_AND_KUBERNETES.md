@@ -160,3 +160,27 @@ fails fast on missing secrets.
   publish immutable images to a registry, add Helm values per environment,
   move from Pod Security `baseline` to `restricted` after runtime smoke, and
   document Postgres backup/PITR.
+
+## 7. Внешние материалы для самообучения (DevOps/SRE, на будущее)
+
+Справочный список — не часть рабочего пайплайна, а ориентир для прокачки по
+инфраструктуре. Приоритет низкий (после защиты); полезно, когда дойдём до
+реального деплоя «комбайна» (серверная симуляция на Xyce, headless 3D-CAD в
+контейнере, очередь Celery+Redis).
+
+- **Локальный Kubernetes без облаков** (Flant, Habr) — поднять k8s локально без
+  Yandex/Cloudflare. URL в дампе обрезан (`habr.com/ru/companies/flant/arti…`),
+  при необходимости найти полную статью по блогу Flant. Прямо релевантно нашему
+  `deploy/k8s` + Docker Desktop/kind/minikube.
+- **Инфраструктура как код (IaC), практики для DevOps** —
+  <https://bookflow.ru/infrastruktura-kak-kod-praktiki-dlya-devops-inzhenerov/>.
+  Terraform и принципы покрытия инфраструктуры кодом.
+- **5 GitHub-репозиториев для роста в DevOps:**
+  - How they SRE — `github.com/upgundecha/howtheysre` (как крупные компании практикуют SRE).
+  - Awesome Scalability — `github.com/binhnguyennn/awesome-scalability` (паттерны масштабируемых систем).
+  - DevOps Exercises — `github.com/bregman-arie/devops-exercises` (Linux, k8s, Terraform, Prometheus, Docker и вопросы для интервью).
+  - Test your sysadmin skills — `github.com/trimstray/test-your-sysadmin-skills` (Linux sysadmin Q&A).
+  - Awesome SRE — `github.com/dastergon/awesome-sre` (подборка ресурсов по надёжности).
+
+> Имена репозиториев восстановлены из обрезанных ссылок дампа — перед
+> использованием сверить точный путь на GitHub.
