@@ -749,13 +749,35 @@
         if ('zoomToCursor' in _controls) _controls.zoomToCursor = true;
 
         // Освещение
-        _scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        _scene.add(new THREE.AmbientLight(0xffffff, 0.4));
         const dir = new THREE.DirectionalLight(0xffffff, 0.8);
         dir.position.set(8, 18, 6);
         _scene.add(dir);
         const fill = new THREE.DirectionalLight(0xb0c4de, 0.25);
         fill.position.set(-10, 6, -8);
         _scene.add(fill);
+
+        // Environment map (IBL): процедурное градиент-небо через PMREM даёт
+        // корректные отражения на металле/ENIG/меди/эпокси — реализм «как настоящая»
+        // без внешнего HDR-ассета. С env-map снижаем ambient, чтобы не пересветить.
+        try {
+            const ec = document.createElement('canvas');
+            ec.width = 16; ec.height = 256;
+            const ectx = ec.getContext('2d');
+            const grad = ectx.createLinearGradient(0, 0, 0, 256);
+            grad.addColorStop(0.0, '#dfeaf5');   // светлое «небо» сверху
+            grad.addColorStop(0.45, '#aab6c6');
+            grad.addColorStop(0.55, '#8f9aa8');   // горизонт
+            grad.addColorStop(1.0, '#2a3340');    // тёмный «пол»
+            ectx.fillStyle = grad;
+            ectx.fillRect(0, 0, 16, 256);
+            const equi = new THREE.CanvasTexture(ec);
+            equi.mapping = THREE.EquirectangularReflectionMapping;
+            const pmrem = new THREE.PMREMGenerator(_renderer);
+            _scene.environment = pmrem.fromEquirectangular(equi).texture;
+            equi.dispose();
+            pmrem.dispose();
+        } catch (e) { /* env-map не критичен для рендера */ }
 
         _root = new THREE.Group();
         _scene.add(_root);
