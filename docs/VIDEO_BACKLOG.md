@@ -39,7 +39,7 @@
 
 ## Термика (наша thermal-секция, P=ΔU²/R → ΔT)
 
-- ☐⭐ Power Electronics with D — Силовая электроника, Тепловые аспекты (`JMh9FQPBdd8`, 15:09)
+- ☑⭐ Power Electronics with D — Силовая электроника, Тепловые аспекты (`JMh9FQPBdd8`, 15:09) — конспект Y
 - ☐ Altium Academy — Thermal Resistance and Heat Transfer in PCB Design (`Zd0EdcWwaZg`, 11:48)
 - ☐ S. Rajaram — Thermal Design of Electronic Equipment (`uRfKw9TKv4w`, 73:01)
 - ☐ EEVblog #744 — SMD Thermal Heatsink Design (`2ygnAv6koSQ`, 22:43)
