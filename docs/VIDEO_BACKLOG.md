@@ -180,7 +180,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 
 - ☐⭐ Mr. P Solver — SciPy для физиков/инженеров (`jmX4FOUEfgU`, 93:29)
 - ☐⭐ UWaterloo — Optimizing ML Code in NumPy & SciPy (`gYcrEZW-xek`, 82:28)
-- ☐ Meerkat — Gauss-Newton, нелинейный МНК (`Kln0ZQ7sX8k`, 20:02) — для нелинейного солвера (диод/LED)
+- ☑ Meerkat — Gauss-Newton, нелинейный МНК (`Kln0ZQ7sX8k`, 20:02) — для нелинейного солвера (диод/LED) — конспект W
 - ☐ 3Blue1Brown — Abstract vector spaces (`TgKwz5Ikpc8`, 16:46) — интуиция
 
 ## WebSockets / Django Channels (наш чат + авто-реактивная схема)
