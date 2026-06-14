@@ -31,6 +31,17 @@ class SectionsForIntentTests(SimpleTestCase):
         sections = ai_algorithms.sections_for_intent('thermal', _divider())
         self.assertTrue(any('Мощность' in t for t, _ in sections))
 
+    def test_thermal_has_derating_section(self):
+        sections = ai_algorithms.sections_for_intent('thermal', _divider())
+        self.assertTrue(any('Запас' in t for t, _ in sections))
+        all_lines = [line for _, lines in sections for line in lines]
+        # derating-строки содержат процент нагрузки + вердикт
+        self.assertTrue(any('%' in line for line in all_lines))
+
+    def test_derating_in_manifest(self):
+        thermal = {a['key'] for a in ai_algorithms.available_algorithms('thermal')}
+        self.assertIn('derating', thermal)
+
     def test_formula_rc_has_formula_and_rf(self):
         sections = ai_algorithms.sections_for_intent('formula', _rc(), 'rc_network')
         titles = ' '.join(t for t, _ in sections)

@@ -69,6 +69,52 @@ def power_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
     return lines
 
 
+def derating_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
+    """Запас по мощности резисторов: рассеиваемая P (из MNA) против номинальной
+    мощности TDP из каталога + вердикт derating. Честно: на реальных `tdp_w`
+    каталога и расчётной P, без угаданных тепловых сопротивлений.
+    """
+    dc = compute_dc(scheme_data)
+    if not dc['ok']:
+        return []
+    rated_by_id: dict[str, float] = {}
+    for comp in _components(scheme_data):
+        params = comp.get('catalog_parameters') or comp.get('parameters') or {}
+        try:
+            rated_by_id[str(comp.get('id'))] = float(
+                params.get('tdp_w') or params.get('power_w') or params.get('power') or 0
+            )
+        except TypeError, ValueError:
+            rated_by_id[str(comp.get('id'))] = 0.0
+    voltages = dc['voltages']
+    rows: list[tuple[str, float, float]] = []
+    for elem in dc['circuit']['elements']:
+        if elem['type'] != 'R' or elem['value'] <= 0:
+            continue
+        n1, n2 = elem['nodes']
+        delta = abs(voltages.get(n1, 0.0) - voltages.get(n2, 0.0))
+        power = delta * delta / elem['value']
+        rated = rated_by_id.get(str(elem['id'])) or 0.25  # дефолт 1/4 Вт
+        rows.append((str(elem['id']), power, rated))
+    if not rows:
+        return []
+    rows.sort(key=lambda r: -(r[1] / r[2] if r[2] else 0.0))
+    lines: list[str] = []
+    worst = 0.0
+    for rid, power, rated in rows[:limit]:
+        load = (power / rated * 100.0) if rated else 0.0
+        worst = max(worst, load)
+        verdict = 'перегрузка' if load >= 100 else ('внимание' if load >= 50 else 'норма')
+        pstr = f'{power * 1000:.0f} мВт' if power < 1 else f'{power:.2f} Вт'
+        lines.append(f'{rid}: {pstr} / {rated:.2f} Вт ном → {load:.0f}% ({verdict})')
+    if worst >= 100:
+        lines.append('⚠ перегрузка по мощности — увеличить номинал/корпус резистора')
+    elif worst >= 50:
+        lines.append('рекомендация: держать нагрузку <50% номинала (derating-запас)')
+    lines.append('источник: P=ΔU²/R (MNA) против tdp_w каталога; правило derating')
+    return lines
+
+
 def _components(scheme_data: dict | None):
     return (scheme_data or {}).get('components') or []
 

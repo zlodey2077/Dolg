@@ -54,6 +54,12 @@ ALGORITHMS: list[Algorithm] = [
         lambda scheme, topology: ai_toolkit.tolerance_lines(scheme),
     ),
     Algorithm(
+        'derating',
+        'Запас по мощности (derating)',
+        frozenset({'thermal', 'why_failed'}),
+        lambda scheme, topology: ai_toolkit.derating_lines(scheme),
+    ),
+    Algorithm(
         'tiny_ai',
         'Нейроподсказка (tiny-AI)',
         frozenset({'overview', 'scheme_overview', 'recommend'}),
