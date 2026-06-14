@@ -129,7 +129,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 
 ## RF / антенны / согласование (наш rf_analysis/scikit-rf, РЭБ-killer)
 
-- ☐⭐ RF Design-6: Smith Chart & Impedance Matching — Anurag Bhargava (`NX6G9A2U7kM`, 43:50)
+- ☑⭐ RF Design-6: Smith Chart & Impedance Matching — Anurag Bhargava (`NX6G9A2U7kM`, 43:50) — конспект V
 - ☐ Impedance Matching on Smith Charts — EMPossible (`L24aB89-m5w`, 12:07)
 - ☐ HackadayU — Introduction to Antenna Basics, Class 1 (`axUcybeamIk`, 41:02)
 
