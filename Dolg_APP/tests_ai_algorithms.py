@@ -42,6 +42,29 @@ class SectionsForIntentTests(SimpleTestCase):
         thermal = {a['key'] for a in ai_algorithms.available_algorithms('thermal')}
         self.assertIn('derating', thermal)
 
+    def test_plan_for_narrow_is_single(self):
+        # Узкий запрос → план = [intent] (обратная совместимость)
+        self.assertEqual(ai_algorithms.plan_for('покажи BOM', 'bom'), ['bom'])
+
+    def test_plan_for_comprehensive_is_multi(self):
+        # Диагностический запрос → расширенный план (несколько движков)
+        plan = ai_algorithms.plan_for('проверь, всё ли ок со схемой', 'overview')
+        self.assertGreater(len(plan), 1)
+        self.assertIn('thermal', plan)
+        # primary intent (если он в плане) идёт первым
+        plan2 = ai_algorithms.plan_for('что измерить?', 'measurement')
+        self.assertEqual(plan2[0], 'measurement')
+
+    def test_sections_for_plan_dedup(self):
+        # dc_voltages есть и в measurement, и в overview — в плане не дублируется
+        sections = ai_algorithms.sections_for_plan(['measurement', 'thermal'], _divider())
+        titles = [t for t, _ in sections]
+        self.assertEqual(len(titles), len(set(titles)))
+        # план объединяет движки обоих intent'ов (DC + мощность/derating)
+        joined = ' '.join(titles)
+        self.assertIn('DC', joined)
+        self.assertTrue('Мощность' in joined or 'Запас' in joined)
+
     def test_formula_rc_has_formula_and_rf(self):
         sections = ai_algorithms.sections_for_intent('formula', _rc(), 'rc_network')
         titles = ' '.join(t for t, _ in sections)

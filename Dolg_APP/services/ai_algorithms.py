@@ -85,6 +85,59 @@ def sections_for_intent(
     return sections
 
 
+# ── Plan-then-Execute: планировщик мульти-движкового ответа ──────────────────
+# Для обзорных/диагностических запросов агент прогоняет НЕСКОЛЬКО движков сразу
+# (а не один по intent) и собирает проверяемый ответ. Исполнитель — тот же реестр
+# (детерминированные не-LLM движки). Узкие запросы остаются одно-движковыми.
+_ANALYTICAL_INTENTS = frozenset({'overview', 'scheme_overview', 'why_failed', 'measurement', 'thermal'})
+_COMPREHENSIVE_KW = (
+    'провер',
+    'все ',
+    'всё',
+    'безопас',
+    'анализ',
+    'health',
+    'норм',
+    'что не так',
+    'оцени',
+    'диагност',
+    'всё ли',
+    'ок?',
+    'годен',
+    'работает ли',
+)
+_FULL_PLAN = ('measurement', 'thermal', 'formula')
+
+
+def plan_for(message: str | None, intent: str) -> list[str]:
+    """Plan-then-Execute: список intent'ов-движков под запрос (порядок = логика проверки).
+
+    Для обзорных/диагностических запросов — расширенный план (несколько движков),
+    иначе — один primary intent (обратная совместимость).
+    """
+    msg = (message or '').lower()
+    broad = intent in _ANALYTICAL_INTENTS or any(kw in msg for kw in _COMPREHENSIVE_KW)
+    if not broad:
+        return [intent]
+    ordered = ([intent] if intent in _FULL_PLAN else []) + [i for i in _FULL_PLAN if i != intent]
+    return ordered
+
+
+def sections_for_plan(
+    intents: list[str], scheme_data: dict | None, topology: str | None = None
+) -> list[tuple[str, list[str]]]:
+    """Объединение секций по нескольким intent'ам (дедуп по заголовку, порядок сохранён)."""
+    seen: set[str] = set()
+    out: list[tuple[str, list[str]]] = []
+    for it in intents:
+        for title, lines in sections_for_intent(it, scheme_data, topology):
+            if title in seen:
+                continue
+            seen.add(title)
+            out.append((title, lines))
+    return out
+
+
 def available_algorithms(intent: str | None = None) -> list[dict]:
     """Манифест алгоритмов (для UI/диагностики/skills-каталога)."""
     return [

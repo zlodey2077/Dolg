@@ -1090,12 +1090,23 @@ def _compose_reply(intent, message, review, scheme_data, catalog, retrieval_cont
         _graph_summary(connectivity),
     ]
 
-    # L2: движок-секции из декларативного реестра алгоритмов (реальные числа).
+    # L2 + Plan-then-Execute: планировщик выбирает движки (для обзорных/диагностических
+    # запросов — несколько сразу), исполнитель = реестр. Для узких запросов план = [intent]
+    # (обратная совместимость). Числа — из движков (compute-don't-guess).
     topology = connectivity.get('topology')
-    engine_sections = [
-        _line_items(title, lines, '')
-        for title, lines in ai_algorithms.sections_for_intent(intent, scheme_data, topology)
-    ]
+    plan = ai_algorithms.plan_for(message, intent)
+    plan_sections = ai_algorithms.sections_for_plan(plan, scheme_data, topology)
+    engine_sections = []
+    if len(plan) > 1 and len(plan_sections) > 1:
+        # Видимый план (ReAct-трассируемость): какие проверки агент прогнал.
+        engine_sections.append(
+            _line_items(
+                'План проверки (агент)',
+                [f'{i + 1}. {title}' for i, (title, _) in enumerate(plan_sections)],
+                '',
+            )
+        )
+    engine_sections += [_line_items(title, lines, '') for title, lines in plan_sections]
 
     if intent in {'overview', 'scheme_overview'}:
         sections = [
