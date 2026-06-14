@@ -46,7 +46,7 @@
 
 ## Надёжность / derating (expert/paranoia + «реальная» ветка моделей)
 
-- ☐⭐ High SNR — Прекратите завышать габариты MOSFET (`dqgPj5GjbJk`, 13:06)
+- ☑⭐ High SNR — Прекратите завышать габариты MOSFET (`dqgPj5GjbJk`, 13:06) — конспект AK
 - ☐ Phil’s Lab — Switching Regulator Component Selection & Simulation (`FqT_Ofd54fo`, 17:00)
 
 ## Питание / стабилизаторы (expert-правила + formula_compute, «собери стабилизатор 5В»)
