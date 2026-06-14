@@ -163,7 +163,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 
 ## 3D / геометрия в коде (вектор design+3D: серверный CAD, OpenCASCADE/CadQuery/FreeCAD)
 
-- ☐⭐ jobstr — 3D Modelling with Python & CadQuery (parametric) (`H5oMQa0SUhY`, 12:05)
+- ☑⭐ jobstr — 3D Modelling with Python & CadQuery (parametric) (`H5oMQa0SUhY`, 12:05) — конспект X
 - ☐ jobstr — Python 3D Modelling (полный) (`2sg_rxwL3Ys`, 127:20) — исчерпывающе, очень длинно
 - ☐ Glad Labs — CadQuery: Parametric 3D с чистым Python (`n4p_WhPYD-g`, 6:53)
 - ☐ Quaoar — OpenCascade in Python, getting started (`P4wEb0HzqKg`, 5:03)
