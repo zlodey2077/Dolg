@@ -51,7 +51,7 @@
 
 ## Питание / стабилизаторы (expert-правила + formula_compute, «собери стабилизатор 5В»)
 
-- ☐⭐ Dmitry Kuznetsov — Compensating voltage stabilizers (`c2ctYvsGB-g`, 20:17)
+- ☑⭐ Dmitry Kuznetsov — Compensating voltage stabilizers (`c2ctYvsGB-g`, 20:17) — конспект AL
 - ☐ Морев А.В. — Источники питания, компенсационный стабилизатор (`WDBNIBA7Jt0`, 48:33)
 - ☐ два + два пять — Types of Power Supplies, Transformers (`zlznzVM7wus`, 63:21)
 - ☐ Dmitry Kuznetsov — DC-DC понижающего типа (`2pIHdbddPQI`, 33:54)
