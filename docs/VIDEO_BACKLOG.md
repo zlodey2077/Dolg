@@ -105,7 +105,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 
 ## Графика редактора (наш canvas симулятора/CAD, Canvas2D/WebGL/Pixi)
 
-- ☐⭐ Rendering performance from the ground up — Martin Splitt (`xuifyagAeu4`, 41:33)
+- ☑⭐ Rendering performance from the ground up — Martin Splitt (`xuifyagAeu4`, 41:33) — конспект U
 - ☐ Cranking Up Performance in Graphics-Intensive Web Apps — Chrome (`wkDd-x0EkFU`, 39:29)
 - ☐ Canvas2D is getting an update — Chrome (`dfOKFSDG7IM`, 10:42)
 - ☐ Making WebGL Dance — Steven Wittens, JSConf (`GNO_CYUjMK8`, 30:55)
@@ -160,3 +160,35 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 - ☐ Тимур Маликов — Триггеры (RS, D, JK) (`7QLQplw5EKE`, 16:56)
 - ☐ Dmitry Kuznetsov — Цифровая электроника, вводная (`gGGsVSP0oLc`, 19:34)
 - ☐ Digital Circuit Design / Verilog, L7 (`k88TfckjIGA`, 72:41)
+
+## 3D / геометрия в коде (вектор design+3D: серверный CAD, OpenCASCADE/CadQuery/FreeCAD)
+
+- ☐⭐ jobstr — 3D Modelling with Python & CadQuery (parametric) (`H5oMQa0SUhY`, 12:05)
+- ☐ jobstr — Python 3D Modelling (полный) (`2sg_rxwL3Ys`, 127:20) — исчерпывающе, очень длинно
+- ☐ Glad Labs — CadQuery: Parametric 3D с чистым Python (`n4p_WhPYD-g`, 6:53)
+- ☐ Quaoar — OpenCascade in Python, getting started (`P4wEb0HzqKg`, 5:03)
+- ☐ Things I Learned — Dataset of 3D Objects с FreeCAD (scripting) (`_61OzGV00h4`, 17:04) — + корм для ML
+- ☐ Ruben — Compiling CadQuery with Docker (`LTRUhQWZnP0`, 2:56) — серверный/Docker путь
+
+## Postgres / pgvector (наш postgres_migration + rag_roadmap)
+
+- ☐⭐ Tiger Data — 18 Months of Pgvector Learnings (`Ua6LDIOVN1s`, 47:13)
+- ☐⭐ NeuralNine — PGVector: Turn PostgreSQL Into Vector DB (`j1QcPSLj7u0`, 20:04)
+- ☐ Dave Ebbelaar — PostgreSQL as VectorDB (`Ff3tJ4pJEa4`, 14:25)
+
+## Численные методы / NumPy-SciPy (наш MNA-солвер, scipy.sparse)
+
+- ☐⭐ Mr. P Solver — SciPy для физиков/инженеров (`jmX4FOUEfgU`, 93:29)
+- ☐⭐ UWaterloo — Optimizing ML Code in NumPy & SciPy (`gYcrEZW-xek`, 82:28)
+- ☐ Meerkat — Gauss-Newton, нелинейный МНК (`Kln0ZQ7sX8k`, 20:02) — для нелинейного солвера (диод/LED)
+- ☐ 3Blue1Brown — Abstract vector spaces (`TgKwz5Ikpc8`, 16:46) — интуиция
+
+## WebSockets / Django Channels (наш чат + авто-реактивная схема)
+
+- ☐⭐ DjangoCon Europe 2023 — Building & scaling a live app (`NdRB9-Xtl9M`, 29:01)
+- ☐ Dennis Ivy — Channels & WebSockets Oversimplified (`cw8-KFVXpTE`, 16:35)
+- ☐⭐ Red Eyed Coder — Real-Time Graph with Channels (`tZY260UyAiE`, 31:16) — live-обновление как наша авто-схема
+
+## Чистый код / Чистая архитектура (Р. Мартин) — принцип работы, см. память
+
+- ☐ Видео-саммари «Clean Code» / «Clean Architecture» (искать) — книги читаем как методологию
