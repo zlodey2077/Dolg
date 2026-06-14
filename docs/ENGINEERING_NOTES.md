@@ -529,3 +529,25 @@ service mesh (mTLS между сервисами, трейсинг, ретраи
 - **Цикл TRAN:** на каждом шаге — построить companion-модели C/L из прошлого состояния → **заштамповать в ту же MNA** → решить линейную систему → получить V(t_{n+1}) → обновить `I_eq` → шаг дальше.
 - → **DOLG (TRAN на клиенте):** наш JS-MNA — **только DC**; ngspice.wasm делает TRAN, но JS-fallback нет. Добавив companion-модели + шаг по времени, **клиентский JS-движок получит транзиент** (заряд RC, генераторы, переходные) без ngspice. Старт — **Backward Euler** (устойчив, прост), потом трапеция для точности; нелинейные элементы (диод) — **Newton на каждом шаге** (§W).
 - **Сквозной вывод (важно для «движка до максимума»):** DC (`solve_dc`), **нелинейность** (§W), **термика** (§Y), **транзиент** (§AC) — всё это **один и тот же MNA-солвер** с разными «штампами»/итерациями. Один сильный линейный решатель в JS + воркеры (§Q) = клиентский движок покрывает почти весь SPICE-функционал. Это и есть стратегия максимизации: не много движков, а **один MNA, переиспользуемый везде**.
+
+---
+
+## Вау-пайплайн «схема→PCB→3D»: теория + архитектура + реализация (исследование 2026-06-14)
+Под план [PIPELINE_SCHEMATIC_TO_3D_PLAN.md](PIPELINE_SCHEMATIC_TO_3D_PLAN.md). Источники текстовые/веб (видео под bot-check).
+
+### AD. [Текст] Алгоритмы автотрассировки PCB (теория + реализация)
+Источники: [Maze Router: Collected Techniques (PDF)](https://www.academia.edu/69808970/Maze_Router_Collected_Techniques) · [The Mathematics of PCB Trace Routing](https://tinycomputers.io/posts/the-mathematics-of-pcb-trace-routing.html) · [Freerouting (gridless, expansion rooms)](https://github.com/freerouting/freerouting) · [VLSI obstacle-avoiding global routing (arXiv)](https://arxiv.org/pdf/2503.07268).
+
+- **Lee maze (1961):** BFS по сетке, **гарантирует кратчайший путь**, но медленный и прожорлив по памяти.
+- **A\* с эвристикой:** направленный поиск — быстрее (наш autorouter — это A* по сетке 0,5 мм + штраф за поворот, greedy: короткие нети первыми). **Line-search** ускоряет ещё (×29–93 над Lee, ×5–19 над A*).
+- **Gridless (Freerouting):** НЕ дискретизирует плату в сетку, а работает на **непрерывной плоскости**, разбитой на выпуклые полигоны («expansion rooms») → **произвольные углы (в т.ч. 45°)** и лучшее качество. Это «правильный» путь к красивым трассам, но крупный переписыватель.
+- **Rip-up & reroute:** итеративно — развести, найти конфликты, **«сорвать» мешающие трассы и переразвести**; мультислой, мульти-терминальные нети. Резко поднимает % разведённых.
+- → **DOLG (по плану):** (1) наш A* greedy без rip-up → у `autoroute_stats` есть `failed`/`unreachable`; **добавить rip-up-reroute** = меньше неразведённых (качество за умеренный код); (2) **45° дёшево:** либо 8-связные соседи в A* (диагонали), либо пост-обработка 90°→два 45°/дуга (наш §L) — без перехода в gridless; (3) gridless/expansion-rooms — «как Freerouting», но это **post-defense** (большой рефактор); (4) line-search — если A* станет узким местом. Для вау к защите хватит **45°-пост-обработки + rip-up**: трассы станут «как настоящие», риск умеренный, autorouter трогаем точечно.
+
+### AE. [Текст] Архитектура EDA-флоу: схема → нетлист → PCB → 3D (как у KiCad)
+Источники: [KiCad: schematic → PCB (RayPCB)](https://www.raypcb.com/kicad-schematic-to-pcb/) · [KiCad PCB Editor docs](https://docs.kicad.org/9.0/en/pcbnew/pcbnew.html) · [KiCad Schematic Editor docs](https://docs.kicad.org/9.0/en/eeschema/eeschema.html) · [Hussam: KiCad schematic capture](https://hussamtalkstech.com/introkicadp1/).
+
+- **Канонический EDA-флоу (KiCad):** (1) **schematic capture** — символы + нети; (2) **annotation** — рефдезы (R1, C1…) автоматически; (3) **netlist** — файл связности (что с чем соединено); (4) **footprint association** — каждому символу сопоставляется физический футпринт; (5) **PCB layout** — нетлист импортируется в плату → расстановка + трассировка; (6) **Gerber** + **3D**.
+- **Нетлист = единый мост:** PCB-редактор общается со schematic-редактором **через связность** (в KiCad — напрямую, без промежуточных файлов, либо импорт netlist). **Forward annotation:** правки схемы прокидываются на плату.
+- → **DOLG (наш флоу зеркалит KiCad — подтверждение архитектуры):** schematic editor → `scheme_data` (**components + connections = нетлист**) → `compute_pcb_layout` (футпринт через `footprintForComponent` + авто-расстановка) → `autoroute_layout(scheme_connections)` → 3D + Gerber. То есть **`scheme_connections` — наш единый «нетлист-мост»**, ровно идея «реюз спайси для роутинга»: одна связность кормит и симуляцию, и плату.
+- **Где мы проще KiCad (и куда полировать):** (а) **footprint association неявная** (из type/package) — KiCad даёт явный редактируемый маппинг символ↔футпринт (можно добавить выбор корпуса в UI); (б) **forward annotation** — при правке схемы переразложить/перетрассировать (наш «один клик» из плана = упрощённый forward annotation); (в) annotation рефдезов — у нас есть label'ы. **Вывод:** архитектурно DOLG = мини-KiCad в браузере; нетлист уже единый мост — надо лишь сделать переход «схема→плата→3D» бесшовным и красивым (план), не меняя архитектуру.
