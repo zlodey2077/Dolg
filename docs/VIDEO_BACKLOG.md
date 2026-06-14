@@ -61,7 +61,7 @@
 
 - ☐ Vladimir Savin — Контрольно-измерительные приборы, Лекция 1 (`5mvX41yB0kA`, 82:55)
 - ☐ Vladimir Savin — КИП, Лекция 2 (`hrBEq6CwPbQ`, 85:34)
-- ☐ ElectronicsClub — Как пользоваться осциллографом (`bAg7YkgrXKA`, 66:21)
+- ☑ ElectronicsClub — Как пользоваться осциллографом (`bAg7YkgrXKA`, 66:21) — конспект AP (how-to, взята суть)
 
 ---
 
