@@ -173,7 +173,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 ## Postgres / pgvector (наш postgres_migration + rag_roadmap)
 
 - ☐⭐ Tiger Data — 18 Months of Pgvector Learnings (`Ua6LDIOVN1s`, 47:13)
-- ☐⭐ NeuralNine — PGVector: Turn PostgreSQL Into Vector DB (`j1QcPSLj7u0`, 20:04)
+- ☑⭐ NeuralNine — PGVector: Turn PostgreSQL Into Vector DB (`j1QcPSLj7u0`, 20:04) — конспект Z (web-sourced, видео под bot-check)
 - ☐ Dave Ebbelaar — PostgreSQL as VectorDB (`Ff3tJ4pJEa4`, 14:25)
 
 ## Численные методы / NumPy-SciPy (наш MNA-солвер, scipy.sparse)
