@@ -73,7 +73,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 
 ## Код / реализация инженерных программ (архитектура DOLG: CAD, симулятор, движки)
 
-- ☐⭐ Яков Шамрай — Введение в разработку САПР (`BNuoEWTykOU`, 65:30) — общая архитектура САПР
+- ☑⭐ Яков Шамрай — Введение в разработку САПР (`BNuoEWTykOU`, 65:30) — общая архитектура САПР — конспект AM
 - ☐⭐ Introduction to Constraint-based Modelling — Karthik (`G0ibqc6RKSM`, 72:52) — constraint solver (привязки/параметрика CAD)
 - ☐ C3D Labs — Геометрическое ядро C3D и КОМПАС-3D (`-6aeoVhTx84`, 20:28) — что такое геом. ядро (3D-вектор)
 - ☐ IEEE — Introduction to SPICE, General-Purpose Simulator (`BnbcD-k4PD8`, 73:30) — глубже движок симулятора
