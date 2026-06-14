@@ -117,7 +117,7 @@ CAD (AutoCAD основы/массивы/блоки, КОМПАС 3D/2D-ЕСКД
 ## GNN / графовые сети (наш gnn_simulator, локальный AI)
 
 - ☐⭐ Stanford CS224W: ML with Graphs (`ew1cnUjRgl4`, серия) — эталонный курс
-- ☐⭐ Petar Veličković — Theoretical Foundations of GNN (`uF53xsT7mjc`, 72:20)
+- ☑⭐ Petar Veličković — Theoretical Foundations of GNN (`uF53xsT7mjc`, 72:20) — конспект AO
 - ☐ TensorFlow — Intro to Graph Neural Networks (`8owQBFAHw7E`, 51:06)
 - ☐ Microsoft Research — Intro to GNN: Models & Applications (`zCEYiCxrL_0`, 59:00)
 
