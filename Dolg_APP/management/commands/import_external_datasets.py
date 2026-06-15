@@ -54,6 +54,27 @@ SUPPORTED_SOURCES = {
 }
 
 
+def _safe_iter_batches(pf, cmd, shard_no):
+    """Итерирует batch'и parquet устойчиво: при битой странице (повреждённый/
+    недокачанный шард → TProtocolException и т.п.) не роняет весь импорт, а
+    отдаёт прочитанное до ошибки и останавливается с предупреждением."""
+    iterator = pf.iter_batches(batch_size=64)
+    while True:
+        try:
+            batch = next(iterator)
+        except StopIteration:
+            return
+        except Exception as exc:
+            cmd.stdout.write(
+                cmd.style.WARNING(
+                    f'  ⚠ шард {shard_no}: parquet повреждён, чтение прервано '
+                    f'({type(exc).__name__}: {str(exc)[:120]}) — беру прочитанное до этой точки'
+                )
+            )
+            return
+        yield batch
+
+
 class Command(BaseCommand):
     help = 'Импорт открытых datasets схем (HuggingFace / GitHub SPICE) в training base.'
 
@@ -379,7 +400,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'  parquet: {pf.metadata.num_rows} строк, колонки: {column_names}')
             _publish_progress(extra={'message': f'Распаковка шарда {shard_idx + 1}/{shards_to_pull}…'})
 
-            for batch in pf.iter_batches(batch_size=64):
+            for batch in _safe_iter_batches(pf, self, shard_idx + 1):
                 if len(out) >= limit:
                     break
                 batch_dict = batch.to_pydict()
