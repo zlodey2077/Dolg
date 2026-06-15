@@ -8,6 +8,7 @@ knowledge, learning, catalog and artifact context.
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -126,16 +127,40 @@ def _query_tokens(
     return tokens[:24]
 
 
+def _item_haystack(item: dict[str, Any]) -> str:
+    return ' '.join(str(item.get(key) or '') for key in ('title', 'snippet', 'keywords')).lower()
+
+
+def _doc_freq(items: list[dict[str, Any]], tokens: list[str]) -> dict[str, int]:
+    """Сколько кандидатов содержат токен (для IDF-взвешивания)."""
+    df = dict.fromkeys(tokens, 0)
+    for item in items:
+        hay = _item_haystack(item)
+        for token in tokens:
+            if token in hay:
+                df[token] += 1
+    return df
+
+
+def _idf_weight(token: str, df: dict[str, int], n_docs: int) -> float:
+    """Редкий по корпусу токен (низкий df) дискриминативнее частого → выше вес.
+    Длинные токены (part_number/номиналы) ценнее коротких. §AH (качество retrieval)."""
+    base = 3.0 if len(token) >= 5 else 2.0
+    idf = math.log((n_docs + 1) / (df.get(token, 0) + 1)) + 1.0
+    return base * idf
+
+
 def _rank_items(items: list[dict[str, Any]], tokens: list[str]) -> list[dict[str, Any]]:
+    n_docs = max(1, len(items))
+    df = _doc_freq(items, tokens)
     unique = {}
     for item in items:
         key = (item.get('source'), item.get('id') or item.get('title'))
-        score = _score_text(
-            ' '.join(str(item.get(key) or '') for key in ('title', 'snippet', 'keywords')),
-            tokens,
-        )
+        hay = _item_haystack(item)
+        # TF-IDF-lite: сумма IDF-весов совпавших токенов (вместо плоского +3/+2).
+        match_score = sum(_idf_weight(token, df, n_docs) for token in tokens if token in hay)
         item = dict(item)
-        item['score'] = item.get('score', 0) + score
+        item['score'] = item.get('score', 0) + match_score
         if item['score'] <= 0:
             continue
         previous = unique.get(key)
