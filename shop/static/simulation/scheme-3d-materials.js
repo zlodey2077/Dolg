@@ -74,6 +74,12 @@
         battery:      _sharedMat({ color: 0xc62828, roughness: 0.7 }),
         ledRed:       _sharedMat({ color: 0xff3344, transparent: true, opacity: 0.85, roughness: 0.2 }),
         switchTop:    _sharedMat({ color: 0x424242, roughness: 0.6 }),
+        // Реалистичные корпус-материалы (Track A полировка).
+        metalCan:     _sharedMat({ color: 0xcfd3da, metalness: 0.86, roughness: 0.26 }),   // алюм. банка электролита / TO-220 tab
+        epoxy:        _sharedMat({ color: 0x202024, metalness: 0.08, roughness: 0.5 }),     // полуглянцевый эпокси-корпус IC
+        ceramic:      _sharedMat({ color: 0x3f6fae, roughness: 0.62 }),                     // керамический/плёночный конденсатор
+        glassBody:    _sharedMat({ color: 0x161616, metalness: 0.1, roughness: 0.32 }),     // стеклянный/эпокси корпус диода
+        leadTin:      _sharedMat({ color: 0xc4c8cf, metalness: 0.78, roughness: 0.24 }),    // лужёный вывод
         // Soldermask: глянцевый по IPC-A-610 (semi-gloss). Roughness 0.45 даёт
         // реалистичный пластиковый блеск, как у настоящего FR-4 board'а.
         pcbGreen:     _sharedMat({ color: 0x0e3d1b, roughness: 0.45, metalness: 0.05 }),

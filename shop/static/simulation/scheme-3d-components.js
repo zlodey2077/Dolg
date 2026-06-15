@@ -164,10 +164,24 @@
     function makeResistor(value) {
         var g = new THREE.Group();
         var R = 0.3, L = 1.6;
-        var body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 20), MAT.beige);
+        var bodyY = 0.35;
+        // Корпус-капсула: бочкообразное тело + скруглённые торцы (реалистичный
+        // плёночный резистор, а не голый цилиндр).
+        var body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L * 0.82, 24), MAT.beige);
         body.rotation.z = Math.PI / 2;
-        body.position.y = 0.35;
+        body.position.y = bodyY;
         g.add(body);
+        [-1, 1].forEach(function (s) {
+            var cap = new THREE.Mesh(new THREE.SphereGeometry(R, 20, 14), MAT.beige);
+            cap.scale.set(0.62, 1, 1);
+            cap.position.set(s * L * 0.41, bodyY, 0);
+            g.add(cap);
+            // Металлический колпачок под вывод.
+            var ferrule = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.86, R * 0.86, L * 0.07, 20), MAT.leadTin);
+            ferrule.rotation.z = Math.PI / 2;
+            ferrule.position.set(s * L * 0.42, bodyY, 0);
+            g.add(ferrule);
+        });
         var bands = resistorBands(value);
         bands.forEach(function (digit, i) {
             var c = RESISTOR_BAND_COLORS[Math.min(9, Math.max(0, digit))];
@@ -197,19 +211,28 @@
             color: color || 0xff3344, transparent: true, opacity: 0.85, roughness: 0.2,
             emissive: color || 0xff3344, emissiveIntensity: 0.25,
         });
-        var body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.8, 20), mat);
+        var body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.8, 24), mat);
         body.position.y = 0.4;
         g.add(body);
         var dome = new THREE.Mesh(
-            new THREE.SphereGeometry(0.3, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+            new THREE.SphereGeometry(0.3, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
             mat
         );
         dome.position.y = 0.8;
         g.add(dome);
-        var leads = [-0.12, 0.12];
-        for (var i = 0; i < leads.length; i++) {
-            var lead = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8), MAT.wire);
-            lead.position.set(leads[i], 0.2, 0);
+        // Фланец-юбка у основания (характерный буртик 5-мм светодиода).
+        var flange = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.08, 24), mat);
+        flange.position.y = 0.06;
+        g.add(flange);
+        // Плоский срез корпуса со стороны катода (тонкая накладка под цвет).
+        var flat = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.7, 0.34), mat);
+        flat.position.set(-0.29, 0.4, 0);
+        g.add(flat);
+        // Выводы: анод длиннее, катод короче (как в реале).
+        var leadSpec = [{ x: 0.1, len: 0.5 }, { x: -0.1, len: 0.36 }];
+        for (var i = 0; i < leadSpec.length; i++) {
+            var lead = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, leadSpec[i].len, 10), MAT.leadTin);
+            lead.position.set(leadSpec[i].x, -leadSpec[i].len / 2 + 0.04, 0);
             g.add(lead);
         }
         return g;
@@ -220,26 +243,34 @@
         var radius = 0.36 + Math.min(0.25, Math.log10(Math.max(1, value || 1)) * 0.04);
         var height = 0.85 + Math.min(0.7, Math.log10(Math.max(1, value || 1)) * 0.08);
         var body = new THREE.Mesh(
-            new THREE.CylinderGeometry(radius, radius, height, 20),
+            new THREE.CylinderGeometry(radius, radius, height, 28),
             MAT.electroBlue
         );
         body.position.y = height / 2;
         g.add(body);
+        // Алюминиевый верхний колпачок (чуть утоплен) + чёрное основание-бунг.
+        var topCap = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.96, radius * 0.96, height * 0.06, 28), MAT.metalCan);
+        topCap.position.y = height + 0.005;
+        g.add(topCap);
+        var base = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.0, radius * 0.92, height * 0.05, 28), MAT.plasticBlack);
+        base.position.y = height * 0.025;
+        g.add(base);
         var stripeH = height * 0.18;
         var stripe = new THREE.Mesh(
-            new THREE.CylinderGeometry(radius * 1.01, radius * 1.01, stripeH, 20, 1, true,
+            new THREE.CylinderGeometry(radius * 1.01, radius * 1.01, stripeH, 28, 1, true,
                                        Math.PI * 0.6, Math.PI * 0.8),
             MAT.electroBand
         );
         stripe.position.y = height * 0.4;
         g.add(stripe);
+        // Вентиляционный крест (score) на алюминиевом верхе.
         var rotations = [0, Math.PI / 2];
         for (var r = 0; r < rotations.length; r++) {
             var notch = new THREE.Mesh(
-                new THREE.BoxGeometry(radius * 1.6, 0.04, 0.06),
-                new THREE.MeshStandardMaterial({ color: 0x222244 })
+                new THREE.BoxGeometry(radius * 1.5, 0.05, 0.05),
+                new THREE.MeshStandardMaterial({ color: 0x2a2a2e })
             );
-            notch.position.y = height + 0.02;
+            notch.position.y = height + 0.04;
             notch.rotation.y = rotations[r];
             g.add(notch);
         }
@@ -254,20 +285,26 @@
 
     function makeDiode() {
         var g = new THREE.Group();
-        var R = 0.2, L = 1.0;
+        var R = 0.2, L = 1.0, bodyY = 0.3;
         var body = new THREE.Mesh(
-            new THREE.CylinderGeometry(R, R, L, 16),
-            new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 })
+            new THREE.CylinderGeometry(R, R, L * 0.84, 20),
+            MAT.glassBody
         );
         body.rotation.z = Math.PI / 2;
-        body.position.y = 0.3;
+        body.position.y = bodyY;
         g.add(body);
+        [-1, 1].forEach(function (s) {
+            var cap = new THREE.Mesh(new THREE.SphereGeometry(R, 16, 12), MAT.glassBody);
+            cap.scale.set(0.55, 1, 1);
+            cap.position.set(s * L * 0.42, bodyY, 0);
+            g.add(cap);
+        });
         var band = new THREE.Mesh(
-            new THREE.CylinderGeometry(R * 1.04, R * 1.04, 0.10, 16),
-            new THREE.MeshStandardMaterial({ color: 0xeeeeee })
+            new THREE.CylinderGeometry(R * 1.05, R * 1.05, 0.12, 20),
+            new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.4 })
         );
         band.rotation.z = Math.PI / 2;
-        band.position.set(L * 0.32, 0.3, 0);
+        band.position.set(L * 0.30, bodyY, 0);
         g.add(band);
         _addBentLead(g, -L / 2, 0.3, 0.04);
         _addBentLead(g,  L / 2, 0.3, 0.04);
@@ -276,76 +313,63 @@
 
     function makeBattery() {
         var g = new THREE.Group();
-        var body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.0, 0.7), MAT.battery);
-        body.position.y = 0.5;
+        // Цилиндрический элемент (AA-style): цветной корпус + металлические торцы
+        // + «+»-нипель + этикеточная полоса со знаками — реалистичнее плоской коробки.
+        var R = 0.5, L = 1.5, bodyY = R + 0.02;
+        var body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L * 0.86, 28), MAT.battery);
+        body.rotation.z = Math.PI / 2;
+        body.position.y = bodyY;
         g.add(body);
-        var termXs = [-0.6, 0.6];
-        for (var i = 0; i < termXs.length; i++) {
-            var term = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.10, 0.10, 0.2, 12),
-                MAT.pinSilver
-            );
-            term.position.set(termXs[i], 1.1, 0);
-            g.add(term);
-        }
+        [-1, 1].forEach(function (s) {
+            var capM = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.98, R * 0.98, L * 0.07, 28), MAT.metalCan);
+            capM.rotation.z = Math.PI / 2;
+            capM.position.set(s * L * 0.46, bodyY, 0);
+            g.add(capM);
+        });
+        var nub = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.28, R * 0.28, 0.12, 20), MAT.metalCan);
+        nub.rotation.z = Math.PI / 2;
+        nub.position.set(L * 0.52, bodyY, 0);
+        g.add(nub);
+        var band = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.006, R * 1.006, L * 0.22, 28, 1, true), MAT.plasticBlack);
+        band.rotation.z = Math.PI / 2;
+        band.position.set(-L * 0.16, bodyY, 0);
+        g.add(band);
         var signMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-        var plusH = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.03), signMat);
-        plusH.position.set(-0.6, 1.22, 0);
-        g.add(plusH);
-        var plusV = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.2), signMat);
-        plusV.position.set(-0.6, 1.22, 0);
-        g.add(plusV);
-        var minus = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.03), signMat);
-        minus.position.set(0.6, 1.22, 0);
-        g.add(minus);
+        var pH = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.18), signMat); pH.position.set(L * 0.32, bodyY + R * 0.92, 0); g.add(pH);
+        var pV = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.03, 0.03), signMat); pV.position.set(L * 0.32, bodyY + R * 0.92, 0); g.add(pV);
+        var mn = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.03, 0.03), signMat); mn.position.set(-L * 0.42, bodyY + R * 0.92, 0); g.add(mn);
         return g;
     }
 
+    // type 'ic' без DIP/SOIC-пакета: используем качественную DIP-8 модель,
+    // а не упрощённый плоский корпус.
     function makeIC() {
-        var g = new THREE.Group();
-        var body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.3, 1.1), MAT.plasticBlack);
-        body.position.y = 0.3;
-        g.add(body);
-        var key = new THREE.Mesh(
-            new THREE.SphereGeometry(0.06, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2),
-            new THREE.MeshStandardMaterial({ color: 0x333333 })
-        );
-        key.position.set(-0.7, 0.45, -0.4);
-        g.add(key);
-        for (var side = 0; side < 2; side++) {
-            for (var i = 0; i < 4; i++) {
-                var pin = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.10, 0.4, 0.06),
-                    MAT.pinSilver
-                );
-                pin.position.set(-0.7 + i * 0.5, 0.1, side === 0 ? -0.6 : 0.6);
-                g.add(pin);
-            }
-        }
-        return g;
+        return makeChipPackage({ widthMm: 9.8, heightMm: 7.6, height3d: 3.4, pins: 8 }, false);
     }
 
     function makeInductor() {
         var g = new THREE.Group();
-        var R = 0.3, L = 1.0;
-        var body = new THREE.Mesh(
-            new THREE.CylinderGeometry(R, R, L, 16),
-            MAT.bobbin
-        );
-        body.rotation.z = Math.PI / 2;
-        body.position.y = 0.35;
-        g.add(body);
-        for (var i = 0; i < 5; i++) {
-            var turn = new THREE.Mesh(
-                new THREE.TorusGeometry(R * 1.05, 0.025, 6, 16),
-                MAT.wire
-            );
-            turn.rotation.y = Math.PI / 2;
-            turn.position.set(-L * 0.4 + i * (L * 0.2), 0.35, 0);
-            g.add(turn);
+        var R = 0.26, L = 1.0, bodyY = 0.36;
+        // Ферритовый/каркасный сердечник.
+        var core = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L * 0.96, 18), MAT.bobbin);
+        core.rotation.z = Math.PI / 2;
+        core.position.y = bodyY;
+        g.add(core);
+        // Реальная намотка: непрерывная винтовая спираль медного провода (TubeGeometry).
+        var turns = 9, coilR = R * 1.16, pts = [], steps = turns * 24;
+        for (var s = 0; s <= steps; s++) {
+            var t = s / steps;
+            var ang = t * turns * Math.PI * 2;
+            var x = (-L * 0.42) + t * (L * 0.84);
+            pts.push(new THREE.Vector3(x, bodyY + Math.sin(ang) * coilR, Math.cos(ang) * coilR));
         }
-        _addBentLead(g, -L / 2, 0.35, 0.04);
-        _addBentLead(g,  L / 2, 0.35, 0.04);
+        var coil = new THREE.Mesh(
+            new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), steps, 0.035, 8, false),
+            MAT.copperTop || MAT.wire
+        );
+        g.add(coil);
+        _addBentLead(g, -L / 2, bodyY, 0.04);
+        _addBentLead(g,  L / 2, bodyY, 0.04);
         return g;
     }
 
@@ -416,13 +440,32 @@
     }
 
     function makeSwitch() {
+        // Тактовая кнопка (tactile push-button): чёрный корпус + металлическая
+        // крышка + круглая кнопка + 4 пина по углам.
         var g = new THREE.Group();
-        var body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.35, 0.7), MAT.plasticGray);
-        body.position.y = 0.18;
+        var bw = 0.62, bd = 0.62, bh = 0.22;
+        var body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), MAT.plasticBlack);
+        body.position.y = bh / 2 + 0.02;
         g.add(body);
-        var lever = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 0.2), MAT.switchTop);
-        lever.position.y = 0.55;
-        g.add(lever);
+        var cap = new THREE.Mesh(
+            new THREE.BoxGeometry(bw * 0.92, 0.05, bd * 0.92),
+            new THREE.MeshStandardMaterial({ color: 0xcfd3da, metalness: 0.65, roughness: 0.35 })
+        );
+        cap.position.y = bh + 0.05;
+        g.add(cap);
+        var btn = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.16, 0.10, 20),
+            new THREE.MeshStandardMaterial({ color: 0x202024, roughness: 0.5 })
+        );
+        btn.position.y = bh + 0.12;
+        g.add(btn);
+        var pinDX = bw / 2 - 0.04, pinDZ = bd / 2 + 0.05;
+        var corners = [[-pinDX, -pinDZ], [pinDX, -pinDZ], [-pinDX, pinDZ], [pinDX, pinDZ]];
+        for (var i = 0; i < corners.length; i++) {
+            var pin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.05), MAT.pinSilver);
+            pin.position.set(corners[i][0], 0.06, corners[i][1]);
+            g.add(pin);
+        }
         return g;
     }
 
@@ -483,25 +526,44 @@
         var w = footprint.widthMm * UNIT_PER_MM;
         var d = footprint.heightMm * UNIT_PER_MM;
         var h = footprint.height3d * UNIT_PER_MM;
-        var body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT.plasticBlack);
-        body.position.y = h / 2 + 0.05;
+        var baseY = isSmd ? 0.04 : 0.14;
+        // Эпокси-корпус + узкий приподнятый «гребень» сверху (ступенька, как у реальных DIP/SOIC).
+        var body = new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.82, d), MAT.epoxy);
+        body.position.y = baseY + h * 0.41;
         g.add(body);
-        var notch = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.018, 18), MAT.plasticGray);
-        notch.rotation.x = Math.PI / 2;
-        notch.position.set(-w * 0.42, h + 0.065, 0);
+        var ridge = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, h * 0.18, d * 0.78), MAT.epoxy);
+        ridge.position.y = baseY + h * 0.91;
+        g.add(ridge);
+        // Ямка-индикатор pin-1 (тёмное углубление в углу верхней грани).
+        var dimple = new THREE.Mesh(new THREE.CylinderGeometry(d * 0.13, d * 0.13, 0.02, 16), MAT.plasticBlack);
+        dimple.position.set(-w * 0.40, baseY + h * 0.99, -d * 0.28);
+        g.add(dimple);
+        // Полукруглая выемка-ключ на торце (стандарт DIP).
+        var notch = new THREE.Mesh(new THREE.CylinderGeometry(d * 0.16, d * 0.16, h, 18, 1, true), MAT.plasticBlack);
+        notch.position.set(-w / 2, baseY + h * 0.45, 0);
         g.add(notch);
         var perSide = Math.ceil(pins / 2);
         var pitch = w / Math.max(2, perSide);
+        var pinW = Math.min(0.12, pitch * 0.45);
         for (var side = 0; side < 2; side++) {
             for (var i = 0; i < perSide; i++) {
                 var x = -w / 2 + pitch * (i + 0.5);
-                var z = side === 0 ? -d / 2 - 0.10 : d / 2 + 0.10;
-                var pin = new THREE.Mesh(
-                    new THREE.BoxGeometry(Math.min(0.12, pitch * 0.45), isSmd ? 0.035 : 0.24, 0.08),
-                    MAT.pinSilver
-                );
-                pin.position.set(x, isSmd ? 0.04 : 0.12, z);
-                g.add(pin);
+                var zEdge = side === 0 ? -d / 2 : d / 2;
+                var zSign = side === 0 ? -1 : 1;
+                if (isSmd) {
+                    // Gull-wing: наклонное плечо + горизонтальная лапка к плате.
+                    var shoulder = new THREE.Mesh(new THREE.BoxGeometry(pinW, 0.03, 0.10), MAT.leadTin);
+                    shoulder.position.set(x, baseY + 0.02, zEdge + zSign * 0.06);
+                    g.add(shoulder);
+                    var foot = new THREE.Mesh(new THREE.BoxGeometry(pinW, 0.025, 0.10), MAT.leadTin);
+                    foot.position.set(x, 0.012, zEdge + zSign * 0.14);
+                    g.add(foot);
+                } else {
+                    // DIP: вывод вниз в плату + загиб наружу.
+                    var leg = new THREE.Mesh(new THREE.BoxGeometry(pinW, baseY + 0.04, 0.06), MAT.leadTin);
+                    leg.position.set(x, (baseY + 0.04) / 2, zEdge + zSign * 0.05);
+                    g.add(leg);
+                }
             }
         }
         return g;
