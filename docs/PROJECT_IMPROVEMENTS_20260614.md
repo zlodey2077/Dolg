@@ -38,6 +38,9 @@ RF-анализ (S21/S11) · интерактивные Probes (V/I+min/max/avg)
 18. **Datasheet Intelligence** (PyMuPDF): pinout / abs max / thermal из PDF.
 19. **нейро-корпус 1000+ схем** (opt-in allow_ai_training) — под GNN.
 20. **ML-curation UI** (давняя просьба): очередь AITrainingExample, soft-delete, гистограммы.
+21. **Мультизагрузка + мультитренировка датасетов** (юзер 2026-06-14): грузить/тренировать не по одному, а сразу несколько/все ассеты.
+    - ✅ Сделано: устойчивый импорт (битый parquet не роняет — `_safe_iter_batches`); `train_tiny_circuit_ai --all-datasets` (объединяет ВСЕ локальные JSON + curated DB); корпус загружен (87 примеров), тренировка работает (loss 0.14).
+    - ⏳ Осталось: (a) **multi-select датасетов в админке** ML (галочки → загрузить/тренировать выбранные/все одной кнопкой); (b) **batch HF-импорт** нескольких шардов с пропуском битых (`--shards N` уже есть; shard-0 битый на стороне датасета); (c) **multi-train GNN** (`train_gnn_voltage_predictor --all-datasets`).
 
 ## Tier 5 — CAD
 21. **Массив (Array)** прямоуг.+круговой; **Блоки** (выделил→сохранил→реюз).
