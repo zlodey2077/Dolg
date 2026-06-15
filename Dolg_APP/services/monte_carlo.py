@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import math
 import time
 
 import numpy as np
@@ -45,6 +46,15 @@ MIN_ITERATIONS = 10
 GMIN = 1e-12  # против сингулярности «плавающих» узлов
 DIODE_DROP = 0.7
 LED_DROP = 2.0
+# Нелинейная модель диода (Shockley + Newton-Raphson). Is выводится из паспортного
+# Vf при опорном токе I_REF, чтобы падение ≈ Vf около рабочей точки, но менялось с
+# током и корректно отсекало обратное смещение (фикс-Vf этого не умел).
+VT_THERMAL = 0.02585  # kT/q при ~300K
+N_DIODE = 2.0  # коэффициент неидеальности (норм для LED/Si-диода в учебной модели)
+I_REF_DIODE = 1e-3  # опорный ток для калибровки Is по Vf
+DIODE_MAX_ITER = 100  # Newton iterations cap
+DIODE_VSTEP_CLAMP = 0.1  # макс. шаг Vd за итерацию (демпфирование экспоненты)
+DIODE_CONV_TOL = 1e-7  # сходимость по |ΔVd|
 # Worst-case: на сколько σ уходим к краю допуска (совпадает с clamp Monte Carlo,
 # поэтому угловой конверт гарантированно охватывает все MC-выборки).
 SIGMA_MULTIPLIER = 3.0
@@ -261,58 +271,99 @@ def solve_dc(circuit: dict, *, caps_open: bool = True, inds_short: bool = True) 
     elements = circuit['elements']
     v_sources = [e for e in elements if e['type'] == 'V']
     diodes = [e for e in elements if e['type'] == 'D']
-    extra = len(v_sources) + len(diodes)
-    size = node_count + extra
+    size = node_count + len(v_sources)
 
-    A = np.zeros((size, size), dtype=np.float64)
-    b = np.zeros(size, dtype=np.float64)
+    def _diode_is(vf: float) -> float:
+        """Is из паспортного Vf при опорном токе I_REF (Shockley)."""
+        denom = math.exp(min(vf, 5.0) / (N_DIODE * VT_THERMAL)) - 1.0
+        return I_REF_DIODE / denom if denom > 0 else 1e-12
 
-    def stamp_g(n1: int, n2: int, g: float) -> None:
-        if n1 > 0:
-            A[n1 - 1, n1 - 1] += g
-        if n2 > 0:
-            A[n2 - 1, n2 - 1] += g
-        if n1 > 0 and n2 > 0:
-            A[n1 - 1, n2 - 1] -= g
-            A[n2 - 1, n1 - 1] -= g
+    diode_is = [_diode_is(float(e.get('value') or DIODE_DROP)) for e in diodes]
+    vd = [float(e.get('value') or DIODE_DROP) for e in diodes]  # init guess = Vf
 
-    for e in elements:
-        if e['type'] == 'R' and e['value'] > 0:
-            stamp_g(e['nodes'][0], e['nodes'][1], 1.0 / e['value'])
-        elif e['type'] == 'L' and inds_short:
-            stamp_g(e['nodes'][0], e['nodes'][1], 1e9)
+    def _build_and_solve(vd_cur):
+        """Один линейный шаг MNA: R/L/Gmin + V-источники + companion-модели диодов
+        в текущей рабочей точке vd_cur. Возвращает (x, diode_currents)."""
+        A = np.zeros((size, size), dtype=np.float64)
+        b = np.zeros(size, dtype=np.float64)
 
-    if caps_open:
-        # G_min — против сингулярности на плавающих узлах
-        for i in range(node_count):
-            A[i, i] += GMIN
+        def stamp_g(n1: int, n2: int, g: float) -> None:
+            if n1 > 0:
+                A[n1 - 1, n1 - 1] += g
+            if n2 > 0:
+                A[n2 - 1, n2 - 1] += g
+            if n1 > 0 and n2 > 0:
+                A[n1 - 1, n2 - 1] -= g
+                A[n2 - 1, n1 - 1] -= g
 
-    for k, e in enumerate(v_sources):
-        row = node_count + k
-        np_, nn = e['nodes']
-        if np_ > 0:
-            A[np_ - 1, row] += 1
-            A[row, np_ - 1] += 1
-        if nn > 0:
-            A[nn - 1, row] -= 1
-            A[row, nn - 1] -= 1
-        b[row] = e['value']
+        for e in elements:
+            if e['type'] == 'R' and e['value'] > 0:
+                stamp_g(e['nodes'][0], e['nodes'][1], 1.0 / e['value'])
+            elif e['type'] == 'L' and inds_short:
+                stamp_g(e['nodes'][0], e['nodes'][1], 1e9)
 
-    for k, e in enumerate(diodes):
-        row = node_count + len(v_sources) + k
-        np_, nn = e['nodes']
-        if np_ > 0:
-            A[np_ - 1, row] += 1
-            A[row, np_ - 1] += 1
-        if nn > 0:
-            A[nn - 1, row] -= 1
-            A[row, nn - 1] -= 1
-        b[row] = e['value']
+        if caps_open:
+            for i in range(node_count):
+                A[i, i] += GMIN
 
-    try:
-        x = np.linalg.solve(A, b)
-    except np.linalg.LinAlgError as exc:
-        raise ValueError(f'Singular MNA matrix: {exc}') from exc
+        for k, e in enumerate(v_sources):
+            row = node_count + k
+            np_, nn = e['nodes']
+            if np_ > 0:
+                A[np_ - 1, row] += 1
+                A[row, np_ - 1] += 1
+            if nn > 0:
+                A[nn - 1, row] -= 1
+                A[row, nn - 1] -= 1
+            b[row] = e['value']
+
+        # Companion-модель диода: I_d ≈ Gd·V + Ieq (линеаризация Shockley в vd_cur).
+        diode_currents = []
+        for k, e in enumerate(diodes):
+            n1, n2 = e['nodes']
+            v = vd_cur[k]
+            ex = math.exp(min(v, 5.0) / (N_DIODE * VT_THERMAL))
+            i_d = diode_is[k] * (ex - 1.0)
+            gd = max(diode_is[k] / (N_DIODE * VT_THERMAL) * ex, GMIN)
+            ieq = i_d - gd * v
+            stamp_g(n1, n2, gd)
+            if n1 > 0:
+                b[n1 - 1] -= ieq
+            if n2 > 0:
+                b[n2 - 1] += ieq
+            diode_currents.append(i_d)
+
+        try:
+            return np.linalg.solve(A, b), diode_currents
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(f'Singular MNA matrix: {exc}') from exc
+
+    if not diodes:
+        x, diode_currents = _build_and_solve(vd)
+    else:
+        # Newton-Raphson: итерируем рабочие точки диодов до сходимости с
+        # демпфированием шага (экспонента иначе расходится).
+        x, diode_currents = _build_and_solve(vd)
+        for _ in range(DIODE_MAX_ITER):
+            x, diode_currents = _build_and_solve(vd)
+            max_dv = 0.0
+            for k, e in enumerate(diodes):
+                n1, n2 = e['nodes']
+                v_n1 = float(x[n1 - 1]) if n1 > 0 else 0.0
+                v_n2 = float(x[n2 - 1]) if n2 > 0 else 0.0
+                new_vd = v_n1 - v_n2
+                step = new_vd - vd[k]
+                if step > DIODE_VSTEP_CLAMP:
+                    new_vd = vd[k] + DIODE_VSTEP_CLAMP
+                elif step < -DIODE_VSTEP_CLAMP:
+                    new_vd = vd[k] - DIODE_VSTEP_CLAMP
+                new_vd = max(-50.0, min(new_vd, float(e.get('value') or DIODE_DROP) + 0.5))
+                max_dv = max(max_dv, abs(new_vd - vd[k]))
+                vd[k] = new_vd
+            if max_dv < DIODE_CONV_TOL:
+                break
+        # Финальный пересчёт токов в сошедшейся точке.
+        x, diode_currents = _build_and_solve(vd)
 
     voltages = {0: 0.0}
     for i in range(node_count):
@@ -320,6 +371,8 @@ def solve_dc(circuit: dict, *, caps_open: bool = True, inds_short: bool = True) 
     currents: dict[str, float] = {}
     for k, e in enumerate(v_sources):
         currents[str(e['id'])] = float(-x[node_count + k])
+    for k, e in enumerate(diodes):
+        currents[str(e['id'])] = float(diode_currents[k])
     return {'voltages': voltages, 'currents': currents}
 
 

@@ -185,3 +185,34 @@ def test_paranoia_ok_when_tolerances_zero():
     rep = run_tolerance_analysis(_voltage_divider(), iterations=50, tolerance=0.0, seed=1)
     assert rep['paranoia']['verdict'] == 'ok'
     assert rep['paranoia']['flags'] == []
+
+
+# ─── Нелинейный диод (Newton/Shockley) ──────────────────────────────────────
+def _diode_series(vsrc, r_ohm, vf):
+    """Vsrc → R → D(vf) → GND. nodes: 0=gnd, 1=src, 2=между R и диодом."""
+    return {
+        'n_nodes': 3,
+        'elements': [
+            {'id': 'V1', 'type': 'V', 'nodes': [1, 0], 'value': float(vsrc)},
+            {'id': 'R1', 'type': 'R', 'nodes': [1, 2], 'value': float(r_ohm)},
+            {'id': 'D1', 'type': 'D', 'nodes': [2, 0], 'value': float(vf)},
+        ],
+    }
+
+
+def test_diode_forward_conduction():
+    # 5В → 1кОм → диод(0.7): падение ~Vf, ток ~(5-Vf)/R > 0, не фикс-Vf-артефакт.
+    r = solve_dc(_diode_series(5.0, 1000.0, 0.7))
+    vd = r['voltages'][2]
+    assert 0.6 < vd < 0.95, vd
+    i_d = r['currents']['D1']
+    assert i_d > 0.003  # ~4 мА
+    assert abs(i_d - (5.0 - vd) / 1000.0) < 1e-4  # согласованность с законом Ома
+
+
+def test_diode_blocks_below_vf():
+    # 1В источник, LED Vf=2В: диод НЕ должен проводить (старая фикс-модель форсила
+    # бы 2В и давала неверный ток). Ожидаем ~0 ток, почти всё напряжение на LED.
+    r = solve_dc(_diode_series(1.0, 1000.0, 2.0))
+    assert abs(r['currents']['D1']) < 1e-5  # практически off
+    assert r['voltages'][2] > 0.95  # падение на R почти нулевое
