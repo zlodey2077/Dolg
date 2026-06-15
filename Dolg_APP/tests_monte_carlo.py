@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from Dolg_APP.services.monte_carlo import (
@@ -11,6 +13,7 @@ from Dolg_APP.services.monte_carlo import (
     run_worst_case,
     scheme_to_circuit,
     solve_dc,
+    solve_transient,
 )
 
 
@@ -216,3 +219,68 @@ def test_diode_blocks_below_vf():
     r = solve_dc(_diode_series(1.0, 1000.0, 2.0))
     assert abs(r['currents']['D1']) < 1e-5  # практически off
     assert r['voltages'][2] > 0.95  # падение на R почти нулевое
+
+
+# ─── Транзиент (Backward Euler, companion C/L) ───────────────────────────────
+def _rc_charge(vsrc, r_ohm, c_farad):
+    """Vsrc → R → C → GND. node 2 = на конденсаторе. tau = RC."""
+    return {
+        'n_nodes': 3,
+        'elements': [
+            {'id': 'V1', 'type': 'V', 'nodes': [1, 0], 'value': float(vsrc)},
+            {'id': 'R1', 'type': 'R', 'nodes': [1, 2], 'value': float(r_ohm)},
+            {'id': 'C1', 'type': 'C', 'nodes': [2, 0], 'value': float(c_farad)},
+        ],
+    }
+
+
+def test_transient_rc_charge_matches_analytic():
+    """V_C(t) = Vsrc·(1 − e^{−t/RC}); шаг dt = τ/100 → ошибка Backward Euler мала."""
+    tau = 1000.0 * 1e-6  # 1 ms
+    r = solve_transient(_rc_charge(5.0, 1000.0, 1e-6), t_stop=5 * tau, dt=tau / 100)
+    # на каждой контрольной точке сверяем с аналитикой
+    for t_chk in (tau, 3 * tau, 5 * tau):
+        idx = min(range(len(r['time'])), key=lambda i: abs(r['time'][i] - t_chk))
+        sim = r['voltages'][2][idx]
+        ana = 5.0 * (1.0 - math.exp(-r['time'][idx] / tau))
+        assert abs(sim - ana) < 0.05, (t_chk, sim, ana)
+    # старт ≈ 0, финал → Vsrc
+    assert abs(r['voltages'][2][0]) < 1e-6
+    assert r['voltages'][2][-1] > 4.9
+
+
+def test_transient_rc_initial_condition():
+    """Начальное напряжение на конденсаторе через v_initial — старт не с нуля."""
+    tau = 1e-3
+    r = solve_transient(_rc_charge(5.0, 1000.0, 1e-6), t_stop=tau, dt=tau / 50, v_initial={2: 5.0})
+    # уже заряжен до Vsrc → ряд держится около 5В (ничего не происходит)
+    assert all(abs(v - 5.0) < 0.05 for v in r['voltages'][2])
+
+
+def test_transient_rl_inductor_becomes_short():
+    """RL: в установившемся режиме катушка = КЗ, узел над ней → 0В."""
+    ckt = {
+        'n_nodes': 3,
+        'elements': [
+            {'id': 'V1', 'type': 'V', 'nodes': [1, 0], 'value': 5.0},
+            {'id': 'R1', 'type': 'R', 'nodes': [1, 2], 'value': 100.0},
+            {'id': 'L1', 'type': 'L', 'nodes': [2, 0], 'value': 10e-3},
+        ],
+    }
+    tau = 10e-3 / 100.0  # L/R = 0.1 ms
+    r = solve_transient(ckt, t_stop=10 * tau, dt=tau / 50)
+    assert abs(r['voltages'][2][-1]) < 0.05  # узел над L → 0
+    assert r['voltages'][2][0] > 4.0  # в t=0 катушка держит ток 0 → почти весь V на ней
+
+
+def test_transient_caps_steps_within_bounds():
+    """Кол-во точек = t_stop/dt + 1, под safety-cap."""
+    r = solve_transient(_rc_charge(5.0, 1000.0, 1e-6), t_stop=1e-3, dt=1e-5)
+    assert r['steps'] == 101
+    assert r['dt'] == 1e-5
+
+
+def test_transient_degenerate_inputs():
+    """dt<=0 / t_stop<=0 / пустая схема → не падает, отдаёт тривиальный ряд."""
+    assert solve_transient({'n_nodes': 1, 'elements': []}, t_stop=1e-3, dt=1e-5)['steps'] == 1
+    assert solve_transient(_rc_charge(5.0, 1000.0, 1e-6), t_stop=0, dt=1e-5)['steps'] == 1

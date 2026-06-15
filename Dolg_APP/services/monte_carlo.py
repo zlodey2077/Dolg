@@ -376,6 +376,191 @@ def solve_dc(circuit: dict, *, caps_open: bool = True, inds_short: bool = True) 
     return {'voltages': voltages, 'currents': currents}
 
 
+# ─── Transient (TRAN) MNA solver — Backward Euler ────────────────────────
+# Companion-модели реактивных элементов по неявной схеме Backward Euler (A-устойчива):
+#   Конденсатор: i_C = C·dv/dt ≈ (C/h)·(v − v_prev) → Geq=C/h, ток-источник Geq·v_prev.
+#   Катушка:     v_L = L·di/dt ≈ (L/h)·(i − i_prev) → Geq=h/L, ток-источник i_prev.
+# Линейная версия (R/V/C/L). Диоды в транзиенте — отдельная итерация (нелинейный
+# Newton на каждом шаге); здесь сознательно линейная, чтобы покрыть RC/RL/RLC точно.
+TRAN_MAX_STEPS = 20000  # safety cap по числу временных точек
+
+
+def solve_transient(
+    circuit: dict,
+    *,
+    t_stop: float,
+    dt: float,
+    v_initial: dict | None = None,
+) -> dict:
+    """Переходный анализ через MNA + Backward Euler.
+
+    Returns {
+        'time':     [t0, t1, ...],            # секунды
+        'voltages': {node_idx: [v0, v1, ...]},# временной ряд по узлам
+        'steps':    int,
+        'dt':       float,
+    }
+    Линейные R/V/C/L. Начальные условия: узлы 0В (или v_initial), ток катушек 0.
+    """
+    node_count = circuit['n_nodes'] - 1
+    if node_count <= 0 or dt <= 0 or t_stop <= 0:
+        return {'time': [0.0], 'voltages': {0: [0.0]}, 'steps': 1, 'dt': dt}
+
+    elements = circuit['elements']
+    v_sources = [e for e in elements if e['type'] == 'V']
+    caps = [e for e in elements if e['type'] == 'C']
+    inds = [e for e in elements if e['type'] == 'L']
+    size = node_count + len(v_sources)
+
+    n_steps = min(int(math.ceil(t_stop / dt)) + 1, TRAN_MAX_STEPS)
+
+    # Состояние: напряжение на каждом конденсаторе и ток через каждую катушку.
+    v_cap = [0.0] * len(caps)
+    i_ind = [0.0] * len(inds)
+    # Начальные узловые напряжения (для v_cap из v_initial).
+    node_v = {i: 0.0 for i in range(node_count + 1)}
+    if v_initial:
+        for k, val in v_initial.items():
+            try:
+                node_v[int(k)] = float(val)
+            except TypeError, ValueError:
+                continue
+    for k, e in enumerate(caps):
+        n1, n2 = e['nodes']
+        v_cap[k] = node_v.get(n1, 0.0) - node_v.get(n2, 0.0)
+
+    def stamp_g(A, n1, n2, g):
+        if n1 > 0:
+            A[n1 - 1, n1 - 1] += g
+        if n2 > 0:
+            A[n2 - 1, n2 - 1] += g
+        if n1 > 0 and n2 > 0:
+            A[n1 - 1, n2 - 1] -= g
+            A[n2 - 1, n1 - 1] -= g
+
+    times: list[float] = []
+    series: dict[int, list[float]] = {i: [] for i in range(node_count + 1)}
+
+    def _record(t: float, node_now: dict) -> None:
+        times.append(t)
+        for i in range(node_count + 1):
+            series[i].append(node_now[i])
+
+    # Начальная рабочая точка (t=0): конденсаторы держат v_cap (источник напряжения),
+    # катушки держат i_ind (источник тока). Это истинные узловые потенциалы при t=0,
+    # отдельно от первого BE-шага (иначе первая точка была бы уже «после» шага).
+    op_size = size + len(caps)
+    A0 = np.zeros((op_size, op_size), dtype=np.float64)
+    b0 = np.zeros(op_size, dtype=np.float64)
+    for e in elements:
+        if e['type'] == 'R' and e['value'] > 0:
+            stamp_g(A0, e['nodes'][0], e['nodes'][1], 1.0 / e['value'])
+    for i in range(node_count):
+        A0[i, i] += GMIN
+    for kk, e in enumerate(v_sources):
+        row = node_count + kk
+        np_, nn = e['nodes']
+        if np_ > 0:
+            A0[np_ - 1, row] += 1
+            A0[row, np_ - 1] += 1
+        if nn > 0:
+            A0[nn - 1, row] -= 1
+            A0[row, nn - 1] -= 1
+        b0[row] = e['value']
+    for k, e in enumerate(caps):  # конденсатор как V-источник = v_cap[k]
+        row = size + k
+        n1, n2 = e['nodes']
+        if n1 > 0:
+            A0[n1 - 1, row] += 1
+            A0[row, n1 - 1] += 1
+        if n2 > 0:
+            A0[n2 - 1, row] -= 1
+            A0[row, n2 - 1] -= 1
+        b0[row] = v_cap[k]
+    for k, e in enumerate(inds):  # катушка как I-источник = i_ind[k] (n1→n2)
+        n1, n2 = e['nodes']
+        if n1 > 0:
+            b0[n1 - 1] -= i_ind[k]
+        if n2 > 0:
+            b0[n2 - 1] += i_ind[k]
+    try:
+        x0 = np.linalg.solve(A0, b0)
+        node0 = {0: 0.0}
+        for i in range(node_count):
+            node0[i + 1] = float(x0[i])
+        _record(0.0, node0)
+    except np.linalg.LinAlgError:
+        pass  # вырожденная начальная точка — пропускаем, первый BE-шаг стартует от IC
+
+    # Шаги BE: точки при t = dt, 2·dt, … (t=0 уже записан выше).
+    for step in range(1, n_steps):
+        t = step * dt
+        A = np.zeros((size, size), dtype=np.float64)
+        b = np.zeros(size, dtype=np.float64)
+
+        for e in elements:
+            if e['type'] == 'R' and e['value'] > 0:
+                stamp_g(A, e['nodes'][0], e['nodes'][1], 1.0 / e['value'])
+        for i in range(node_count):
+            A[i, i] += GMIN
+
+        # Конденсаторы: Geq=C/h, ток-источник Ieq=Geq·v_prev (по направлению n1→n2).
+        for k, e in enumerate(caps):
+            n1, n2 = e['nodes']
+            geq = float(e['value']) / dt
+            ieq = geq * v_cap[k]
+            stamp_g(A, n1, n2, geq)
+            if n1 > 0:
+                b[n1 - 1] += ieq
+            if n2 > 0:
+                b[n2 - 1] -= ieq
+
+        # Катушки: Geq=h/L, ток-источник Ieq=i_prev.
+        for k, e in enumerate(inds):
+            n1, n2 = e['nodes']
+            geq = dt / max(float(e['value']), 1e-12)
+            ieq = i_ind[k]
+            stamp_g(A, n1, n2, geq)
+            if n1 > 0:
+                b[n1 - 1] -= ieq
+            if n2 > 0:
+                b[n2 - 1] += ieq
+
+        for kk, e in enumerate(v_sources):
+            row = node_count + kk
+            np_, nn = e['nodes']
+            if np_ > 0:
+                A[np_ - 1, row] += 1
+                A[row, np_ - 1] += 1
+            if nn > 0:
+                A[nn - 1, row] -= 1
+                A[row, nn - 1] -= 1
+            b[row] = e['value']
+
+        try:
+            x = np.linalg.solve(A, b)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(f'Singular MNA matrix (transient t={t:g}): {exc}') from exc
+
+        node_now = {0: 0.0}
+        for i in range(node_count):
+            node_now[i + 1] = float(x[i])
+
+        _record(t, node_now)
+
+        # Обновляем состояние реактивных элементов для следующего шага.
+        for k, e in enumerate(caps):
+            n1, n2 = e['nodes']
+            v_cap[k] = node_now.get(n1, 0.0) - node_now.get(n2, 0.0)
+        for k, e in enumerate(inds):
+            n1, n2 = e['nodes']
+            geq = dt / max(float(e['value']), 1e-12)
+            v_l = node_now.get(n1, 0.0) - node_now.get(n2, 0.0)
+            i_ind[k] = i_ind[k] + geq * v_l
+
+    return {'time': times, 'voltages': series, 'steps': len(times), 'dt': dt}
+
+
 # ─── Tolerance resolution (per-element) ──────────────────────────────────
 def _resolve_tolerances(
     elements: list[dict],
