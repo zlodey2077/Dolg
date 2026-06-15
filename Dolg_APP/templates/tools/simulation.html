@@ -2698,11 +2698,12 @@ body.sim-sticky-add .sticky-add-toggle {
     min-height: 0;
     min-width: 0;
     background: linear-gradient(135deg, rgba(10, 20, 50, 0.95), rgba(15, 25, 60, 0.95));
-    border: 3px solid var(--accent-cyan);
+    /* Рамка области рисования заметнее (3px → 5px) — чётче выделяет рабочее поле. */
+    border: 5px solid var(--accent-cyan);
     border-radius: 12px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 0 30px rgba(0, 212, 255, 0.3), inset 0 0 20px rgba(0, 212, 255, 0.05);
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.4), inset 0 0 20px rgba(0, 212, 255, 0.05);
 }
 
 #schematicCanvas {
@@ -7682,9 +7683,9 @@ function drawCanvas() {
         const w = Math.abs(selectionBox.x2 - selectionBox.x1);
         const h = Math.abs(selectionBox.y2 - selectionBox.y1);
         ctx.save();
-        ctx.strokeStyle = 'rgba(0, 212, 255, 0.9)';
+        ctx.strokeStyle = 'rgba(0, 212, 255, 0.95)';
         ctx.fillStyle = 'rgba(0, 212, 255, 0.1)';
-        ctx.lineWidth = 1.5 / zoom;
+        ctx.lineWidth = 2.5 / zoom;
         ctx.setLineDash([8 / zoom, 4 / zoom]);
         ctx.fillRect(x1, y1, w, h);
         ctx.strokeRect(x1, y1, w, h);
