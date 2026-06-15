@@ -143,6 +143,20 @@ class SectionsForIntentTests(SimpleTestCase):
         keys = {a['key'] for a in ai_algorithms.available_algorithms('why_failed')}
         self.assertIn('pcb_drc', keys)
 
+    def test_ac_sweep_in_manifest(self):
+        keys = {a['key'] for a in ai_algorithms.available_algorithms('formula')}
+        self.assertIn('ac_sweep', keys)
+
+    def test_ac_sweep_lines_reports_filter_type(self):
+        # RC-цепь → AC-развёртка выдаёт тип отклика и источник.
+        lines = ai_toolkit.ac_sweep_lines(_rc_charging('1k', '159n'))
+        joined = ' '.join(lines)
+        self.assertIn('тип отклика', joined)
+        self.assertTrue(any('AC-развёртка' in ln for ln in lines))
+
+    def test_ac_sweep_empty_without_reactive(self):
+        self.assertEqual(ai_toolkit.ac_sweep_lines(_divider()), [])
+
     def test_pcb_drc_lines_graceful_without_traces(self):
         # На схеме без разведённых трасс функция не падает (возвращает список).
         self.assertIsInstance(ai_toolkit.pcb_drc_lines(_divider()), list)

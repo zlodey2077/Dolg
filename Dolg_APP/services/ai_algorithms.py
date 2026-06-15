@@ -78,6 +78,12 @@ ALGORITHMS: list[Algorithm] = [
         lambda scheme, topology: ai_toolkit.transient_lines(scheme),
     ),
     Algorithm(
+        'ac_sweep',
+        'Частотный отклик (AC-развёртка, Bode)',
+        frozenset({'formula', 'measurement'}),
+        lambda scheme, topology: ai_toolkit.ac_sweep_lines(scheme),
+    ),
+    Algorithm(
         'pcb_drc',
         'DRC платы (IPC-2221)',
         frozenset({'why_failed', 'overview', 'scheme_overview'}),

@@ -8,10 +8,12 @@ import pytest
 
 from Dolg_APP.services.monte_carlo import (
     MAX_ITERATIONS,
+    run_ac_sweep,
     run_monte_carlo,
     run_tolerance_analysis,
     run_worst_case,
     scheme_to_circuit,
+    solve_ac,
     solve_dc,
     solve_transient,
 )
@@ -40,6 +42,53 @@ def test_scheme_to_circuit_basic():
     types = [e['type'] for e in c['elements']]
     assert 'V' in types
     assert types.count('R') == 2
+
+
+def _rc_lowpass_circuit(r=1000.0, c=159e-9):
+    """V1 1В → R → C → GND. node 2 = выход. fc = 1/(2πRC)."""
+    return {
+        'n_nodes': 3,
+        'elements': [
+            {'id': 'V1', 'type': 'V', 'nodes': [1, 0], 'value': 1.0},
+            {'id': 'R1', 'type': 'R', 'nodes': [1, 2], 'value': r},
+            {'id': 'C1', 'type': 'C', 'nodes': [2, 0], 'value': c},
+        ],
+    }
+
+
+def test_ac_solve_minus_3db_at_cutoff():
+    """RC low-pass: |H| на fc = 1/√2 ≈ 0.707 (−3 дБ)."""
+    fc = 1.0 / (2 * math.pi * 1000.0 * 159e-9)
+    ac = solve_ac(_rc_lowpass_circuit(), [fc])
+    assert abs(ac['nodes'][2]['mag'][0] - 0.7071) < 0.01
+
+
+def test_ac_sweep_detects_lowpass_and_cutoff():
+    sch = {
+        'components': [
+            {'id': 'B1', 'type': 'battery', 'voltage': 1, 'ports': [{'id': '+'}, {'id': '-'}]},
+            {'id': 'R1', 'type': 'resistor', 'resistance': 1000, 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'C1', 'type': 'capacitor', 'capacitance': 159e-9, 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'G1', 'type': 'ground', 'ports': [{'id': '1'}]},
+        ],
+        'connections': [
+            {'from': {'compId': 'B1', 'portId': '+'}, 'to': {'compId': 'R1', 'portId': '1'}},
+            {'from': {'compId': 'R1', 'portId': '2'}, 'to': {'compId': 'C1', 'portId': '1'}},
+            {'from': {'compId': 'C1', 'portId': '2'}, 'to': {'compId': 'B1', 'portId': '-'}},
+            {'from': {'compId': 'B1', 'portId': '-'}, 'to': {'compId': 'G1', 'portId': '1'}},
+        ],
+    }
+    r = run_ac_sweep(sch, f_start=10, f_stop=1e6, points=120)
+    assert r['ok'] is True
+    assert r['kind'] == 'low_pass'
+    # частота среза в разумной близости к 1 кГц (лог-сетка → ±25%)
+    assert 700 < r['f_3db_hz'] < 1400
+
+
+def test_ac_sweep_rejects_resistive_only():
+    # Чисто резистивный делитель → нет C/L → AC-развёртка не запускается.
+    res = run_ac_sweep(_voltage_divider())
+    assert res['ok'] is False
 
 
 def test_scheme_to_circuit_parses_engineering_strings():

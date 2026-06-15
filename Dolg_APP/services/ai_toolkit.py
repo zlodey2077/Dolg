@@ -453,3 +453,28 @@ def transient_lines(scheme_data: dict | None) -> list[str]:
         f'установление 95% за ≈ {_time_to(0.95) * 1000:.3g} мс',
         'источник: транзиент Backward Euler (MNA solve_transient)',
     ]
+
+
+def ac_sweep_lines(scheme_data: dict | None) -> list[str]:
+    """Частотный отклик (AC-развёртка): если есть C/L, прогоняем комплексный MNA
+    по лог-сетке частот и сообщаем тип фильтра + частоту среза −3 дБ. Числа из
+    движка solve_ac, не из формул."""
+    try:
+        from .monte_carlo import run_ac_sweep
+
+        report = run_ac_sweep(scheme_data or {})
+    except Exception:
+        return []
+    if not report.get('ok'):
+        return []
+    kind_ru = {
+        'low_pass': 'ФНЧ (low-pass)',
+        'high_pass': 'ФВЧ (high-pass)',
+        'band': 'полосовой',
+        'unknown': '—',
+    }
+    lines = [f'тип отклика: {kind_ru.get(report.get("kind"), "—")}']
+    if report.get('f_3db_hz'):
+        lines.append(f'частота среза −3 дБ ≈ {report["f_3db_hz"]:,.0f} Гц')
+    lines.append('источник: AC-развёртка (комплексный MNA solve_ac)')
+    return lines

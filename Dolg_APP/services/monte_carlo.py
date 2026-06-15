@@ -582,6 +582,144 @@ def solve_transient(
     return {'time': times, 'voltages': series, 'steps': len(times), 'dt': dt}
 
 
+# ─── AC sweep (частотный отклик / Bode) — комплексный MNA ────────────────
+AC_MAX_POINTS = 2000  # safety cap по числу частотных точек
+
+
+def solve_ac(circuit: dict, freqs) -> dict:
+    """Частотный отклик линейной цепи: для каждой f строим КОМПЛЕКСНЫЙ MNA
+    (R→G, C→jωC, L→1/(jωL)) и решаем. V-источники — AC-возбуждение с амплитудой
+    `value` (1В источник даёт передаточную функцию). Возвращает мод/фазу по узлам.
+
+    Линейная (диоды/нелинейность не учитываются — для AC нужна рабочая точка,
+    как и в transient). Returns {'freqs', 'nodes': {n: {'mag':[...],'phase_deg':[...]}}}.
+    """
+    node_count = circuit['n_nodes'] - 1
+    if node_count <= 0:
+        return {'freqs': [], 'nodes': {}}
+    elements = circuit['elements']
+    v_sources = [e for e in elements if e['type'] == 'V']
+    size = node_count + len(v_sources)
+    nodes_out: dict[int, dict] = {i: {'mag': [], 'phase_deg': []} for i in range(node_count + 1)}
+    freq_list = [float(f) for f in freqs if float(f) > 0][:AC_MAX_POINTS]
+
+    def stamp_y(mat, n1: int, n2: int, y: complex) -> None:
+        if n1 > 0:
+            mat[n1 - 1, n1 - 1] += y
+        if n2 > 0:
+            mat[n2 - 1, n2 - 1] += y
+        if n1 > 0 and n2 > 0:
+            mat[n1 - 1, n2 - 1] -= y
+            mat[n2 - 1, n1 - 1] -= y
+
+    for f in freq_list:
+        w = 2.0 * math.pi * f
+        A = np.zeros((size, size), dtype=np.complex128)
+        b = np.zeros(size, dtype=np.complex128)
+
+        for e in elements:
+            n1, n2 = e['nodes']
+            if e['type'] == 'R' and e['value'] > 0:
+                stamp_y(A, n1, n2, 1.0 / e['value'])
+            elif e['type'] == 'C':
+                stamp_y(A, n1, n2, 1j * w * float(e['value']))
+            elif e['type'] == 'L' and float(e['value']) > 0:
+                stamp_y(A, n1, n2, 1.0 / (1j * w * float(e['value'])))
+        for i in range(node_count):
+            A[i, i] += GMIN
+
+        for k, e in enumerate(v_sources):
+            row = node_count + k
+            np_, nn = e['nodes']
+            if np_ > 0:
+                A[np_ - 1, row] += 1
+                A[row, np_ - 1] += 1
+            if nn > 0:
+                A[nn - 1, row] -= 1
+                A[row, nn - 1] -= 1
+            b[row] = float(e['value'])
+
+        try:
+            x = np.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            for i in range(node_count + 1):
+                nodes_out[i]['mag'].append(float('nan'))
+                nodes_out[i]['phase_deg'].append(float('nan'))
+            continue
+
+        nodes_out[0]['mag'].append(0.0)
+        nodes_out[0]['phase_deg'].append(0.0)
+        for i in range(node_count):
+            v = complex(x[i])
+            nodes_out[i + 1]['mag'].append(abs(v))
+            nodes_out[i + 1]['phase_deg'].append(math.degrees(math.atan2(v.imag, v.real)))
+
+    return {'freqs': freq_list, 'nodes': nodes_out}
+
+
+def run_ac_sweep(
+    scheme_data: dict,
+    *,
+    f_start: float = 1.0,
+    f_stop: float = 1e6,
+    points: int = 60,
+) -> dict:
+    """AC-развёртка по схеме (лог-шкала частот). Находит выходной узел (макс.
+    размах амплитуды) и его −3 дБ относительно низкочастотного/пикового уровня.
+
+    Returns {'freqs', 'nodes', 'output_node', 'f_3db_hz', 'kind'} либо {'ok': False}.
+    """
+    circuit = scheme_to_circuit(scheme_data or {})
+    elements = circuit.get('elements') or []
+    has_reactive = any(e['type'] in ('C', 'L') for e in elements)
+    if circuit['n_nodes'] <= 1 or not has_reactive or not any(e['type'] == 'V' for e in elements):
+        return {'ok': False, 'reason': 'no_ac_network'}
+    points = max(4, min(int(points), AC_MAX_POINTS))
+    ratio = (f_stop / f_start) ** (1.0 / (points - 1))
+    freqs = [f_start * ratio**i for i in range(points)]
+    ac = solve_ac(circuit, freqs)
+    nodes = ac['nodes']
+    # Выходной узел: с наибольшим размахом амплитуды (исключая ground).
+    out_node, best_span = None, -1.0
+    for n, data in nodes.items():
+        if n == 0 or not data['mag']:
+            continue
+        span = max(data['mag']) - min(data['mag'])
+        if span > best_span:
+            out_node, best_span = n, span
+    f_3db = None
+    kind = 'unknown'
+    if out_node is not None:
+        mag = nodes[out_node]['mag']
+        ref = mag[0]  # уровень на низкой частоте
+        peak = max(mag)
+        # low-pass: спад от НЧ-уровня; high-pass: рост к ВЧ.
+        if ref >= peak * 0.99:  # НЧ ≈ пик → low-pass
+            kind = 'low_pass'
+            thr = ref / math.sqrt(2)
+            for fr, m in zip(ac['freqs'], mag):
+                if m <= thr:
+                    f_3db = fr
+                    break
+        elif mag[-1] >= peak * 0.99:  # ВЧ ≈ пик → high-pass
+            kind = 'high_pass'
+            thr = mag[-1] / math.sqrt(2)
+            for fr, m in zip(ac['freqs'], mag):
+                if m >= thr:
+                    f_3db = fr
+                    break
+        else:
+            kind = 'band'
+    return {
+        'ok': True,
+        'freqs': ac['freqs'],
+        'nodes': nodes,
+        'output_node': out_node,
+        'f_3db_hz': f_3db,
+        'kind': kind,
+    }
+
+
 # ─── Tolerance resolution (per-element) ──────────────────────────────────
 def _resolve_tolerances(
     elements: list[dict],
