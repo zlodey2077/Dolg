@@ -42,6 +42,23 @@ def test_scheme_to_circuit_basic():
     assert types.count('R') == 2
 
 
+def test_scheme_to_circuit_parses_engineering_strings():
+    """Номиналы строками ('1k'/'1u'/'5V') парсятся, не роняют MNA (раньше float('1k')→crash)."""
+    scheme = {
+        'components': [
+            {'id': 'B1', 'type': 'battery', 'voltage': '5V', 'ports': [{'id': '+'}, {'id': '-'}]},
+            {'id': 'R1', 'type': 'resistor', 'resistance': '1k', 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'C1', 'type': 'capacitor', 'capacitance': '1u', 'ports': [{'id': '1'}, {'id': '2'}]},
+        ],
+        'connections': [],
+    }
+    circuit = scheme_to_circuit(scheme)
+    by_type = {e['type']: e['value'] for e in circuit['elements']}
+    assert abs(by_type['R'] - 1000.0) < 1e-6
+    assert abs(by_type['C'] - 1e-6) < 1e-12
+    assert abs(by_type['V'] - 5.0) < 1e-6
+
+
 def test_dc_solver_matches_theory_voltage_divider():
     """V_R2 = 9V × 2k/(1k+2k) = 6V; current = 9V/3k = 3mA."""
     c = scheme_to_circuit(_voltage_divider())

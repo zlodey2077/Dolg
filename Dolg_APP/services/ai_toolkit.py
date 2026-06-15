@@ -370,3 +370,86 @@ def tolerance_lines(scheme_data: dict | None, *, tolerance: float = 0.05) -> lis
         lines.append(f'вердикт: {verdict}')
     lines.append(f'источник: NumPy Monte Carlo + worst-case (±{int(tolerance * 100)}%)')
     return lines
+
+
+def pcb_drc_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
+    """DRC разведённой платы (IPC-2221): из scheme_data строим layout и проверяем
+    ширину дорожек, зазоры между нетами и отступ от края. Compute-don't-guess —
+    findings из движка pcb_drc с rule_id/рекомендацией."""
+    try:
+        from ..pcb_layout import compute_pcb_layout
+        from .pcb_drc import run_pcb_drc
+
+        layout = compute_pcb_layout(scheme_data or {})
+        if not layout.get('traces'):
+            return []
+        report = run_pcb_drc(layout)
+    except Exception:
+        return []
+    summary = report.get('summary') or {}
+    findings = report.get('findings') or []
+    if not findings:
+        return [
+            f'PCB DRC: нарушений нет ({summary.get("checked_traces", 0)} трасс проверено)',
+            'источник: IPC-2221 (ширина/зазор/край)',
+        ]
+    sev = {'error': 'ошибка', 'warning': 'предупр.', 'info': 'инфо'}
+    lines = [f'[{sev.get(f.get("severity"), "инфо")}] {f.get("message")}' for f in findings[:limit]]
+    lines.append(f'итог: {summary.get("errors", 0)} ошибок, {summary.get("warnings", 0)} предупр.')
+    lines.append('источник: IPC-2221 (current capacity / conductor spacing)')
+    return lines
+
+
+def transient_lines(scheme_data: dict | None) -> list[str]:
+    """Переходный процесс: если в схеме есть C/L, прогоняем solve_transient и
+    сообщаем эмпирическую постоянную времени (до 63% установившегося) и время
+    установления (95%). Compute-don't-guess — числа из движка, не из формул."""
+    try:
+        import statistics
+
+        from .monte_carlo import scheme_to_circuit, solve_transient
+
+        circuit = scheme_to_circuit(scheme_data or {})
+        elements = circuit.get('elements') or []
+        caps = [e for e in elements if e['type'] == 'C']
+        inds = [e for e in elements if e['type'] == 'L']
+        if not caps and not inds:
+            return []
+        res = [e['value'] for e in elements if e['type'] == 'R' and e['value'] > 0]
+        r_typ = statistics.median(res) if res else 1000.0
+        if caps:
+            tau_guess = max(e['value'] for e in caps) * r_typ
+        else:
+            tau_guess = max(e['value'] for e in inds) / max(r_typ, 1e-9)
+        tau_guess = min(max(tau_guess, 1e-9), 100.0)
+        tr = solve_transient(circuit, t_stop=8 * tau_guess, dt=tau_guess / 50)
+    except Exception:
+        return []
+    times = tr.get('time') or []
+    series = tr.get('voltages') or {}
+    if len(times) < 3:
+        return []
+    best_node, best_swing, best = None, -1.0, None
+    for node, vals in series.items():
+        if node == 0 or not vals:
+            continue
+        swing = max(vals) - min(vals)
+        if swing > best_swing:
+            best_node, best_swing, best = node, swing, vals
+    if best is None or best_swing < 1e-6:
+        return []
+    start, final = best[0], best[-1]
+
+    def _time_to(frac: float) -> float:
+        target = start + frac * (final - start)
+        for t, v in zip(times, best):
+            if (final >= start and v >= target) or (final < start and v <= target):
+                return t
+        return times[-1]
+
+    return [
+        f'узел {best_node}: {start:.2f} → {final:.2f} В (переходный процесс)',
+        f'постоянная времени τ ≈ {_time_to(0.632) * 1000:.3g} мс (63%)',
+        f'установление 95% за ≈ {_time_to(0.95) * 1000:.3g} мс',
+        'источник: транзиент Backward Euler (MNA solve_transient)',
+    ]

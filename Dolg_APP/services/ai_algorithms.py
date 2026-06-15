@@ -72,6 +72,18 @@ ALGORITHMS: list[Algorithm] = [
         lambda scheme, topology: ai_toolkit.regulator_lines(scheme),
     ),
     Algorithm(
+        'transient',
+        'Переходный процесс (TRAN, MNA)',
+        frozenset({'measurement', 'formula', 'overview'}),
+        lambda scheme, topology: ai_toolkit.transient_lines(scheme),
+    ),
+    Algorithm(
+        'pcb_drc',
+        'DRC платы (IPC-2221)',
+        frozenset({'why_failed', 'overview', 'scheme_overview'}),
+        lambda scheme, topology: ai_toolkit.pcb_drc_lines(scheme),
+    ),
+    Algorithm(
         'tiny_ai',
         'Нейроподсказка (tiny-AI)',
         frozenset({'overview', 'scheme_overview', 'recommend'}),

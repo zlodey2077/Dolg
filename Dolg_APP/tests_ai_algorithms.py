@@ -28,6 +28,24 @@ def _rc():
     }
 
 
+def _rc_charging(r='1k', c='1u'):
+    """Заряд RC: 5В → R → C → GND. τ = RC. Номиналы строками (как в редакторе)."""
+    return {
+        'components': [
+            {'id': 'B1', 'type': 'battery', 'voltage': '5V', 'ports': [{'id': '+'}, {'id': '-'}]},
+            {'id': 'R1', 'type': 'resistor', 'resistance': r, 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'C1', 'type': 'capacitor', 'capacitance': c, 'ports': [{'id': '1'}, {'id': '2'}]},
+            {'id': 'G1', 'type': 'ground', 'ports': [{'id': '1'}]},
+        ],
+        'connections': [
+            {'from': {'compId': 'B1', 'portId': '+'}, 'to': {'compId': 'R1', 'portId': '1'}},
+            {'from': {'compId': 'R1', 'portId': '2'}, 'to': {'compId': 'C1', 'portId': '1'}},
+            {'from': {'compId': 'C1', 'portId': '2'}, 'to': {'compId': 'B1', 'portId': '-'}},
+            {'from': {'compId': 'B1', 'portId': '-'}, 'to': {'compId': 'G1', 'portId': '1'}},
+        ],
+    }
+
+
 class SectionsForIntentTests(SimpleTestCase):
     def test_measurement_has_dc_section(self):
         sections = ai_algorithms.sections_for_intent('measurement', _divider())
@@ -104,6 +122,30 @@ class SectionsForIntentTests(SimpleTestCase):
     def test_thermal_tj_in_manifest(self):
         keys = {a['key'] for a in ai_algorithms.available_algorithms('thermal')}
         self.assertIn('thermal_tj', keys)
+
+    def test_transient_lines_reports_time_constant(self):
+        # RC 1k×1µF → τ ≈ 1 мс; функция строит непустой ответ с τ и источником.
+        lines = ai_toolkit.transient_lines(_rc_charging('1k', '1u'))
+        joined = ' '.join(lines)
+        self.assertIn('τ', joined)
+        self.assertIn('мс', joined)
+        self.assertTrue(any('Backward Euler' in ln for ln in lines))
+
+    def test_transient_empty_without_reactive(self):
+        # Чисто резистивный делитель → нет C/L → транзиент молчит.
+        self.assertEqual(ai_toolkit.transient_lines(_divider()), [])
+
+    def test_transient_in_manifest(self):
+        keys = {a['key'] for a in ai_algorithms.available_algorithms('measurement')}
+        self.assertIn('transient', keys)
+
+    def test_pcb_drc_in_manifest(self):
+        keys = {a['key'] for a in ai_algorithms.available_algorithms('why_failed')}
+        self.assertIn('pcb_drc', keys)
+
+    def test_pcb_drc_lines_graceful_without_traces(self):
+        # На схеме без разведённых трасс функция не падает (возвращает список).
+        self.assertIsInstance(ai_toolkit.pcb_drc_lines(_divider()), list)
 
     def test_sections_for_plan_dedup(self):
         # dc_voltages есть и в measurement, и в overview — в плане не дублируется

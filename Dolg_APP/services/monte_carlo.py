@@ -62,6 +62,27 @@ SIGMA_MULTIPLIER = 3.0
 WORST_CASE_MAX_COMPONENTS = 13  # 2^13 = 8192 прогонов
 
 
+def _num(value, default: float) -> float:
+    """Парс номинала в float, устойчивый к инженерным строкам ('1k'→1000,
+    '1u'→1e-6, '100n'→1e-7). Реальные схемы хранят номиналы строками, а голый
+    float('1k') падал и ронял весь MNA (DC/power/транзиент/толеранс)."""
+    if value is None or value == '':
+        return float(default)
+    try:
+        return float(value)
+    except TypeError, ValueError:
+        pass
+    try:
+        from .engineering_units import parse_engineering_number
+
+        parsed = parse_engineering_number(value, default=None)
+        if parsed is not None:
+            return float(parsed)
+    except Exception:
+        pass
+    return float(default)
+
+
 def _component_tolerance(component: dict) -> float | None:
     """Относительный допуск компонента (0.05 = ±5%) из scheme. None — если не
     задан (тогда берётся глобальный). Поле `tolerance_percent` — это проценты
@@ -184,7 +205,7 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
         n2 = node_of(cid, ports[1].get('id') or '2') if len(ports) > 1 else 0
 
         if ctype == 'resistor':
-            value = float(c.get('resistance') or c.get('value') or 1000)
+            value = _num(c.get('resistance') or c.get('value'), 1000)
             elements.append(
                 {
                     'id': cid,
@@ -202,7 +223,7 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
                     'id': cid,
                     'type': 'C',
                     'nodes': [n1, n2],
-                    'value': float(c.get('capacitance') or 1e-6),
+                    'value': _num(c.get('capacitance'), 1e-6),
                     'label': f'C{cid}',
                     'tolerable': False,
                 }
@@ -213,13 +234,13 @@ def scheme_to_circuit(scheme_data: dict) -> dict:
                     'id': cid,
                     'type': 'L',
                     'nodes': [n1, n2],
-                    'value': float(c.get('inductance') or 1e-3),
+                    'value': _num(c.get('inductance'), 1e-3),
                     'label': f'L{cid}',
                     'tolerable': False,
                 }
             )
         elif ctype == 'battery':
-            value = float(c.get('voltage') or 9.0)
+            value = _num(c.get('voltage'), 9.0)
             elements.append(
                 {
                     'id': cid,
