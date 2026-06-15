@@ -2866,8 +2866,11 @@ function onMouseDown(e) {
             else if (!isObjSelected(hit)) setCadSelection(groupMembersOf(hit));
             else State.selectedObj = hit;
             State.draggingObj = true;
-            State.dragLastX = wRaw.x;
-            State.dragLastY = wRaw.y;
+            // Привязка действует и при перетаскивании: опорная точка тоже снапится,
+            // чтобы объект шагал по сетке/объектам (applySnap — no-op для none/ortho/polar).
+            const dragStart = applySnap(wRaw.x, wRaw.y);
+            State.dragLastX = dragStart.x;
+            State.dragLastY = dragStart.y;
             State.dragMoved = false;
             State.canvas.style.cursor = 'move';
         } else {
@@ -2922,18 +2925,20 @@ function onMouseMove(e) {
         return;
     }
     if (State.draggingObj && selectionObjects().length) {
-        const dx = wRaw.x - State.dragLastX;
-        const dy = wRaw.y - State.dragLastY;
+        // Снапим целевую позицию курсора → объект подтягивается к сетке/объектам.
+        const target = applySnap(wRaw.x, wRaw.y);
+        const dx = target.x - State.dragLastX;
+        const dy = target.y - State.dragLastY;
         if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
             selectionObjects().forEach(obj => translateObject(obj, dx, dy));
-            State.dragLastX = wRaw.x;
-            State.dragLastY = wRaw.y;
+            State.dragLastX = target.x;
+            State.dragLastY = target.y;
             State.dragMoved = true;
             State.netAnalysis = null;
             State.bom = [];
             render();
         }
-        document.getElementById('coordsDisplay').textContent = `X: ${Math.round(wRaw.x)}, Y: ${Math.round(wRaw.y)}`;
+        document.getElementById('coordsDisplay').textContent = `X: ${Math.round(target.x)}, Y: ${Math.round(target.y)}`;
         return;
     }
     const wireAnchor = State.tool === 'line' && State.smartWireEnabled ? resolveSmartWireAnchor(wRaw.x, wRaw.y) : null;
