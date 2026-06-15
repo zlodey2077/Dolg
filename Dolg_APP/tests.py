@@ -653,6 +653,58 @@ class EngineeringReviewTests(TestCase):
         self.assertEqual(data['measurement']['status'], 'ok')
         self.assertEqual(ProjectMeasurement.objects.filter(project=self.project).count(), 1)
 
+    def test_generate_protocol_returns_markdown_with_sections(self):
+        response = self.client.post(
+            reverse('hello:api_generate_protocol'),
+            data=json.dumps(
+                {
+                    'title': 'Протокол LED',
+                    'scheme_data': self.scheme,
+                    'lab_calcs': [
+                        {
+                            'ok': True,
+                            'title': 'Запас по нагрузке (derating)',
+                            'status_label': 'риск',
+                            'outputs': {
+                                'load_percent': {
+                                    'label': 'Загрузка',
+                                    'value': 72,
+                                    'unit': '%',
+                                    'display': '72',
+                                }
+                            },
+                        }
+                    ],
+                    'findings': [
+                        {
+                            'rule_id': 'pcb.x',
+                            'severity': 'error',
+                            'message': 'тест-ошибка',
+                            'recommendation': 'починить',
+                        }
+                    ],
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        self.assertIn('# Протокол LED', data['markdown'])
+        self.assertIn('Состав схемы', data['sections'])
+        self.assertIn('Инженерные расчёты', data['sections'])
+        self.assertIn('тест-ошибка', data['markdown'])
+
+    def test_generate_protocol_download_returns_markdown_file(self):
+        response = self.client.post(
+            reverse('hello:api_generate_protocol'),
+            data=json.dumps({'title': 'Скачать', 'scheme_data': self.scheme, 'download': True}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('text/markdown', response['Content-Type'])
+        self.assertIn('attachment', response['Content-Disposition'])
+
     def test_cad_import_preview_parses_spice_subset(self):
         source = 'V1 in 0 DC 9\nR1 in out 1k\nR2 out 0 2k\n.ac dec 10 1 1k'
         result = import_preview('ltspice', source)

@@ -136,6 +136,8 @@ urlpatterns = [
     path('api/ai/context/', views.api_ai_context, name='api_ai_context'),
     # Engineering Review V2: in-memory scheme → JSON-отчёт (no project save).
     path('api/sim/engineering_review/', views.api_engineering_review, name='api_engineering_review'),
+    # Авто-протокол (Markdown): инженерный отчёт / протокол лабораторной работы.
+    path('api/sim/protocol/', views.api_generate_protocol, name='api_generate_protocol'),
     # Block B1: schema → CircuitPython code.py для прошивки микроконтроллеров.
     path('api/sim/export/circuit_python/', views.api_export_circuit_python, name='api_export_circuit_python'),
     # Block D2: server-side Monte Carlo DC analysis (numpy MNA, 1000+ iter/sec).

@@ -2233,8 +2233,14 @@ def api_cad_scheme_operations_preview(request):
         atomic=bool(data.get('atomic')),
     )
     scheme_data = result.get('scheme_data') or {}
-    layout_profile = data.get('layout_profile') or data.get('standard_profile') or (
-        (scheme_data.get('metadata') or {}).get('standard_profile') if isinstance(scheme_data, dict) else None
+    layout_profile = (
+        data.get('layout_profile')
+        or data.get('standard_profile')
+        or (
+            (scheme_data.get('metadata') or {}).get('standard_profile')
+            if isinstance(scheme_data, dict)
+            else None
+        )
     )
     drc = _validate_scheme_data(scheme_data)
     layout_quality = {}
@@ -2742,6 +2748,42 @@ def api_engineering_review(request):
             'risk_count': review.get('risk_count', 0),
         }
     )
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_generate_protocol(request):
+    """Авто-протокол (Markdown): инженерный отчёт проекта ИЛИ лабораторной работы.
+
+    POST: {scheme_data?, measurements?, lab_calcs?, findings?, title?, author?,
+           include_dc?, download?}. Один генератор для симулятора и инженерной
+           лаборатории (см. services/protocol_generator). `download:true` отдаёт
+           .md файлом, иначе JSON {ok, markdown, sections}.
+    """
+    from .services.protocol_generator import build_protocol
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError, ValueError:
+        return _json_error('Invalid JSON')
+
+    scheme_data = data.get('scheme_data') if isinstance(data.get('scheme_data'), dict) else None
+    result = build_protocol(
+        title=str(data.get('title') or 'Протокол проектирования')[:200],
+        scheme_data=scheme_data,
+        include_dc=bool(data.get('include_dc', True)),
+        measurements=data.get('measurements') if isinstance(data.get('measurements'), list) else None,
+        lab_calcs=data.get('lab_calcs') if isinstance(data.get('lab_calcs'), list) else None,
+        findings=data.get('findings') if isinstance(data.get('findings'), list) else None,
+        notes=data.get('notes'),
+        author=getattr(request.user, 'username', None),
+    )
+
+    if data.get('download'):
+        response = HttpResponse(result['markdown'], content_type='text/markdown; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="protocol.md"'
+        return response
+    return JsonResponse({'ok': True, 'markdown': result['markdown'], 'sections': result['sections']})
 
 
 @login_required(login_url='accounts:login')
