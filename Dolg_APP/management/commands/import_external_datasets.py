@@ -303,7 +303,9 @@ class Command(BaseCommand):
                     'Получить токен: https://huggingface.co/settings/tokens, добавить в .env как HF_TOKEN=hf_...'
                 )
             )
-        from Dolg_APP.services.cad_import import import_kicad_sexpr
+        # Датасет смешанный: KiCad sexpr + EAGLE XML вперемешку. Авто-диспетчер
+        # сам выбирает парсер по содержимому строки.
+        from Dolg_APP.services.cad_import import import_schematic_auto as import_kicad_sexpr
 
         # Авто-детект ключа со схемой: пробуем несколько типичных имён.
         TEXT_KEYS = ('schematic', 'kicad_sch', 'sch', 'content', 'text', 'data', 'kicad', 'source')

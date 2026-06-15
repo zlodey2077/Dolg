@@ -327,6 +327,98 @@ def import_kicad_sexpr(source):
     }
 
 
+def _eagle_part_type(name: str, deviceset: str) -> str | None:
+    """Тип компонента EAGLE по имени/deviceset. None — служебный объект (рамка,
+    лого, метка), который не считаем компонентом."""
+    ds = (deviceset or '').upper()
+    nm = (name or '').upper()
+    if ds.startswith(('FRAME', 'LOGO', 'DOCFIELD')) or 'FRAME' in ds:
+        return None
+    # Символы питания/земли EAGLE: deviceset GND/+5V/VCC/+3V3 → якорь земли.
+    if ds in {'GND', 'GND1', '0', 'AGND', 'DGND'} or ds.startswith(('+', 'VCC', 'VDD', 'VSS', 'VEE')):
+        return 'ground'
+    if nm.startswith('GND'):
+        return 'ground'
+    if ds.startswith('LED'):
+        return 'led'
+    # Пассивы по префиксу deviceset (R-EU_0207, C-EU, L-...), затем — по имени.
+    prefix_map = {'R': 'resistor', 'C': 'capacitor', 'L': 'inductor', 'D': 'diode', 'Q': 'transistor'}
+    if ds[:1] in prefix_map and not ds.startswith(('RELAY', 'CONN', 'CRYSTAL')):
+        return prefix_map[ds[:1]]
+    ctype = _spice_component_type(name)  # эвристика по первой букве имени (R1→resistor)
+    return ctype
+
+
+_EAGLE_PART_RE = re.compile(r'<part\b([^>]*?)/?>', re.I)
+_EAGLE_NET_RE = re.compile(r'<net\b([^>]*?)>(.*?)</net>', re.I | re.S)
+_EAGLE_PINREF_RE = re.compile(r'<pinref\b([^>]*?)/?>', re.I)
+_XML_ATTR_RE = re.compile(r'([\w:]+)\s*=\s*"([^"]*)"')
+
+
+def _xml_attrs(blob: str) -> dict:
+    return dict(_XML_ATTR_RE.findall(blob))
+
+
+def import_eagle_xml(source):
+    """Импорт схемы EAGLE (.sch — XML `<eagle><drawing><schematic>`).
+
+    Датасет open-schematics смешанный: часть шардов — KiCad sexpr, часть — EAGLE XML.
+    Парсим regex'ом по тегам `<part>`/`<net>`/`<pinref>` (а не строгим ET): реальные
+    EAGLE-файлы часто not-well-formed (сырые `&`, спецсимволы в text) и роняют
+    ElementTree. parts → компоненты, nets/pinref → соединения. Рамки/лого отбрасываются."""
+    text = source or ''
+    parts: dict[str, dict] = {}
+    for blob in _EAGLE_PART_RE.findall(text):
+        attrs = _xml_attrs(blob)
+        name = attrs.get('name')
+        if not name:
+            continue
+        ctype = _eagle_part_type(name, attrs.get('deviceset') or '')
+        if ctype is None:
+            continue  # рамка/лого — не компонент
+        parts[name] = {'ref': name, 'type': ctype, 'nodes': [], 'value': attrs.get('value') or ''}
+
+    net_map: dict[str, list] = {}
+    for net_attr_blob, net_body in _EAGLE_NET_RE.findall(text):
+        net_name = _xml_attrs(net_attr_blob).get('name') or f'N{len(net_map) + 1}'
+        for pin_blob in _EAGLE_PINREF_RE.findall(net_body):
+            part_name = _xml_attrs(pin_blob).get('part')
+            if part_name in parts:
+                parts[part_name]['nodes'].append(net_name)
+                net_map.setdefault(net_name, []).append(part_name)
+
+    parsed = list(parts.values())
+    unsupported = [] if parsed else ['EAGLE: не найдено ни одного компонента.']
+    scheme = _build_scheme(parsed, net_map, unsupported)
+    return {
+        'ok': bool(parsed),
+        'format': 'eagle_xml',
+        'scheme_data': scheme,
+        'summary': {'components': len(parsed), 'nets': len(net_map), 'unsupported': len(unsupported)},
+        'unsupported': unsupported,
+    }
+
+
+def import_schematic_auto(source):
+    """Авто-детект формата схемы (KiCad sexpr vs EAGLE XML) и вызов нужного парсера.
+
+    Используется при импорте смешанных датасетов (open-schematics): EAGLE-шарды и
+    KiCad-шарды лежат вперемешку."""
+    text = (source or '').lstrip()
+    head = text[:400].lower()
+    if '<eagle' in head or ('<?xml' in head and 'eagle.dtd' in head):
+        return import_eagle_xml(source)
+    if head.startswith('(kicad_sch') or '(lib_id' in text[:5000] or '(symbol ' in text[:5000]:
+        return import_kicad_sexpr(source)
+    if head.startswith('<?xml') or head.startswith('<'):
+        # прочий XML — пробуем KiCad netlist XML, затем EAGLE
+        result = import_kicad_xml(source)
+        if result.get('scheme_data', {}).get('components'):
+            return result
+        return import_eagle_xml(source)
+    return import_kicad_sexpr(source)
+
+
 def import_cad_text(format_name, source):
     fmt = str(format_name or '').strip().lower()
     if fmt in {'ltspice', 'spice', 'netlist', 'asc'}:

@@ -40,7 +40,12 @@ from Dolg_APP.models import (
     Subscription,
 )
 from Dolg_APP.pcb_layout import compute_pcb_layout, to_gerber_drill, to_gerber_top_copper
-from Dolg_APP.services.cad_import import import_kicad_sexpr, import_preview
+from Dolg_APP.services.cad_import import (
+    import_eagle_xml,
+    import_kicad_sexpr,
+    import_preview,
+    import_schematic_auto,
+)
 from Dolg_APP.services.constraint_solver import solve_design_constraints
 from Dolg_APP.services.engineering_units import parse_engineering_quantity
 from Dolg_APP.services.expert_rules import build_expert_facts, evaluate_expert_rules, load_rule_pack
@@ -749,6 +754,55 @@ class EngineeringReviewTests(TestCase):
         result = import_kicad_sexpr('(kicad_sch (version 20231120) (lib_symbols))')
         self.assertFalse(result['ok'])
         self.assertEqual(result['summary']['components'], 0)
+
+    def test_cad_import_eagle_xml_extracts_parts_and_nets(self):
+        # EAGLE .sch: parts → компоненты, net/pinref → соединения. Рамка FRAME — не компонент.
+        source = (
+            '<?xml version="1.0" encoding="utf-8"?>\n'
+            '<!DOCTYPE eagle SYSTEM "eagle.dtd">\n'
+            '<eagle version="9.6.2"><drawing><schematic><parts>\n'
+            '  <part name="FRAME1" library="frames" deviceset="FRAME_A4" device=""/>\n'
+            '  <part name="R1" library="rcl" deviceset="R-EU_0207" device="" value="10k"/>\n'
+            '  <part name="C1" library="rcl" deviceset="C-EU" device="" value="100n"/>\n'
+            '  <part name="GND1" library="supply" deviceset="GND" device=""/>\n'
+            '</parts><sheets><sheet><nets>\n'
+            '  <net name="N$1" class="0"><segment>\n'
+            '    <pinref part="R1" pin="2"/><pinref part="C1" pin="1"/>\n'
+            '  </segment></net>\n'
+            '  <net name="GND" class="0"><segment>\n'
+            '    <pinref part="C1" pin="2"/><pinref part="GND1" pin="GND"/>\n'
+            '  </segment></net>\n'
+            '</nets></sheet></sheets></schematic></drawing></eagle>'
+        )
+        result = import_eagle_xml(source)
+        self.assertTrue(result['ok'])
+        comps = {
+            c['label']: c['type'] for c in result['scheme_data']['components'] if c.get('type') != 'node'
+        }
+        self.assertEqual(comps.get('R1'), 'resistor')
+        self.assertEqual(comps.get('C1'), 'capacitor')
+        self.assertEqual(comps.get('GND1'), 'ground')
+        self.assertNotIn('FRAME1', comps)  # рамка отброшена
+        self.assertTrue(result['scheme_data']['connections'])  # есть соединения из nets
+
+    def test_cad_import_eagle_survives_malformed_xml(self):
+        # Сырой & в text не должен ронять парсер (regex, не строгий ET).
+        source = (
+            '<eagle version="9.6.2"><drawing><schematic><parts>\n'
+            '  <part name="R1" deviceset="R" value="1k"/>\n'
+            '</parts><sheets><sheet>\n'
+            '  <text>Power & Ground rail</text>\n'  # сырой & — ломает strict ET
+            '</sheet></sheets></schematic></drawing></eagle>'
+        )
+        result = import_eagle_xml(source)
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['summary']['components'], 1)
+
+    def test_cad_import_auto_dispatches_eagle_vs_kicad(self):
+        eagle = '<?xml version="1.0"?><!DOCTYPE eagle SYSTEM "eagle.dtd"><eagle version="9.6.2"><drawing><schematic><parts><part name="R1" deviceset="R" value="1k"/></parts></schematic></drawing></eagle>'
+        kicad = '(kicad_sch (symbol (lib_id "Device:R") (property "Reference" "R1") (property "Value" "1k")))'
+        self.assertEqual(import_schematic_auto(eagle)['format'], 'eagle_xml')
+        self.assertEqual(import_schematic_auto(kicad)['format'], 'kicad_sexpr')
 
     def test_cad_import_api_can_save_project(self):
         self._seed_diagnostics_lesson()
