@@ -17,7 +17,7 @@ from knowledge.models import (
     LearningTrack,
 )
 from knowledge.services.circuit_svg import render_training_circuit
-from knowledge.services.engineering_lab import calculate_lab
+from knowledge.services.engineering_lab import calculate_lab, lab_expected_value
 from knowledge.services.formula_steps import check_equivalent_expression, explain_formula
 from knowledge.services.lab_measurements import compare_lab_measurement, run_lab_sweep
 from knowledge.services.learning_grader import grade_circuit_task, grade_math_task, grade_simulation_task
@@ -540,12 +540,46 @@ class EngineeringLabTests(TestCase):
         self.assertTrue(result['ok'])
         self.assertIn(result['status'], {'risk', 'overheat'})
 
+    def test_derating_flags_overloaded_component(self):
+        # Резистор 0.25 Вт рассеивает 0.18 Вт при пределе 50% → загрузка 72% → риск.
+        result = calculate_lab(
+            'derating',
+            {'rated_value': 0.25, 'actual_value': 0.18, 'derating_percent': 50},
+        )
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['status'], 'risk')
+        self.assertAlmostEqual(result['outputs']['load_percent']['value'], 72.0, delta=0.5)
+        self.assertLess(result['outputs']['margin']['value'], 0)  # за пределом derating
+
+    def test_derating_ok_with_margin(self):
+        result = calculate_lab(
+            'derating',
+            {'rated_value': 0.25, 'actual_value': 0.1, 'derating_percent': 50},
+        )
+        self.assertEqual(result['status'], 'ok')
+
+    def test_derating_overheat_above_rated(self):
+        result = calculate_lab('derating', {'rated_value': 0.25, 'actual_value': 0.3})
+        self.assertEqual(result['status'], 'overheat')
+
+    def test_derating_serves_as_task_oracle(self):
+        # lab_expected_value берёт нужный выход derating-расчёта для проверки задания.
+        value = lab_expected_value(
+            {
+                'kind': 'derating',
+                'inputs': {'rated_value': 0.25, 'actual_value': 0.125, 'derating_percent': 50},
+                'output': 'load_percent',
+            }
+        )
+        self.assertAlmostEqual(value, 50.0, delta=0.1)
+
     def test_lab_page_is_public(self):
         response = self.client.get(reverse('knowledge:engineering_lab'))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Инженерная лаборатория')
         self.assertContains(response, 'Генератор NE555')
+        self.assertContains(response, 'derating')
 
     def test_lab_api_calculates_ne555(self):
         response = self.client.post(

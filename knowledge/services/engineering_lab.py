@@ -78,6 +78,22 @@ LAB_TOOLS = [
             {'name': 'max_junction_c', 'label': 'Tj max', 'unit': '°C', 'default': 125},
         ],
     },
+    {
+        'kind': 'derating',
+        'title': 'Запас по нагрузке (derating)',
+        'description': 'Загрузка компонента относительно номинала и рекомендованного '
+        'предела (правило derating: резисторы обычно ≤50% от Pmax для надёжности).',
+        'fields': [
+            {'name': 'rated_value', 'label': 'Номинал (Pmax/Vmax)', 'unit': 'Вт|В', 'default': 0.25},
+            {
+                'name': 'actual_value',
+                'label': 'Факт (рассеиваемая/приложенная)',
+                'unit': 'Вт|В',
+                'default': 0.18,
+            },
+            {'name': 'derating_percent', 'label': 'Предел загрузки', 'unit': '%', 'default': 50},
+        ],
+    },
 ]
 
 
@@ -138,6 +154,7 @@ def calculate_lab(kind, payload):
         'linear_regulator': _calculate_linear_regulator,
         'rc_debounce': _calculate_rc_debounce,
         'thermal_margin': _calculate_thermal_margin,
+        'derating': _calculate_derating,
     }
     if kind not in calculators:
         return {
@@ -297,6 +314,50 @@ def _calculate_thermal_margin(payload):
             'junction_temperature_c': _output('Температура кристалла', junction, '°C'),
             'thermal_margin_c': _output('Запас до Tj max', max_junction - junction, '°C'),
             'temperature_rise_c': _output('Нагрев относительно среды', power * theta_ja, '°C'),
+        },
+    }
+
+
+def _calculate_derating(payload):
+    rated = _input(payload, 'rated_value', 0.25)
+    actual = _input(payload, 'actual_value', 0.18)
+    derating_percent = _input(payload, 'derating_percent', 50)
+    derating_percent = min(max(derating_percent, 1.0), 100.0)
+
+    load_percent = (actual / rated * 100.0) if rated > 0 else math.inf
+    derated_limit = rated * derating_percent / 100.0
+    margin = derated_limit - actual  # запас до рекомендованного предела
+    headroom_to_max = rated - actual  # запас до абсолютного номинала
+
+    if load_percent > 100:
+        assessment = _status(
+            'overheat',
+            'Превышен номинал: фактическая нагрузка выше Pmax/Vmax — компонент выйдет из строя.',
+        )
+    elif load_percent > derating_percent:
+        assessment = _status(
+            'risk',
+            f'Загрузка {load_percent:.0f}% выше рекомендованного предела {derating_percent:.0f}%: '
+            f'снизьте нагрузку или возьмите компонент большего номинала.',
+        )
+    elif load_percent > derating_percent * 0.8:
+        assessment = _status(
+            'needs_margin',
+            f'Загрузка {load_percent:.0f}% близка к пределу derating {derating_percent:.0f}%: запас невелик.',
+        )
+    else:
+        assessment = _status(
+            'ok',
+            f'Загрузка {load_percent:.0f}% в пределах derating {derating_percent:.0f}%: запас достаточный.',
+        )
+
+    return {
+        **assessment,
+        'outputs': {
+            'load_percent': _output('Загрузка', load_percent, '%'),
+            'derated_limit': _output('Рекомендованный предел', derated_limit, 'Вт|В'),
+            'margin': _output('Запас до предела', margin, 'Вт|В'),
+            'headroom_to_max': _output('Запас до номинала', headroom_to_max, 'Вт|В'),
         },
     }
 
