@@ -79,6 +79,32 @@ class SectionsForIntentTests(SimpleTestCase):
         keys = {a['key'] for a in ai_algorithms.available_algorithms('formula')}
         self.assertIn('regulator', keys)
 
+    def test_thermal_tj_for_led(self):
+        led = {
+            'components': [
+                {'id': 'B1', 'type': 'battery', 'voltage': 5, 'ports': [{'id': '+'}, {'id': '-'}]},
+                {'id': 'R1', 'type': 'resistor', 'resistance': 100, 'ports': [{'id': '1'}, {'id': '2'}]},
+                {'id': 'D1', 'type': 'led', 'ports': [{'id': 'a'}, {'id': 'k'}]},
+                {'id': 'G1', 'type': 'ground', 'ports': [{'id': '1'}]},
+            ],
+            'connections': [
+                {'from': {'compId': 'B1', 'portId': '+'}, 'to': {'compId': 'R1', 'portId': '1'}},
+                {'from': {'compId': 'R1', 'portId': '2'}, 'to': {'compId': 'D1', 'portId': 'a'}},
+                {'from': {'compId': 'D1', 'portId': 'k'}, 'to': {'compId': 'B1', 'portId': '-'}},
+                {'from': {'compId': 'B1', 'portId': '-'}, 'to': {'compId': 'G1', 'portId': '1'}},
+            ],
+        }
+        joined = ' '.join(ai_toolkit.thermal_lines(led))
+        self.assertIn('T_j', joined)
+        self.assertIn('°C', joined)
+
+    def test_thermal_tj_empty_without_diodes(self):
+        self.assertEqual(ai_toolkit.thermal_lines(_divider()), [])
+
+    def test_thermal_tj_in_manifest(self):
+        keys = {a['key'] for a in ai_algorithms.available_algorithms('thermal')}
+        self.assertIn('thermal_tj', keys)
+
     def test_sections_for_plan_dedup(self):
         # dc_voltages есть и в measurement, и в overview — в плане не дублируется
         sections = ai_algorithms.sections_for_plan(['measurement', 'thermal'], _divider())

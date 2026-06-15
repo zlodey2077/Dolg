@@ -60,6 +60,12 @@ ALGORITHMS: list[Algorithm] = [
         lambda scheme, topology: ai_toolkit.derating_lines(scheme),
     ),
     Algorithm(
+        'thermal_tj',
+        'Температура кристалла диода/LED (T_j)',
+        frozenset({'thermal', 'why_failed'}),
+        lambda scheme, topology: ai_toolkit.thermal_lines(scheme),
+    ),
+    Algorithm(
         'regulator',
         'Линейный стабилизатор (dropout/P)',
         frozenset({'formula', 'thermal', 'recommend'}),

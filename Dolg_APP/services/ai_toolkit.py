@@ -125,6 +125,49 @@ def derating_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
     return lines
 
 
+def thermal_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
+    """Оценка температуры кристалла диодов/LED: T_j = Ta + P·R_θ, где P = Vd·Id из
+    нелинейного MNA (реальные Vd, Id), R_θ — дефолт по типу (оценка, не паспорт).
+    Флаг при приближении к T_j_max. Пусто, если диодов/LED в схеме нет (§Y)."""
+    dc = compute_dc(scheme_data)
+    if not dc['ok']:
+        return []
+    voltages = dc['voltages']
+    currents = dc.get('currents') or {}
+    ta = 25.0  # окружающая, °C
+    # R_θ (j-a, °C/Вт) и T_j_max по типу — дефолтные оценки без радиатора.
+    led = {'rth': 300.0, 'tjmax': 110.0}
+    diode = {'rth': 100.0, 'tjmax': 150.0}
+    rows = []
+    for elem in dc['circuit']['elements']:
+        if elem.get('type') != 'D':
+            continue
+        n1, n2 = elem['nodes']
+        vd = abs(voltages.get(n1, 0.0) - voltages.get(n2, 0.0))
+        idc = abs(float(currents.get(str(elem['id']), 0.0)))
+        power = vd * idc
+        is_led = str(elem.get('label') or '').upper().startswith('LED')
+        spec = led if is_led else diode
+        tj = ta + power * spec['rth']
+        rows.append((str(elem['id']), power, tj, spec['tjmax']))
+    if not rows:
+        return []
+    rows.sort(key=lambda r: -r[2])
+    lines = []
+    worst_ratio = 0.0
+    for rid, power, tj, tjmax in rows[:limit]:
+        worst_ratio = max(worst_ratio, tj / tjmax if tjmax else 0.0)
+        flag = 'перегрев' if tj >= tjmax else ('близко к пределу' if tj >= 0.85 * tjmax else 'норма')
+        pstr = f'{power * 1000:.1f} мВт' if power < 1 else f'{power:.2f} Вт'
+        lines.append(f'{rid}: P={pstr} → T_j≈{tj:.0f}°C (макс {tjmax:.0f}, {flag})')
+    if worst_ratio >= 1.0:
+        lines.append('⚠ перегрев кристалла — снизить ток/добавить теплоотвод')
+    elif worst_ratio >= 0.85:
+        lines.append('близко к T_j_max — уменьшить ток или улучшить охлаждение')
+    lines.append('источник: T_j=Ta+P·R_θ (P=Vd·Id из нелинейного MNA); R_θ — дефолт-оценка по типу')
+    return lines
+
+
 def regulator_lines(scheme_data: dict | None) -> list[str]:
     """Линейный стабилизатор (78xx/LM317/КРЕН): проверка dropout (Vin−Vout) и
     рассеяния P=(Vin−Vout)·Iнагр. Детект по типу/метке; Vout из параметра либо
