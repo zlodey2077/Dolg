@@ -489,58 +489,169 @@ class Command(BaseCommand):
         deadline_seconds: int = 120,
         progress=None,
     ):
-        """Download one HuggingFace dataset shard with bounded requests timeouts."""
-        try:
-            import requests
-        except ImportError as exc:
-            raise CommandError('requests is required for robust dataset download') from exc
+        """Download one HuggingFace dataset shard.
 
+        Основной путь — **curl** (проверено: requests из этой сети стопорится на
+        data-CDN HF с ReadTimeout 0 МБ, а curl качает шард целиком на 4+ МБ/с).
+        curl идёт с `-C -` (докачка частичного .part), `--retry` и
+        `--ssl-no-revoke` (обходит Windows-проверку отзыва сертификата schannel).
+        Если curl недоступен — фолбэк на requests (ретраи + Range-докачка)."""
         url = f'https://huggingface.co/datasets/{spec["hf_id"]}/resolve/main/{shard_name}'
         headers = {}
         if token:
             headers['Authorization'] = f'Bearer {token}'
         target_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = target_path.with_suffix(target_path.suffix + '.part')
+
+        import shutil
+        import subprocess
+
+        curl_bin = shutil.which('curl')
+        if curl_bin:
+            cmd = [
+                curl_bin,
+                '-sS',
+                '--ssl-no-revoke',
+                '-L',
+                '-C',
+                '-',
+                '--retry',
+                '3',
+                '--retry-delay',
+                '3',
+                '--connect-timeout',
+                '20',
+                '-m',
+                str(max(30, int(deadline_seconds))),
+                url,
+                '-o',
+                str(tmp_path),
+            ]
+            if token:
+                cmd[1:1] = ['-H', f'Authorization: Bearer {token}']
+            if progress:
+                progress({'stage': 'download', 'message': f'Скачиваю {shard_name} через curl…'})
+            attempts = max(1, int(getattr(self, '_download_attempts', 3)))
+            for attempt in range(1, attempts + 1):
+                try:
+                    res = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=max(60, int(deadline_seconds)) + 60,
+                    )
+                    rc = res.returncode
+                except subprocess.TimeoutExpired:
+                    rc = 'timeout'
+                have = tmp_path.stat().st_size if tmp_path.exists() else 0
+                if rc == 0 and have > 0:
+                    break
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'  ⚠ {shard_name}: curl попытка {attempt}/{attempts} (rc={rc}), '
+                        f'скачано {have // 1048576} МБ — докачаю (-C -)'
+                    )
+                )
+                if attempt < attempts:
+                    time.sleep(3)
+            if not tmp_path.exists() or tmp_path.stat().st_size <= 0:
+                raise CommandError(f'curl не смог скачать {shard_name}')
+            tmp_path.replace(target_path)
+            if progress:
+                progress(
+                    {
+                        'stage': 'downloaded',
+                        'downloaded_mb': round(target_path.stat().st_size / (1024 * 1024), 1),
+                        'message': f'Шард сохранён: {target_path.name}',
+                    }
+                )
+            return str(target_path)
+
+        try:
+            import requests
+        except ImportError as exc:
+            raise CommandError('curl недоступен, а requests не установлен — нет способа скачать') from exc
         if tmp_path.exists():
             try:
                 tmp_path.unlink()
             except OSError:
                 pass
 
-        if progress:
-            progress({'stage': 'download', 'message': f'Скачиваю {shard_name} через requests…'})
+        # HF из этой сети нестабилен (Cloudflare-throttle): голый запрос ловит
+        # ReadTimeout посреди шарда. Решение — ретраи с бэкоффом + ДОКАЧКА через
+        # Range: частично скачанный .part не выбрасываем, продолжаем с его размера.
+        attempts = max(1, int(getattr(self, '_download_attempts', 5)))
         started_at = time.time()
-        with requests.get(
-            url, headers=headers, stream=True, timeout=(15, 30), allow_redirects=True
-        ) as response:
-            response.raise_for_status()
-            total = int(response.headers.get('content-length') or 0)
-            downloaded = 0
-            last_update = time.time()
-            with tmp_path.open('wb') as handle:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if time.time() - started_at > max(10, int(deadline_seconds)):
-                        raise TimeoutError(
-                            f'Download deadline exceeded: {deadline_seconds}s for {shard_name}'
-                        )
-                    if not chunk:
-                        continue
-                    handle.write(chunk)
-                    downloaded += len(chunk)
-                    now = time.time()
-                    if progress and now - last_update >= 1.5:
-                        mb = downloaded / (1024 * 1024)
-                        payload = {
-                            'stage': 'download',
-                            'downloaded_mb': round(mb, 1),
-                            'message': f'Скачано {mb:.1f} МБ',
-                        }
-                        if total:
-                            payload['download_total_mb'] = round(total / (1024 * 1024), 1)
-                            payload['message'] += f' из {payload["download_total_mb"]:.1f} МБ'
-                        progress(payload)
-                        last_update = now
-        if tmp_path.stat().st_size <= 0:
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            resume_from = tmp_path.stat().st_size if tmp_path.exists() else 0
+            req_headers = dict(headers)
+            mode = 'wb'
+            if resume_from > 0:
+                req_headers['Range'] = f'bytes={resume_from}-'
+                mode = 'ab'
+            if progress:
+                progress(
+                    {
+                        'stage': 'download',
+                        'message': f'Скачиваю {shard_name} (попытка {attempt}/{attempts}'
+                        + (f', докачка с {resume_from // 1048576} МБ' if resume_from else '')
+                        + ')…',
+                    }
+                )
+            try:
+                with requests.get(
+                    url, headers=req_headers, stream=True, timeout=(15, 60), allow_redirects=True
+                ) as response:
+                    if response.status_code == 416 and resume_from > 0:
+                        break  # range за концом → файл уже целиком скачан
+                    # Сервер проигнорировал Range (вернул 200 вместо 206) → начать заново
+                    if resume_from > 0 and response.status_code == 200:
+                        mode, resume_from = 'wb', 0
+                    response.raise_for_status()
+                    total = int(response.headers.get('content-length') or 0) + resume_from
+                    downloaded = resume_from
+                    last_update = time.time()
+                    with tmp_path.open(mode) as handle:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if time.time() - started_at > max(10, int(deadline_seconds)):
+                                raise TimeoutError(
+                                    f'Download deadline exceeded: {deadline_seconds}s for {shard_name}'
+                                )
+                            if not chunk:
+                                continue
+                            handle.write(chunk)
+                            downloaded += len(chunk)
+                            now = time.time()
+                            if progress and now - last_update >= 1.5:
+                                mb = downloaded / (1024 * 1024)
+                                payload = {
+                                    'stage': 'download',
+                                    'downloaded_mb': round(mb, 1),
+                                    'message': f'Скачано {mb:.1f} МБ',
+                                }
+                                if total:
+                                    payload['download_total_mb'] = round(total / (1024 * 1024), 1)
+                                    payload['message'] += f' из {payload["download_total_mb"]:.1f} МБ'
+                                progress(payload)
+                                last_update = now
+                last_exc = None
+                break  # дошли до конца ответа без исключения
+            except (requests.exceptions.RequestException, TimeoutError) as exc:
+                last_exc = exc
+                have = tmp_path.stat().st_size if tmp_path.exists() else 0
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'  ⚠ {shard_name}: попытка {attempt}/{attempts} прервана '
+                        f'({type(exc).__name__}), скачано {have // 1048576} МБ — докачаю'
+                    )
+                )
+                if time.time() - started_at > max(10, int(deadline_seconds)):
+                    break  # бюджет шарда исчерпан
+                time.sleep(min(2**attempt, 12))  # экспоненциальный бэкофф
+        if last_exc is not None:
+            raise last_exc
+        if not tmp_path.exists() or tmp_path.stat().st_size <= 0:
             raise CommandError(f'Downloaded empty shard: {shard_name}')
         tmp_path.replace(target_path)
         if progress:
