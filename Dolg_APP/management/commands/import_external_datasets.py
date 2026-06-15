@@ -54,11 +54,15 @@ SUPPORTED_SOURCES = {
 }
 
 
-def _safe_iter_batches(pf, cmd, shard_no):
+def _safe_iter_batches(pf, cmd, shard_no, columns=None):
     """Итерирует batch'и parquet устойчиво: при битой странице (повреждённый/
     недокачанный шард → TProtocolException и т.п.) не роняет весь импорт, а
-    отдаёт прочитанное до ошибки и останавливается с предупреждением."""
-    iterator = pf.iter_batches(batch_size=64)
+    отдаёт прочитанное до ошибки и останавливается с предупреждением.
+
+    `columns` — читать только нужные колонки. Тяжёлый бинарный `image` (PNG)
+    исключается: его страницы бьются (TProtocolException) и роняли весь шард,
+    хотя парсер схему берёт из текстовых полей. Без него шард читается целиком."""
+    iterator = pf.iter_batches(batch_size=64, columns=columns)
     while True:
         try:
             batch = next(iterator)
@@ -120,6 +124,13 @@ class Command(BaseCommand):
             help='Сколько parquet-шардов скачать из открытого датасета (1..78). '
             'Каждый шард ≈1000-1100 схем, 50-80 МБ. По умолчанию 1 (для быстрой проверки). '
             '--shards 78 = все 84к схем, ~4-6 ГБ диска и 30-60 мин на загрузку.',
+        )
+        parser.add_argument(
+            '--start-shard',
+            type=int,
+            default=0,
+            help='С какого шарда начинать (0..77). Полезно пропустить битый shard-0 '
+            '(--start-shard 1) или возобновить прерванную загрузку.',
         )
 
         parser.add_argument(
@@ -275,6 +286,7 @@ class Command(BaseCommand):
         _publish_progress(extra={'message': 'Скачиваю parquet-шард…'})
 
         shards_to_pull = max(1, min(78, int(opts.get('shards') or 1)))
+        start_shard = max(0, min(77, int(opts.get('start_shard') or 0)))
         # HF_TOKEN из env — даёт ×10 rate-limit и стабильную загрузку.
         # Без токена анонимы часто получают 429 или connection hang.
         import os as _os
@@ -328,12 +340,13 @@ class Command(BaseCommand):
                     pass
                 download_stop.wait(2.0)  # каждые 2 сек
 
-        for shard_idx in range(shards_to_pull):
+        last_shard = min(78, start_shard + shards_to_pull)
+        for shard_idx in range(start_shard, last_shard):
             if len(out) >= limit:
                 break
             shard_name = f'data/train-{shard_idx:05d}-of-00078.parquet'
-            self.stdout.write(f'  → шард {shard_idx + 1}/{shards_to_pull}: {shard_name}')
-            shard_label = f'Скачиваю шард {shard_idx + 1}/{shards_to_pull}…'
+            self.stdout.write(f'  → шард {shard_idx} (до {last_shard - 1}): {shard_name}')
+            shard_label = f'Скачиваю шард {shard_idx}/{last_shard - 1}…'
             _publish_progress(extra={'message': shard_label})
 
             # Зачистка зависших .incomplete от предыдущих failed-runs — иначе
@@ -395,12 +408,19 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f'  ⚠ шард {shard_idx + 1} не открылся: {exc}'))
                 continue
 
-            if shard_idx == 0:
-                column_names = list(pf.schema_arrow.names)
-                self.stdout.write(f'  parquet: {pf.metadata.num_rows} строк, колонки: {column_names}')
-            _publish_progress(extra={'message': f'Распаковка шарда {shard_idx + 1}/{shards_to_pull}…'})
+            # Читаем все колонки КРОМЕ бинарных image (PNG/JPEG): их страницы в
+            # этом датасете повреждены и роняли iter_batches, а для парсинга схемы
+            # они не нужны (берём schematic/json/yaml). Без image шард читается весь.
+            all_cols = list(pf.schema_arrow.names)
+            read_cols = [c for c in all_cols if c.lower() not in ('image', 'png', 'jpeg', 'thumbnail')]
+            if shard_idx == start_shard:
+                self.stdout.write(
+                    f'  parquet: {pf.metadata.num_rows} строк, колонки: {all_cols} '
+                    f'(читаю без бинарных: {read_cols})'
+                )
+            _publish_progress(extra={'message': f'Распаковка шарда {shard_idx}/{last_shard - 1}…'})
 
-            for batch in _safe_iter_batches(pf, self, shard_idx + 1):
+            for batch in _safe_iter_batches(pf, self, shard_idx, columns=read_cols):
                 if len(out) >= limit:
                     break
                 batch_dict = batch.to_pydict()

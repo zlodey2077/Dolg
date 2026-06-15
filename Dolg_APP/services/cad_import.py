@@ -249,22 +249,68 @@ def import_kicad_xml(source):
     }
 
 
+_KICAD_LIB_ID = re.compile(r'\(lib_id\s+"([^"]+)"')
+_KICAD_PROP = re.compile(r'\(property\s+"([^"]+)"\s+"([^"]*)"')
+
+
 def import_kicad_sexpr(source):
+    """Быстрый парсер KiCad-схем (формат sexpr, в т.ч. KiCad 8 `eeschema`).
+
+    Старая реализация была одной regex с `.*?` и re.S по всему файлу — на схемах
+    в сотни КБ это давало катастрофический бэктрекинг (секунды на файл) И не
+    матчила инстансы KiCad 8 `(symbol (lib_id ...))`, давая 0 компонентов.
+
+    Здесь — без посимвольного скана скобок (он на чистом Python стоил десятки мс
+    на 178-КБ схему). Якорь = `(lib_id "…")`: он есть ТОЛЬКО у инстансов символов,
+    а определения в `(lib_symbols …)` его не содержат — значит библиотека
+    отсеивается даром. Между соседними lib_id C-level regex'ом берём Reference/
+    Value этого инстанса. На реальном open-schematics: 0→десятки компонентов,
+    секунды→единицы мс на файл.
+    """
+    text = source or ''
     parsed = []
     net_map = {}
     unsupported = []
-    comp_re = re.compile(
-        r'\(symbol\s+"?([^"\s)]+)"?.*?\(property\s+"?Reference"?\s+"?([^"\s)]+)"?\).*?\(property\s+"?Value"?\s+"?([^")]+)"?\)',
-        re.S,
-    )
-    for idx, match in enumerate(comp_re.finditer(source or ''), start=1):
-        lib_name, ref, value = match.groups()
-        ctype = normalize_component_type(lib_name.split(':')[-1])
-        if ctype == lib_name.split(':')[-1].lower():
-            ctype = _spice_component_type(ref)
+
+    libids = list(_KICAD_LIB_ID.finditer(text))
+    idx = 0
+    for i, lib_match in enumerate(libids):
+        lib_name = lib_match.group(1)
+        # Тело инстанса — от его lib_id до начала следующего инстанса (или конца
+        # файла). Reference/Value этого символа лежат здесь, до следующего lib_id.
+        seg_start = lib_match.end()
+        seg_end = libids[i + 1].start() if i + 1 < len(libids) else len(text)
+        segment = text[seg_start:seg_end]
+        ref = ''
+        value = ''
+        for prop_match in _KICAD_PROP.finditer(segment):
+            key, val = prop_match.group(1), prop_match.group(2)
+            if key == 'Reference':
+                ref = val
+            elif key == 'Value':
+                value = val
+            if ref and value:
+                break
+        if not ref:
+            continue  # графика без Reference — не компонент
+        # Power-порты (#PWR…) и ERC-флаги (#FLG…) — это якоря питания/земли, не
+        # приборы. KiCad помечает их lib_id 'power:GND'/'power:+5V' и ссылкой #PWR.
+        # Без спец-обработки _spice_component_type('#…') свалил бы их в 'ic' и
+        # раздул статистику ИС — критичный шум для обучающего корпуса.
+        if lib_name.startswith('power:') or ref.startswith('#FLG'):
+            ctype = 'ground'
+        elif ref.startswith('#PWR'):
+            ctype = 'ground'
+        else:
+            short = lib_name.split(':')[-1]
+            ctype = normalize_component_type(short)
+            if ctype == short.lower():
+                ctype = _spice_component_type(ref)
+        idx += 1
         node = f'N{idx}'
         parsed.append({'ref': ref, 'type': ctype, 'nodes': [node], 'value': value})
         net_map.setdefault(node, []).append(ref)
+
     if not parsed:
         unsupported.append('Не удалось распознать ни одного компонента KiCad.')
     scheme = _build_scheme(parsed, net_map, unsupported)

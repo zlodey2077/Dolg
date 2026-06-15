@@ -40,7 +40,7 @@ from Dolg_APP.models import (
     Subscription,
 )
 from Dolg_APP.pcb_layout import compute_pcb_layout, to_gerber_drill, to_gerber_top_copper
-from Dolg_APP.services.cad_import import import_preview
+from Dolg_APP.services.cad_import import import_kicad_sexpr, import_preview
 from Dolg_APP.services.constraint_solver import solve_design_constraints
 from Dolg_APP.services.engineering_units import parse_engineering_quantity
 from Dolg_APP.services.expert_rules import build_expert_facts, evaluate_expert_rules, load_rule_pack
@@ -664,6 +664,39 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('ground', types)
         self.assertEqual(result['preview']['component_count'], 3)
         self.assertIn('.ac dec 10 1 1k', result['preview']['analysis_directives'])
+
+    def test_cad_import_kicad8_sexpr_extracts_instances(self):
+        # KiCad 8 eeschema: инстансы (symbol (lib_id ...)), определения в
+        # (lib_symbols ...) — их парсер игнорирует. Power-порт #PWR → ground.
+        source = (
+            '(kicad_sch (version 20231120) (generator "eeschema")\n'
+            '  (lib_symbols\n'
+            '    (symbol "Device:R" (property "Reference" "R")\n'
+            '      (symbol "R_0_1" (rectangle (start 0 0) (end 1 1))))\n'
+            '    (symbol "Device:C" (property "Reference" "C")))\n'
+            '  (symbol (lib_id "Device:R") (at 50 50 0)\n'
+            '    (property "Reference" "R1") (property "Value" "10k"))\n'
+            '  (symbol (lib_id "Device:C") (at 80 50 0)\n'
+            '    (property "Reference" "C1") (property "Value" "100n"))\n'
+            '  (symbol (lib_id "power:GND") (at 50 90 0)\n'
+            '    (property "Reference" "#PWR01") (property "Value" "GND"))\n'
+            ')'
+        )
+        result = import_kicad_sexpr(source)
+        self.assertTrue(result['ok'])
+        comps = {
+            c['label']: c['type'] for c in result['scheme_data']['components'] if c.get('type') != 'node'
+        }
+        # Извлечены ровно 3 инстанса, а не определения из lib_symbols.
+        self.assertEqual(set(comps), {'R1', 'C1', '#PWR01'})
+        self.assertEqual(comps['R1'], 'resistor')
+        self.assertEqual(comps['C1'], 'capacitor')
+        self.assertEqual(comps['#PWR01'], 'ground')  # power-порт, не ic
+
+    def test_cad_import_kicad_sexpr_empty_when_no_instances(self):
+        result = import_kicad_sexpr('(kicad_sch (version 20231120) (lib_symbols))')
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['summary']['components'], 0)
 
     def test_cad_import_api_can_save_project(self):
         self._seed_diagnostics_lesson()
