@@ -144,6 +144,71 @@ def test_short_nets_routed_before_long_ones():
     assert out['autoroute_stats']['failed'] == 0
 
 
+def _layout_enclosed_pad():
+    """Pad A заперт кольцом препятствий — net 'blocked' физически не разводится."""
+    return {
+        'pcb_w_mm': 20.0,
+        'pcb_h_mm': 20.0,
+        'trace_width_mm': 0.5,
+        'pads': [
+            {'comp_id': 'A', 'port_id': '1', 'x_mm': 10.0, 'y_mm': 10.0},
+            {'comp_id': 'B', 'port_id': '1', 'x_mm': 17.0, 'y_mm': 17.0},
+        ],
+        'comps': [
+            {'id': 'W1', 'x_left_mm': 7.0, 'y_top_mm': 6.5, 'w_mm': 6.0, 'h_mm': 1.0},
+            {'id': 'W2', 'x_left_mm': 7.0, 'y_top_mm': 13.0, 'w_mm': 6.0, 'h_mm': 1.0},
+            {'id': 'W3', 'x_left_mm': 6.5, 'y_top_mm': 7.0, 'w_mm': 1.0, 'h_mm': 6.0},
+            {'id': 'W4', 'x_left_mm': 13.0, 'y_top_mm': 7.0, 'w_mm': 1.0, 'h_mm': 6.0},
+        ],
+    }
+
+
+def test_ripup_stats_present_and_label():
+    """Контракт rip-up: статы содержат ripup_rounds/ripup_recovered, а ярлык
+    алгоритма отражает включённость фазы."""
+    layout = _layout_two_pads_with_obstacle()
+    conns = [{'id': 'n', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}}]
+    on = autoroute_layout(layout, conns, enable_ripup=True)['autoroute_stats']
+    off = autoroute_layout(layout, conns, enable_ripup=False)['autoroute_stats']
+    assert 'ripup_rounds' in on and 'ripup_recovered' in on
+    assert 'rip-up' in on['algorithm']
+    assert 'rip-up' not in off['algorithm']
+    # Без неудач rip-up не запускается (раундов 0).
+    assert on['ripup_rounds'] == 0
+
+
+def test_ripup_never_worse_than_greedy():
+    """Ключевой инвариант: rip-up не ухудшает результат — разведённых не меньше,
+    неудач не больше, чем у чистого жадного прохода (свап принимается лишь при
+    строгом росте, иначе откат)."""
+    layout = _layout_enclosed_pad()
+    conns = [{'id': 'blocked', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}}]
+    greedy = autoroute_layout(layout, conns, enable_ripup=False)['autoroute_stats']
+    ripup = autoroute_layout(layout, conns, enable_ripup=True)['autoroute_stats']
+    assert ripup['routed'] >= greedy['routed']
+    assert ripup['failed'] <= greedy['failed']
+
+
+def test_ripup_runs_but_cannot_fix_true_enclosure():
+    """На физически запертом паде rip-up фаза отрабатывает (rounds>0), но честно
+    не выдумывает путь: failed остаётся, recovered=0 (нет трасс-блокеров — мешают
+    корпуса)."""
+    layout = _layout_enclosed_pad()
+    conns = [{'id': 'blocked', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}}]
+    stats = autoroute_layout(layout, conns, enable_ripup=True)['autoroute_stats']
+    assert stats['failed'] == 1
+    assert stats['ripup_rounds'] >= 1
+    assert stats['ripup_recovered'] == 0
+
+
+def test_ripup_rounds_bounded():
+    """Число раундов rip-up ограничено max_ripup_rounds — гарантия завершения."""
+    layout = _layout_enclosed_pad()
+    conns = [{'id': 'blocked', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}}]
+    stats = autoroute_layout(layout, conns, enable_ripup=True, max_ripup_rounds=2)['autoroute_stats']
+    assert stats['ripup_rounds'] <= 2
+
+
 def test_grid_dimensions_match_board_size():
     layout = _layout_two_pads_with_obstacle()
     grid_w, grid_h, occ = build_obstacle_grid(layout, step_mm=0.5)

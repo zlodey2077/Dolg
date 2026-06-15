@@ -195,6 +195,35 @@ def _net_length_mm(f_pad: tuple[float, float], t_pad: tuple[float, float]) -> fl
     return abs(f_pad[0] - t_pad[0]) + abs(f_pad[1] - t_pad[1])
 
 
+MAX_RIPUP_ROUNDS = 4  # сколько раз обходим неразведённые неты, снимая блокеры
+
+
+def _lockdown_cells(path: list[tuple[int, int]]) -> set[tuple[int, int]]:
+    """Клетки трассы + clearance-ореол — становятся obstacles для других net'ов."""
+    cells: set[tuple[int, int]] = set()
+    for cx, cy in path:
+        for dx in range(-TRACE_CLEARANCE_CELLS, TRACE_CLEARANCE_CELLS + 1):
+            for dy in range(-TRACE_CLEARANCE_CELLS, TRACE_CLEARANCE_CELLS + 1):
+                cells.add((cx + dx, cy + dy))
+    return cells
+
+
+def _route_one(grid_w, grid_h, occupied, f_pad, t_pad, step_mm, turn_penalty):
+    """A* для одного net'а на текущем occupied. Освобождает pad-клетки обоих
+    концов (их мог накрыть clearance-ореол чужой трассы — иначе нельзя войти)."""
+    start = _world_to_cell(f_pad[0], f_pad[1], step_mm)
+    goal = _world_to_cell(t_pad[0], t_pad[1], step_mm)
+    freed = set()
+    for pc in (start, goal):
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                c = (pc[0] + dx, pc[1] + dy)
+                if c in occupied:
+                    freed.add(c)
+    occ_eff = occupied - freed if freed else occupied
+    return astar(grid_w, grid_h, occ_eff, start, goal, turn_penalty)
+
+
 def autoroute_layout(
     layout: dict,
     scheme_connections: list[dict] | None = None,
@@ -202,20 +231,27 @@ def autoroute_layout(
     step_mm: float = GRID_STEP_MM,
     clearance_mm: float = COMP_CLEARANCE_MM,
     turn_penalty: float = TURN_PENALTY,
+    enable_ripup: bool = True,
+    max_ripup_rounds: int = MAX_RIPUP_ROUNDS,
 ) -> dict:
     """Главный entry-point: layout → layout с переразведёнными traces.
 
+    Жадная трассировка (короткие net'ы первыми) + **rip-up & reroute**: если net
+    не разведён, снимаем уже проложенные трассы, которые лежат на его пути, разводим
+    его и переразводим снятые. Свап принимается ТОЛЬКО если итоговое число разведённых
+    net'ов строго выросло (иначе откат) — это исключает осцилляцию и гарантирует
+    завершение за конечное число раундов.
+
     Args:
         layout: результат `pcb_layout.compute_pcb_layout(scheme_data)`.
-        scheme_connections: оригинальные connections со scheme_data
-            (пары from/to для каждого net'а).
+        scheme_connections: оригинальные connections со scheme_data (пары from/to).
+        enable_ripup: включить rip-up&reroute фазу после жадной трассировки.
 
     Returns:
-        Новый dict с обновлённым `traces` и `autoroute_stats`:
-            {'routed': int, 'failed': int, 'unreachable': list[conn_id],
-             'avg_length_mm': float, 'cells_per_mm': float}
+        Новый dict с `traces` и `autoroute_stats` (routed/failed/unreachable/
+        avg_length_mm/ripup_rounds/ripup_recovered/…).
     """
-    grid_w, grid_h, occupied = build_obstacle_grid(layout, step_mm, clearance_mm)
+    grid_w, grid_h, base_occupied = build_obstacle_grid(layout, step_mm, clearance_mm)
     pads_by_key = {
         (p.get('comp_id'), p.get('port_id')): (float(p['x_mm']), float(p['y_mm']))
         for p in layout.get('pads', []) or []
@@ -232,23 +268,96 @@ def autoroute_layout(
         pending.append((_net_length_mm(f_pad, t_pad), conn, f_pad, t_pad))
     pending.sort(key=lambda x: x[0])
 
+    # Состояние: разведённые net'ы (conn_id → клетки/путь/мета) + список неудач.
+    net_cells: dict[str, set[tuple[int, int]]] = {}
+    net_path: dict[str, list[tuple[int, int]]] = {}
+    meta: dict[str, tuple] = {}
+    failed: list[str] = []
+
+    def _occupied(exclude: set[str] | None = None) -> set[tuple[int, int]]:
+        occ = set(base_occupied)
+        for nid, cells in net_cells.items():
+            if exclude and nid in exclude:
+                continue
+            occ |= cells
+        return occ
+
+    def _try_route(cid: str) -> bool:
+        conn, f_pad, t_pad = meta[cid]
+        path = _route_one(grid_w, grid_h, _occupied(), f_pad, t_pad, step_mm, turn_penalty)
+        if path is None:
+            return False
+        net_cells[cid] = _lockdown_cells(path)
+        net_path[cid] = path
+        return True
+
+    # Жадная фаза
+    for index, (_length, conn, f_pad, t_pad) in enumerate(pending):
+        cid = str(conn.get('id') or f'net{index}')
+        meta[cid] = (conn, f_pad, t_pad)
+        if not _try_route(cid):
+            failed.append(cid)
+
+    # Rip-up & reroute фаза
+    ripup_rounds = 0
+    ripup_recovered = 0
+    if enable_ripup and failed:
+        for _round in range(max_ripup_rounds):
+            if not failed:
+                break
+            ripup_rounds += 1
+            progress = False
+            for cid in list(failed):
+                conn, f_pad, t_pad = meta[cid]
+                # Путь по «голой» плате (только компоненты): если и так нет — мешают
+                # не трассы, а корпуса; rip-up бесполезен.
+                bare = _route_one(grid_w, grid_h, set(base_occupied), f_pad, t_pad, step_mm, turn_penalty)
+                if bare is None:
+                    continue
+                conflict_cells = _lockdown_cells(bare)
+                conflicts = [nid for nid, cells in net_cells.items() if cells & conflict_cells]
+                if not conflicts:
+                    # Свободно и без снятия — просто разводим (соседи могли освободить).
+                    if _try_route(cid):
+                        failed.remove(cid)
+                        ripup_recovered += 1
+                        progress = True
+                    continue
+                # Снимок для отката, если свап не улучшит итог.
+                snap_cells = {k: set(v) for k, v in net_cells.items()}
+                snap_path = dict(net_path)
+                snap_failed = list(failed)
+                before = len(net_cells)
+                for nid in conflicts:
+                    net_cells.pop(nid, None)
+                    net_path.pop(nid, None)
+                routed_cid = _try_route(cid)
+                if routed_cid:
+                    failed.remove(cid)
+                for nid in conflicts:  # переразводим снятые
+                    if not _try_route(nid) and nid not in failed:
+                        failed.append(nid)
+                if len(net_cells) > before:  # строго больше разведено — принимаем
+                    ripup_recovered += len(net_cells) - before
+                    progress = True
+                else:  # не улучшили — полный откат
+                    net_cells.clear()
+                    net_cells.update(snap_cells)
+                    net_path.clear()
+                    net_path.update(snap_path)
+                    failed[:] = snap_failed
+            if not progress:
+                break
+
+    # Эмит трасс из финальных путей
     new_traces: list[dict] = []
     routed_lengths_mm: list[float] = []
-    failed: list[str] = []
-    routed = 0
-
-    for _length, conn, f_pad, t_pad in pending:
-        start_cell = _world_to_cell(f_pad[0], f_pad[1], step_mm)
-        goal_cell = _world_to_cell(t_pad[0], t_pad[1], step_mm)
-        path = astar(grid_w, grid_h, occupied, start_cell, goal_cell, turn_penalty)
-        if path is None:
-            failed.append(str(conn.get('id') or ''))
-            continue
+    for cid, path in net_path.items():
+        conn = meta[cid][0]
         simplified = _simplify_collinear(path)
-        # Полилиния в мире → срезаем прямые углы на 45° (chamfer), затем эмитим
-        # сегменты. A* и lock-down — по исходному пути; chamfer только украшает выход.
-        world_pts = [_cell_to_world(cx, cy, step_mm) for cx, cy in simplified]
-        world_pts = _chamfer_corners(world_pts, CHAMFER_MM)
+        # Полилиния в мире → срезаем прямые углы на 45° (chamfer). A* по клеткам;
+        # chamfer только украшает выход.
+        world_pts = _chamfer_corners([_cell_to_world(cx, cy, step_mm) for cx, cy in simplified], CHAMFER_MM)
         for i in range(1, len(world_pts)):
             ax, ay = world_pts[i - 1]
             bx, by = world_pts[i]
@@ -262,20 +371,6 @@ def autoroute_layout(
                     'astar': True,
                 }
             )
-        # Lock-down: клетки этой трассы становятся obstacles + clearance
-        for cx, cy in path:
-            for dx in range(-TRACE_CLEARANCE_CELLS, TRACE_CLEARANCE_CELLS + 1):
-                for dy in range(-TRACE_CLEARANCE_CELLS, TRACE_CLEARANCE_CELLS + 1):
-                    occupied.add((cx + dx, cy + dy))
-        # Но pad-клетки goal/start всё ещё нужны другим net'ам (multi-net pad'ы)
-        for pad_world in (f_pad, t_pad):
-            pcx, pcy = _world_to_cell(pad_world[0], pad_world[1], step_mm)
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    occupied.discard((pcx + dx, pcy + dy))
-
-        routed += 1
-        # Длина в мм — Manhattan по simplified
         length_mm = 0.0
         for i in range(1, len(simplified)):
             ax, ay = simplified[i - 1]
@@ -287,7 +382,7 @@ def autoroute_layout(
     out_layout['traces'] = new_traces
     out_layout['vias'] = []  # Phase 1 — single layer, без vias
     out_layout['autoroute_stats'] = {
-        'routed': routed,
+        'routed': len(net_path),
         'failed': len(failed),
         'unreachable': failed,
         'avg_length_mm': round(sum(routed_lengths_mm) / len(routed_lengths_mm), 2)
@@ -297,7 +392,11 @@ def autoroute_layout(
         'cells_per_mm': round(1.0 / step_mm, 2),
         'grid_w': grid_w,
         'grid_h': grid_h,
-        'algorithm': 'A* (Manhattan + turn penalty, 45° chamfered)',
+        'algorithm': 'A* (Manhattan + turn penalty, 45° chamfered) + rip-up&reroute'
+        if enable_ripup
+        else 'A* (Manhattan + turn penalty, 45° chamfered)',
         'turn_penalty': turn_penalty,
+        'ripup_rounds': ripup_rounds,
+        'ripup_recovered': ripup_recovered,
     }
     return out_layout
