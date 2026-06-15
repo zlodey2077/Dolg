@@ -399,13 +399,60 @@ def import_eagle_xml(source):
     }
 
 
-def import_schematic_auto(source):
-    """Авто-детект формата схемы (KiCad sexpr vs EAGLE XML) и вызов нужного парсера.
+_KICAD_LEGACY_COMP_RE = re.compile(r'\$Comp\b(.*?)\$EndComp', re.S)
+_KICAD_LEGACY_L_RE = re.compile(r'^L\s+(\S+)\s+(\S+)', re.M)
+_KICAD_LEGACY_F1_RE = re.compile(r'^F\s+1\s+"([^"]*)"', re.M)
 
-    Используется при импорте смешанных датасетов (open-schematics): EAGLE-шарды и
-    KiCad-шарды лежат вперемешку."""
+
+def import_kicad_legacy(source):
+    """Импорт устаревшего KiCad .sch (`EESchema Schematic File Version 2/4`).
+
+    Старый строчный формат (до sexpr): компоненты в блоках `$Comp … $EndComp`,
+    строка `L <lib>:<part> <ref>` даёт тип/обозначение, `F 1 "<value>"` — номинал.
+    Соединения — placeholder-узлы (как у sexpr-парсера). Часть шардов open-schematics
+    именно в этом формате."""
+    text = source or ''
+    parsed = []
+    net_map: dict[str, list] = {}
+    unsupported = []
+    idx = 0
+    for block in _KICAD_LEGACY_COMP_RE.findall(text):
+        lm = _KICAD_LEGACY_L_RE.search(block)
+        if not lm:
+            continue
+        libpart, ref = lm.group(1), lm.group(2)
+        vm = _KICAD_LEGACY_F1_RE.search(block)
+        value = vm.group(1) if vm else ''
+        if ref.startswith(('#PWR', '#FLG')):
+            ctype = 'ground'
+        else:
+            short = libpart.split(':')[-1]
+            ctype = normalize_component_type(short)
+            if ctype == short.lower():
+                ctype = _spice_component_type(ref)
+        idx += 1
+        node = f'N{idx}'
+        parsed.append({'ref': ref, 'type': ctype, 'nodes': [node], 'value': value})
+        net_map.setdefault(node, []).append(ref)
+    if not parsed:
+        unsupported.append('KiCad legacy: компоненты не найдены.')
+    scheme = _build_scheme(parsed, net_map, unsupported)
+    return {
+        'ok': bool(parsed),
+        'format': 'kicad_legacy',
+        'scheme_data': scheme,
+        'summary': {'components': len(parsed), 'nets': len(net_map), 'unsupported': len(unsupported)},
+        'unsupported': unsupported,
+    }
+
+
+def import_schematic_auto(source):
+    """Авто-детект формата схемы и вызов нужного парсера. open-schematics смешан:
+    KiCad sexpr (KiCad 6+), KiCad legacy (EESchema), EAGLE XML — лежат вперемешку."""
     text = (source or '').lstrip()
     head = text[:400].lower()
+    if head.startswith('eeschema schematic file'):
+        return import_kicad_legacy(source)
     if '<eagle' in head or ('<?xml' in head and 'eagle.dtd' in head):
         return import_eagle_xml(source)
     if head.startswith('(kicad_sch') or '(lib_id' in text[:5000] or '(symbol ' in text[:5000]:

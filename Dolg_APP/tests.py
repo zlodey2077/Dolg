@@ -804,6 +804,33 @@ class EngineeringReviewTests(TestCase):
         self.assertEqual(import_schematic_auto(eagle)['format'], 'eagle_xml')
         self.assertEqual(import_schematic_auto(kicad)['format'], 'kicad_sexpr')
 
+    def test_cad_import_kicad_legacy_eeschema(self):
+        # Старый KiCad .sch (EESchema Schematic File): $Comp-блоки, L/F-строки.
+        source = (
+            'EESchema Schematic File Version 4\n'
+            'LIBS:device\n'
+            '$Comp\n'
+            'L Device:R R1\n'
+            'U 1 1 5C0F1A2B\n'
+            'P 5000 3000\n'
+            'F 0 "R1" H 5070 3046 50  0000 L CNN\n'
+            'F 1 "10k" H 5070 2955 50  0000 L CNN\n'
+            '$EndComp\n'
+            '$Comp\n'
+            'L power:GND #PWR01\n'
+            'F 0 "#PWR01" H 5000 2750 50  0001 C CNN\n'
+            'F 1 "GND" H 5005 2827 50  0000 C CNN\n'
+            '$EndComp\n'
+            '$EndSCHEMATC\n'
+        )
+        result = import_schematic_auto(source)
+        self.assertEqual(result['format'], 'kicad_legacy')
+        comps = {
+            c['label']: c['type'] for c in result['scheme_data']['components'] if c.get('type') != 'node'
+        }
+        self.assertEqual(comps.get('R1'), 'resistor')
+        self.assertEqual(comps.get('#PWR01'), 'ground')
+
     def test_cad_import_api_can_save_project(self):
         self._seed_diagnostics_lesson()
         response = self.client.post(
