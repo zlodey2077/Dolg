@@ -1679,9 +1679,8 @@
                 </div>
             </div>
 
-            <!-- Слои -->
-            <div class="panel-section">
-                <div class="panel-section-title">Инженерный анализ</div>
+            <details class="panel-section panel-section--collapsible" open>
+                <summary class="panel-section-title">Инженерный анализ</summary>
                 <div class="panel-section-content">
                     <div class="cad-engine-grid">
                         <button type="button" id="panelDrcBtn" class="btn-small primary">Проверить</button>
@@ -1692,7 +1691,7 @@
                     <div id="cadDrcList" class="cad-mini-list" style="margin-top:8px;"></div>
                     <div id="cadNetInfo" class="cad-mini-list" style="margin-top:8px;"></div>
                 </div>
-            </div>
+            </details>
 
             <div class="panel-section" id="cadImportPreviewPanel" style="display:none;">
                 <div class="panel-section-title">Предпросмотр импорта</div>
@@ -1705,8 +1704,8 @@
                 </div>
             </div>
 
-            <div class="panel-section">
-                <div class="panel-section-title">Спецификация и каталог</div>
+            <details class="panel-section panel-section--collapsible" open>
+                <summary class="panel-section-title">Спецификация и каталог</summary>
                 <div class="panel-section-content">
                     <div id="cadBomList" class="cad-mini-list"></div>
                     <div class="cad-engine-grid" style="margin-top:8px;">
@@ -1714,10 +1713,10 @@
                         <button type="button" id="exportBomCsvBtn" class="btn-small">CSV</button>
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <div class="panel-section">
-                <div class="panel-section-title">AI-помощник CAD</div>
+            <details class="panel-section panel-section--collapsible" open>
+                <summary class="panel-section-title">AI-помощник CAD</summary>
                 <div class="panel-section-content">
                     <textarea id="cadAiPrompt" class="property-input" rows="3" placeholder="Например: проверь схему, собери стабилизатор 5В, объясни выбранный узел"></textarea>
                     <div class="cad-engine-grid" style="margin-top:8px;">
@@ -1726,15 +1725,15 @@
                     </div>
                     <div id="cadAiOutput" class="cad-ai-output" style="margin-top:8px;">Команды применяются только после подтверждения.</div>
                 </div>
-            </div>
+            </details>
 
             {% comment %}
             2026-06-02 CAD Tier A: PCB Layer Manager — 8 предустановленных слоёв PCB.
             Standardized под индустрию (KiCad/Altium совместимо).
             Каждый: toggle visibility (👁), цвет, опц. active (для рисования).
             {% endcomment %}
-            <div class="panel-section pcb-layers-section">
-                <div class="panel-section-title">📐 Слои PCB</div>
+            <details class="panel-section pcb-layers-section panel-section--collapsible" open>
+                <summary class="panel-section-title">📐 Слои PCB</summary>
                 <div class="panel-section-content">
                     <div class="pcb-layers-list" id="pcbLayersList">
                         <div class="pcb-layer-row" data-pcb-layer="top-copper">
@@ -1769,9 +1768,25 @@
                             <input type="checkbox" checked title="Показать/скрыть"><span class="pcb-layer-color" style="background:#ffd54f"></span>
                             <span class="pcb-layer-name">Outline</span>
                         </div>
+                        <div class="pcb-layer-row" data-pcb-layer="inner1">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#2e8b57"></span>
+                            <span class="pcb-layer-name">Inner Copper 1</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="inner2">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#8a6d3b"></span>
+                            <span class="pcb-layer-name">Inner Copper 2</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="fab">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#9aa0a6"></span>
+                            <span class="pcb-layer-name">Fab / Assembly</span>
+                        </div>
+                        <div class="pcb-layer-row" data-pcb-layer="courtyard">
+                            <input type="checkbox" title="Показать/скрыть"><span class="pcb-layer-color" style="background:#ff79c6"></span>
+                            <span class="pcb-layer-name">Courtyard</span>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </details>
 
             <details class="panel-section panel-section--collapsible layers-section">
                 <summary class="panel-section-title">
