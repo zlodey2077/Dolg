@@ -786,14 +786,13 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                     </div>
                 </div>
 
-                <!-- TAB: Probes — placeholder для следующей итерации -->
+                <!-- TAB: Probes — живые измерения V/I (заполняется после симуляции) -->
                 <div class="sim-dock-tab-body" data-tab-body="probes" role="tabpanel">
                     <div id="probes-panel">
                         <p class="placeholder">
-                            📍 <b>Закреплённые пробники</b><br>
-                            Кликни по проводу/узлу на схеме — probe прилипнет здесь с live-значением V/I.
-                            Каждый probe сохраняет min/max/avg, для TRAN — мини-график.
-                            <br><small style="color: #6c7388;">(планируется в следующей итерации)</small>
+                            📍 <b>Пробники (V/I)</b><br>
+                            Запустите симуляцию — здесь появятся напряжения узлов и токи ветвей
+                            резисторов с накоплением min/max/avg по прогонам. Клик по строке закрепляет probe.
                         </p>
                     </div>
                 </div>
@@ -7755,6 +7754,131 @@ function toggleVoltageBadges() {
 }
 window.toggleVoltageBadges = toggleVoltageBadges;
 
+// ─── Probes: живые измерения по узлам/ветвям с накоплением min/max/avg ───
+// Переиспользует result.nodeVoltages + _lastPortNetMap (напряжения узлов) и
+// считает ток ветви резисторов I=(Va−Vb)/R. НЕ трогает клики канваса: панель
+// обновляется как сайд-эффект рендера результата симуляции.
+let _probeStats = new Map();        // ключ ('V:'+net | 'I:'+compId) → {min,max,sum,n,last}
+let _pinnedProbes = new Set();      // закреплённые ключи (наверх таблицы)
+
+function _accStat(key, val) {
+    let s = _probeStats.get(key);
+    if (!s) { s = { min: val, max: val, sum: 0, n: 0, last: val }; _probeStats.set(key, s); }
+    if (val < s.min) s.min = val;
+    if (val > s.max) s.max = val;
+    s.sum += val; s.n += 1; s.last = val;
+    return s;
+}
+
+function resetProbeStats() {
+    _probeStats.clear();
+    updateProbesPanel(window._lastSimResult);
+    if (typeof showNotification === 'function') showNotification('Статистика probes сброшена', 'info');
+}
+window.resetProbeStats = resetProbeStats;
+
+function toggleProbePin(key) {
+    if (_pinnedProbes.has(key)) _pinnedProbes.delete(key); else _pinnedProbes.add(key);
+    updateProbesPanel(window._lastSimResult);
+}
+window.toggleProbePin = toggleProbePin;
+
+function _fmtProbeCurrent(i) {
+    const a = Math.abs(i);
+    if (a < 1e-9) return '0';
+    if (a < 1e-6) return (i * 1e9).toFixed(0) + 'нА';
+    if (a < 1e-3) return (i * 1e6).toFixed(1) + 'мкА';
+    if (a < 1) return (i * 1e3).toFixed(2) + 'мА';
+    return i.toFixed(3) + 'А';
+}
+
+function updateProbesPanel(result) {
+    const panel = document.getElementById('probes-panel');
+    if (!panel) return;
+    const nv = result && result.nodeVoltages;
+    const map = window._lastPortNetMap;
+    if (!nv || !map) {
+        panel.innerHTML = '<p class="placeholder">📍 Запустите симуляцию — здесь появятся напряжения узлов и токи ветвей с накоплением min/max/avg по прогонам. Клик по строке закрепляет probe наверху.</p>';
+        return;
+    }
+    // net → список компонентов на нём (для подписи)
+    const netRefs = new Map();
+    for (const c of components) {
+        const ports = c.ports || getComponentPorts(c.type) || [];
+        for (const p of ports) {
+            const net = map.get(`${c.id}:${p.id}`);
+            if (net == null) continue;
+            const key = String(net);
+            if (!netRefs.has(key)) netRefs.set(key, new Set());
+            netRefs.get(key).add(String(c.label || c.type || '').split(' ')[0] || c.type);
+        }
+    }
+    const rows = [];
+    // Напряжения узлов
+    Object.keys(nv).forEach(netKey => {
+        if (String(netKey) === '0') return;
+        const v = nv[netKey];
+        if (v == null || !isFinite(v)) return;
+        const key = 'V:' + netKey;
+        const s = _accStat(key, v);
+        const refs = Array.from(netRefs.get(String(netKey)) || []).slice(0, 3).join(', ');
+        rows.push({ key, kind: 'V', label: `N${netKey}${refs ? ' · ' + refs : ''}`, fmt: _fmtBadgeVoltage, s });
+    });
+    // Токи ветвей резисторов: I = (Va − Vb) / R
+    for (const c of components) {
+        if (String(c.type || '') !== 'resistor') continue;
+        const R = Number(c.resistance);
+        if (!(R > 0)) continue;
+        const ports = c.ports || getComponentPorts(c.type) || [];
+        if (ports.length < 2) continue;
+        const na = map.get(`${c.id}:${ports[0].id}`);
+        const nb = map.get(`${c.id}:${ports[1].id}`);
+        if (na == null || nb == null) continue;
+        const Va = String(na) === '0' ? 0 : nv[String(na)];
+        const Vb = String(nb) === '0' ? 0 : nv[String(nb)];
+        if (Va == null || Vb == null || !isFinite(Va) || !isFinite(Vb)) continue;
+        const I = (Va - Vb) / R;
+        const key = 'I:' + c.id;
+        const s = _accStat(key, I);
+        rows.push({ key, kind: 'I', label: String(c.label || ('R' + c.id)).split(' ')[0], fmt: _fmtProbeCurrent, s });
+    }
+    if (!rows.length) {
+        panel.innerHTML = '<p class="placeholder">Нет данных по узлам. Проверьте, что схема собрана (есть земля и замкнутые цепи).</p>';
+        return;
+    }
+    rows.sort((a, b) => (_pinnedProbes.has(b.key) - _pinnedProbes.has(a.key)));
+    const cell = (txt, extra = '') => `<td style="padding:3px 6px;${extra}">${txt}</td>`;
+    const body = rows.map(r => {
+        const pinned = _pinnedProbes.has(r.key);
+        const avg = r.s.n ? r.s.sum / r.s.n : r.s.last;
+        const color = r.kind === 'V' ? '#7fdbff' : '#ffc26b';
+        return `<tr onclick="toggleProbePin('${r.key}')" title="Клик — закрепить/открепить"
+                    style="cursor:pointer; ${pinned ? 'background:rgba(0,212,255,0.10);' : ''}">
+            ${cell((pinned ? '📌 ' : '') + escapeHtml(r.label))}
+            ${cell(`<b style="color:${color};">${r.fmt(r.s.last)}</b>`, 'text-align:right;')}
+            ${cell(r.fmt(r.s.min), 'text-align:right; color:#9fb2c8;')}
+            ${cell(r.fmt(r.s.max), 'text-align:right; color:#9fb2c8;')}
+            ${cell(r.fmt(avg), 'text-align:right; color:#9fb2c8;')}
+        </tr>`;
+    }).join('');
+    panel.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:0.8rem; color:#9fb2c8;">Напряжения узлов (V) и токи ветвей (I) · накопление по прогонам</span>
+            <button type="button" onclick="resetProbeStats()" style="font-size:0.75rem;">↺ сброс min/max</button>
+        </div>
+        <table style="width:100%; font-size:0.8rem; border-collapse:collapse;">
+            <thead><tr style="color:#00d4ff; text-align:left;">
+                <th style="padding:3px 6px;">Точка</th>
+                <th style="padding:3px 6px; text-align:right;">Текущее</th>
+                <th style="padding:3px 6px; text-align:right;">min</th>
+                <th style="padding:3px 6px; text-align:right;">max</th>
+                <th style="padding:3px 6px; text-align:right;">avg</th>
+            </tr></thead>
+            <tbody>${body}</tbody>
+        </table>`;
+}
+window.updateProbesPanel = updateProbesPanel;
+
 function _getComponentVoltageRating(comp) {
     if (!comp) return null;
     const params = comp.catalog_parameters || comp.parameters || {};
@@ -10357,6 +10481,8 @@ function renderSimResult(result, built, elapsedMs, engineVersion, rawOutput) {
             );
         }
     } catch (e) { /* не критично — Ω просто покажет «нет данных» */ }
+    // Probes-таб: живые измерения по узлам/ветвям (сайд-эффект, не влияет на разметку результата).
+    try { updateProbesPanel(result); } catch (e) { /* панель не критична */ }
     const thermalSection = renderThermalSection(_lastSimPowers);
     const proAnalysis = renderProAnalysisToolbar(result);
 
