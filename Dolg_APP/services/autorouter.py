@@ -27,12 +27,41 @@ Phase 2 (post-defense):
 from __future__ import annotations
 
 import heapq
+import math
 
 GRID_STEP_MM = 0.5
 TURN_PENALTY = 3.0  # штраф за поворот (cells)
 COMP_CLEARANCE_MM = 1.0  # отступ от bbox компонента до возможной трассы
 TRACE_CLEARANCE_CELLS = 1  # клеток между параллельными трассами
 MAX_ASTAR_EXPANSIONS = 250_000  # safety cap: не зависнуть на сложных схемах
+# 90° углы манхэттен-пути против правил PCB (§L): срезаем их на 45° (chamfer).
+# Только геометрия эмитируемой трассы; A* и lock-down по исходным клеткам.
+CHAMFER_MM = 0.8
+
+
+def _chamfer_corners(points: list[tuple[float, float]], chamfer_mm: float) -> list[tuple[float, float]]:
+    """Срезает прямые (90°) углы полилинии на 45°: каждый внутренний угол B → две
+    точки на инцидентных сегментах (на расстоянии d от B) + диагональ между ними.
+    d ограничено половиной короткого сегмента, чтобы срезы соседних углов не
+    пересекались. Точки-срезы лежат на исходных сегментах → не выходят за
+    безопасный коридор пути (obstacle-clearance сохраняется)."""
+    if len(points) < 3 or chamfer_mm <= 0:
+        return points
+    out: list[tuple[float, float]] = [points[0]]
+    for i in range(1, len(points) - 1):
+        ax, ay = points[i - 1]
+        bx, by = points[i]
+        cx, cy = points[i + 1]
+        lab = math.hypot(bx - ax, by - ay)
+        lbc = math.hypot(cx - bx, cy - by)
+        if lab < 1e-9 or lbc < 1e-9:
+            out.append((bx, by))
+            continue
+        d = min(chamfer_mm, lab / 2.0, lbc / 2.0)
+        out.append((bx + (ax - bx) * d / lab, by + (ay - by) * d / lab))
+        out.append((bx + (cx - bx) * d / lbc, by + (cy - by) * d / lbc))
+    out.append(points[-1])
+    return out
 
 
 def _world_to_cell(x_mm: float, y_mm: float, step: float) -> tuple[int, int]:
@@ -216,10 +245,13 @@ def autoroute_layout(
             failed.append(str(conn.get('id') or ''))
             continue
         simplified = _simplify_collinear(path)
-        # Эмитим сегменты в layout-формате
-        for i in range(1, len(simplified)):
-            ax, ay = _cell_to_world(simplified[i - 1][0], simplified[i - 1][1], step_mm)
-            bx, by = _cell_to_world(simplified[i][0], simplified[i][1], step_mm)
+        # Полилиния в мире → срезаем прямые углы на 45° (chamfer), затем эмитим
+        # сегменты. A* и lock-down — по исходному пути; chamfer только украшает выход.
+        world_pts = [_cell_to_world(cx, cy, step_mm) for cx, cy in simplified]
+        world_pts = _chamfer_corners(world_pts, CHAMFER_MM)
+        for i in range(1, len(world_pts)):
+            ax, ay = world_pts[i - 1]
+            bx, by = world_pts[i]
             new_traces.append(
                 {
                     'from': {'x_mm': ax, 'y_mm': ay},
@@ -265,7 +297,7 @@ def autoroute_layout(
         'cells_per_mm': round(1.0 / step_mm, 2),
         'grid_w': grid_w,
         'grid_h': grid_h,
-        'algorithm': 'A* (Manhattan + turn penalty)',
+        'algorithm': 'A* (Manhattan + turn penalty, 45° chamfered)',
         'turn_penalty': turn_penalty,
     }
     return out_layout

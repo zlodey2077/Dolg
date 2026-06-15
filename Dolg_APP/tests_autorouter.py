@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from Dolg_APP.services.autorouter import (
+    _chamfer_corners,
     astar,
     autoroute_layout,
     build_obstacle_grid,
@@ -53,6 +54,35 @@ def test_routes_around_obstacle_when_possible():
             assert not (20.1 < x < 29.9 and 22.1 < y < 27.9), (
                 f'Trace endpoint {x},{y} crossed obstacle interior'
             )
+
+
+def test_chamfer_cuts_right_angle_to_45():
+    # L-полилиния: вверх до (0,10), затем вправо — 90° угол в (0,10).
+    out = _chamfer_corners([(0.0, 0.0), (0.0, 10.0), (10.0, 10.0)], 2.0)
+    assert (0.0, 10.0) not in out  # острый угол срезан
+    assert (0.0, 8.0) in out and (2.0, 10.0) in out  # две точки-среза
+    # диагональ между ними — 45° (|dx| == |dy|)
+    i = out.index((0.0, 8.0))
+    ax, ay = out[i]
+    bx, by = out[i + 1]
+    assert abs(bx - ax) == pytest.approx(abs(by - ay))
+
+
+def test_chamfer_noop_for_short_polyline():
+    assert _chamfer_corners([(0.0, 0.0), (1.0, 1.0)], 2.0) == [(0.0, 0.0), (1.0, 1.0)]
+
+
+def test_traces_have_45deg_chamfer():
+    layout = _layout_two_pads_with_obstacle()
+    connections = [{'id': 'n', 'from': {'compId': 'A', 'portId': '1'}, 'to': {'compId': 'B', 'portId': '1'}}]
+    out = autoroute_layout(layout, connections)
+    assert '45' in out['autoroute_stats']['algorithm']
+    diagonal = any(
+        abs(tr['from']['x_mm'] - tr['to']['x_mm']) > 1e-6
+        and abs(tr['from']['y_mm'] - tr['to']['y_mm']) > 1e-6
+        for tr in out['traces']
+    )
+    assert diagonal, 'ожидался хотя бы один диагональный (45°) сегмент после chamfer'
 
 
 def test_no_connections_yields_empty_traces():
