@@ -39,3 +39,31 @@ class GlossaryRetrievalTests(TestCase):
         ctx = build_retrieval_context('что такое конденсатор')
         lines = retrieval_lines(ctx, limit=6)
         self.assertTrue(any(line.startswith('глоссарий:') for line in lines))
+
+    def test_engine_terms_present(self):
+        # Термины под движки симулятора (derating/dropout/Tj/Monte Carlo/MNA/IPC).
+        ids = {e['id'] for e in _load_glossary()}
+        self.assertTrue(
+            {
+                'derating',
+                'dropout',
+                'time_constant',
+                'regulator',
+                'junction_temperature',
+                'monte_carlo',
+                'mna',
+                'ipc_2221',
+            }.issubset(ids)
+        )
+
+    def test_multiword_alias_grounds_via_substring(self):
+        # Составные алиасы («monte carlo», «постоянная времени») матчатся по сырому
+        # сообщению, а не только по одиночным токенам.
+        for query, term in (
+            ('что такое monte carlo', 'Анализ Монте-Карло'),
+            ('что такое постоянная времени', 'Постоянная времени (τ)'),
+        ):
+            titles = [
+                i['title'] for i in build_retrieval_context(query)['items'] if i['source'] == 'glossary'
+            ]
+            self.assertIn(term, titles)

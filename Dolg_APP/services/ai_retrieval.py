@@ -55,7 +55,7 @@ def build_retrieval_context(
 ) -> dict[str, Any]:
     tokens = _query_tokens(message, intent=intent, scheme=scheme, review=review)
     items: list[dict[str, Any]] = []
-    items.extend(_glossary_items(tokens))
+    items.extend(_glossary_items(tokens, message=message))
     items.extend(_artifact_items(project, tokens))
     items.extend(_training_items(project, tokens))
     items.extend(_legal_source_items(tokens))
@@ -425,17 +425,22 @@ def _load_glossary() -> list[dict[str, Any]]:
     return _GLOSSARY_CACHE
 
 
-def _glossary_items(tokens: list[str]) -> list[dict[str, Any]]:
+def _glossary_items(tokens: list[str], message: str = '') -> list[dict[str, Any]]:
     """Точные определения базовых терминов — чтобы на вопрос вроде «что такое
     резистор» ассистент опирался на выверенный текст, а не выдумывал. Матч по
     алиасам термина; найденному даём высокий базовый score, чтобы определение
-    шло первым в контексте."""
+    шло первым в контексте. Одиночные алиасы матчатся по токенам, а составные
+    («monte carlo», «постоянная времени») — substring по сырому сообщению."""
     token_set = set(tokens)
+    text = (message or '').lower()
     items: list[dict[str, Any]] = []
     for entry in _load_glossary():
         aliases = [str(a).lower() for a in entry.get('aliases') or []]
         aliases.append(str(entry.get('term') or '').lower())
-        if not any(alias and alias in token_set for alias in aliases):
+        matched = any(alias and alias in token_set for alias in aliases)
+        if not matched and text:
+            matched = any(alias and (' ' in alias or '-' in alias) and alias in text for alias in aliases)
+        if not matched:
             continue
         snippet = entry.get('definition') or ''
         if entry.get('formula'):
