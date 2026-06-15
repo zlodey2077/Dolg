@@ -104,14 +104,79 @@ def derating_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
     for rid, power, rated in rows[:limit]:
         load = (power / rated * 100.0) if rated else 0.0
         worst = max(worst, load)
-        verdict = 'перегрузка' if load >= 100 else ('внимание' if load >= 50 else 'норма')
+        # Доменные пороги derating-factor (§AK): ≤50% промышл., ≤80% IPC-9592B.
+        if load >= 100:
+            verdict = 'перегрузка'
+        elif load >= 80:
+            verdict = 'предел >80%'
+        elif load >= 50:
+            verdict = 'внимание >50%'
+        else:
+            verdict = 'норма'
         pstr = f'{power * 1000:.0f} мВт' if power < 1 else f'{power:.2f} Вт'
         lines.append(f'{rid}: {pstr} / {rated:.2f} Вт ном → {load:.0f}% ({verdict})')
     if worst >= 100:
         lines.append('⚠ перегрузка по мощности — увеличить номинал/корпус резистора')
+    elif worst >= 80:
+        lines.append('выше 80% (предел high-density по IPC-9592B) — поднять номинал/корпус')
     elif worst >= 50:
-        lines.append('рекомендация: держать нагрузку <50% номинала (derating-запас)')
-    lines.append('источник: P=ΔU²/R (MNA) против tdp_w каталога; правило derating')
+        lines.append('рекомендация: держать нагрузку <50% номинала (промышл. derating-запас)')
+    lines.append('источник: P=ΔU²/R (MNA) против tdp_w; derating ≤50% (промышл.)/≤80% (IPC-9592B)')
+    return lines
+
+
+def regulator_lines(scheme_data: dict | None) -> list[str]:
+    """Линейный стабилизатор (78xx/LM317/КРЕН): проверка dropout (Vin−Vout) и
+    рассеяния P=(Vin−Vout)·Iнагр. Детект по типу/метке; Vout из параметра либо
+    из 78xx-цифр (7805→5В). Пусто, если регулятора/Vin нет (§AL)."""
+    import re
+
+    from shop.component_validation import parse_engineering_value
+
+    comps = _components(scheme_data)
+    reg = None
+    vout = None
+    pat78 = re.compile(r'78(\d\d)')
+    label_re = re.compile(r'(78\d\d|79\d\d|lm3\d\d|кр142|крен|regulator|стабилиз|ldo)', re.IGNORECASE)
+    for c in comps:
+        label = str(c.get('label') or '')
+        ctype = (c.get('type') or '').lower()
+        params = c.get('catalog_parameters') or c.get('parameters') or {}
+        if (
+            ctype in ('regulator', 'ldo')
+            or label_re.search(label)
+            or (ctype == 'ic' and label_re.search(label))
+        ):
+            reg = c
+            try:
+                vout = float(params.get('vout') or params.get('output_voltage') or c.get('vout') or 0) or None
+            except TypeError, ValueError:
+                vout = None
+            m = pat78.search(label)
+            if vout is None and m:
+                vout = float(m.group(1))  # 7805 → 05 → 5 В
+            break
+    if not reg:
+        return []
+    src = _first_of(scheme_data, 'battery')
+    vin = parse_engineering_value('voltage', src.get('voltage') or src.get('value')) if src else None
+    label = str(reg.get('label') or reg.get('type') or 'регулятор')
+    lines: list[str] = []
+    if vin and vout:
+        dropout = vin - vout
+        lines.append(f'{label}: Vin={vin:g} В, Vout={vout:g} В → dropout = {dropout:.2f} В')
+        if dropout < 2.0:
+            lines.append(
+                f'⚠ dropout {dropout:.2f} В < ~2 В — стандартный 78xx не стабилизирует (нужен LDO или выше Vin)'
+            )
+        else:
+            lines.append('dropout ОК (≥2 В для стандартного линейного)')
+        lines.append(
+            f'рассеяние P = (Vin−Vout)·Iнагр = {dropout:.2f}·I Вт → радиатор при больших токах (термика §Y)'
+        )
+        lines.append('источник: формула линейного стабилизатора (dropout + P=(Vin−Vout)·I)')
+    elif vout:
+        lines.append(f'{label}: Vout = {vout:g} В (добавьте источник Vin для проверки dropout)')
     return lines
 
 

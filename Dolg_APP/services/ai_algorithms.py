@@ -60,6 +60,12 @@ ALGORITHMS: list[Algorithm] = [
         lambda scheme, topology: ai_toolkit.derating_lines(scheme),
     ),
     Algorithm(
+        'regulator',
+        'Линейный стабилизатор (dropout/P)',
+        frozenset({'formula', 'thermal', 'recommend'}),
+        lambda scheme, topology: ai_toolkit.regulator_lines(scheme),
+    ),
+    Algorithm(
         'tiny_ai',
         'Нейроподсказка (tiny-AI)',
         frozenset({'overview', 'scheme_overview', 'recommend'}),

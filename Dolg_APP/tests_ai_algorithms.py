@@ -4,8 +4,18 @@ from __future__ import annotations
 
 from django.test import SimpleTestCase
 
-from Dolg_APP.services import ai_algorithms
+from Dolg_APP.services import ai_algorithms, ai_toolkit
 from Dolg_APP.tests_ai_toolkit import _divider
+
+
+def _regulator_scheme(vin):
+    return {
+        'components': [
+            {'id': 'V1', 'type': 'battery', 'voltage': vin, 'ports': [{'id': '+'}, {'id': '-'}]},
+            {'id': 'U1', 'type': 'ic', 'label': '7805', 'ports': [{'id': '1'}, {'id': '2'}, {'id': '3'}]},
+        ],
+        'connections': [],
+    }
 
 
 def _rc():
@@ -54,6 +64,20 @@ class SectionsForIntentTests(SimpleTestCase):
         # primary intent (если он в плане) идёт первым
         plan2 = ai_algorithms.plan_for('что измерить?', 'measurement')
         self.assertEqual(plan2[0], 'measurement')
+
+    def test_regulator_dropout_ok(self):
+        joined = ' '.join(ai_toolkit.regulator_lines(_regulator_scheme(12)))
+        self.assertIn('dropout', joined.lower())
+        self.assertIn('5', joined)  # Vout=5 из 7805
+        self.assertIn('ОК', joined)  # 12-5=7 ≥ 2
+
+    def test_regulator_dropout_too_low(self):
+        lines = ai_toolkit.regulator_lines(_regulator_scheme(5))
+        self.assertTrue(any('не стабилизирует' in ln for ln in lines))
+
+    def test_regulator_in_manifest(self):
+        keys = {a['key'] for a in ai_algorithms.available_algorithms('formula')}
+        self.assertIn('regulator', keys)
 
     def test_sections_for_plan_dedup(self):
         # dc_voltages есть и в measurement, и в overview — в плане не дублируется
