@@ -1617,7 +1617,11 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
 .analysis-bottom-content {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    /* Скролл вместо обрезки: при высоком контенте карточек (Scope/Gen/Multimeter)
+       нижние кнопки/иконки раньше прятались под фикс-высотой панели — теперь
+       контент прокручивается, иконки всегда доступны. */
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 8px;
 }
 /* Лаба внутри permanent-панели: scope-доминантный layout (см. ниже в .dolg-lab-grid).
@@ -1627,7 +1631,9 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     padding: 0;
     height: 100%;
     min-height: 0;
-    overflow: hidden;
+    /* Карточки лаборатории прокручиваются внутри, а не обрезаются (иконки видны). */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Top-toolbar: components-panel становится горизонтальной полосой 64-90px.
