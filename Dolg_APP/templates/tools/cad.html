@@ -306,7 +306,13 @@
         background: rgba(10, 14, 39, 0.6);
         border: 1px solid rgba(0, 212, 255, 0.2);
         border-radius: 8px;
-        flex-wrap: wrap;
+        /* Одна строка с горизонтальным скроллом вместо переноса в 2-3 ряда:
+           тулбар не съедает вертикаль и не обрезает кнопки (раньше wrap раздувал
+           панель на пол-экрана при сужении). */
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
         align-items: center;
     }
 
@@ -342,9 +348,11 @@
         display: flex;
         gap: 8px;
         align-items: center;
-        flex-wrap: wrap;       /* раньше nowrap — кнопки уезжали за рамку при сужении */
+        /* nowrap безопасен: родитель .top-controls прокручивается по горизонтали,
+           поэтому группы остаются целыми в одну строку и ничего не обрезается. */
+        flex-wrap: nowrap;
+        flex-shrink: 0;
         min-width: 0;
-        max-width: 100%;
     }
     /* На очень узких viewport-ах (мобильный, или окно после split-screen)
        сжимаем элементы внутри группы. */
@@ -1035,10 +1043,13 @@
         padding: 8px;
         align-items: center;
         align-content: flex-start;
-        flex-wrap: wrap;
+        /* Компактный тулбар: одна строка с горизонтальным скроллом (не переносится
+           в несколько рядов, не съедает вертикаль, кнопки не обрезаются). */
+        flex-wrap: nowrap;
         gap: 6px;
         max-height: none;
-        overflow: visible;
+        overflow-x: auto;
+        overflow-y: hidden;
         overscroll-behavior: contain;
         scrollbar-width: thin;
         background: linear-gradient(180deg, rgba(9, 24, 45, 0.98), rgba(6, 17, 31, 0.98));
@@ -1061,10 +1072,9 @@
     }
 
     .top-controls .cad-actions-group {
-        flex: 1 1 520px;
-        flex-wrap: wrap;
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
         justify-content: flex-end;
-        max-width: 100%;
         background: linear-gradient(180deg, rgba(10, 32, 56, 0.94), rgba(8, 23, 42, 0.94));
         border-color: rgba(34, 211, 238, 0.35);
     }
