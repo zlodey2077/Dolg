@@ -17,7 +17,7 @@ from typing import Any
 from django.db import connection, transaction
 from django.utils import timezone
 
-from Dolg_APP.models import EngineJob
+from Dolg_APP.models import EngineJob, ProjectEvent, SimulationRun
 
 from .engineering_units import parse_engineering_number
 from .monte_carlo import (
@@ -363,6 +363,85 @@ def _finish_success(
         finished_at=timezone.now(),
     )
     job.refresh_from_db()
+    try:
+        _persist_simulation_run(job, result, warnings, elapsed_ms)
+    except Exception as exc:  # pragma: no cover - history is useful, not job-critical.
+        saved_warnings = [str(item) for item in warnings]
+        saved_warnings.append(f'SimulationRun history save failed: {exc}')
+        EngineJob.objects.filter(pk=job.pk).update(warnings=_json_safe(saved_warnings))
+        job.warnings = saved_warnings
+
+
+def _persist_simulation_run(
+    job: EngineJob,
+    result: dict[str, Any],
+    warnings: list[str],
+    elapsed_ms: int,
+) -> SimulationRun | None:
+    if not job.project_id:
+        return None
+    with transaction.atomic():
+        run = SimulationRun.objects.create(
+            project_id=job.project_id,
+            user_id=job.user_id,
+            analysis_type=_simulation_run_analysis(job.analysis_type, result),
+            engine=job.engine_id,
+            elapsed_ms=max(0, int(elapsed_ms or 0)),
+            status='success',
+            progress_percent=100,
+            message=f'EngineJob #{job.pk}: {job.engine_name or job.engine_id}',
+            started_at=job.started_at,
+            finished_at=job.finished_at or timezone.now(),
+            netlist=job.netlist,
+            result_summary=_engine_result_summary(result, warnings),
+            result_data=_json_safe(result),
+            warnings=[str(item) for item in (warnings or result.get('warnings') or [])],
+        )
+        ProjectEvent.objects.create(
+            project_id=job.project_id,
+            user_id=job.user_id,
+            event_type='simulation_run',
+            payload={
+                'run_id': run.id,
+                'engine_job_id': job.id,
+                'analysis_type': run.analysis_type,
+                'engine': run.engine,
+                'status': run.status,
+                'elapsed_ms': run.elapsed_ms,
+                'progress_percent': run.progress_percent,
+            },
+        )
+    return run
+
+
+def _simulation_run_analysis(analysis_type: str, result: dict[str, Any]) -> str:
+    raw = str(result.get('analysis_type') or analysis_type or 'unknown').strip().lower()
+    if raw in {'transient', 'time'}:
+        return 'tran'
+    if raw in {'dc', 'op', 'ac', 'tran', 'pulse'}:
+        return raw
+    return 'unknown'
+
+
+def _engine_result_summary(result: dict[str, Any], warnings: list[str]) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return {}
+    return {
+        'type': result.get('analysis_type') or result.get('type') or 'unknown',
+        'node_count': _count_result_rows(result.get('nodes') or result.get('node_voltages')),
+        'branch_count': _count_result_rows(result.get('branches') or result.get('currents_a')),
+        'waveform_count': _count_result_rows(result.get('waveforms')),
+        'has_warnings': bool(warnings or result.get('warnings')),
+        'metrics': _json_safe(result.get('metrics') or {}),
+    }
+
+
+def _count_result_rows(value: Any) -> int:
+    if isinstance(value, dict):
+        return len(value)
+    if isinstance(value, (list, tuple)):
+        return len(value)
+    return 0
 
 
 def _finish_error(job: EngineJob, error: str, started: float) -> None:

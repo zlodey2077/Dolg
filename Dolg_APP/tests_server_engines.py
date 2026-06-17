@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from Dolg_APP.models import EngineJob
+from Dolg_APP.models import EngineJob, ProjectEvent, SchematicProject, SimulationRun
 from Dolg_APP.services.engine_jobs import run_due_engine_jobs
 from Dolg_APP.services.server_engines import (
     recommend_server_engines,
@@ -182,6 +182,39 @@ class ServerEngineApiTests(TestCase):
         self.assertEqual(job.result['analysis_type'], 'dc')
         voltages = [float(value) for value in job.result['node_voltages'].values()]
         self.assertTrue(any(abs(value - 5.0) < 1e-6 for value in voltages))
+
+    def test_local_worker_persists_project_simulation_run(self):
+        project = SchematicProject.objects.create(
+            user=self.user,
+            name='Engine project',
+            scheme_data=_divider_scheme(),
+        )
+        job = EngineJob.objects.create(
+            project=project,
+            user=self.user,
+            engine_id='dolg-numpy-mna',
+            engine_name='NumPy MNA',
+            analysis_type='dc',
+            scheme_data=_divider_scheme(),
+        )
+
+        outcome = run_due_engine_jobs(limit=1, worker_id='pytest-worker')
+
+        self.assertEqual(outcome['processed'], 1)
+        job.refresh_from_db()
+        self.assertEqual(job.status, 'success')
+        run = SimulationRun.objects.get()
+        self.assertEqual(run.project, project)
+        self.assertEqual(run.user, self.user)
+        self.assertEqual(run.analysis_type, 'dc')
+        self.assertEqual(run.engine, 'dolg-numpy-mna')
+        self.assertEqual(run.status, 'success')
+        self.assertEqual(run.result_summary['type'], 'dc')
+        self.assertEqual(run.result_summary['node_count'], job.result['metrics']['node_count'])
+        self.assertIn('node_voltages', run.result_data)
+        event = ProjectEvent.objects.get(event_type='simulation_run')
+        self.assertEqual(event.payload['engine_job_id'], job.id)
+        self.assertEqual(event.payload['run_id'], run.id)
 
     def test_local_worker_leaves_external_engine_queued_by_default(self):
         job = EngineJob.objects.create(
