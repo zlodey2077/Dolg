@@ -3093,6 +3093,7 @@ def _protocol_findings_from_review(review_report):
                 'severity': severity,
                 'message': finding.get('title') or finding.get('message') or str(finding),
                 'recommendation': finding.get('recommendation') or '',
+                'source_references': finding.get('source_references') or [],
             }
         )
     return findings[:40]

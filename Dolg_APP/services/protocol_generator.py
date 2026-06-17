@@ -18,6 +18,7 @@ import time
 _VALUE_FIELDS = ('resistance', 'capacitance', 'inductance', 'voltage', 'current', 'value', 'part_number')
 _SEVERITY_ORDER = {'error': 0, 'warning': 1, 'info': 2}
 _SEVERITY_LABEL = {'error': 'ошибка', 'warning': 'предупреждение', 'info': 'инфо'}
+_EMPTY_CELL = '—'
 
 
 def _component_value(component: dict) -> str:
@@ -42,6 +43,19 @@ def _fmt(value, digits: int = 4) -> str:
     return f'{v:.{digits}g}'
 
 
+def _md_cell(value) -> str:
+    text = str(value or _EMPTY_CELL).strip() or _EMPTY_CELL
+    return text.replace('|', '/')
+
+
+def _first_component_value(component: dict, *keys: str) -> str:
+    for key in keys:
+        value = component.get(key)
+        if value not in (None, '', False):
+            return str(value)
+    return ''
+
+
 def _scheme_section(scheme_data: dict) -> tuple[str, list[str]] | None:
     components = (scheme_data or {}).get('components') or []
     if not components:
@@ -60,6 +74,58 @@ def _scheme_section(scheme_data: dict) -> tuple[str, list[str]] | None:
     lines = [f'Компонентов: {len(components)}, соединений: {len(connections)}. Состав: {summary}.', '']
     lines.extend(rows)
     return ('Состав схемы', lines)
+
+
+def _bom_section(scheme_data: dict) -> tuple[str, list[str]] | None:
+    components = (scheme_data or {}).get('components') or []
+    if not components:
+        return None
+
+    linked = footprints = datasheets = spice_models = 0
+    rows = [
+        '| Обозначение | BOM/каталог | Footprint/CAD | Datasheet | SPICE |',
+        '|---|---|---|---|---|',
+    ]
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        label = component.get('label') or component.get('id') or _EMPTY_CELL
+        catalog = _first_component_value(
+            component, 'catalog_ref', 'catalog_slug', 'part_number', 'sku', 'product_id'
+        )
+        footprint = _first_component_value(component, 'footprint', 'cad_model', 'package')
+        datasheet = _first_component_value(component, 'datasheet_url', 'datasheet', 'product_datasheet_url')
+        spice = _first_component_value(component, 'spice_model', 'model')
+        linked += int(bool(catalog))
+        footprints += int(bool(footprint))
+        datasheets += int(bool(datasheet))
+        spice_models += int(bool(spice))
+        rows.append(
+            '| '
+            + ' | '.join(
+                [
+                    _md_cell(label),
+                    _md_cell(catalog),
+                    _md_cell(footprint),
+                    _md_cell(datasheet),
+                    _md_cell(spice),
+                ]
+            )
+            + ' |'
+        )
+
+    total = len([component for component in components if isinstance(component, dict)])
+    if not total:
+        return None
+    lines = [
+        (
+            f'Компонентов: {total}; связаны с BOM/каталогом: {linked}; '
+            f'footprint/CAD: {footprints}; datasheet: {datasheets}; SPICE-модель: {spice_models}.'
+        ),
+        '',
+    ]
+    lines.extend(rows)
+    return ('BOM и источники компонентов', lines)
 
 
 def _dc_section(scheme_data: dict) -> tuple[str, list[str]] | None:
@@ -166,6 +232,42 @@ def _findings_section(findings: list) -> tuple[str, list[str]] | None:
     return ('Проверки (DRC / review)', lines)
 
 
+def _source_refs(finding: dict) -> list:
+    refs = []
+    for key in ('source_references', 'sources', 'references'):
+        value = finding.get(key)
+        if isinstance(value, dict):
+            refs.append(value)
+        elif isinstance(value, list):
+            refs.extend(value)
+    return refs
+
+
+def _sources_section(findings: list) -> tuple[str, list[str]] | None:
+    rows = []
+    seen = set()
+    for finding in findings or []:
+        if not isinstance(finding, dict):
+            continue
+        rule_id = finding.get('rule_id') or finding.get('code') or ''
+        for source in _source_refs(finding):
+            if isinstance(source, dict):
+                title = source.get('title') or source.get('name') or source.get('id') or 'source'
+                url = source.get('url') or source.get('href') or ''
+                line = f'- {rule_id}: {title}' if rule_id else f'- {title}'
+                if url:
+                    line += f' — {url}'
+            else:
+                line = f'- {rule_id}: {source}' if rule_id else f'- {source}'
+            if line in seen:
+                continue
+            seen.add(line)
+            rows.append(line)
+    if not rows:
+        return None
+    return ('Источники проверки', rows[:30])
+
+
 def build_protocol(
     title: str = 'Протокол проектирования',
     scheme_data: dict | None = None,
@@ -189,6 +291,9 @@ def build_protocol(
         sec = _scheme_section(scheme_data)
         if sec:
             sections.append(sec)
+        sec = _bom_section(scheme_data)
+        if sec:
+            sections.append(sec)
         if include_dc:
             sec = _dc_section(scheme_data)
             if sec:
@@ -200,6 +305,7 @@ def build_protocol(
         (_measurements_section, measurements),
         (_lab_section, lab_calcs),
         (_findings_section, findings),
+        (_sources_section, findings),
     ):
         sec = builder(arg)
         if sec:

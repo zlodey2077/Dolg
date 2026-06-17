@@ -49,6 +49,42 @@ def test_scheme_section_and_bom():
     assert 'R1' in md and 'resistor' in md and '1000' in md
 
 
+def test_bom_readiness_section_renders_catalog_metadata():
+    scheme = _divider()
+    scheme['components'][1].update(
+        {
+            'catalog_ref': 'RC0603FR-071KL',
+            'footprint': 'R_0603',
+            'datasheet_url': 'https://example.test/r0603.pdf',
+            'spice_model': 'R0603_RES',
+        }
+    )
+    p = build_protocol('BOM protocol', scheme, include_dc=False)
+
+    assert any('BOM' in section for section in p['sections'])
+    assert 'RC0603FR-071KL' in p['markdown']
+    assert 'R_0603' in p['markdown']
+    assert 'R0603_RES' in p['markdown']
+
+
+def test_sources_section_renders_finding_references():
+    p = build_protocol(
+        'Sources protocol',
+        findings=[
+            {
+                'rule_id': 'ipc.clearance',
+                'severity': 'warning',
+                'message': 'clearance risk',
+                'source_references': [{'title': 'IPC-2221', 'url': 'https://example.test/ipc-2221'}],
+            }
+        ],
+    )
+
+    assert any('Источники' in section for section in p['sections'])
+    assert 'IPC-2221' in p['markdown']
+    assert 'https://example.test/ipc-2221' in p['markdown']
+
+
 def test_dc_section_computed_from_scheme():
     p = build_protocol('Делитель', _divider())
     assert any('DC' in s for s in p['sections'])

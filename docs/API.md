@@ -254,6 +254,9 @@ Pro-аналитика в интерфейсе может сохранить к�
 `scheme_data`, последние `SimulationRun`, сохраненные `ProjectMeasurement` и
 in-memory Engineering Review findings. Review не сохраняется в БД, чтобы генерация
 отчета не засоряла историю проекта.
+Markdown/PDF включает состав схемы, BOM/readiness по каталогам, datasheet,
+footprint/SPICE-метаданным, историю симуляций, измерения, review findings и
+источники экспертных правил, если они есть в findings.
 
 **Request:**
 ```json
