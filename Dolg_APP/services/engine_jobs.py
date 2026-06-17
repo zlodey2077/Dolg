@@ -462,7 +462,7 @@ def _option_int(
         return default
     try:
         number = int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
     return max(minimum, min(number, maximum))
 

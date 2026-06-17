@@ -291,7 +291,7 @@ def _project_context_from_payload(request, payload, added_items, limited, skippe
     if project_id:
         try:
             project_id = int(project_id)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             project_id = None
 
     if project_id:
@@ -1146,7 +1146,7 @@ def add_to_cart(request, slug):
     cart_filter = _cart_owner_filter(request)
     try:
         quantity = max(1, int(request.POST.get('quantity', 1)))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         quantity = 1
 
     if product.stock <= 0:
@@ -1228,7 +1228,7 @@ def update_cart_item(request, item_id):
     cart_item = get_object_or_404(CartItem, id=item_id, **_cart_owner_filter(request))
     try:
         quantity = int(request.POST.get('quantity', 1))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         quantity = 1
 
     if quantity > 0 and cart_item.product.stock > 0:
@@ -1446,7 +1446,7 @@ def api_bom_match(request):
     подходящий товар для каждого типа. Возвращает match'и и итоговую цену."""
     try:
         payload = json.loads(request.body)
-    except json.JSONDecodeError, ValueError:
+    except (json.JSONDecodeError, ValueError):
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
     try:
@@ -1473,7 +1473,7 @@ def api_bom_export_xlsx(request):
 
     try:
         payload = json.loads(request.body)
-    except json.JSONDecodeError, ValueError:
+    except (json.JSONDecodeError, ValueError):
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
     try:
@@ -1602,7 +1602,7 @@ def api_bom_add_all(request):
     body: {"items": [{"slug": "...", "quantity": 3}, ...]}"""
     try:
         payload = json.loads(request.body)
-    except json.JSONDecodeError, ValueError:
+    except (json.JSONDecodeError, ValueError):
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
     items = payload.get('items', [])
@@ -1624,7 +1624,7 @@ def api_bom_add_all(request):
         slug = (item.get('slug') or '').strip()
         try:
             qty = max(1, int(item.get('quantity', 1)))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
         if not slug:
             continue

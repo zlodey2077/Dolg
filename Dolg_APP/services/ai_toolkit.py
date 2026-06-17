@@ -84,7 +84,7 @@ def derating_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
             rated_by_id[str(comp.get('id'))] = float(
                 params.get('tdp_w') or params.get('power_w') or params.get('power') or 0
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             rated_by_id[str(comp.get('id'))] = 0.0
     voltages = dc['voltages']
     rows: list[tuple[str, float, float]] = []
@@ -193,7 +193,7 @@ def regulator_lines(scheme_data: dict | None) -> list[str]:
             reg = c
             try:
                 vout = float(params.get('vout') or params.get('output_voltage') or c.get('vout') or 0) or None
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 vout = None
             m = pat78.search(label)
             if vout is None and m:

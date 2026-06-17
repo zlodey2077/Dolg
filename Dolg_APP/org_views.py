@@ -759,7 +759,7 @@ def org_catalog_add(request, org_slug):
             # Квантизация до 2 знаков — иначе DB cast потом тоже может ругаться
             elif price is not None:
                 price = price.quantize(Decimal('0.01'))
-        except InvalidOperation, ValueError:
+        except (InvalidOperation, ValueError):
             errors.append('Цена должна быть числом.')
             price = None
         try:
@@ -774,7 +774,7 @@ def org_catalog_add(request, org_slug):
         if category_id and not errors:
             try:
                 category = Category.objects.get(pk=int(category_id))
-            except Category.DoesNotExist, ValueError:
+            except (Category.DoesNotExist, ValueError):
                 errors.append('Категория не найдена.')
 
         if not errors and category is not None and price is not None:

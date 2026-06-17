@@ -200,7 +200,7 @@ def engineering_lab_api(request):
     if request.body:
         try:
             payload = json.loads(request.body.decode('utf-8'))
-        except json.JSONDecodeError, UnicodeDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             payload = {}
     if not payload:
         payload = request.POST.dict()
@@ -331,7 +331,7 @@ def learning_task_check(request, slug, task_id):
     if request.body:
         try:
             payload = json.loads(request.body.decode('utf-8'))
-        except json.JSONDecodeError, UnicodeDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             payload = {}
     if not payload:
         payload = request.POST.dict()

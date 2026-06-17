@@ -79,7 +79,7 @@ def _parse_voltage(component: dict) -> float | None:
             continue
         try:
             return float(raw)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
     return None
 

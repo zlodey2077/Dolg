@@ -294,7 +294,7 @@ def _estimate_tokens(value):
     if isinstance(value, (dict, list, tuple)):
         try:
             text = json.dumps(value, ensure_ascii=False, sort_keys=True)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             text = repr(value)
     else:
         text = str(value)

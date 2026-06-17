@@ -261,7 +261,7 @@ def chat_topic_create(request):
     if project_id and is_pro:
         try:
             attached_project = SchematicProject.objects.get(pk=int(project_id), user=request.user)
-        except SchematicProject.DoesNotExist, ValueError, TypeError:
+        except (SchematicProject.DoesNotExist, ValueError, TypeError):
             attached_project = None
 
     topic = ChatTopic.objects.create(
@@ -303,7 +303,7 @@ def chat_reply_create(request, topic_id):
     if parent_id:
         try:
             parent = ChatReply.objects.get(pk=int(parent_id), topic=topic)
-        except ChatReply.DoesNotExist, ValueError, TypeError:
+        except (ChatReply.DoesNotExist, ValueError, TypeError):
             parent = None
 
     reply = ChatReply.objects.create(
@@ -386,7 +386,7 @@ def chat_reaction_toggle(request):
     """Toggle реакции на топик или ответ. Free: только 👍. Pro: любой emoji."""
     try:
         data = json.loads(request.body)
-    except json.JSONDecodeError, ValueError:
+    except (json.JSONDecodeError, ValueError):
         return JsonResponse({'ok': False, 'error': 'invalid_json'}, status=400)
 
     target_type = data.get('target_type')  # 'topic' | 'reply'
@@ -401,13 +401,13 @@ def chat_reaction_toggle(request):
     if target_type == 'topic':
         try:
             topic = ChatTopic.objects.get(pk=int(target_id), moderation_status='visible')
-        except ChatTopic.DoesNotExist, ValueError, TypeError:
+        except (ChatTopic.DoesNotExist, ValueError, TypeError):
             return JsonResponse({'ok': False, 'error': 'topic_not_found'}, status=404)
         kwargs['target_topic'] = topic
     elif target_type == 'reply':
         try:
             reply = ChatReply.objects.get(pk=int(target_id), moderation_status='visible')
-        except ChatReply.DoesNotExist, ValueError, TypeError:
+        except (ChatReply.DoesNotExist, ValueError, TypeError):
             return JsonResponse({'ok': False, 'error': 'reply_not_found'}, status=404)
         kwargs['target_reply'] = reply
     else:
@@ -464,7 +464,7 @@ def chat_topic_poll(request, topic_id):
     since_id = 0
     try:
         since_id = int(request.GET.get('since_id') or 0)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         pass
     qs = visible_queryset(
         topic.replies.filter(id__gt=since_id).select_related('author', 'parent'),
@@ -597,7 +597,7 @@ def org_conversation_message_create(request, org_slug, conv_id):
     if parent_id:
         try:
             parent = OrgConversationMessage.objects.get(pk=int(parent_id), conversation=conv)
-        except OrgConversationMessage.DoesNotExist, ValueError, TypeError:
+        except (OrgConversationMessage.DoesNotExist, ValueError, TypeError):
             parent = None
 
     # @mentions: парсим @username, оставляем только тех, кто реально member org
@@ -662,7 +662,7 @@ def org_conversation_poll(request, org_slug, conv_id):
     since_id = 0
     try:
         since_id = int(request.GET.get('since_id') or 0)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         pass
     qs = visible_queryset(
         conv.messages.filter(id__gt=since_id).select_related('author', 'parent'),

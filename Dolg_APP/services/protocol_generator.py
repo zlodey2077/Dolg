@@ -31,7 +31,7 @@ def _component_value(component: dict) -> str:
 def _fmt(value, digits: int = 4) -> str:
     try:
         v = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return str(value)
     if v != v:  # NaN
         return '—'

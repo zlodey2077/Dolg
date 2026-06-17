@@ -58,7 +58,7 @@ def _seg_points(trace: dict) -> tuple[float, float, float, float] | None:
     t = trace.get('to') or {}
     try:
         return (float(f['x_mm']), float(f['y_mm']), float(t['x_mm']), float(t['y_mm']))
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         return None
 
 

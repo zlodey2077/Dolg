@@ -41,7 +41,7 @@ def _parse_consent(request):
     try:
         data = json.loads(raw)
         return data if isinstance(data, dict) else {}
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return {}
 
 

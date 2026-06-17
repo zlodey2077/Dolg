@@ -638,7 +638,7 @@ class Command(BaseCommand):
     def _as_float(value):
         try:
             return float(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0.0
 
     def _print_human(self, report):

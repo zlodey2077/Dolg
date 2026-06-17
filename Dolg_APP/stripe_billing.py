@@ -133,7 +133,7 @@ def handle_checkout_completed(event_data: dict) -> bool:
     User = get_user_model()
     try:
         user = User.objects.get(pk=int(user_id))
-    except User.DoesNotExist, ValueError, TypeError:
+    except (User.DoesNotExist, ValueError, TypeError):
         return False
 
     customer_id = session.get('customer') or ''

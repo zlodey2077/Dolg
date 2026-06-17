@@ -103,7 +103,7 @@ def _progress_percent(payload: dict) -> int:
     try:
         if total and current is not None:
             return max(0, min(100, int(float(current) / float(total) * 100)))
-    except TypeError, ValueError, ZeroDivisionError:
+    except (TypeError, ValueError, ZeroDivisionError):
         pass
     return 0
 
@@ -561,7 +561,7 @@ def staff_ops_snapshot_api(request):
 
     try:
         period_days = int(request.GET.get('period_days', 7))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         period_days = 7
     period_days = max(1, min(90, period_days))
     return JsonResponse(
@@ -580,7 +580,7 @@ def _validate_dataset_path(raw: str | None) -> Path | None:
         candidate = Path(raw).resolve()
         root = DATASET_ROOT.resolve()
         candidate.relative_to(root)
-    except ValueError, OSError:
+    except (ValueError, OSError):
         return None
     return candidate if candidate.exists() else None
 
@@ -602,7 +602,7 @@ def ml_training_start(request):
     try:
         epochs = int(request.POST.get('epochs', 200))
         size = int(request.POST.get('size', 240))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return JsonResponse({'ok': False, 'error': 'Невалидные параметры.'}, status=400)
 
     epochs = max(10, min(1000, epochs))
@@ -756,7 +756,7 @@ def ml_dataset_import(request):
         return JsonResponse({'ok': False, 'error': f'Неподдерживаемый source: {source}'}, status=400)
     try:
         limit = int(request.POST.get('limit', 500))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return JsonResponse({'ok': False, 'error': 'Невалидный limit.'}, status=400)
     limit = max(1, min(5000, limit))
     persist = request.POST.get('persist') in ('1', 'true', 'on', 'yes')
@@ -764,7 +764,7 @@ def ml_dataset_import(request):
     as_projects = request.POST.get('as_projects') in ('1', 'true', 'on', 'yes')
     try:
         project_min_quality = int(request.POST.get('project_min_quality', 60))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         project_min_quality = 60
     project_min_quality = max(0, min(100, project_min_quality))
     job = _create_ml_job(

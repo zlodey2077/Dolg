@@ -717,7 +717,7 @@ def evaluate_reliability_margin(scheme_data):
                         stress += 0.8
                     elif ratio >= 0.5:
                         stress += 0.3
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     pass
         contribution = rate * stress
         total += contribution

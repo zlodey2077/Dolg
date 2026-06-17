@@ -18,7 +18,7 @@ try:
     import stripe
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
-except ImportError, AttributeError:
+except (ImportError, AttributeError):
     stripe = None  # Fallback if stripe not installed
 
 
@@ -212,7 +212,7 @@ def stripe_webhook(request):
                 if payment.status != 'succeeded':
                     payment.mark_as_succeeded(charge_id=intent['latest_charge'])
 
-            except Order.DoesNotExist, PaymentTransaction.DoesNotExist:
+            except (Order.DoesNotExist, PaymentTransaction.DoesNotExist):
                 pass
 
     # Handle payment_intent.payment_failed
@@ -229,7 +229,7 @@ def stripe_webhook(request):
                     error_msg = intent.get('last_payment_error', {}).get('message', 'Unknown error')
                     payment.mark_as_failed(error_msg)
 
-            except Order.DoesNotExist, PaymentTransaction.DoesNotExist:
+            except (Order.DoesNotExist, PaymentTransaction.DoesNotExist):
                 pass
 
     return JsonResponse({'status': 'success'}, status=200)

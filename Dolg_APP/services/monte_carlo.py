@@ -70,7 +70,7 @@ def _num(value, default: float) -> float:
         return float(default)
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         pass
     try:
         from .engineering_units import parse_engineering_number
@@ -90,13 +90,13 @@ def _component_tolerance(component: dict) -> float | None:
     if component.get('tolerance_percent') is not None:
         try:
             value = float(component['tolerance_percent']) / 100.0
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return max(0.0, min(0.5, value))
     if component.get('tolerance') is not None:
         try:
             value = float(component['tolerance'])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         if value > 1.0:  # прислали проценты в поле доли — мягко конвертируем
             value /= 100.0
@@ -444,7 +444,7 @@ def solve_transient(
         for k, val in v_initial.items():
             try:
                 node_v[int(k)] = float(val)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
     for k, e in enumerate(caps):
         n1, n2 = e['nodes']
@@ -734,7 +734,7 @@ def _resolve_tolerances(
     for key, val in (component_tolerances or {}).items():
         try:
             v = float(val)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
         overrides[str(key)] = max(0.0, min(0.5, v))
 

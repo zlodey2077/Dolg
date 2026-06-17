@@ -164,12 +164,12 @@ def grade_math_task(task, answer):
         if lab_config:
             try:
                 rubric['expected_value'] = lab_expected_value(lab_config)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return _result(False, 'Лабораторный расчет задания настроен некорректно.')
         elif formula_config:
             try:
                 rubric['expected_value'] = formula_expected_value(formula_config)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return _result(False, 'Формула задания настроена некорректно.')
         else:
             return _result(False, 'В задании не задано ожидаемое значение.')
@@ -358,7 +358,7 @@ def grade_simulation_task(task, scheme_data, simulation_result):
         if lab_config:
             try:
                 rubric['expected_value'] = lab_expected_value(lab_config)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return _result(False, 'Лабораторный расчет измерения настроен некорректно.')
     measurement = evaluate_measurement(metric, value, rubric)
 

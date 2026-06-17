@@ -41,7 +41,7 @@ def _json_value(value: Any):
 def _mb(value: int | float | None) -> float:
     try:
         return round(float(value or 0) / 1024 / 1024, 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0.0
 
 

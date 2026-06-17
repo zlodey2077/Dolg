@@ -775,5 +775,5 @@ def _first_int(pattern: str, text: str) -> int | None:
         return None
     try:
         return int(match.group(1))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None

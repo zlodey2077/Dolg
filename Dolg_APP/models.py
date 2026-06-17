@@ -1567,12 +1567,12 @@ class FunctionalBlock(models.Model):
     def component_count(self):
         try:
             return len((self.schema_json or {}).get('components', []))
-        except TypeError, AttributeError:
+        except (TypeError, AttributeError):
             return 0
 
     @property
     def connection_count(self):
         try:
             return len((self.schema_json or {}).get('connections', []))
-        except TypeError, AttributeError:
+        except (TypeError, AttributeError):
             return 0

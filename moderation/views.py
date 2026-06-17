@@ -84,7 +84,7 @@ def api_queue(request):
 def api_report(request):
     try:
         data = json.loads(request.body or '{}')
-    except json.JSONDecodeError, ValueError:
+    except (json.JSONDecodeError, ValueError):
         return _json_error('Invalid JSON')
 
     target_type = data.get('target_type')
@@ -125,7 +125,7 @@ def api_case_action(request, case_id):
 
     try:
         data = json.loads(request.body or '{}')
-    except json.JSONDecodeError, ValueError:
+    except (json.JSONDecodeError, ValueError):
         return _json_error('Invalid JSON')
 
     action_type = (data.get('action') or '').strip()

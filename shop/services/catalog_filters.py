@@ -595,7 +595,7 @@ def _to_float(value) -> float | None:
         return None
     try:
         return float(str(value).replace(',', '.'))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 

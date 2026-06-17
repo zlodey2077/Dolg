@@ -393,9 +393,9 @@ def build_measurement_rows(sections: dict[str, Any]) -> list[dict[str, str]]:
                             base = abs(float(expected)) or 1.0
                             ratio = abs(delta) / base
                             row['status'] = 'норма' if ratio <= tol else 'ошибка'
-                        except TypeError, ValueError:
+                        except (TypeError, ValueError):
                             pass
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     pass
             if tolerance is not None:
                 row['tolerance'] = f'{_format_scalar(tolerance)}'

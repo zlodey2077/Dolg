@@ -1276,7 +1276,7 @@ def is_stock_image(image_field):
             or 'wikimedia.org' in lowered
             or 'wikipedia.org' in lowered
         )
-    except AttributeError, ValueError:
+    except (AttributeError, ValueError):
         return False
 
 
@@ -1350,7 +1350,7 @@ def parameter_preview(params, limit=5):
         return []
     try:
         limit = int(limit)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         limit = 5
 
     selected = []
@@ -1692,7 +1692,7 @@ def product_reviews(product, count=3):
     """Возвращает список из <count> seeded-отзывов для product. Без БД."""
     try:
         count = int(count)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         count = 3
     pid = getattr(product, 'id', None) or 0
     rng = _seeded(pid, 'reviews')

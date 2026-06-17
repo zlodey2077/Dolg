@@ -37,7 +37,7 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
             break
     try:
         return float(''.join(number)) if number else default
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
