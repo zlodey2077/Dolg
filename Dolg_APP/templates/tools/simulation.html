@@ -505,6 +505,10 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                         onclick="openEngineeringReview()" title="Инженер ревью: проверка схемы, рекомендации, score">
                     <span>🛠</span> Ревью
                 </button>
+                <button class="tool-btn" id="protocol-download-btn" type="button"
+                        onclick="downloadEngineeringProtocol()" title="Скачать Markdown-протокол: схема, симуляции, измерения и review">
+                    <span>📄</span> Протокол
+                </button>
                 <button class="tool-btn tool-btn--engines" id="server-engines-btn" type="button"
                         onclick="openServerEnginesModal()" title="Серверные движки: Xyce, PySpice, GnuCap, OpenModelica, Docker/Kubernetes">
                     <span>🧠</span> Движки
@@ -12856,6 +12860,10 @@ const SIM_ANALYSIS_API = {
     rfAnalysis: '{% url "hello:api_rf_analysis" %}',
 };
 
+const PROTOCOL_API = {
+    generate: '{% url "hello:api_generate_protocol" %}',
+};
+
 function getSimCsrfToken() {
     const m = document.cookie.match(/(^| )csrftoken=([^;]+)/);
     return m ? m[2] : '';
@@ -12874,6 +12882,55 @@ async function simApiFetch(url, options = {}) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
+}
+
+async function downloadEngineeringProtocol() {
+    const schemeData = typeof buildSchemeData === 'function' ? buildSchemeData() : {};
+    const componentsCount = Array.isArray(schemeData.components) ? schemeData.components.length : 0;
+    if (!componentsCount) {
+        showNotification('⚠️ Сначала добавьте компоненты на схему', 'warning');
+        return;
+    }
+
+    const payload = {
+        title: currentProject && currentProject.name ? `Протокол проектирования: ${currentProject.name}` : 'Протокол проектирования',
+        include_dc: true,
+        include_review: Boolean(currentProject && currentProject.id),
+    };
+    if (currentProject && currentProject.id) {
+        payload.project_id = currentProject.id;
+    } else {
+        payload.scheme_data = schemeData;
+    }
+
+    try {
+        showNotification('📄 Собираю протокол...', 'info');
+        const data = await simApiFetch(PROTOCOL_API.generate, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+        if (!data.markdown) throw new Error('Пустой протокол');
+        const filename = currentProject && currentProject.id
+            ? `dolg_protocol_project_${currentProject.id}.md`
+            : `dolg_protocol_draft_${Date.now()}.md`;
+        if (typeof downloadTextFile === 'function') {
+            downloadTextFile(filename, data.markdown, 'text/markdown;charset=utf-8');
+        } else {
+            const blob = new Blob([data.markdown], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        const count = data.meta && data.meta.section_count ? data.meta.section_count : (data.sections || []).length;
+        showNotification(`✓ Протокол скачан (${count || 'несколько'} секций)`, 'success');
+    } catch (e) {
+        showNotification('Протокол: ' + (e.message || e), 'warning');
+    }
 }
 
 function buildSchemeData() {
