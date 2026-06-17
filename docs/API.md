@@ -255,8 +255,8 @@ Pro-аналитика в интерфейсе может сохранить к�
 in-memory Engineering Review findings. Review не сохраняется в БД, чтобы генерация
 отчета не засоряла историю проекта.
 Markdown/PDF включает состав схемы, BOM/readiness по каталогам, datasheet,
-footprint/SPICE-метаданным, историю симуляций, измерения, review findings и
-источники экспертных правил, если они есть в findings.
+footprint/SPICE-метаданным, историю симуляций, summary осциллограмм/артефактов,
+измерения, review findings и источники экспертных правил, если они есть в findings.
 
 **Request:**
 ```json

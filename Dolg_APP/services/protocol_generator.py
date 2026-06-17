@@ -19,6 +19,7 @@ _VALUE_FIELDS = ('resistance', 'capacitance', 'inductance', 'voltage', 'current'
 _SEVERITY_ORDER = {'error': 0, 'warning': 1, 'info': 2}
 _SEVERITY_LABEL = {'error': 'ошибка', 'warning': 'предупреждение', 'info': 'инфо'}
 _EMPTY_CELL = '—'
+_SPARKLINE = '▁▂▃▄▅▆▇█'
 
 
 def _component_value(component: dict) -> str:
@@ -41,6 +42,16 @@ def _fmt(value, digits: int = 4) -> str:
     if abs(v) >= 1000 or abs(v) < 0.001:
         return f'{v:.{digits}g}'
     return f'{v:.{digits}g}'
+
+
+def _float_or_none(value):
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if result != result:  # NaN
+        return None
+    return result
 
 
 def _md_cell(value) -> str:
@@ -174,6 +185,14 @@ def _run_field(run, key: str, default=None):
     return getattr(run, key, default)
 
 
+def _run_result(run) -> dict:
+    for key in ('result_data', 'result', 'output'):
+        value = _run_field(run, key)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
 def _simulation_runs_section(simulation_runs: list) -> tuple[str, list[str]] | None:
     rows = []
     for run in simulation_runs or []:
@@ -192,6 +211,131 @@ def _simulation_runs_section(simulation_runs: list) -> tuple[str, list[str]] | N
         'Запуски симуляции',
         ['| Анализ | Движок | Статус | Время | Дата |', '|---|---|---|---|---|'] + rows,
     )
+
+
+def _thin_values(values: list[float], limit: int = 36) -> list[float]:
+    if len(values) <= limit:
+        return values
+    if limit <= 1:
+        return values[:1]
+    last = len(values) - 1
+    return [values[round(index * last / (limit - 1))] for index in range(limit)]
+
+
+def _sparkline(values: list[float]) -> str:
+    values = _thin_values([value for value in values if value is not None])
+    if not values:
+        return ''
+    lo = min(values)
+    hi = max(values)
+    if hi == lo:
+        return _SPARKLINE[0] * len(values)
+    scale = len(_SPARKLINE) - 1
+    return ''.join(_SPARKLINE[round((value - lo) / (hi - lo) * scale)] for value in values)
+
+
+def _waveform_rows(result: dict) -> list[str]:
+    rows = []
+    waveforms = result.get('waveforms')
+    if not isinstance(waveforms, list):
+        waveforms = []
+    for wave in waveforms[:5]:
+        if not isinstance(wave, dict):
+            continue
+        points = wave.get('points') or []
+        y_values = []
+        x_values = []
+        for point in points:
+            if isinstance(point, dict):
+                y = _float_or_none(point.get('y'))
+                x = _float_or_none(point.get('x'))
+            elif isinstance(point, (list, tuple)) and len(point) >= 2:
+                x = _float_or_none(point[0])
+                y = _float_or_none(point[1])
+            else:
+                x = None
+                y = _float_or_none(point)
+            if y is not None:
+                y_values.append(y)
+            if x is not None:
+                x_values.append(x)
+        name = wave.get('name') or wave.get('node') or 'trace'
+        unit = wave.get('unit') or ''
+        if y_values:
+            preview = _sparkline(y_values)
+            x_range = f', x={_fmt(min(x_values))}..{_fmt(max(x_values))}' if x_values else ''
+            rows.append(
+                f'- {name}: {len(y_values)} точек{x_range}, '
+                f'y={_fmt(min(y_values))}..{_fmt(max(y_values))} {unit}; `{preview}`'.rstrip()
+            )
+        else:
+            rows.append(f'- {name}: точки не сохранены')
+
+    nodes = result.get('nodes')
+    if isinstance(nodes, list) and len(rows) < 5:
+        for node in nodes[: 5 - len(rows)]:
+            if not isinstance(node, dict):
+                continue
+            samples = [_float_or_none(value) for value in node.get('samples') or []]
+            samples = [value for value in samples if value is not None]
+            if not samples:
+                continue
+            name = node.get('id') or node.get('name') or 'node'
+            unit = node.get('unit') or ''
+            rows.append(
+                f'- {name}: {len(samples)} samples, '
+                f'{_fmt(min(samples))}..{_fmt(max(samples))} {unit}; `{_sparkline(samples)}`'.rstrip()
+            )
+    return rows
+
+
+def _metric_lines(metrics: dict) -> list[str]:
+    rows = []
+    for key, value in list((metrics or {}).items())[:10]:
+        if isinstance(value, (dict, list)):
+            continue
+        rows.append(f'{key}={_fmt(value)}')
+    return rows
+
+
+def _artifact_lines(artifacts: list) -> list[str]:
+    rows = []
+    for artifact in artifacts[:5] if isinstance(artifacts, list) else []:
+        if isinstance(artifact, dict):
+            name = artifact.get('name') or artifact.get('filename') or artifact.get('type') or 'artifact'
+            location = artifact.get('url') or artifact.get('path') or artifact.get('href') or ''
+            rows.append(f'- {name}' + (f': {location}' if location else ''))
+        else:
+            rows.append(f'- {artifact}')
+    return rows
+
+
+def _simulation_outputs_section(simulation_runs: list) -> tuple[str, list[str]] | None:
+    lines = []
+    for run in simulation_runs or []:
+        result = _run_result(run)
+        summary = _run_field(run, 'result_summary') or {}
+        if not isinstance(summary, dict):
+            summary = {}
+        metrics = result.get('metrics') if isinstance(result.get('metrics'), dict) else summary.get('metrics')
+        wave_rows = _waveform_rows(result) if result else []
+        artifact_rows = _artifact_lines(result.get('artifacts') or _run_field(run, 'artifacts') or [])
+        metric_rows = _metric_lines(metrics if isinstance(metrics, dict) else {})
+        if not (wave_rows or metric_rows or artifact_rows):
+            continue
+        analysis = _run_field(run, 'analysis_type') or _run_field(run, 'type') or 'unknown'
+        engine = _run_field(run, 'engine') or result.get('engine') or 'local'
+        lines.append(f'**{analysis} / {engine}**')
+        if metric_rows:
+            lines.append('- metrics: ' + ', '.join(metric_rows))
+        lines.extend(wave_rows)
+        if artifact_rows:
+            lines.append('- artifacts:')
+            lines.extend([f'  {row}' for row in artifact_rows])
+        lines.append('')
+    if not lines:
+        return None
+    return ('Осциллограммы и артефакты симуляции', lines)
 
 
 def _lab_section(lab_calcs: list) -> tuple[str, list[str]] | None:
@@ -299,6 +443,9 @@ def build_protocol(
             if sec:
                 sections.append(sec)
     sec = _simulation_runs_section(simulation_runs or [])
+    if sec:
+        sections.append(sec)
+    sec = _simulation_outputs_section(simulation_runs or [])
     if sec:
         sections.append(sec)
     for builder, arg in (

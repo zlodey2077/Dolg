@@ -160,6 +160,39 @@ def test_simulation_runs_section_renders_engine_history():
     assert '42' in p['markdown']
 
 
+def test_simulation_outputs_section_renders_waveform_summary():
+    p = build_protocol(
+        'Waveform protocol',
+        simulation_runs=[
+            {
+                'analysis_type': 'tran',
+                'engine': 'xyce-worker',
+                'result_data': {
+                    'metrics': {'steps': 4, 'dt_s': 0.001},
+                    'waveforms': [
+                        {
+                            'name': 'V(out)',
+                            'unit': 'V',
+                            'points': [
+                                {'x': 0.0, 'y': 0.0},
+                                {'x': 0.001, 'y': 1.2},
+                                {'x': 0.002, 'y': 0.4},
+                                {'x': 0.003, 'y': 2.4},
+                            ],
+                        }
+                    ],
+                    'artifacts': [{'name': 'tran.csv', 'path': 'artifacts/tran.csv'}],
+                },
+            }
+        ],
+    )
+
+    assert any('Осциллограммы' in section for section in p['sections'])
+    assert 'V(out)' in p['markdown']
+    assert 'steps=4' in p['markdown']
+    assert 'tran.csv' in p['markdown']
+
+
 def test_synergy_with_engineering_lab_derating():
     # Авто-протокол = лабораторный отчёт: реальный результат calculate_lab → секция.
     from knowledge.services.engineering_lab import calculate_lab
