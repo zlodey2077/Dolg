@@ -26,7 +26,7 @@
     ├── Dolg_PR/              # Конфигурация проекта (settings, urls)
     ├── Dolg_APP/             # Редактор схем, CAD, проекты, симуляция
     │   ├── templates/tools/  # simulation.html, cad.html, projects.html
-    │   ├── tests.py          # 81 серверный тест: проекты, review/import, Pro-аналитика, fallback, PDF
+    │   ├── tests.py          # core Django-тесты: проекты, review/import, Pro-аналитика, fallback, PDF
     │   ├── tests_browser.py  # optional Playwright smoke: simulation/BOM, DC/AC/TRAN, modals, exports, CAD, projects
     │   ├── services/         # project_review.py, schematic_graph.py, cad_import.py, rule_ai.py, simulation_analysis.py
     │   └── simulation_quota.py
@@ -437,14 +437,14 @@ WebSocket-инфра ("channels==4.3.2" + "daphne==4.2.1") для двух ко�
 
 
 Тесты, coverage и lint
-Текущее состояние: 263 passed / 6 skipped / 0 failed · coverage 71% · ruff 0 errors
+Текущее состояние: `pytest --collect-only` на 2026-06-17 видит 626 тестов. Последний полный coverage snapshot ниже исторический и требует отдельного обновления.
 
-Быстрый прогон (pytest + django, 269 тестов)
+Быстрый прогон (pytest + django)
     $env:FAST_TESTS = '1'   # пропускает миграции (×3-5 быстрее)
-    pytest                  # 269 тестов через pytest-django runner
-    pytest --cov            # с покрытием (по .coveragerc), html-отчёт в htmlcov/
-    pytest -k chat          # фильтр по подстроке имени
-    pytest --reuse-db       # не пере-создаёт test DB при повторных прогонах
+    .\.venv\Scripts\python.exe -m pytest
+    .\.venv\Scripts\python.exe -m pytest Dolg_APP\tests_server_engines.py -q
+    .\.venv\Scripts\python.exe -m pytest --collect-only -q
+    .\.venv\Scripts\python.exe -m pytest --cov  # html-отчёт в htmlcov/
 
 
 Coverage по приложениям (snapshot 2026-05-19)

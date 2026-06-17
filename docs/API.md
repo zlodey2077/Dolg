@@ -374,6 +374,11 @@ engine, persists `EngineJob`, keeps external CLI execution out of Django
 requests, and can process `dolg-numpy-mna` jobs through the internal NumPy MNA
 adapter.
 
+The simulation UI uses the same contract in the server-engine runner modal:
+select `engine_id`/`analysis_type`, submit the current scheme, poll
+`queued -> running -> success/error`, and render normalized `nodes`,
+`branches`, `metrics` and `warnings`.
+
 Run one local worker pass:
 ```bash
 python manage.py run_engine_worker --once --limit 5
@@ -388,6 +393,11 @@ Default worker mode only claims local adapter jobs (`dolg-numpy-mna`). External
 engines such as `xyce`, `pyspice` and `gnucap` remain queued until a dedicated
 Docker/CLI worker is started. Local worker results use the shared contract:
 `nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`.
+
+If a successful local job has `project_id`, the worker also creates a
+`SimulationRun` for that project and logs `ProjectEvent(event_type="simulation_run")`.
+This keeps browser-driven simulation history and worker-driven server-engine
+history in one place.
 
 ---
 
