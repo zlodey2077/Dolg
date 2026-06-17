@@ -40,6 +40,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 - UI серверных движков доведен до первого end-to-end сценария: выбор engine/analysis, submit в `/api/sim/jobs/`, polling queued/running/success/error, компактный вывод `nodes`, `branches`, `metrics`, `warnings`.
 - Успешный `EngineJob`, привязанный к проекту, теперь сохраняется в `SimulationRun` и пишет событие `ProjectEvent(simulation_run)`. Проверки после изменения: `Dolg_APP/tests_server_engines.py` - 15 passed; `manage.py check` - OK.
 - В модалке серверных движков добавлена видимая очередь jobs: counts по `queued/running/success/error`, последние задания, ручное обновление и выбор job из списка.
+- Docker повторно проверен после UI-работ: CLI установлен (`29.5.2`), repair script поднял `vmcompute`, `LxssManager`, `com.docker.service` и включил Windows WSL/VM features, но лог `logs/windows-stack-repair-20260617-080433.log` требует restart до надёжного теста. До перезагрузки `docker version` видит client, но server pipe `dockerDesktopLinuxEngine/docker_engine` отсутствует; Docker Desktop/backend остановлены через admin stop helper.
 
 ## Новый план после PR-проверки
 
@@ -65,6 +66,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 4. Закрыть системные блокеры без остановки разработки.
    - Docker Desktop не запускать во время обычной работы, пока он снова не начинает стабильно отвечать.
    - Для остановки зависшего Docker держать task `Docker: stop stuck Desktop (admin)`.
+   - После repair script 2026-06-17 нужна перезагрузка Windows; после неё первым делом открыть Docker Desktop и запустить `scripts/check_vscode_stacks.ps1`.
    - Отдельно решить Windows WSL/Docker reset/repair: сначала backup/rename Docker WSL data, только после явного решения.
    - Kubernetes включать после живого Docker daemon и kube context.
 
