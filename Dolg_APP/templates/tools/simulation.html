@@ -1103,6 +1103,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <div class="server-engine-summary" id="server-engine-summary"></div>
             <div class="server-engine-router" id="server-engine-router"></div>
             <div class="server-engine-runner" id="server-engine-runner"></div>
+            <div class="server-engine-queue" id="server-engine-queue"></div>
             <div class="server-engine-tabs" id="server-engine-tabs" role="tablist" aria-label="Категории движков"></div>
             <div class="server-engine-grid" id="server-engine-grid"></div>
         </div>
@@ -1332,6 +1333,92 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     color: #b9c8e3;
     font-size: 0.72rem;
 }
+.server-engine-queue {
+    background: rgba(8, 13, 31, 0.58);
+    border: 1px solid rgba(127, 219, 255, 0.16);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    color: #c7d3e8;
+    font-size: 0.8rem;
+}
+.server-engine-queue__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.server-engine-queue__head strong {
+    color: #e8f6ff;
+}
+.server-engine-queue__head button {
+    border: 1px solid rgba(127, 219, 255, 0.38);
+    background: rgba(127, 219, 255, 0.08);
+    color: #dff8ff;
+    border-radius: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 0.74rem;
+}
+.server-engine-queue__head button:hover {
+    background: rgba(127, 219, 255, 0.18);
+}
+.server-engine-queue__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.server-engine-queue__stats span {
+    border: 1px solid rgba(127, 219, 255, 0.16);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: #b9c8e3;
+    font-size: 0.72rem;
+}
+.server-engine-queue__list {
+    display: grid;
+    gap: 5px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+.server-engine-queue__item {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(68px, 0.6fr) minmax(140px, 1.4fr) minmax(74px, 0.7fr) minmax(70px, 0.6fr);
+    gap: 8px;
+    align-items: center;
+    border: 0;
+    border-top: 1px solid rgba(127, 219, 255, 0.08);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    padding-top: 5px;
+    text-align: left;
+}
+.server-engine-queue__item:hover {
+    background: rgba(127, 219, 255, 0.06);
+}
+.server-engine-queue__item code {
+    color: #a6ffcb;
+}
+.server-engine-queue__stats code {
+    color: #a6ffcb;
+}
+.server-engine-queue__badge {
+    justify-self: start;
+    border-radius: 999px;
+    padding: 2px 7px;
+    color: #08101f;
+    background: #7fdbff;
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+.server-engine-queue__badge[data-status="success"] { background: #a6ffcb; }
+.server-engine-queue__badge[data-status="error"] { background: #ffb1b1; }
+.server-engine-queue__badge[data-status="queued"],
+.server-engine-queue__badge[data-status="running"] { background: #ffd38a; }
 .server-engine-tabs {
     display: flex;
     gap: 6px;
@@ -1555,6 +1642,13 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     .server-engine-job-status__head {
         align-items: flex-start;
         flex-direction: column;
+    }
+    .server-engine-queue__head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .server-engine-queue__item {
+        grid-template-columns: 1fr;
     }
     .server-engine-grid {
         grid-template-columns: 1fr;
@@ -9739,6 +9833,8 @@ let _serverEngineActiveCategory = '';
 let _serverEngineSelectedId = 'dolg-numpy-mna';
 let _serverEngineRecommendedIds = new Set();
 let _serverEngineCurrentJob = null;
+let _serverEngineJobs = [];
+let _serverEngineJobsLoaded = false;
 let _serverEnginePollTimer = null;
 
 const SERVER_ENGINE_JOB_API = {
@@ -9766,7 +9862,9 @@ function openServerEnginesModal() {
     if (!modal) return;
     modal.style.display = 'flex';
     renderServerEngineCatalog();
+    renderServerEngineQueue();
     refreshServerEngineRecommendations();
+    refreshServerEngineJobQueue({ silent: true });
 }
 
 function closeServerEnginesModal() {
@@ -9868,6 +9966,89 @@ function renderServerEngineRunner(engines, router) {
         <div class="server-engine-job-status" id="server-engine-job-status" data-status="idle"></div>
     `;
     renderServerEngineJobStatus(_serverEngineCurrentJob);
+}
+
+async function refreshServerEngineJobQueue(options = {}) {
+    const params = new URLSearchParams();
+    if (currentProject && currentProject.id) params.set('project_id', currentProject.id);
+    const url = params.toString() ? `${SERVER_ENGINE_JOB_API.jobs}?${params}` : SERVER_ENGINE_JOB_API.jobs;
+    try {
+        const data = await simApiFetch(url, { method: 'GET' });
+        _serverEngineJobs = Array.isArray(data.jobs) ? data.jobs : [];
+        _serverEngineJobsLoaded = true;
+        renderServerEngineQueue();
+    } catch (e) {
+        _serverEngineJobsLoaded = true;
+        _serverEngineJobs = [];
+        renderServerEngineQueue(e);
+        if (!options.silent) showNotification('Server jobs: ' + (e.message || e), 'warning');
+    }
+}
+
+function renderServerEngineQueue(error) {
+    const box = document.getElementById('server-engine-queue');
+    if (!box) return;
+    if (error) {
+        box.innerHTML = `
+            <div class="server-engine-queue__head">
+                <strong>Очередь jobs</strong>
+                <button type="button" onclick="refreshServerEngineJobQueue()">Обновить</button>
+            </div>
+            <div style="color:#ffb1b1;">${escapeHtml(error.message || error)}</div>
+        `;
+        return;
+    }
+    const counts = countServerEngineJobs(_serverEngineJobs);
+    const stats = ['queued', 'running', 'success', 'error']
+        .map(status => `<span>${escapeHtml(status)}: <code>${counts[status] || 0}</code></span>`)
+        .join('');
+    const rows = _serverEngineJobs.slice(0, 8).map(renderServerEngineQueueItem).join('');
+    const empty = _serverEngineJobsLoaded ? 'Заданий нет.' : 'Загрузка...';
+    box.innerHTML = `
+        <div class="server-engine-queue__head">
+            <strong>Очередь jobs</strong>
+            <button type="button" onclick="refreshServerEngineJobQueue()">Обновить</button>
+        </div>
+        <div class="server-engine-queue__stats">${stats}</div>
+        <div class="server-engine-queue__list">${rows || `<div>${escapeHtml(empty)}</div>`}</div>
+    `;
+}
+
+function renderServerEngineQueueItem(job) {
+    const status = String(job.status || 'queued');
+    const title = `Job #${job.id || ''}`;
+    const engine = job.engine_name || job.engine_id || '';
+    const analysis = job.analysis_type || '';
+    const progress = Number(job.progress_percent || 0);
+    return `
+        <button type="button" class="server-engine-queue__item" onclick="selectServerEngineJob(${Number(job.id) || 0})">
+            <code>${escapeHtml(title)}</code>
+            <span>${escapeHtml(engine)}</span>
+            <span>${escapeHtml(analysis)} · ${Math.max(0, Math.min(progress, 100))}%</span>
+            <span class="server-engine-queue__badge" data-status="${escapeHtml(status)}">${escapeHtml(status)}</span>
+        </button>
+    `;
+}
+
+function countServerEngineJobs(jobs) {
+    return (jobs || []).reduce((acc, job) => {
+        const status = String(job.status || 'queued');
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {});
+}
+
+async function selectServerEngineJob(jobId) {
+    if (!jobId) return;
+    try {
+        await pollServerEngineJob(jobId, { reschedule: false });
+        if (_serverEngineCurrentJob && ['queued', 'running'].includes(_serverEngineCurrentJob.status)) {
+            scheduleServerEngineJobPoll(jobId, 1200);
+        }
+    } catch (e) {
+        renderServerEngineJobError(e);
+        showNotification('Server job: ' + (e.message || e), 'warning');
+    }
 }
 
 function selectServerEngine(engineId) {
@@ -9986,6 +10167,7 @@ async function submitServerEngineJob() {
         });
         _serverEngineCurrentJob = data.job;
         renderServerEngineJobStatus(_serverEngineCurrentJob);
+        refreshServerEngineJobQueue({ silent: true });
         showNotification(`✓ Job #${data.job.id} поставлен`, 'success');
         scheduleServerEngineJobPoll(data.job.id, 800);
     } catch (e) {
@@ -10012,11 +10194,12 @@ function scheduleServerEngineJobPoll(jobId, delayMs) {
     }, delayMs || 1500);
 }
 
-async function pollServerEngineJob(jobId) {
+async function pollServerEngineJob(jobId, options = {}) {
     const data = await simApiFetch(SERVER_ENGINE_JOB_API.detail(jobId), { method: 'GET' });
     _serverEngineCurrentJob = data.job;
     renderServerEngineJobStatus(_serverEngineCurrentJob);
-    if (['queued', 'running'].includes(_serverEngineCurrentJob.status)) {
+    refreshServerEngineJobQueue({ silent: true });
+    if (['queued', 'running'].includes(_serverEngineCurrentJob.status) && options.reschedule !== false) {
         scheduleServerEngineJobPoll(jobId, 1600);
     } else if (_serverEngineCurrentJob.status === 'success') {
         publishServerEngineResult(_serverEngineCurrentJob);
