@@ -506,7 +506,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                     <span>🛠</span> Ревью
                 </button>
                 <button class="tool-btn" id="protocol-download-btn" type="button"
-                        onclick="downloadEngineeringProtocol()" title="Скачать Markdown-протокол: схема, симуляции, измерения и review">
+                        onclick="openEngineeringProtocolPreview()" title="Предпросмотр Markdown-протокола: схема, симуляции, измерения и review">
                     <span>📄</span> Протокол
                 </button>
                 <button class="tool-btn tool-btn--engines" id="server-engines-btn" type="button"
@@ -1094,6 +1094,23 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <p style="margin-top: 12px; font-size: 0.8rem; color: #888;">
                 💡 Этот netlist можно скопировать в ngspice, LTspice или любой другой SPICE-совместимый симулятор.
             </p>
+        </div>
+    </div>
+
+    <!-- Модалка предпросмотра инженерного протокола -->
+    <div id="protocol-preview-modal" class="sim-modal" style="display:none;">
+        <div class="sim-modal-content" style="max-width: 860px;">
+            <div class="sim-modal-header">
+                <h2>📄 Инженерный протокол</h2>
+                <button class="close-btn" onclick="closeProtocolPreview()" type="button" title="Закрыть протокол" aria-label="Закрыть окно предпросмотра протокола">✕</button>
+            </div>
+            <div id="protocol-preview-meta" style="margin-bottom: 10px; color:#9fb3c8; font-size:0.86rem;">Готовлю протокол...</div>
+            <textarea id="protocol-preview-output" readonly spellcheck="false" style="width:100%; min-height: 420px; background:#0a1020; color:#dce7f3; border:1px solid rgba(0,212,255,0.3); border-radius:4px; padding:12px; font-family:'Consolas','Courier New',monospace; font-size:0.84rem; line-height:1.5; resize:vertical;"></textarea>
+            <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                <button onclick="refreshProtocolPreview()" class="btn btn-secondary" style="flex:1;">⟳ Обновить</button>
+                <button onclick="copyProtocolPreview()" class="btn btn-primary" style="flex:1;">📋 Копировать</button>
+                <button onclick="downloadProtocolPreview()" class="btn btn-success" style="flex:1;">💾 Скачать .md</button>
+            </div>
         </div>
     </div>
 
@@ -12884,12 +12901,12 @@ async function simApiFetch(url, options = {}) {
     return data;
 }
 
-async function downloadEngineeringProtocol() {
+function _buildEngineeringProtocolPayload() {
     const schemeData = typeof buildSchemeData === 'function' ? buildSchemeData() : {};
     const componentsCount = Array.isArray(schemeData.components) ? schemeData.components.length : 0;
     if (!componentsCount) {
         showNotification('⚠️ Сначала добавьте компоненты на схему', 'warning');
-        return;
+        return null;
     }
 
     const payload = {
@@ -12902,30 +12919,117 @@ async function downloadEngineeringProtocol() {
     } else {
         payload.scheme_data = schemeData;
     }
+    return payload;
+}
 
+function _engineeringProtocolFilename() {
+    return currentProject && currentProject.id
+        ? `dolg_protocol_project_${currentProject.id}.md`
+        : `dolg_protocol_draft_${Date.now()}.md`;
+}
+
+function _saveProtocolMarkdown(filename, markdown) {
+    if (typeof downloadTextFile === 'function') {
+        downloadTextFile(filename, markdown, 'text/markdown;charset=utf-8');
+        return;
+    }
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function _fetchEngineeringProtocol() {
+    const payload = _buildEngineeringProtocolPayload();
+    if (!payload) return null;
+    const data = await simApiFetch(PROTOCOL_API.generate, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+    if (!data.markdown) throw new Error('Пустой протокол');
+    return data;
+}
+
+function closeProtocolPreview() {
+    const modal = document.getElementById('protocol-preview-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function openEngineeringProtocolPreview() {
+    const modal = document.getElementById('protocol-preview-modal');
+    const output = document.getElementById('protocol-preview-output');
+    const meta = document.getElementById('protocol-preview-meta');
+    if (!modal || !output || !meta) return;
+    modal.style.display = 'flex';
+    output.value = 'Готовлю протокол...';
+    meta.textContent = currentProject && currentProject.id
+        ? `Проект #${currentProject.id}: ${currentProject.name || 'без названия'}`
+        : 'Черновой протокол по текущей схеме';
+    await refreshProtocolPreview({ silent: true });
+}
+
+async function refreshProtocolPreview(options = {}) {
+    const output = document.getElementById('protocol-preview-output');
+    const meta = document.getElementById('protocol-preview-meta');
+    if (!output || !meta) return;
+    try {
+        output.value = 'Готовлю протокол...';
+        const data = await _fetchEngineeringProtocol();
+        if (!data) {
+            output.value = '';
+            meta.textContent = 'Нет данных для протокола';
+            return;
+        }
+        output.value = data.markdown;
+        const count = data.meta && data.meta.section_count ? data.meta.section_count : (data.sections || []).length;
+        const projectLabel = data.project && data.project.name ? ` · ${data.project.name}` : '';
+        meta.textContent = `Секций: ${count || 0}${projectLabel}`;
+        if (!options.silent) showNotification('✓ Протокол обновлён', 'success');
+    } catch (e) {
+        output.value = '';
+        meta.textContent = 'Не удалось собрать протокол';
+        showNotification('Протокол: ' + (e.message || e), 'warning');
+    }
+}
+
+async function copyProtocolPreview() {
+    const output = document.getElementById('protocol-preview-output');
+    const text = output ? output.value : '';
+    if (!text || text === 'Готовлю протокол...') return;
+    try {
+        await navigator.clipboard.writeText(text);
+        showNotification('✓ Протокол скопирован', 'success');
+    } catch (e) {
+        if (output) {
+            output.select();
+            document.execCommand('copy');
+        }
+        showNotification('✓ Протокол скопирован', 'success');
+    }
+}
+
+function downloadProtocolPreview() {
+    const output = document.getElementById('protocol-preview-output');
+    const text = output ? output.value : '';
+    if (!text || text === 'Готовлю протокол...') return;
+    _saveProtocolMarkdown(_engineeringProtocolFilename(), text);
+    showNotification('✓ Протокол скачан', 'success');
+}
+
+async function downloadEngineeringProtocol() {
     try {
         showNotification('📄 Собираю протокол...', 'info');
-        const data = await simApiFetch(PROTOCOL_API.generate, {
-            method: 'POST',
-            body: JSON.stringify(payload),
-        });
-        if (!data.markdown) throw new Error('Пустой протокол');
-        const filename = currentProject && currentProject.id
-            ? `dolg_protocol_project_${currentProject.id}.md`
-            : `dolg_protocol_draft_${Date.now()}.md`;
-        if (typeof downloadTextFile === 'function') {
-            downloadTextFile(filename, data.markdown, 'text/markdown;charset=utf-8');
-        } else {
-            const blob = new Blob([data.markdown], { type: 'text/markdown;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+        const data = await _fetchEngineeringProtocol();
+        if (!data) return;
+        const filename = data.project && data.project.id
+            ? `dolg_protocol_project_${data.project.id}.md`
+            : _engineeringProtocolFilename();
+        _saveProtocolMarkdown(filename, data.markdown);
         const count = data.meta && data.meta.section_count ? data.meta.section_count : (data.sections || []).length;
         showNotification(`✓ Протокол скачан (${count || 'несколько'} секций)`, 'success');
     } catch (e) {

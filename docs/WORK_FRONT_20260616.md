@@ -41,7 +41,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 - Успешный `EngineJob`, привязанный к проекту, теперь сохраняется в `SimulationRun` и пишет событие `ProjectEvent(simulation_run)`. Проверки после изменения: `Dolg_APP/tests_server_engines.py` - 15 passed; `manage.py check` - OK.
 - В модалке серверных движков добавлена видимая очередь jobs: counts по `queued/running/success/error`, последние задания, ручное обновление и выбор job из списка.
 - Docker повторно проверен после UI-работ: CLI установлен (`29.5.2`), repair script поднял `vmcompute`, `LxssManager`, `com.docker.service` и включил Windows WSL/VM features, но лог `logs/windows-stack-repair-20260617-080433.log` требует restart до надёжного теста. До перезагрузки `docker version` видит client, но server pipe `dockerDesktopLinuxEngine/docker_engine` отсутствует; Docker Desktop/backend остановлены через admin stop helper.
-- Авто-протокол получил проектный режим: `POST /api/sim/protocol/` с `project_id` подтягивает `scheme_data`, последние `SimulationRun`, сохранённые `ProjectMeasurement` и in-memory Engineering Review findings; в симулятор добавлена кнопка one-click download `.md`. Проверки: `tests_protocol_generator.py` + 2 API-теста - 11 passed; `manage.py check` - OK.
+- Авто-протокол получил проектный режим: `POST /api/sim/protocol/` с `project_id` подтягивает `scheme_data`, последние `SimulationRun`, сохранённые `ProjectMeasurement` и in-memory Engineering Review findings; в симулятор добавлен preview/download `.md`. Проверки: `tests_protocol_generator.py` + 2 API-теста - 11 passed; `manage.py check` - OK.
 - Для виртуальной лаборатории добавлен базовый animation controller: общий rAF-loop для sweep осциллографа и phase preview генератора, `prefers-reduced-motion`, `dispose()` cleanup и публичный `DolgLab.setAnimationEnabled(...)`.
 
 ## Новый план после PR-проверки
@@ -106,8 +106,8 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Result payload уже нормализуется для локального worker и сохраняется в историю проекта: `nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`; расширить этот контракт на Xyce/PySpice после восстановления Docker.
 
 4. Авто-протокол `.md`/PDF.
-   - Готово: `.md`-генератор умеет проектный режим через `project_id` и собирает схему, историю симуляций, измерения и review findings без сохранения лишнего `ProjectReview`; в симуляторе есть кнопка one-click download.
-   - Осталось: PDF-рендер, графики/осциллограммы, BOM/sources и preview протокола перед скачиванием.
+   - Готово: `.md`-генератор умеет проектный режим через `project_id` и собирает схему, историю симуляций, измерения и review findings без сохранения лишнего `ProjectReview`; в симуляторе есть preview/download модалка.
+   - Осталось: PDF-рендер, графики/осциллограммы и BOM/sources.
    - Это инженерный отчёт проекта, который полезен пользователю и может переиспользоваться любым экспортом.
 
 5. Вау-пайплайн схема -> PCB -> 3D.
