@@ -207,7 +207,7 @@
 | # | Что | Состояние | Прио | Усилие |
 |---|---|---|---|---|
 | 12.1 | Очистка артефактов (`*.log`, `~$*.docx`, `.tmp_*/`) | ✅ commit `837a59c` (16 PNG + 5 JPG + 2 Office-локов снесены, `.gitignore` расширен) | — | — |
-| 12.2 | **`docs/` консолидация** 52 → ≤10 файлов: слить `NEXT_PLAN` + `IMPROVEMENT_PLAN_*` + `PRIORITY_ROADMAP_*` + `CAD_REDESIGN_PLAN` + `CAD_HARD_UPGRADE_PLAN` + `SIMULATOR_LIVENESS_PLAN` в один `BACKLOG.md`; 8× `WORKFRONT_*` + 4× `AUDIT_*` + `EMERGENCY_*` + `ACCUMULATED_ISSUES` + `SCHEMATIC_EDITOR_FIXES` + `FULL_CODE_AUDIT` + `CODE_AUDIT_AND_DEFENSE_DOCS_WORKFLOW` + `ENGINEERING_PROCESS_NOTES` + `PROJECT_SESSION_*` → `docs/archive/` (или просто `git rm`, история сохранится) | 🟧 | 2 ч (нужен confirm на удаление) |
+| 12.2 | **`docs/` консолидация** roadmap/backlog/research-файлов | ✅ 2026-06-16: старые планы сжаты в `docs/DEVELOPMENT_HISTORY.md`, активный фронт оставлен в `docs/WORK_FRONT_20260616.md`, поглощённые файлы удалены | — | — |
 | 12.3 | **`scripts/` чистка** — one-shot генераторы с датами: `update_diploma_materials_20260519.py` (60 КБ), `build_presentation_*_20260519.py` (×2 × 29 КБ, почти дубль), `update_speech_scheme_questions_20260519.py`, `rebuild_defense_materials_20260524.py` (40 КБ), `generate_diploma_two_chapter_rework.py` (59 КБ), `update_diploma_v3_from_docs_20260510.py`, DRC-chain (`expand_drc_rules.py` 46 КБ + `finalize_drc_rules.py` + `enable_drc_rules.py`), `seed_ml_dataset.py` (59 КБ) → `scripts/archive/` или `git rm` | 🟧 | 1 ч (нужен confirm) |
 | 12.4 | `management/commands/` ревизия (38 файлов) — отметить one-shot (seed/backfill/migrate/normalize) → `archive/`; репитативные → оставить или объединить в `health_check` | 🟧 | 2-3 ч |
 | 12.5 | `simulation.html` split (18 640 строк → отдельные `shop/static/simulation/scheme-{presets,erc,multisection,router,utils}.js`) | 📚 | 1 день, **post-defense** (риск ломануть рендер) |
@@ -233,7 +233,7 @@
 | 13.10 | `.github/workflows/ci.yml` — добавить `bandit` + `pip-audit` + `gitleaks` step'ы (= H4 из § 9) | ❌ | 🔥 | 30 мин |
 | 13.11 | **Git history scrub** — secrets (если найдутся через H5 gitleaks), AI-fingerprints (датированные комменты — отдельный backlog [[project-anti-ai-cleanup-backlog]]) | ❌ | 🟧 после H5 | 1-2 ч `git filter-repo` + force-push (требует приватного репо или координации) |
 | 13.12 | Stale branches / closed PRs cleanup | ❓ глянуть `git branch -a` | 🟢 | 5 мин |
-| 13.13 | Release tags / changelog | 🟡 `docs/CHANGELOG.md` есть, но git tags нет | 🟢 | 5 мин на тег `v1.0.0-defense` |
+| 13.13 | Release tags / история изменений | 🟡 история теперь в `docs/DEVELOPMENT_HISTORY.md`, git tags ещё нет | 🟢 | 5 мин на тег `v1.0.0-defense` |
 | 13.14 | Repository description + topics + README badges (защитные значки security/license/python-version) | 🟢 | 10 мин на Settings |
 | 13.15 | GitHub Advanced Security — code scanning (CodeQL) — бесплатно для public repo | ❌ | 🟢 | 5 мин на `.github/workflows/codeql.yml` |
 | 13.16 | Dependabot alerts включены в Settings → Code security | ❓ | 🟧 | 1 клик |
