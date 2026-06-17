@@ -1,0 +1,71 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.envFile": "${workspaceFolder}\\.env",
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "."
+  ],
+  "ruff.configuration": "${workspaceFolder}\\pyproject.toml",
+  "ruff.nativeServer": "on",
+  "files.associations": {
+    ".env.example": "dotenv",
+    "*.env.example": "dotenv",
+    "*.html": "django-html",
+    "**/templates/**/*.html": "django-html",
+    "Dockerfile*": "dockerfile"
+  },
+  "yaml.schemaStore.enable": true,
+  "yaml.validate": true,
+  "yaml.schemas": {
+    "https://json.schemastore.org/docker-compose.json": [
+      "deploy/docker-compose*.yml"
+    ],
+    "https://json.schemastore.org/kustomization.json": [
+      "deploy/k8s/kustomization.yaml"
+    ],
+    "https://json.schemastore.org/kubernetes.json": [
+      "deploy/k8s/django.yaml",
+      "deploy/k8s/monitoring.yaml",
+      "deploy/k8s/namespace.yaml",
+      "deploy/k8s/networkpolicy.yaml",
+      "deploy/k8s/nginx.yaml",
+      "deploy/k8s/pdb.yaml",
+      "deploy/k8s/postgres.yaml",
+      "deploy/k8s/redis.yaml",
+      "deploy/k8s/storage.yaml"
+    ]
+  },
+  "sqltools.connections": [
+    {
+      "name": "DOLG SQLite dev",
+      "driver": "SQLite",
+      "database": "${workspaceFolder}\\db.sqlite3",
+      "previewLimit": 50
+    }
+  ],
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.env.windows": {
+    "PYTHONUTF8": "1"
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/__pycache__": true,
+    "**/staticfiles": true,
+    "**/media": true
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/__pycache__": true
+  }
+}

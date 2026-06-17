@@ -1,0 +1,280 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Stacks: health check",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\check_vscode_stacks.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stacks: repair Windows Docker/WSL (admin)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\run_windows_stack_repair_as_admin.cmd",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: stop stuck Desktop (admin)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\stop_docker_desktop_as_admin.cmd",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Django: check",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "manage.py",
+        "check"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Django: migrations check",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "manage.py",
+        "makemigrations",
+        "--check",
+        "--dry-run"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pytest: all",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pytest: server engines",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "pytest",
+        "Dolg_APP/tests_server_engines.py",
+        "-q"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Engine worker: once (local)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "manage.py",
+        "run_engine_worker",
+        "--once",
+        "--limit",
+        "5"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Engine worker: watch (local)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "manage.py",
+        "run_engine_worker",
+        "--limit",
+        "5",
+        "--sleep",
+        "2"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Ruff: check",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "ruff",
+        "check",
+        "."
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: npm install",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d frontend && npm install"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: type-check",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d frontend && npm run type-check"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: build",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d frontend && npm run build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: test",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d frontend && npm run test"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: compose config",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        ".env",
+        "-f",
+        "deploy/docker-compose.yml",
+        "config"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "SECRET_KEY": "local-vscode-compose-config-secret-key-000000000000",
+          "POSTGRES_PASSWORD": "local-postgres-password",
+          "GRAFANA_ADMIN_PASSWORD": "local-grafana-password",
+          "EMAIL_BACKEND": "django.core.mail.backends.locmem.EmailBackend",
+          "METRICS_TOKEN": "local-metrics-token"
+        }
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "K8s: render kustomize",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "kustomize",
+        "deploy/k8s"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "K8s: dry-run apply",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "apply",
+        "--dry-run=client",
+        "-k",
+        "deploy/k8s"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "SQL: Django DB inspect",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "manage.py",
+        "shell",
+        "-c",
+        "from django.db import connection; print(connection.vendor, connection.settings_dict.get('NAME')); print('\\n'.join(connection.introspection.table_names()[:30]))"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

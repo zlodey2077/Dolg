@@ -1,0 +1,26 @@
+{
+  "recommendations": [
+    "batisteo.vscode-django",
+    "charliermarsh.ruff",
+    "editorconfig.editorconfig",
+    "github.vscode-github-actions",
+    "humao.rest-client",
+    "mikestead.dotenv",
+    "ms-azuretools.vscode-docker",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "ms-playwright.playwright",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-vscode.powershell",
+    "ms-vscode-remote.remote-containers",
+    "ms-vscode-remote.remote-ssh",
+    "ms-vscode-remote.remote-wsl",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-sqlite",
+    "qwtel.sqlite-viewer",
+    "redhat.vscode-xml",
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+    "wholroyd.jinja"
+  ]
+}
