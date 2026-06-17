@@ -710,6 +710,18 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('text/markdown', response['Content-Type'])
         self.assertIn('attachment', response['Content-Disposition'])
 
+    def test_generate_protocol_download_returns_pdf_file(self):
+        response = self.client.post(
+            reverse('hello:api_generate_protocol'),
+            data=json.dumps({'title': 'Protocol PDF', 'scheme_data': self.scheme, 'format': 'pdf'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('.pdf', response['Content-Disposition'])
+        self.assertTrue(response.content.startswith(b'%PDF'))
+
     def test_generate_protocol_can_collect_project_context(self):
         SimulationRun.objects.create(
             project=self.project,

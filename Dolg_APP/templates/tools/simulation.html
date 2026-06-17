@@ -1110,6 +1110,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 <button onclick="refreshProtocolPreview()" class="btn btn-secondary" style="flex:1;">⟳ Обновить</button>
                 <button onclick="copyProtocolPreview()" class="btn btn-primary" style="flex:1;">📋 Копировать</button>
                 <button onclick="downloadProtocolPreview()" class="btn btn-success" style="flex:1;">💾 Скачать .md</button>
+                <button onclick="downloadProtocolPdf()" class="btn btn-primary" style="flex:1;">📄 Скачать PDF</button>
             </div>
         </div>
     </div>
@@ -12922,18 +12923,14 @@ function _buildEngineeringProtocolPayload() {
     return payload;
 }
 
-function _engineeringProtocolFilename() {
+function _engineeringProtocolFilename(ext = 'md') {
+    const suffix = String(ext || 'md').replace(/^\./, '');
     return currentProject && currentProject.id
-        ? `dolg_protocol_project_${currentProject.id}.md`
-        : `dolg_protocol_draft_${Date.now()}.md`;
+        ? `dolg_protocol_project_${currentProject.id}.${suffix}`
+        : `dolg_protocol_draft_${Date.now()}.${suffix}`;
 }
 
-function _saveProtocolMarkdown(filename, markdown) {
-    if (typeof downloadTextFile === 'function') {
-        downloadTextFile(filename, markdown, 'text/markdown;charset=utf-8');
-        return;
-    }
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+function _saveProtocolBlob(filename, blob) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -12942,6 +12939,14 @@ function _saveProtocolMarkdown(filename, markdown) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function _saveProtocolMarkdown(filename, markdown) {
+    if (typeof downloadTextFile === 'function') {
+        downloadTextFile(filename, markdown, 'text/markdown;charset=utf-8');
+        return;
+    }
+    _saveProtocolBlob(filename, new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
 }
 
 async function _fetchEngineeringProtocol() {
@@ -13019,6 +13024,33 @@ function downloadProtocolPreview() {
     if (!text || text === 'Готовлю протокол...') return;
     _saveProtocolMarkdown(_engineeringProtocolFilename(), text);
     showNotification('✓ Протокол скачан', 'success');
+}
+
+async function downloadProtocolPdf() {
+    try {
+        const payload = _buildEngineeringProtocolPayload();
+        if (!payload) return;
+        payload.format = 'pdf';
+        showNotification('📄 Собираю PDF-протокол...', 'info');
+        const res = await fetch(PROTOCOL_API.generate, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getSimCsrfToken(),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        _saveProtocolBlob(_engineeringProtocolFilename('pdf'), blob);
+        showNotification('✓ PDF-протокол скачан', 'success');
+    } catch (e) {
+        showNotification('PDF-протокол: ' + (e.message || e), 'warning');
+    }
 }
 
 async function downloadEngineeringProtocol() {

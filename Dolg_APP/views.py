@@ -82,6 +82,135 @@ def _reportlab_pdf():
     return A4, pdfmetrics, TTFont, canvas
 
 
+def _pdf_font_name(pdfmetrics, TTFont):
+    for pdf_font_name, pdf_font_path in (
+        ('TimesNewRoman', r'C:\Windows\Fonts\times.ttf'),
+        ('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
+    ):
+        try:
+            pdfmetrics.registerFont(TTFont(pdf_font_name, pdf_font_path))
+        except Exception:
+            continue
+    registered_fonts = pdfmetrics.getRegisteredFontNames()
+    return (
+        'TimesNewRoman'
+        if 'TimesNewRoman' in registered_fonts
+        else ('DejaVuSans' if 'DejaVuSans' in registered_fonts else 'Helvetica')
+    )
+
+
+def _clean_protocol_pdf_text(text):
+    text = str(text or '').strip()
+    for marker in ('**', '`'):
+        text = text.replace(marker, '')
+    if text.startswith('_') and text.endswith('_') and len(text) > 1:
+        text = text[1:-1]
+    return text.replace('\t', '    ')
+
+
+def _wrap_pdf_text(text, max_width, font_name, font_size, pdfmetrics):
+    words = _clean_protocol_pdf_text(text).split(' ')
+    lines = []
+    current = ''
+    for word in words:
+        if not word:
+            continue
+        candidate = f'{current} {word}'.strip()
+        if pdfmetrics.stringWidth(candidate, font_name, font_size) <= max_width:
+            current = candidate
+            continue
+        if current:
+            lines.append(current)
+        if pdfmetrics.stringWidth(word, font_name, font_size) <= max_width:
+            current = word
+            continue
+        chunk = ''
+        for char in word:
+            candidate = f'{chunk}{char}'
+            if chunk and pdfmetrics.stringWidth(candidate, font_name, font_size) > max_width:
+                lines.append(chunk)
+                chunk = char
+            else:
+                chunk = candidate
+        current = chunk
+    if current:
+        lines.append(current)
+    return lines or ['']
+
+
+def _iter_protocol_pdf_blocks(markdown):
+    for raw_line in str(markdown or '').splitlines():
+        line = raw_line.strip()
+        if not line:
+            yield 'blank', ''
+            continue
+        if line.startswith('# '):
+            yield 'h1', line[2:].strip()
+            continue
+        if line.startswith('## '):
+            yield 'h2', line[3:].strip()
+            continue
+        if line.startswith('|') and line.endswith('|'):
+            cells = [cell.strip() for cell in line.strip('|').split('|')]
+            if cells and all(set(cell) <= {'-', ':'} for cell in cells):
+                continue
+            yield 'table', '  |  '.join(cells)
+            continue
+        if line.startswith('- '):
+            yield 'list', f'- {line[2:].strip()}'
+            continue
+        yield 'body', line
+
+
+def _render_protocol_pdf(markdown):
+    A4, pdfmetrics, TTFont, canvas = _reportlab_pdf()
+    buffer = BytesIO()
+    page = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    font_name = _pdf_font_name(pdfmetrics, TTFont)
+    margin_x = 42
+    bottom_y = 42
+    y = height - 48
+    page.setTitle('DOLG engineering protocol')
+
+    def new_page():
+        nonlocal y
+        page.showPage()
+        y = height - 48
+
+    def draw_text(text, font_size=10, leading=14, extra_after=2, left_pad=0):
+        nonlocal y
+        max_width = width - margin_x * 2 - left_pad
+        page.setFont(font_name, font_size)
+        for wrapped in _wrap_pdf_text(text, max_width, font_name, font_size, pdfmetrics):
+            if y < bottom_y:
+                new_page()
+                page.setFont(font_name, font_size)
+            page.drawString(margin_x + left_pad, y, wrapped)
+            y -= leading
+        y -= extra_after
+
+    for kind, text in _iter_protocol_pdf_blocks(markdown):
+        if kind == 'blank':
+            y -= 6
+            if y < bottom_y:
+                new_page()
+        elif kind == 'h1':
+            draw_text(text, font_size=15, leading=19, extra_after=8)
+        elif kind == 'h2':
+            y -= 3
+            draw_text(text, font_size=12, leading=16, extra_after=5)
+        elif kind == 'table':
+            draw_text(text, font_size=8, leading=11, extra_after=1)
+        elif kind == 'list':
+            draw_text(text, font_size=9, leading=12, extra_after=1, left_pad=10)
+        else:
+            draw_text(text, font_size=10, leading=14, extra_after=2)
+
+    page.save()
+    return buffer.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # Page views
 # ---------------------------------------------------------------------------
@@ -3035,6 +3164,13 @@ def api_generate_protocol(request):
         notes=notes,
         author=getattr(request.user, 'username', None),
     )
+
+    output_format = str(data.get('format') or data.get('download_format') or '').lower()
+    if output_format in {'pdf', 'application/pdf'}:
+        response = HttpResponse(_render_protocol_pdf(result['markdown']), content_type='application/pdf')
+        filename = f'dolg_protocol_project_{project.id}.pdf' if project else 'protocol.pdf'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     if data.get('download'):
         response = HttpResponse(result['markdown'], content_type='text/markdown; charset=utf-8')

@@ -245,7 +245,7 @@ Pro-аналитика в интерфейсе может сохранить к�
 ## Engineering protocol
 
 ### `POST /api/sim/protocol/`
-Генерирует Markdown-протокол проектирования. Требует логин. Есть два режима:
+Генерирует Markdown/PDF-протокол проектирования. Требует логин. Есть два режима:
 ручной payload (`scheme_data`, `measurements`, `lab_calcs`, `findings`) и проектный
 режим через `project_id`.
 
@@ -261,7 +261,8 @@ in-memory Engineering Review findings. Review не сохраняется в Б�
     "project_id": 7,
     "include_dc": true,
     "include_review": true,
-    "download": false
+    "download": false,
+    "format": "json"
 }
 ```
 
@@ -285,6 +286,8 @@ in-memory Engineering Review findings. Review не сохраняется в Б�
 
 Если `download: true`, ответ возвращается как `text/markdown` с attachment filename
 `dolg_protocol_project_<id>.md` для проектного режима или `protocol.md` для ручного.
+Если передать `format: "pdf"`, endpoint вернет `application/pdf` с filename
+`dolg_protocol_project_<id>.pdf` или `protocol.pdf`.
 
 ---
 
