@@ -1,0 +1,2 @@
+var Dolg=function(r){"use strict";function c(n,o){return`${n}:${o}`}function u(){const n=new Map;function o(e){n.has(e)||n.set(e,e);let t=e;for(;n.get(t)!==t;){const i=n.get(n.get(t));n.set(t,i),t=i}return t}function f(e,t){const i=o(e),a=o(t);i!==a&&n.set(i,a)}return{find:o,union:f,parent:n}}return window.Dolg={UnionFind:{create:u,portKey:c},version:"0.1.0"},r.createUnionFind=u,r.portKey=c,Object.defineProperty(r,Symbol.toStringTag,{value:"Module"}),r}({});
+//# sourceMappingURL=index.js.map
