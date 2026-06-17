@@ -39,6 +39,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 - PR-проверка 2026-06-17: на GitHub открыт только Dependabot PR #3 (`pypdf 6.10.2 -> 6.12.0`), refs PR загружены локально, релевантные проверки прошли, изменение вынесено в отдельный commit `34f8d9e`.
 - UI серверных движков доведен до первого end-to-end сценария: выбор engine/analysis, submit в `/api/sim/jobs/`, polling queued/running/success/error, компактный вывод `nodes`, `branches`, `metrics`, `warnings`.
 - Успешный `EngineJob`, привязанный к проекту, теперь сохраняется в `SimulationRun` и пишет событие `ProjectEvent(simulation_run)`. Проверки после изменения: `Dolg_APP/tests_server_engines.py` - 15 passed; `manage.py check` - OK.
+- В модалке серверных движков добавлена видимая очередь jobs: counts по `queued/running/success/error`, последние задания, ручное обновление и выбор job из списка.
 
 ## Новый план после PR-проверки
 
@@ -58,6 +59,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Готово: UI polling в `simulation.html`: submit -> queued/running/success/error.
    - Готово: отображение нормализованного результата: `nodes`, `branches`, `metrics`, `warnings`; `waveforms`/`artifacts` оставить для следующих worker'ов.
    - Готово: сохранение успешного результата в историю `SimulationRun`, если job привязан к проекту.
+   - Готово: видимая очередь EngineJob в UI с counts и быстрым выбором последнего job.
    - Осталось: отдельный удобный режим запуска локального `dolg-numpy-mna` worker через dev task/management command; не запускать процессы из web request.
 
 4. Закрыть системные блокеры без остановки разработки.
