@@ -75,6 +75,9 @@
 
     // --- Состояние лаборатории -------------------------------------------------
     const state = {
+        animation: {
+            enabled: true,
+        },
         // Осциллограф
         scope: {
             channel: null,      // имя узла схемы или null для авто
@@ -83,6 +86,7 @@
             offset: 0,          // вертикальный сдвиг
             cursorT1: null,     // время T1 в секундах (Shift+Click)
             cursorT2: null,     // время T2 в секундах (Shift+Click повторно)
+            sweepPhase: 0,
         },
         // Мультиметр
         multimeter: {
@@ -97,12 +101,17 @@
             frequency: 1000,    // Гц
             offset: 0,          // DC
             targetCompId: null, // id источника (battery)
+            phase: 0,
         },
     };
 
     let _root = null;
     let _cbs = null;
     let _bound = false;
+    let _labAnimRaf = null;
+    let _labAnimLastTs = 0;
+    let _labAnimLastScopeDraw = 0;
+    let _labAnimLastGenDraw = 0;
 
     // --- HTML-разметка лаборатории --------------------------------------------
     const HTML = `
@@ -205,6 +214,7 @@
         rootEl.innerHTML = HTML;
         rebindAll();
         refresh();
+        _startInstrumentAnimation();
         // 2026-06-01 recovery #4: ResizeObserver на scope card. Резизит
         // canvas под актуальный CSS-размер (с учётом DPI), чтобы scope не
         // оставался растянутым/размытым при изменении analysis-bottom высоты.
@@ -229,6 +239,7 @@
     }
 
     function dispose() {
+        _stopInstrumentAnimation();
         if (_root) _root.innerHTML = '';
         _root = null; _cbs = null; _bound = false;
     }
@@ -312,6 +323,61 @@
         drawScope();
         updateMultimeter();
         drawGenPreview();
+        _startInstrumentAnimation();
+    }
+
+    function _prefersReducedMotion() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function _hasTransientScopeResult() {
+        const result = (_cbs && _cbs.getLastResult && _cbs.getLastResult()) || null;
+        return Boolean(result && result.type === 'tran' && result.points && result.points.length);
+    }
+
+    function _startInstrumentAnimation() {
+        if (_labAnimRaf || !_root || !state.animation.enabled || _prefersReducedMotion()) return;
+        _labAnimLastTs = 0;
+        _labAnimRaf = requestAnimationFrame(_instrumentAnimationFrame);
+    }
+
+    function _stopInstrumentAnimation() {
+        if (_labAnimRaf) cancelAnimationFrame(_labAnimRaf);
+        _labAnimRaf = null;
+        _labAnimLastTs = 0;
+        _labAnimLastScopeDraw = 0;
+        _labAnimLastGenDraw = 0;
+    }
+
+    function _instrumentAnimationFrame(ts) {
+        if (!_root || !_root.isConnected || !state.animation.enabled || _prefersReducedMotion()) {
+            _stopInstrumentAnimation();
+            return;
+        }
+
+        const dt = _labAnimLastTs ? Math.min(0.08, Math.max(0, (ts - _labAnimLastTs) / 1000)) : 0;
+        _labAnimLastTs = ts;
+        if (!document.hidden && dt > 0) {
+            state.scope.sweepPhase = (state.scope.sweepPhase + dt * 0.7) % 1;
+            const genRate = Math.max(0.18, Math.min(2.2, Math.log10(Math.max(10, state.gen.frequency || 10)) / 2.4));
+            state.gen.phase = (state.gen.phase + dt * genRate) % 1;
+
+            if (ts - _labAnimLastScopeDraw > 34 && _hasTransientScopeResult()) {
+                _labAnimLastScopeDraw = ts;
+                drawScope();
+            }
+            if (ts - _labAnimLastGenDraw > 50) {
+                _labAnimLastGenDraw = ts;
+                drawGenPreview();
+            }
+        }
+        _labAnimRaf = requestAnimationFrame(_instrumentAnimationFrame);
+    }
+
+    function setAnimationEnabled(enabled) {
+        state.animation.enabled = enabled !== false;
+        if (state.animation.enabled) _startInstrumentAnimation();
+        else _stopInstrumentAnimation();
     }
 
     // --- Списки выбора (узлы / источники) -------------------------------------
@@ -664,6 +730,22 @@
                 cursorInfo = ` · T1=${fmtTime(state.scope.cursorT1 - tOrigin)} (Shift+Click для T2)`;
             }
         }
+
+        const sweepX = Math.max(0, Math.min(W, (state.scope.sweepPhase || 0) * W));
+        const sweep = ctx.createLinearGradient(Math.max(0, sweepX - 28), 0, Math.min(W, sweepX + 8), 0);
+        sweep.addColorStop(0, 'rgba(127, 255, 176, 0)');
+        sweep.addColorStop(0.7, 'rgba(127, 255, 176, 0.14)');
+        sweep.addColorStop(1, 'rgba(210, 255, 225, 0.78)');
+        ctx.save();
+        ctx.fillStyle = sweep;
+        ctx.fillRect(Math.max(0, sweepX - 28), 0, 36, H);
+        ctx.strokeStyle = 'rgba(210, 255, 225, 0.82)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sweepX, 0);
+        ctx.lineTo(sweepX, H);
+        ctx.stroke();
+        ctx.restore();
 
         // §2.7 OVERLOAD detection: |V| > 0.95 × screen-range или резкое dV/dt.
         // Создаёт небольшой шум по волне + помечает info-line.
@@ -1120,6 +1202,7 @@
         // Рисуем ~3 периода
         const periods = 3;
         const samples = 200;
+        const phaseShift = state.gen.phase || 0;
         const amp = state.gen.amplitude;
         const off = state.gen.offset;
         const yScale = (H * 0.4) / Math.max(0.01, amp + Math.abs(off));
@@ -1129,14 +1212,14 @@
         ctx.beginPath();
         for (let i = 0; i <= samples; i++) {
             const t = (i / samples) * periods;
-            const phase = (t % 1);
+            const phase = ((t + phaseShift) % 1 + 1) % 1;
             let v;
             if (state.gen.wave === 'square') {
                 v = phase < 0.5 ? amp : -amp;
             } else if (state.gen.wave === 'triangle') {
                 v = phase < 0.5 ? (amp * (4 * phase - 1)) : (amp * (3 - 4 * phase));
             } else {
-                v = amp * Math.sin(2 * Math.PI * t);
+                v = amp * Math.sin(2 * Math.PI * (t + phaseShift));
             }
             const x = (i / samples) * W;
             const y = yMid - (v + off) * yScale;
@@ -1195,5 +1278,5 @@
         refresh();
     }
 
-    window.DolgLab = { init, refresh, dispose, setProbeNet };
+    window.DolgLab = { init, refresh, dispose, setProbeNet, setAnimationEnabled };
 })(window);
