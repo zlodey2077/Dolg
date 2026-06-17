@@ -37,6 +37,7 @@ scheme-* всё равно доступны для inline-JS в нашем DOMCo
 <script src="{% static 'simulation/scheme-lab.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'simulation/ml-toolbar.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'lib/qrcode.min.js' %}?v=1.0.0" defer></script>
+<script id="server-engine-catalog-data" type="application/json">{{ server_engine_catalog_json|safe }}</script>
 
 {# ============== Keyboard shortcuts panel (нажми ? для справки) ============== #}
 <style>
@@ -503,6 +504,10 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 <button class="tool-btn tool-btn--review" id="eng-review-btn" type="button"
                         onclick="openEngineeringReview()" title="Инженер ревью: проверка схемы, рекомендации, score">
                     <span>🛠</span> Ревью
+                </button>
+                <button class="tool-btn tool-btn--engines" id="server-engines-btn" type="button"
+                        onclick="openServerEnginesModal()" title="Серверные движки: Xyce, PySpice, GnuCap, OpenModelica, Docker/Kubernetes">
+                    <span>🧠</span> Движки
                 </button>
 
                 {% comment %}
@@ -1088,6 +1093,20 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
         </div>
     </div>
 
+    <!-- Модалка серверных движков и будущего engine-router -->
+    <div id="server-engines-modal" class="sim-modal" style="display:none;">
+        <div class="sim-modal-content sim-modal-content--wide">
+            <div class="sim-modal-header">
+                <h2>🧠 Серверные движки</h2>
+                <button class="close-btn" onclick="closeServerEnginesModal()" type="button" title="Закрыть каталог движков" aria-label="Закрыть каталог серверных движков">✕</button>
+            </div>
+            <div class="server-engine-summary" id="server-engine-summary"></div>
+            <div class="server-engine-router" id="server-engine-router"></div>
+            <div class="server-engine-tabs" id="server-engine-tabs" role="tablist" aria-label="Категории движков"></div>
+            <div class="server-engine-grid" id="server-engine-grid"></div>
+        </div>
+    </div>
+
     <!-- Модалка выбора проекта (Save/Load) -->
     <div id="project-picker-modal" class="sim-modal" style="display:none;">
         <div class="sim-modal-content">
@@ -1143,11 +1162,154 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     box-sizing: border-box;
     box-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
 }
+.sim-modal-content--wide {
+    max-width: min(1180px, 96vw) !important;
+}
 .sim-modal-header {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 16px;
 }
 .sim-modal-header h2 { color: var(--accent-cyan); margin: 0; font-size: 1.2rem; }
+.server-engine-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.server-engine-stat,
+.server-engine-router {
+    background: rgba(26, 39, 68, 0.62);
+    border: 1px solid rgba(0, 212, 255, 0.22);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.server-engine-stat small {
+    display: block;
+    color: #93a4c4;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.server-engine-stat strong {
+    display: block;
+    color: #fff;
+    font-size: 1.04rem;
+    margin-top: 4px;
+}
+.server-engine-router {
+    margin-bottom: 12px;
+    color: #d7e8ff;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+.server-engine-router strong { color: #7fdbff; }
+.server-engine-router code {
+    color: #a6ffcb;
+    background: rgba(0, 0, 0, 0.22);
+    border-radius: 4px;
+    padding: 1px 4px;
+}
+.server-engine-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.server-engine-tab {
+    border: 1px solid rgba(0, 212, 255, 0.25);
+    background: rgba(0, 212, 255, 0.07);
+    color: #cfefff;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.server-engine-tab.active,
+.server-engine-tab:hover {
+    background: rgba(0, 212, 255, 0.20);
+    border-color: rgba(0, 212, 255, 0.65);
+    color: #fff;
+}
+.server-engine-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+    max-height: min(52vh, 560px);
+    overflow-y: auto;
+    padding-right: 2px;
+}
+.server-engine-card {
+    background: rgba(8, 13, 31, 0.82);
+    border: 1px solid rgba(0, 212, 255, 0.20);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 210px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.server-engine-card--primary {
+    border-color: rgba(166, 255, 203, 0.65);
+    box-shadow: inset 0 0 0 1px rgba(166, 255, 203, 0.15);
+}
+.server-engine-card header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    justify-content: space-between;
+}
+.server-engine-card h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 0.98rem;
+    line-height: 1.25;
+}
+.server-engine-status {
+    flex-shrink: 0;
+    border-radius: 999px;
+    padding: 2px 7px;
+    font-size: 0.68rem;
+    color: #08101f;
+    background: #7fdbff;
+    white-space: nowrap;
+}
+.server-engine-status[data-status="connected"],
+.server-engine-status[data-status="primary-candidate"] { background: #a6ffcb; }
+.server-engine-status[data-status="license-gated"] { background: #ffd38a; }
+.server-engine-status[data-status="research"] { background: #cbb7ff; }
+.server-engine-status[data-status="prototype"] { background: #ffb1b1; }
+.server-engine-card p {
+    margin: 0;
+    color: #c7d3e8;
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+.server-engine-card dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 74px 1fr;
+    gap: 5px 8px;
+    color: #aab9d6;
+    font-size: 0.76rem;
+}
+.server-engine-card dt { color: #7fdbff; }
+.server-engine-card dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.server-engine-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: auto;
+}
+.server-engine-tags span {
+    border: 1px solid rgba(127, 219, 255, 0.20);
+    border-radius: 4px;
+    color: #9cc7e9;
+    font-size: 0.68rem;
+    padding: 1px 5px;
+}
 .picker-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
 .picker-item {
     display: flex; justify-content: space-between; align-items: center;
@@ -1260,6 +1422,13 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     .sim-modal-header h2 {
         font-size: 1rem;
         line-height: 1.25;
+    }
+    .server-engine-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .server-engine-grid {
+        grid-template-columns: 1fr;
+        max-height: none;
     }
     #bom-footer > div:last-child .btn {
         flex: 1 1 120px !important;
@@ -1871,6 +2040,15 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
 }
 .simulator-container > .components-panel .tool-btn--review:hover {
     background: linear-gradient(135deg, rgba(255, 167, 38, 0.40), rgba(200, 110, 0, 0.40));
+    color: #fff;
+}
+.simulator-container > .components-panel .tool-btn--engines {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.16), rgba(14, 165, 233, 0.18));
+    border-color: rgba(125, 235, 185, 0.48);
+    color: #c7ffe4;
+}
+.simulator-container > .components-panel .tool-btn--engines:hover {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.34), rgba(14, 165, 233, 0.34));
     color: #fff;
 }
 .components-drawer-grid {
@@ -9424,6 +9602,154 @@ function downloadNetlist() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+let _serverEngineCatalog = null;
+let _serverEngineActiveCategory = '';
+let _serverEngineRecommendedIds = new Set();
+
+function getServerEngineCatalog() {
+    if (_serverEngineCatalog) return _serverEngineCatalog;
+    const tag = document.getElementById('server-engine-catalog-data');
+    try {
+        _serverEngineCatalog = JSON.parse(tag ? tag.textContent : '{}');
+    } catch (e) {
+        _serverEngineCatalog = { ok: false, categories: [], engines: [], summary: {}, router_profile: {} };
+    }
+    if (!_serverEngineCatalog || !_serverEngineCatalog.engines) {
+        _serverEngineCatalog = { ok: false, categories: [], engines: [], summary: {}, router_profile: {} };
+    }
+    return _serverEngineCatalog;
+}
+
+function openServerEnginesModal() {
+    const modal = document.getElementById('server-engines-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    renderServerEngineCatalog();
+    refreshServerEngineRecommendations();
+}
+
+function closeServerEnginesModal() {
+    const modal = document.getElementById('server-engines-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderServerEngineCatalog(category) {
+    if (category !== undefined) _serverEngineActiveCategory = category;
+    const payload = getServerEngineCatalog();
+    const engines = payload.engines || [];
+    const summary = payload.summary || {};
+    const router = payload.router_profile || {};
+    const categories = payload.categories || [];
+    const active = _serverEngineActiveCategory || '';
+    const filtered = active ? engines.filter(e => e.category === active) : engines;
+
+    renderServerEngineSummary(summary, router);
+    renderServerEngineRouter(router);
+    renderServerEngineTabs(categories, active);
+    renderServerEngineGrid(filtered, router);
+}
+
+function renderServerEngineSummary(summary, router) {
+    const box = document.getElementById('server-engine-summary');
+    if (!box) return;
+    const connected = (summary.by_status && summary.by_status.connected) || 0;
+    const adapters = ((summary.by_status && summary.by_status['adapter-ready']) || 0)
+        + ((summary.by_status && summary.by_status['primary-candidate']) || 0);
+    box.innerHTML = [
+        ['Всего движков', summary.total || 0],
+        ['Docker/REST готовы', summary.docker_rest_ready || adapters],
+        ['Уже подключены', connected],
+        ['Основной серверный', router.primary_engine || summary.primary_candidate || 'xyce'],
+    ].map(([label, value]) => (
+        `<div class="server-engine-stat"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></div>`
+    )).join('');
+}
+
+function renderServerEngineRouter(router) {
+    const box = document.getElementById('server-engine-router');
+    if (!box) return;
+    const docker = (router.docker_services || []).map(x => `<code>${escapeHtml(x)}</code>`).join(' ');
+    const fallback = (router.fallback_order || []).map(x => `<code>${escapeHtml(x)}</code>`).join(' → ');
+    box.innerHTML = `
+        <strong>Единый контур:</strong> ${escapeHtml(router.strategy || 'engine-router выбирает backend под задачу.')}
+        <br><strong>REST-контракт:</strong> <code>${escapeHtml((router.contract || {}).submit || 'POST /engines/{engine_id}/jobs')}</code>,
+        <code>${escapeHtml((router.contract || {}).status || 'GET /engines/jobs/{job_id}')}</code>,
+        <code>${escapeHtml((router.contract || {}).result || 'GET /engines/jobs/{job_id}/result')}</code>
+        <br><strong>Fallback:</strong> ${fallback || '<code>xyce</code> → <code>pyspice</code>'}
+        <br><strong>Docker/Kubernetes:</strong> ${docker || '<code>engine-gateway</code> <code>xyce-worker</code>'}
+    `;
+}
+
+function renderServerEngineTabs(categories, active) {
+    const box = document.getElementById('server-engine-tabs');
+    if (!box) return;
+    const all = `<button type="button" class="server-engine-tab ${active ? '' : 'active'}" onclick="renderServerEngineCatalog('')">Все</button>`;
+    const buttons = categories.map(cat => (
+        `<button type="button" class="server-engine-tab ${active === cat.key ? 'active' : ''}" onclick="renderServerEngineCatalog('${escapeHtml(cat.key)}')">${escapeHtml(cat.label)}</button>`
+    )).join('');
+    box.innerHTML = all + buttons;
+}
+
+function renderServerEngineGrid(engines, router) {
+    const box = document.getElementById('server-engine-grid');
+    if (!box) return;
+    if (!engines.length) {
+        box.innerHTML = '<p class="picker-empty">Для этой категории пока нет движков.</p>';
+        return;
+    }
+    const primary = (router && router.primary_engine) || 'xyce';
+    box.innerHTML = engines.map(engine => renderServerEngineCard(engine, primary)).join('');
+}
+
+function renderServerEngineCard(engine, primaryId) {
+    const tags = (engine.tags || []).slice(0, 5).map(tag => `<span>${escapeHtml(tag)}</span>`).join('');
+    const outputs = (engine.outputs || []).slice(0, 3).join(', ');
+    const recommended = _serverEngineRecommendedIds.has(engine.id);
+    const primary = engine.id === primaryId || engine.status === 'primary-candidate';
+    return `
+        <article class="server-engine-card ${primary ? 'server-engine-card--primary' : ''}">
+            <header>
+                <h3>${escapeHtml(engine.name)}${recommended ? ' · рекомендован' : ''}</h3>
+                <span class="server-engine-status" data-status="${escapeHtml(engine.status || '')}">${escapeHtml(engine.status_label || engine.status || 'status')}</span>
+            </header>
+            <p>${escapeHtml(engine.task || '')}</p>
+            <p>${escapeHtml(engine.fit || '')}</p>
+            <dl>
+                <dt>Интеграция</dt><dd>${escapeHtml(engine.integration || '')}</dd>
+                <dt>Endpoint</dt><dd><code>${escapeHtml(engine.endpoint || '—')}</code></dd>
+                <dt>Выход</dt><dd>${escapeHtml(outputs || 'JSON/artifacts')}</dd>
+                <dt>Лицензия</dt><dd>${escapeHtml(engine.license || '—')}</dd>
+            </dl>
+            <div class="server-engine-tags">${tags}</div>
+        </article>
+    `;
+}
+
+async function refreshServerEngineRecommendations() {
+    let schemeData = {};
+    try {
+        if (typeof buildSchemeData === 'function') schemeData = buildSchemeData();
+    } catch (e) {
+        schemeData = {};
+    }
+    try {
+        const resp = await fetch('{% url "hello:api_server_engine_recommend" %}', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getSimCsrfToken() },
+            body: JSON.stringify({ scheme_data: schemeData, limit: 6 }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        _serverEngineRecommendedIds = new Set((data.engines || []).map(e => e.id));
+        if (data.router_profile && _serverEngineCatalog) _serverEngineCatalog.router_profile = data.router_profile;
+        renderServerEngineCatalog();
+    } catch (e) {
+        _serverEngineRecommendedIds = new Set(['xyce', 'pyspice', 'dolg-ngspice-wasm']);
+        renderServerEngineCatalog();
+    }
 }
 
 function escapeHtml(s) {

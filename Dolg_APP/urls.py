@@ -140,6 +140,16 @@ urlpatterns = [
     path('api/sim/protocol/', views.api_generate_protocol, name='api_generate_protocol'),
     # Block B1: schema → CircuitPython code.py для прошивки микроконтроллеров.
     path('api/sim/export/circuit_python/', views.api_export_circuit_python, name='api_export_circuit_python'),
+    # Server-side engine router catalog: Xyce/PySpice/GnuCap/OpenModelica/etc.
+    path('api/sim/server-engines/', views.api_server_engines, name='api_server_engines'),
+    path(
+        'api/sim/server-engines/recommend/',
+        views.api_server_engine_recommend,
+        name='api_server_engine_recommend',
+    ),
+    path('api/sim/jobs/', views.api_engine_jobs, name='api_engine_jobs'),
+    path('api/sim/jobs/<int:job_id>/', views.api_engine_job_detail, name='api_engine_job_detail'),
+    path('api/sim/jobs/<int:job_id>/result/', views.api_engine_job_result, name='api_engine_job_result'),
     # Block D2: server-side Monte Carlo DC analysis (numpy MNA, 1000+ iter/sec).
     path('api/sim/monte_carlo/', views.api_monte_carlo, name='api_monte_carlo'),
     # RF S-параметры 2-портовых фильтров через scikit-rf (S21/S11, −3дБ).

@@ -11,6 +11,7 @@ from .models import (
     ChatTopic,
     Comment,
     EngineeringArtifact,
+    EngineJob,
     MLJob,
     Organization,
     OrganizationInvite,
@@ -182,6 +183,33 @@ class SimulationRunAdmin(admin.ModelAdmin):
     list_select_related = ('project', 'user')
 
     @admin.display(description='Прогресс')
+    def progress_badge(self, obj):
+        color = '#168a3a' if obj.status == 'success' else '#b8860b'
+        if obj.status == 'error':
+            color = '#b3261e'
+        return format_html('<strong style="color:{};">{}%</strong>', color, obj.progress_percent)
+
+
+@admin.register(EngineJob)
+class EngineJobAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'engine_id',
+        'analysis_type',
+        'status',
+        'progress_badge',
+        'project',
+        'user',
+        'created_at',
+    )
+    list_filter = ('engine_id', 'analysis_type', 'status', 'created_at')
+    search_fields = ('engine_id', 'engine_name', 'project__name', 'user__username', 'netlist', 'external_id')
+    readonly_fields = ('created_at', 'updated_at', 'started_at', 'heartbeat_at', 'finished_at')
+    autocomplete_fields = ('project', 'user')
+    list_select_related = ('project', 'user')
+    date_hierarchy = 'created_at'
+
+    @admin.display(description='Progress')
     def progress_badge(self, obj):
         color = '#168a3a' if obj.status == 'success' else '#b8860b'
         if obj.status == 'error':

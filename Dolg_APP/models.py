@@ -782,6 +782,64 @@ class SimulationRun(models.Model):
         return f'{self.project.name} — {self.analysis_type} — {self.created_at:%Y-%m-%d %H:%M}'
 
 
+class EngineJob(models.Model):
+    """Async job contract for external simulation engines."""
+
+    STATUS_CHOICES = [
+        ('queued', 'queued'),
+        ('running', 'running'),
+        ('success', 'success'),
+        ('error', 'error'),
+        ('cancelled', 'cancelled'),
+        ('stale', 'stale'),
+    ]
+
+    project = models.ForeignKey(
+        SchematicProject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='engine_jobs',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='engine_jobs',
+    )
+    engine_id = models.CharField(max_length=80, db_index=True)
+    engine_name = models.CharField(max_length=120, blank=True)
+    analysis_type = models.CharField(max_length=32, default='unknown', db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued', db_index=True)
+    progress_percent = models.PositiveSmallIntegerField(default=0)
+    message = models.CharField(max_length=260, blank=True)
+    external_id = models.CharField(max_length=160, blank=True, db_index=True)
+    worker = models.CharField(max_length=120, blank=True)
+    netlist = models.TextField(blank=True)
+    scheme_data = models.JSONField(default=dict, blank=True)
+    options = models.JSONField(default=dict, blank=True)
+    input_payload = models.JSONField(default=dict, blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+    artifacts = models.JSONField(default=list, blank=True)
+    error = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status', '-created_at'], name='ej_user_status_created_idx'),
+            models.Index(fields=['engine_id', 'status', '-created_at'], name='ej_engine_status_created_idx'),
+            models.Index(fields=['project', '-created_at'], name='ej_project_created_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.engine_id} job #{self.pk} [{self.status}]'
+
+
 class ProjectMeasurement(models.Model):
     project = models.ForeignKey(
         SchematicProject,

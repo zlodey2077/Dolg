@@ -16,12 +16,13 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from shop.models import Product
 
 from .models import (
     Announcement,
+    EngineJob,
     ProjectEvent,
     ProjectMeasurement,
     ProjectReview,
@@ -58,6 +59,7 @@ from .services.review_i18n import (
     status_label_ru,
 )
 from .services.schematic_operations import apply_schematic_operations
+from .services.server_engines import get_server_engine, recommend_server_engines, server_engine_payload
 from .simulation_quota import quota_dict
 
 logger = logging.getLogger(__name__)
@@ -165,6 +167,7 @@ def simulation(request):
         'user': request.user,
         'is_guest_demo': not request.user.is_authenticated,
         'entitlements': feature_summary(request.user),
+        'server_engine_catalog_json': json.dumps(server_engine_payload(), ensure_ascii=False),
         'page_title': 'Симуляция электроники',
         'page_description': 'Инструмент для симуляции поведения электронных компонентов',
     }
@@ -958,6 +961,7 @@ def shared_scheme(request, token):
         'is_shared_view': True,
         'entitlements': feature_summary(request.user),
         'shared_project': project,
+        'server_engine_catalog_json': json.dumps(server_engine_payload(), ensure_ascii=False),
         'page_title': f'{project.name} — общий просмотр',
         'page_description': f'Read-only схема пользователя {project.user.username}',
     }
@@ -2544,6 +2548,184 @@ def api_ai_context(request):
         include_deep_hint=has_feature(request.user, 'ai_deep_hint'),
     )
     return JsonResponse({'ok': True, 'context': context})
+
+
+@require_GET
+def api_server_engines(request):
+    """Catalog for the future Docker/Kubernetes simulation engine router."""
+    category = request.GET.get('category') or None
+    return JsonResponse(server_engine_payload(category=category), json_dumps_params={'ensure_ascii': False})
+
+
+@require_POST
+def api_server_engine_recommend(request):
+    """Recommend server-side engines for the current in-memory scheme."""
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError, ValueError:
+        return _json_error('Invalid JSON')
+    scheme_data = data.get('scheme_data') or data.get('scheme') or {}
+    if not isinstance(scheme_data, dict):
+        return _json_error('scheme_data must be an object')
+    try:
+        limit = int(data.get('limit') or 5)
+    except TypeError, ValueError:
+        limit = 5
+    engines = recommend_server_engines(scheme_data, limit=max(1, min(limit, 10)))
+    return JsonResponse(
+        {'ok': True, 'engines': engines, 'router_profile': server_engine_payload()['router_profile']},
+        json_dumps_params={'ensure_ascii': False},
+    )
+
+
+def _engine_job_to_dict(job, *, include_input=False, include_result=False):
+    data = {
+        'id': job.id,
+        'engine_id': job.engine_id,
+        'engine_name': job.engine_name,
+        'analysis_type': job.analysis_type,
+        'status': job.status,
+        'progress_percent': job.progress_percent,
+        'message': job.message,
+        'external_id': job.external_id,
+        'worker': job.worker,
+        'project_id': job.project_id,
+        'created_at': job.created_at.isoformat() if job.created_at else None,
+        'updated_at': job.updated_at.isoformat() if job.updated_at else None,
+        'started_at': job.started_at.isoformat() if job.started_at else None,
+        'heartbeat_at': job.heartbeat_at.isoformat() if job.heartbeat_at else None,
+        'finished_at': job.finished_at.isoformat() if job.finished_at else None,
+        'warnings': job.warnings or [],
+        'artifacts': job.artifacts or [],
+        'error': job.error,
+        'links': {
+            'status': reverse('hello:api_engine_job_detail', args=[job.id]),
+            'result': reverse('hello:api_engine_job_result', args=[job.id]),
+        },
+    }
+    if include_input:
+        data.update(
+            {
+                'netlist': job.netlist,
+                'scheme_data': job.scheme_data or {},
+                'options': job.options or {},
+                'input_payload': job.input_payload or {},
+            }
+        )
+    if include_result:
+        data['result'] = job.result or {}
+    return data
+
+
+def _engine_jobs_for_user(user):
+    qs = EngineJob.objects.select_related('project', 'user')
+    if user.is_staff or user.is_superuser:
+        return qs
+    return qs.filter(user=user)
+
+
+@login_required(login_url='accounts:login')
+@require_http_methods(['GET', 'POST'])
+def api_engine_jobs(request):
+    """Submit or list async jobs for the future external engine gateway."""
+    if request.method == 'GET':
+        jobs = _engine_jobs_for_user(request.user)
+        engine_id = (request.GET.get('engine_id') or '').strip()
+        status = (request.GET.get('status') or '').strip()
+        project_id = (request.GET.get('project_id') or '').strip()
+        if engine_id:
+            jobs = jobs.filter(engine_id=engine_id)
+        if status:
+            jobs = jobs.filter(status=status)
+        if project_id:
+            try:
+                project = _project_for_read(request.user, int(project_id))
+            except TypeError, ValueError, Http404:
+                return _json_error('Project not found', status=404)
+            jobs = jobs.filter(project=project)
+        return JsonResponse(
+            {'ok': True, 'jobs': [_engine_job_to_dict(job) for job in jobs[:50]]},
+            json_dumps_params={'ensure_ascii': False},
+        )
+
+    data = _read_json_payload(request)
+    engine_id = str(data.get('engine_id') or data.get('engine') or '').strip().lower()
+    engine = get_server_engine(engine_id)
+    if not engine:
+        return _json_error('Unknown engine_id')
+
+    project = None
+    project_id = data.get('project_id')
+    if project_id not in (None, ''):
+        try:
+            project = _project_for_read(request.user, int(project_id))
+        except TypeError, ValueError, Http404:
+            return _json_error('Project not found', status=404)
+
+    scheme_data = data.get('scheme_data') or data.get('scheme') or {}
+    if scheme_data and not isinstance(scheme_data, dict):
+        return _json_error('scheme_data must be an object')
+
+    options = data.get('options') or {}
+    if options and not isinstance(options, dict):
+        return _json_error('options must be an object')
+
+    analysis_type = str(data.get('analysis_type') or data.get('analysis') or 'unknown').strip().lower()[:32]
+    netlist = str(data.get('netlist') or '')
+    job = EngineJob.objects.create(
+        project=project,
+        user=request.user,
+        engine_id=engine['id'],
+        engine_name=engine.get('name', ''),
+        analysis_type=analysis_type or 'unknown',
+        status='queued',
+        progress_percent=0,
+        message='Queued for external engine worker; no CLI process is started inside the web request.',
+        netlist=netlist,
+        scheme_data=scheme_data if isinstance(scheme_data, dict) else {},
+        options=options if isinstance(options, dict) else {},
+        input_payload={
+            'engine_endpoint': engine.get('endpoint', ''),
+            'expected_outputs': engine.get('outputs', []),
+            'source': data.get('source') or 'api',
+        },
+    )
+    return JsonResponse(
+        {
+            'ok': True,
+            'job': _engine_job_to_dict(job, include_input=True),
+            'router_profile': server_engine_payload()['router_profile'],
+        },
+        status=202,
+        json_dumps_params={'ensure_ascii': False},
+    )
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_engine_job_detail(request, job_id):
+    job = get_object_or_404(_engine_jobs_for_user(request.user), pk=job_id)
+    return JsonResponse(
+        {'ok': True, 'job': _engine_job_to_dict(job, include_input=True, include_result=True)},
+        json_dumps_params={'ensure_ascii': False},
+    )
+
+
+@login_required(login_url='accounts:login')
+@require_GET
+def api_engine_job_result(request, job_id):
+    job = get_object_or_404(_engine_jobs_for_user(request.user), pk=job_id)
+    status = 200 if job.status == 'success' else 202
+    return JsonResponse(
+        {
+            'ok': job.status == 'success',
+            'job': _engine_job_to_dict(job, include_result=True),
+            'result': job.result or {},
+            'pending': job.status in {'queued', 'running'},
+        },
+        status=status,
+        json_dumps_params={'ensure_ascii': False},
+    )
 
 
 @login_required(login_url='accounts:login')

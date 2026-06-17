@@ -242,6 +242,155 @@ Pro-аналитика в интерфейсе может сохранить к�
 
 ---
 
+## Server engine catalog
+
+### `GET /api/sim/server-engines/`
+Публичный каталог движков для будущего Docker/Kubernetes router-слоя. Логин не
+требуется. Опциональный query-параметр `category` фильтрует каталог: `core`,
+`spice`, `modeling`, `eda`, `embedded`, `lab`, `radio`, `cv`, `ops`.
+
+**Response:**
+```json
+{
+    "ok": true,
+    "categories": [{"key": "spice", "label": "SPICE/схемы"}],
+    "engines": [
+        {
+            "id": "xyce",
+            "name": "Xyce",
+            "status": "primary-candidate",
+            "category": "spice",
+            "endpoint": "/engines/xyce/jobs",
+            "tags": ["electronics", "spice", "dc", "ac", "transient"]
+        }
+    ],
+    "summary": {
+        "total": 21,
+        "docker_rest_ready": 4,
+        "primary_candidate": "xyce"
+    },
+    "router_profile": {
+        "primary_engine": "xyce",
+        "interactive_engine": "dolg-ngspice-wasm",
+        "python_bridge": "pyspice"
+    }
+}
+```
+
+### `POST /api/sim/server-engines/recommend/`
+Подбирает подходящие движки для текущей схемы по компонентам и тегам. Логин не
+требуется; для браузерного POST действует обычный CSRF-заголовок `X-CSRFToken`.
+
+**Request:**
+```json
+{
+    "scheme_data": {"components": [{"type": "resistor"}, {"type": "voltage_source"}]},
+    "limit": 5
+}
+```
+
+**Response:**
+```json
+{
+    "ok": true,
+    "engines": [{"id": "xyce", "name": "Xyce", "status": "primary-candidate"}],
+    "router_profile": {"primary_engine": "xyce", "python_bridge": "pyspice"}
+}
+```
+
+Текущий слой является catalog/router-profile API. Реальное выполнение внешних
+CLI-движков должно идти через отдельный async job gateway, а не через web request.
+
+### `GET /api/sim/jobs/`
+Lists external engine jobs visible to the current user. Requires login.
+Optional filters: `engine_id`, `status`, `project_id`.
+
+**Response:**
+```json
+{
+    "ok": true,
+    "jobs": [
+        {
+            "id": 12,
+            "engine_id": "xyce",
+            "analysis_type": "tran",
+            "status": "queued",
+            "progress_percent": 0,
+            "links": {
+                "status": "/api/sim/jobs/12/",
+                "result": "/api/sim/jobs/12/result/"
+            }
+        }
+    ]
+}
+```
+
+### `POST /api/sim/jobs/`
+Creates an async external-engine job record. Requires login. This endpoint does
+not start a CLI process inside the web request; workers will later consume
+`queued` jobs.
+
+**Request:**
+```json
+{
+    "engine_id": "xyce",
+    "analysis_type": "tran",
+    "project_id": 7,
+    "netlist": "* demo\n.tran 1u 1m\n.end",
+    "scheme_data": {"components": [], "connections": []},
+    "options": {"timeout_s": 30}
+}
+```
+
+**Response:** HTTP `202 Accepted`
+```json
+{
+    "ok": true,
+    "job": {
+        "id": 12,
+        "engine_id": "xyce",
+        "engine_name": "Xyce",
+        "status": "queued",
+        "input_payload": {
+            "engine_endpoint": "/engines/xyce/run",
+            "expected_outputs": ["raw/CSV curves", "solver log", "convergence report"],
+            "source": "api"
+        }
+    },
+    "router_profile": {"primary_engine": "xyce", "python_bridge": "pyspice"}
+}
+```
+
+### `GET /api/sim/jobs/<id>/`
+Returns job status, input contract and result payload if it already exists.
+
+### `GET /api/sim/jobs/<id>/result/`
+Returns HTTP `202` while the job is `queued`/`running`, and HTTP `200` after
+`success`. The response shape is stable in both cases: `ok`, `job`, `result`,
+`pending`.
+
+Current implementation is a safe gateway plus a local worker. It validates the
+engine, persists `EngineJob`, keeps external CLI execution out of Django
+requests, and can process `dolg-numpy-mna` jobs through the internal NumPy MNA
+adapter.
+
+Run one local worker pass:
+```bash
+python manage.py run_engine_worker --once --limit 5
+```
+
+Run a local polling worker:
+```bash
+python manage.py run_engine_worker --limit 5 --sleep 2
+```
+
+Default worker mode only claims local adapter jobs (`dolg-numpy-mna`). External
+engines such as `xyce`, `pyspice` and `gnucap` remain queued until a dedicated
+Docker/CLI worker is started. Local worker results use the shared contract:
+`nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`.
+
+---
+
 ## AI assistant
 
 ### `POST /api/ai/chat/`
