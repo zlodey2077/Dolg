@@ -42,7 +42,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 - В модалке серверных движков добавлена видимая очередь jobs: counts по `queued/running/success/error`, последние задания, ручное обновление и выбор job из списка.
 - Docker повторно проверен после UI-работ: CLI установлен (`29.5.2`), repair script поднял `vmcompute`, `LxssManager`, `com.docker.service` и включил Windows WSL/VM features, но лог `logs/windows-stack-repair-20260617-080433.log` требует restart до надёжного теста. До перезагрузки `docker version` видит client, но server pipe `dockerDesktopLinuxEngine/docker_engine` отсутствует; Docker Desktop/backend остановлены через admin stop helper.
 - Авто-протокол получил проектный режим: `POST /api/sim/protocol/` с `project_id` подтягивает `scheme_data`, последние `SimulationRun`, сохранённые `ProjectMeasurement` и in-memory Engineering Review findings; в симулятор добавлен preview/download `.md` и PDF-экспорт через `format: "pdf"`, а генератор выводит BOM/readiness, summary осциллограмм/артефактов и источники экспертных правил. Проверки: `tests_protocol_generator.py` + API-тесты; `manage.py check` - OK.
-- Для виртуальной лаборатории добавлен базовый animation controller: общий rAF-loop для sweep осциллографа и phase preview генератора, `prefers-reduced-motion`, `dispose()` cleanup и публичный `DolgLab.setAnimationEnabled(...)`.
+- Для виртуальной лаборатории добавлен базовый animation controller: общий rAF-loop для sweep осциллографа и phase preview генератора, `prefers-reduced-motion`, `dispose()` cleanup, публичный `DolgLab.setAnimationEnabled(...)`, trigger/hold/probe-индикация scope и методы `setScopeHold`/`setScopeTriggerMode`.
 
 ## Новый план после PR-проверки
 
@@ -142,8 +142,8 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - KaTeX/Monaco/Cytoscape - только если они закрывают конкретный demo/use-case.
 
 4. Анимации виртуальных приборов.
-   - Готово: общий rAF-controller в `scheme-lab.js` для осциллографа и генератора с cleanup/reduced-motion.
-   - До защиты довести осциллограф, генератор, мультиметр и будущие приборы до "живого" состояния: sweep/trace animation, плавное обновление измерений, trigger/hold states, индикация подключения probe.
+   - Готово: общий rAF-controller в `scheme-lab.js` для осциллографа и генератора с cleanup/reduced-motion, sweep/trace animation, trigger/hold states и индикацией подключенного probe.
+   - До защиты довести генератор, мультиметр и будущие приборы до "живого" состояния: плавное обновление измерений, state badges, единый contract для новых приборов.
    - Делать это как общий слой instrument animation controller, чтобы новые приборы подключались к одному contract, а не получали отдельные разрозненные таймеры.
 
 ## P2 - каталог, продукт и данные

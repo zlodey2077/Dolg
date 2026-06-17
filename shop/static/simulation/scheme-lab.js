@@ -87,6 +87,10 @@
             cursorT1: null,     // время T1 в секундах (Shift+Click)
             cursorT2: null,     // время T2 в секундах (Shift+Click повторно)
             sweepPhase: 0,
+            triggerMode: 'auto',
+            triggerLevel: 0,
+            hold: false,
+            probeAttached: false,
         },
         // Мультиметр
         multimeter: {
@@ -147,6 +151,8 @@
                             <option value="0.1">100 мс</option>
                         </select>
                     </label>
+                    <button type="button" id="dolgLabScopeTrigger" class="dolg-lab-btn" title="Trigger mode">TRIG AUTO</button>
+                    <button type="button" id="dolgLabScopeHold" class="dolg-lab-btn" title="Freeze sweep">HOLD</button>
                 </div>
             </div>
 
@@ -250,6 +256,7 @@
 
         $('dolgLabScopeChannel').addEventListener('change', e => {
             state.scope.channel = e.target.value || null;
+            state.scope.probeAttached = false;
             drawScope();
         });
         // T1/T2 курсоры — Shift+Click ставит/обновляет курсор на холсте.
@@ -274,6 +281,8 @@
             state.scope.tDiv = parseFloat(e.target.value) || 1e-3;
             drawScope();
         });
+        $('dolgLabScopeTrigger').addEventListener('click', cycleScopeTriggerMode);
+        $('dolgLabScopeHold').addEventListener('click', () => setScopeHold(!state.scope.hold));
         $('dolgLabMmMode').addEventListener('change', e => {
             state.multimeter.mode = e.target.value;
             updateMultimeter();
@@ -320,6 +329,7 @@
     function refresh() {
         if (!_root || !_bound) return;
         rebuildSelectors();
+        _syncScopeStateButtons();
         drawScope();
         updateMultimeter();
         drawGenPreview();
@@ -358,11 +368,19 @@
         const dt = _labAnimLastTs ? Math.min(0.08, Math.max(0, (ts - _labAnimLastTs) / 1000)) : 0;
         _labAnimLastTs = ts;
         if (!document.hidden && dt > 0) {
-            state.scope.sweepPhase = (state.scope.sweepPhase + dt * 0.7) % 1;
+            if (!state.scope.hold) {
+                const nextSweep = state.scope.sweepPhase + dt * 0.7;
+                state.scope.sweepPhase = nextSweep % 1;
+                if (state.scope.triggerMode === 'single' && nextSweep >= 1) {
+                    state.scope.hold = true;
+                    _syncScopeStateButtons();
+                    drawScope();
+                }
+            }
             const genRate = Math.max(0.18, Math.min(2.2, Math.log10(Math.max(10, state.gen.frequency || 10)) / 2.4));
             state.gen.phase = (state.gen.phase + dt * genRate) % 1;
 
-            if (ts - _labAnimLastScopeDraw > 34 && _hasTransientScopeResult()) {
+            if (!state.scope.hold && ts - _labAnimLastScopeDraw > 34 && _hasTransientScopeResult()) {
                 _labAnimLastScopeDraw = ts;
                 drawScope();
             }
@@ -378,6 +396,48 @@
         state.animation.enabled = enabled !== false;
         if (state.animation.enabled) _startInstrumentAnimation();
         else _stopInstrumentAnimation();
+    }
+
+    function _scopeTriggerLabel() {
+        return String(state.scope.triggerMode || 'auto').toUpperCase();
+    }
+
+    function _syncScopeStateButtons() {
+        if (!_root) return;
+        const triggerBtn = _root.querySelector('#dolgLabScopeTrigger');
+        const holdBtn = _root.querySelector('#dolgLabScopeHold');
+        if (triggerBtn) {
+            triggerBtn.textContent = 'TRIG ' + _scopeTriggerLabel();
+            triggerBtn.classList.toggle('active', state.scope.triggerMode !== 'auto');
+        }
+        if (holdBtn) {
+            holdBtn.textContent = state.scope.hold ? 'RUN' : 'HOLD';
+            holdBtn.classList.toggle('active', Boolean(state.scope.hold));
+        }
+    }
+
+    function cycleScopeTriggerMode() {
+        const modes = ['auto', 'normal', 'single'];
+        const current = modes.indexOf(state.scope.triggerMode);
+        state.scope.triggerMode = modes[(current + 1 + modes.length) % modes.length];
+        if (state.scope.triggerMode === 'single') state.scope.hold = false;
+        _syncScopeStateButtons();
+        drawScope();
+    }
+
+    function setScopeTriggerMode(mode) {
+        const next = String(mode || 'auto').toLowerCase();
+        state.scope.triggerMode = ['auto', 'normal', 'single'].includes(next) ? next : 'auto';
+        if (state.scope.triggerMode === 'single') state.scope.hold = false;
+        _syncScopeStateButtons();
+        drawScope();
+    }
+
+    function setScopeHold(enabled) {
+        state.scope.hold = enabled !== false;
+        _syncScopeStateButtons();
+        if (!state.scope.hold) _startInstrumentAnimation();
+        drawScope();
     }
 
     // --- Списки выбора (узлы / источники) -------------------------------------
@@ -581,6 +641,20 @@
         const pxPerSec = W / (tDiv * 10);
         const pxPerVolt = H / (vDiv * 8);
         const yMid = H / 2;
+        const triggerY = yMid - (state.scope.triggerLevel || 0) * pxPerVolt;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 209, 102, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        ctx.moveTo(0, triggerY);
+        ctx.lineTo(W, triggerY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ffd166';
+        ctx.font = '11px monospace';
+        ctx.fillText('TRIG ' + _scopeTriggerLabel(), 10, Math.max(14, triggerY - 4));
+        ctx.restore();
 
         // §2.7 Phosphor (ghost-trace): рисуем предыдущую волну полупрозрачно,
         // ниже основной — даёт «послесвет» CRT при изменении параметров.
@@ -747,6 +821,30 @@
         ctx.stroke();
         ctx.restore();
 
+        const statusPills = ['TRIG ' + _scopeTriggerLabel()];
+        if (state.scope.hold) statusPills.push('HOLD');
+        if (state.scope.probeAttached) statusPills.push('PROBE');
+        ctx.save();
+        ctx.font = 'bold 11px monospace';
+        let pillX = W - 10;
+        for (let i = statusPills.length - 1; i >= 0; i--) {
+            const label = statusPills[i];
+            const pillW = ctx.measureText(label).width + 14;
+            pillX -= pillW;
+            ctx.fillStyle = label === 'HOLD' ? 'rgba(255, 107, 107, 0.88)' : 'rgba(6, 35, 34, 0.88)';
+            ctx.strokeStyle = label === 'PROBE' ? '#00d4ff' : '#7fffb0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(pillX, 9, pillW, 20, 6);
+            else ctx.rect(pillX, 9, pillW, 20);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#eafff3';
+            ctx.fillText(label, pillX + 7, 23);
+            pillX -= 6;
+        }
+        ctx.restore();
+
         // §2.7 OVERLOAD detection: |V| > 0.95 × screen-range или резкое dV/dt.
         // Создаёт небольшой шум по волне + помечает info-line.
         const fullRange = state.scope.vDiv * 4;     // от центра до края экрана
@@ -763,11 +861,16 @@
             }
         }
         const overload = overloadV || overloadDvDt;
+        const scopeStateInfo =
+            ` · TRIG ${_scopeTriggerLabel()}` +
+            (state.scope.hold ? ' · HOLD' : '') +
+            (state.scope.probeAttached ? ' · PROBE' : '');
 
         info.textContent =
             `канал V(${channel}) · ${state.scope.vDiv}В/дел · ${fmtTime(state.scope.tDiv)}/дел · ` +
             `Vmin=${fmtVolts(vmin)}, Vmax=${fmtVolts(vmax)}, Vavg=${fmtVolts(vAvg)}, RMS=${fmtVolts(vRms)}` +
             cursorInfo +
+            scopeStateInfo +
             (overload ? '  · 🔴 OVERLOAD' : '');
     }
 
@@ -1253,6 +1356,7 @@
         if (netId == null || !_root) return;
         const key = String(netId);
         state.scope.channel = key;
+        state.scope.probeAttached = true;
         state.multimeter.nodeA = key;
         // Если есть селекторы — синхронизируем UI
         const $ = (id) => _root.querySelector('#' + id);
@@ -1278,5 +1382,13 @@
         refresh();
     }
 
-    window.DolgLab = { init, refresh, dispose, setProbeNet, setAnimationEnabled };
+    window.DolgLab = {
+        init,
+        refresh,
+        dispose,
+        setProbeNet,
+        setAnimationEnabled,
+        setScopeHold,
+        setScopeTriggerMode,
+    };
 })(window);
