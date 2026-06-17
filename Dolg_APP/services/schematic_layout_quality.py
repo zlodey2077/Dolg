@@ -8,7 +8,7 @@ internal/external subcircuits on one sheet.
 
 from __future__ import annotations
 
-from itertools import combinations
+from itertools import combinations, pairwise
 from math import hypot
 from typing import Any
 
@@ -97,7 +97,9 @@ ESKD_VALUE_REQUIRED_TYPES = {
 ESKD_BLACK_COLORS = {'', 'black', '#000', '#000000', '#111', '#111111', 'none'}
 
 
-def analyze_schematic_layout(scheme_data: dict[str, Any] | None, *, profile: str | None = None) -> dict[str, Any]:
+def analyze_schematic_layout(
+    scheme_data: dict[str, Any] | None, *, profile: str | None = None
+) -> dict[str, Any]:
     profile = _resolve_profile(scheme_data, profile)
     scopes = _layout_scopes(scheme_data)
     if not scopes:
@@ -111,16 +113,16 @@ def analyze_schematic_layout(scheme_data: dict[str, Any] | None, *, profile: str
     return _merge_scoped_reports(scoped_reports, profile=profile)
 
 
-def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None, *, profile: str = 'generic') -> dict[str, Any]:
+def _analyze_flat_schematic_layout(
+    scheme_data: dict[str, Any] | None, *, profile: str = 'generic'
+) -> dict[str, Any]:
     components = _components(scheme_data)
     connections = _connections(scheme_data)
     by_id = {str(item.get('id')): item for item in components if item.get('id') is not None}
     findings: list[dict[str, Any]] = []
 
     missing_coordinates = [
-        str(item.get('id') or index)
-        for index, item in enumerate(components)
-        if _center(item) is None
+        str(item.get('id') or index) for index, item in enumerate(components) if _center(item) is None
     ]
     if missing_coordinates:
         _finding(
@@ -141,10 +143,14 @@ def _analyze_flat_schematic_layout(scheme_data: dict[str, Any] | None, *, profil
         if not wire:
             continue
         points, source_id, target_id = wire
-        if len(points) == 2 and _is_diagonal(points[0], points[1]) and _distance(points[0], points[1]) >= LONG_WIRE:
+        if (
+            len(points) == 2
+            and _is_diagonal(points[0], points[1])
+            and _distance(points[0], points[1]) >= LONG_WIRE
+        ):
             direct_diagonal_connections.append(index)
             unrouted_long_connections.append(index)
-        for left, right in zip(points, points[1:]):
+        for left, right in pairwise(points):
             if _distance(left, right) < MIN_WIRE_LENGTH:
                 continue
             segment = {
@@ -290,12 +296,19 @@ def _layout_scopes(scheme_data: dict[str, Any] | None) -> list[tuple[str, dict[s
     for index, subcircuit in enumerate(scheme_data.get('subcircuits') or []):
         if not isinstance(subcircuit, dict):
             continue
-        name = subcircuit.get('id') or subcircuit.get('name') or subcircuit.get('title') or f'subcircuit_{index + 1}'
+        name = (
+            subcircuit.get('id')
+            or subcircuit.get('name')
+            or subcircuit.get('title')
+            or f'subcircuit_{index + 1}'
+        )
         scopes.append((f'subcircuit:{name}', subcircuit))
     return scopes
 
 
-def _merge_scoped_reports(scoped_reports: list[tuple[str, dict[str, Any]]], *, profile: str = 'generic') -> dict[str, Any]:
+def _merge_scoped_reports(
+    scoped_reports: list[tuple[str, dict[str, Any]]], *, profile: str = 'generic'
+) -> dict[str, Any]:
     findings = []
     metrics = {
         'scope_count': len(scoped_reports),
@@ -325,7 +338,9 @@ def _merge_scoped_reports(scoped_reports: list[tuple[str, dict[str, Any]]], *, p
             'missing_coordinate_count',
         ):
             metrics[key] += int(scope_metrics.get(key) or 0)
-        metrics['requires_hierarchy'] = metrics['requires_hierarchy'] or bool(scope_metrics.get('requires_hierarchy'))
+        metrics['requires_hierarchy'] = metrics['requires_hierarchy'] or bool(
+            scope_metrics.get('requires_hierarchy')
+        )
         for finding in report.get('findings') or []:
             item = dict(finding)
             item['scope'] = scope_name
@@ -369,7 +384,9 @@ def _center(component: dict[str, Any]) -> tuple[float, float] | None:
         return None
 
 
-def _wire_points(connection: dict[str, Any], by_id: dict[str, dict[str, Any]]) -> tuple[list[tuple[float, float]], str, str] | None:
+def _wire_points(
+    connection: dict[str, Any], by_id: dict[str, dict[str, Any]]
+) -> tuple[list[tuple[float, float]], str, str] | None:
     source_endpoint = connection.get('from')
     target_endpoint = connection.get('to')
     source_id = _endpoint_id(source_endpoint)
@@ -413,7 +430,9 @@ def _endpoint_point(endpoint: Any, by_id: dict[str, dict[str, Any]]) -> tuple[fl
     center = _center(component)
     if center is None:
         return None
-    port_id = endpoint.get('portId') or endpoint.get('port') or endpoint.get('pin') or endpoint.get('terminal')
+    port_id = (
+        endpoint.get('portId') or endpoint.get('port') or endpoint.get('pin') or endpoint.get('terminal')
+    )
     if port_id is None:
         return center
     port = _find_port(component, str(port_id))
@@ -550,7 +569,9 @@ def _component_size(component: dict[str, Any], component_type: str) -> tuple[flo
     return SIZE_BY_TYPE.get(component_type, (76, 42))
 
 
-def _detect_flattened_hierarchy(components: list[dict[str, Any]], scheme_data: dict[str, Any] | None) -> dict[str, int] | None:
+def _detect_flattened_hierarchy(
+    components: list[dict[str, Any]], scheme_data: dict[str, Any] | None
+) -> dict[str, int] | None:
     if isinstance(scheme_data, dict) and (scheme_data.get('sheets') or scheme_data.get('subcircuits')):
         return None
     internal = 0
@@ -603,7 +624,11 @@ def _append_eskd_findings(
     connections: list[dict[str, Any]],
     scheme_data: dict[str, Any] | None,
 ) -> None:
-    metadata = scheme_data.get('metadata') if isinstance(scheme_data, dict) and isinstance(scheme_data.get('metadata'), dict) else {}
+    metadata = (
+        scheme_data.get('metadata')
+        if isinstance(scheme_data, dict) and isinstance(scheme_data.get('metadata'), dict)
+        else {}
+    )
     eskd = metadata.get('eskd') if isinstance(metadata.get('eskd'), dict) else {}
     scope_kind = str(eskd.get('scope_kind') or metadata.get('scope_kind') or 'principle').lower()
 
@@ -716,7 +741,9 @@ def _append_eskd_findings(
         )
 
 
-def _append_functional_eskd_findings(findings: list[dict[str, Any]], components: list[dict[str, Any]]) -> None:
+def _append_functional_eskd_findings(
+    findings: list[dict[str, Any]], components: list[dict[str, Any]]
+) -> None:
     unnamed_blocks = []
     for component in components:
         ctype = normalize_component_type(component.get('type'))
@@ -736,7 +763,14 @@ def _append_functional_eskd_findings(findings: list[dict[str, Any]], components:
 
 
 def _component_refdes(component: dict[str, Any]) -> str:
-    return str(component.get('refdes') or component.get('ref') or component.get('reference') or component.get('label') or component.get('id') or '').strip()
+    return str(
+        component.get('refdes')
+        or component.get('ref')
+        or component.get('reference')
+        or component.get('label')
+        or component.get('id')
+        or ''
+    ).strip()
 
 
 def _refdes_matches(refdes: str, prefixes: tuple[str, ...]) -> bool:
@@ -744,7 +778,7 @@ def _refdes_matches(refdes: str, prefixes: tuple[str, ...]) -> bool:
         return False
     upper = refdes.upper().replace(' ', '')
     for prefix in sorted(prefixes, key=len, reverse=True):
-        if upper.startswith(prefix) and upper[len(prefix): len(prefix) + 1].isdigit():
+        if upper.startswith(prefix) and upper[len(prefix) : len(prefix) + 1].isdigit():
             return True
     return False
 

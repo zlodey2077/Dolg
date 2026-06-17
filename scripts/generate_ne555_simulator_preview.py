@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from importlib import import_module
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -10,7 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from Dolg_APP.services.schematic_layout_quality import analyze_schematic_layout
+analyze_schematic_layout = import_module(
+    'Dolg_APP.services.schematic_layout_quality'
+).analyze_schematic_layout
 
 
 OUT_DIR = Path('docs/final/generated')
@@ -45,13 +48,7 @@ def font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 
 def esc(text: object) -> str:
-    return (
-        str(text)
-        .replace('&', '&amp;')
-        .replace('<', '&lt;')
-        .replace('>', '&gt;')
-        .replace('"', '&quot;')
-    )
+    return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
 
 class Canvas:
@@ -87,13 +84,34 @@ class Canvas:
             f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="{width}" stroke-linejoin="round" stroke-linecap="round"/>'
         )
 
-    def rect(self, x: int, y: int, w: int, h: int, fill: str = 'white', outline: str = BLACK, width: int = 2, radius: int = 5) -> None:
-        self.draw.rounded_rectangle((x, y, x + w, y + h), radius=radius, fill=fill, outline=outline, width=width)
+    def rect(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        fill: str = 'white',
+        outline: str = BLACK,
+        width: int = 2,
+        radius: int = 5,
+    ) -> None:
+        self.draw.rounded_rectangle(
+            (x, y, x + w, y + h), radius=radius, fill=fill, outline=outline, width=width
+        )
         self.svg.append(
             f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{radius}" fill="{fill}" stroke="{outline}" stroke-width="{width}"/>'
         )
 
-    def text(self, x: int, y: int, value: str, size: int = 12, fill: str = BLACK, anchor: str = 'start', bold: bool = False) -> None:
+    def text(
+        self,
+        x: int,
+        y: int,
+        value: str,
+        size: int = 12,
+        fill: str = BLACK,
+        anchor: str = 'start',
+        bold: bool = False,
+    ) -> None:
         fnt = font(size, bold=bold)
         px = x
         py = y
@@ -173,7 +191,9 @@ class Canvas:
         self.line(x, cy + 22, x, y2)
         points = [(x - 16, cy - 18), (x + 16, cy - 18), (x, cy + 14)]
         self.draw.polygon(points, outline=BLACK)
-        self.svg.append(f'<polygon points="{x-16},{cy-18} {x+16},{cy-18} {x},{cy+14}" fill="white" stroke="{BLACK}" stroke-width="2"/>')
+        self.svg.append(
+            f'<polygon points="{x - 16},{cy - 18} {x + 16},{cy - 18} {x},{cy + 14}" fill="white" stroke="{BLACK}" stroke-width="2"/>'
+        )
         self.line(x - 18, cy + 16, x + 18, cy + 16)
         self.line(x + 22, cy - 23, x + 38, cy - 39, width=1)
         self.line(x + 27, cy - 8, x + 43, cy - 24, width=1)
@@ -307,7 +327,13 @@ def draw_external() -> None:
 
     c.rect(42, 812, 640, 50, NOTE_FILL, '#cbd5e1', 1)
     c.text(58, 826, 'Correct construction rule:', 12, bold=True)
-    c.text(58, 845, 'external schematic uses the NE555 subcircuit symbol; internal structure belongs on a separate sheet with matching ports 1-8.', 11, '#444444')
+    c.text(
+        58,
+        845,
+        'external schematic uses the NE555 subcircuit symbol; internal structure belongs on a separate sheet with matching ports 1-8.',
+        11,
+        '#444444',
+    )
     c.ground(1180, 780, 'main ground')
     c.save(EXTERNAL_SVG, EXTERNAL_PNG)
 
@@ -379,13 +405,21 @@ def draw_internal() -> None:
 
     q = c.npn(1070, 590, 'discharge NPN')
     c.poly([(955, 415), (1010, 415), (1010, q['base'][1]), q['base']])
-    c.poly([ports['7 DISCH'], (1300, ports['7 DISCH'][1]), (1300, 430), (q['collector'][0], 430), q['collector']])
+    c.poly(
+        [ports['7 DISCH'], (1300, ports['7 DISCH'][1]), (1300, 430), (q['collector'][0], 430), q['collector']]
+    )
     c.poly([q['emitter'], (q['emitter'][0], gnd_y)], GND)
     c.node(q['emitter'][0], gnd_y, GND)
 
     c.rect(42, 812, 720, 50, NOTE_FILL, '#cbd5e1', 1)
     c.text(58, 826, 'Functional abstraction:', 12, bold=True)
-    c.text(58, 845, 'this is the readable subcircuit a simulator/editor should expand from the NE555 symbol, not a literal chip-die schematic.', 11, '#444444')
+    c.text(
+        58,
+        845,
+        'this is the readable subcircuit a simulator/editor should expand from the NE555 symbol, not a literal chip-die schematic.',
+        11,
+        '#444444',
+    )
     c.ground(1160, 785, 'pin 1 reference')
     c.save(INTERNAL_SVG, INTERNAL_PNG)
 
@@ -403,10 +437,7 @@ def _component(component_id, component_type, x, y, label='', width=None, height=
     if height is not None:
         item['height'] = height
     if ports:
-        item['ports'] = [
-            {'id': port_id, 'x': px, 'y': py}
-            for port_id, (px, py) in ports.items()
-        ]
+        item['ports'] = [{'id': port_id, 'x': px, 'y': py} for port_id, (px, py) in ports.items()]
     if props:
         item.update(props)
     return item
@@ -452,18 +483,129 @@ def build_hierarchical_scheme():
                 '5': (900, 485),
             },
         ),
-        _component('R2', 'resistor', 270, 220, 'R2 100k', width=68, height=68, resistance=100000, ports={'1': (270, 186), '2': (270, 335)}),
-        _component('R1', 'potentiometer', 430, 250, 'R1 5M', width=78, height=78, resistance=5000000, ports={'top': (430, 211), 'wiper': (430, 420), 'bottom': (430, 420)}),
-        _component('C1', 'capacitor', 430, 610, 'C1 47uF', width=54, height=84, capacitance=47, ports={'1': (430, 420), '2': (430, 765)}),
-        _component('S1', 'button', 185, 460, 'S1', width=82, height=42, ports={'1': (270, 335), '2': (140, 765)}),
-        _component('C2', 'capacitor', 970, 640, 'C2 10nF', width=54, height=84, capacitance='0.01', ports={'1': (970, 565), '2': (970, 765)}),
-        _component('R3', 'resistor', 1060, 335, 'R3 1k', width=78, height=34, resistance=1000, ports={'1': (1012, 335), '2': (1110, 335)}),
-        _component('T1', 'transistor', 1210, 455, 'T1 NPN', width=86, height=96, spice_model='QNPN', ports={'b': (1148, 455), 'c': (1228, 383), 'e': (1228, 527)}),
-        _component('LED1', 'led', 1228, 155, 'LED1', width=72, height=54, spice_model='DLED', ports={'a': (1228, 105), 'k': (1228, 205)}),
-        _component('R4', 'resistor', 1228, 255, 'R4 1.5k', width=78, height=68, resistance=1500, ports={'1': (1228, 205), '2': (1228, 383)}),
-        _component('C3', 'capacitor', 1340, 435, 'C3 100nF', width=54, height=84, capacitance='0.1', ports={'1': (1340, 105), '2': (1340, 765)}),
-        _component('C4', 'capacitor', 1420, 435, 'C4 100uF', width=54, height=84, capacitance=100, ports={'1': (1420, 105), '2': (1420, 765)}),
-        _component('POWER', 'connector', 1315, 72, 'POWER 9-12V', width=86, height=48, ports={'+': (1228, 105), '-': (1383, 765)}),
+        _component(
+            'R2',
+            'resistor',
+            270,
+            220,
+            'R2 100k',
+            width=68,
+            height=68,
+            resistance=100000,
+            ports={'1': (270, 186), '2': (270, 335)},
+        ),
+        _component(
+            'R1',
+            'potentiometer',
+            430,
+            250,
+            'R1 5M',
+            width=78,
+            height=78,
+            resistance=5000000,
+            ports={'top': (430, 211), 'wiper': (430, 420), 'bottom': (430, 420)},
+        ),
+        _component(
+            'C1',
+            'capacitor',
+            430,
+            610,
+            'C1 47uF',
+            width=54,
+            height=84,
+            capacitance=47,
+            ports={'1': (430, 420), '2': (430, 765)},
+        ),
+        _component(
+            'S1', 'button', 185, 460, 'S1', width=82, height=42, ports={'1': (270, 335), '2': (140, 765)}
+        ),
+        _component(
+            'C2',
+            'capacitor',
+            970,
+            640,
+            'C2 10nF',
+            width=54,
+            height=84,
+            capacitance='0.01',
+            ports={'1': (970, 565), '2': (970, 765)},
+        ),
+        _component(
+            'R3',
+            'resistor',
+            1060,
+            335,
+            'R3 1k',
+            width=78,
+            height=34,
+            resistance=1000,
+            ports={'1': (1012, 335), '2': (1110, 335)},
+        ),
+        _component(
+            'T1',
+            'transistor',
+            1210,
+            455,
+            'T1 NPN',
+            width=86,
+            height=96,
+            spice_model='QNPN',
+            ports={'b': (1148, 455), 'c': (1228, 383), 'e': (1228, 527)},
+        ),
+        _component(
+            'LED1',
+            'led',
+            1228,
+            155,
+            'LED1',
+            width=72,
+            height=54,
+            spice_model='DLED',
+            ports={'a': (1228, 105), 'k': (1228, 205)},
+        ),
+        _component(
+            'R4',
+            'resistor',
+            1228,
+            255,
+            'R4 1.5k',
+            width=78,
+            height=68,
+            resistance=1500,
+            ports={'1': (1228, 205), '2': (1228, 383)},
+        ),
+        _component(
+            'C3',
+            'capacitor',
+            1340,
+            435,
+            'C3 100nF',
+            width=54,
+            height=84,
+            capacitance='0.1',
+            ports={'1': (1340, 105), '2': (1340, 765)},
+        ),
+        _component(
+            'C4',
+            'capacitor',
+            1420,
+            435,
+            'C4 100uF',
+            width=54,
+            height=84,
+            capacitance=100,
+            ports={'1': (1420, 105), '2': (1420, 765)},
+        ),
+        _component(
+            'POWER',
+            'connector',
+            1315,
+            72,
+            'POWER 9-12V',
+            width=86,
+            height=48,
+            ports={'+': (1228, 105), '-': (1383, 765)},
+        ),
     ]
     external_connections = [
         _wire('VCC_RAIL', 'a', 'R2', '1', (270, 105), (270, 186), net='VCC'),
@@ -508,16 +650,92 @@ def build_hierarchical_scheme():
         _component('P4_RESET', 'pin', 110, 560, '4 RESET', ports={'p': (110, 560)}),
         _component('P3_OUT', 'pin', 1390, 400, '3 OUT', ports={'p': (1390, 400)}),
         _component('P7_DISCH', 'pin', 1390, 560, '7 DISCH', ports={'p': (1390, 560)}),
-        _component('RINT_TOP', 'resistor', 365, 182, '5k top', width=68, height=68, resistance=5000, ports={'1': (365, 105), '2': (365, 260)}),
-        _component('RINT_MID', 'resistor', 365, 340, '5k mid', width=68, height=68, resistance=5000, ports={'1': (365, 260), '2': (365, 420)}),
-        _component('RINT_BOT', 'resistor', 365, 596, '5k bottom', width=68, height=68, resistance=5000, ports={'1': (365, 420), '2': (365, 770)}),
+        _component(
+            'RINT_TOP',
+            'resistor',
+            365,
+            182,
+            '5k top',
+            width=68,
+            height=68,
+            resistance=5000,
+            ports={'1': (365, 105), '2': (365, 260)},
+        ),
+        _component(
+            'RINT_MID',
+            'resistor',
+            365,
+            340,
+            '5k mid',
+            width=68,
+            height=68,
+            resistance=5000,
+            ports={'1': (365, 260), '2': (365, 420)},
+        ),
+        _component(
+            'RINT_BOT',
+            'resistor',
+            365,
+            596,
+            '5k bottom',
+            width=68,
+            height=68,
+            resistance=5000,
+            ports={'1': (365, 420), '2': (365, 770)},
+        ),
         _component('REF_HIGH', 'node', 365, 260, '2/3 VCC', ports={'a': (365, 260)}),
         _component('REF_LOW', 'node', 365, 420, '1/3 VCC', ports={'a': (365, 420)}),
-        _component('CMP_THRESH', 'comparator', 635, 284, 'Threshold comparator', width=150, height=78, ports={'+': (560, 274), '-': (560, 304), 'out': (710, 284)}),
-        _component('CMP_TRIG', 'comparator', 635, 431, 'Trigger comparator', width=150, height=78, ports={'+': (560, 421), '-': (560, 451), 'out': (710, 431)}),
-        _component('SR_LATCH', 'sr_latch', 890, 382, 'SR latch', width=130, height=105, ports={'R': (825, 360), 'S': (825, 412), 'RESET': (825, 392), 'Q': (955, 382), 'nQ': (955, 415)}),
-        _component('OUT_DRIVER', 'output_driver', 1145, 391, 'Output driver', width=150, height=92, ports={'in': (1070, 382), 'out': (1220, 392), 'vcc': (1120, 345), 'gnd': (1120, 437)}),
-        _component('Q_DISCH', 'transistor', 1070, 590, 'Discharge NPN', width=86, height=96, spice_model='QNPN', ports={'b': (1008, 590), 'c': (1088, 518), 'e': (1088, 662)}),
+        _component(
+            'CMP_THRESH',
+            'comparator',
+            635,
+            284,
+            'Threshold comparator',
+            width=150,
+            height=78,
+            ports={'+': (560, 274), '-': (560, 304), 'out': (710, 284)},
+        ),
+        _component(
+            'CMP_TRIG',
+            'comparator',
+            635,
+            431,
+            'Trigger comparator',
+            width=150,
+            height=78,
+            ports={'+': (560, 421), '-': (560, 451), 'out': (710, 431)},
+        ),
+        _component(
+            'SR_LATCH',
+            'sr_latch',
+            890,
+            382,
+            'SR latch',
+            width=130,
+            height=105,
+            ports={'R': (825, 360), 'S': (825, 412), 'RESET': (825, 392), 'Q': (955, 382), 'nQ': (955, 415)},
+        ),
+        _component(
+            'OUT_DRIVER',
+            'output_driver',
+            1145,
+            391,
+            'Output driver',
+            width=150,
+            height=92,
+            ports={'in': (1070, 382), 'out': (1220, 392), 'vcc': (1120, 345), 'gnd': (1120, 437)},
+        ),
+        _component(
+            'Q_DISCH',
+            'transistor',
+            1070,
+            590,
+            'Discharge NPN',
+            width=86,
+            height=96,
+            spice_model='QNPN',
+            ports={'b': (1008, 590), 'c': (1088, 518), 'e': (1088, 662)},
+        ),
     ]
     internal_connections = [
         _wire('VCC8', 'a', 'RINT_TOP', '1', (365, 105), net='VCC_INTERNAL'),
@@ -539,7 +757,17 @@ def build_hierarchical_scheme():
         _wire('VCC8', 'a', 'OUT_DRIVER', 'vcc', (1120, 105), (1120, 345), net='VCC_INTERNAL'),
         _wire('OUT_DRIVER', 'gnd', 'GND1', 'a', (1120, 770), net='GND_INTERNAL'),
         _wire('SR_LATCH', 'nQ', 'Q_DISCH', 'b', (1010, 415), (1010, 590), net='DISCHARGE_DRIVE'),
-        _wire('P7_DISCH', 'p', 'Q_DISCH', 'c', (1300, 560), (1300, 430), (1088, 430), (1088, 518), net='DISCHARGE_COLLECTOR'),
+        _wire(
+            'P7_DISCH',
+            'p',
+            'Q_DISCH',
+            'c',
+            (1300, 560),
+            (1300, 430),
+            (1088, 430),
+            (1088, 518),
+            net='DISCHARGE_COLLECTOR',
+        ),
         _wire('Q_DISCH', 'e', 'GND1', 'a', (1088, 770), net='GND_INTERNAL'),
     ]
 
@@ -605,7 +833,12 @@ def apply_eskd_component_metadata(scheme: dict) -> dict:
         'R4': {'refdes': 'R4', 'label': 'R4', 'value_label': '1,5 кОм', 'symbol_standard': 'ГОСТ 2.728'},
         'C3': {'refdes': 'C3', 'label': 'C3', 'value_label': '100 нФ', 'symbol_standard': 'ГОСТ 2.728'},
         'C4': {'refdes': 'C4', 'label': 'C4', 'value_label': '100 мкФ', 'symbol_standard': 'ГОСТ 2.728'},
-        'POWER': {'refdes': 'XP1', 'label': 'XP1', 'value_label': '+9...12 В', 'symbol_standard': 'ГОСТ 2.755'},
+        'POWER': {
+            'refdes': 'XP1',
+            'label': 'XP1',
+            'value_label': '+9...12 В',
+            'symbol_standard': 'ГОСТ 2.755',
+        },
     }
     for component_id, values in patch.items():
         if component_id in components:
@@ -616,7 +849,9 @@ def apply_eskd_component_metadata(scheme: dict) -> dict:
 def write_hierarchical_quality_outputs() -> dict:
     scheme = apply_eskd_component_metadata(build_hierarchical_scheme())
     quality = analyze_schematic_layout(scheme, profile='eskd')
-    HIERARCHICAL_SCHEME_JSON.write_text(json.dumps({'scheme_data': scheme}, ensure_ascii=False, indent=2), encoding='utf-8')
+    HIERARCHICAL_SCHEME_JSON.write_text(
+        json.dumps({'scheme_data': scheme}, ensure_ascii=False, indent=2), encoding='utf-8'
+    )
     QUALITY_REPORT_JSON.write_text(json.dumps(quality, ensure_ascii=False, indent=2), encoding='utf-8')
     if not quality['ok']:
         raise SystemExit(json.dumps({'layout_quality': quality}, ensure_ascii=False, indent=2))

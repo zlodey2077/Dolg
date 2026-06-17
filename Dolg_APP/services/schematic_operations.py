@@ -6,9 +6,9 @@ This module is the safe bridge between AI/CAD commands and the canonical
 
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import datetime, timezone
 import re
+from copy import deepcopy
+from datetime import UTC, datetime
 from typing import Any
 
 from .schematic_graph import normalize_component_type
@@ -100,7 +100,9 @@ def apply_schematic_operations(
         )
 
     if operations is not None and not ops:
-        return _fatal_result(original, report, 'invalid_operations', 'operations must be an object or an array.')
+        return _fatal_result(
+            original, report, 'invalid_operations', 'operations must be an object or an array.'
+        )
 
     for index, operation in enumerate(ops):
         before = deepcopy(state)
@@ -143,7 +145,9 @@ def apply_schematic_operations(
     }
 
 
-def _fatal_result(scheme_data: dict[str, Any], report: dict[str, Any], code: str, message: str) -> dict[str, Any]:
+def _fatal_result(
+    scheme_data: dict[str, Any], report: dict[str, Any], code: str, message: str
+) -> dict[str, Any]:
     report['ok'] = False
     report['rejected_count'] += 1
     report['rejected'].append(
@@ -210,7 +214,12 @@ def _operation_name(operation: dict[str, Any] | None) -> str:
 
 def _add_component(state: dict[str, Any], operation: dict[str, Any]) -> dict[str, Any]:
     component = deepcopy(operation.get('component')) if isinstance(operation.get('component'), dict) else {}
-    ctype = normalize_component_type(component.get('type') or operation.get('component_type') or operation.get('kind') or operation.get('type'))
+    ctype = normalize_component_type(
+        component.get('type')
+        or operation.get('component_type')
+        or operation.get('kind')
+        or operation.get('type')
+    )
     if not ctype:
         return _reject('missing_component_type', 'add_component requires type/component_type.')
 
@@ -224,7 +233,9 @@ def _add_component(state: dict[str, Any], operation: dict[str, Any]) -> dict[str
     component['x'] = _as_number(component.get('x', operation.get('x')), 0)
     component['y'] = _as_number(component.get('y', operation.get('y')), 0)
     component['rotation'] = _normalize_rotation(component.get('rotation', operation.get('rotation', 0)))
-    component['ports'] = _normalize_ports(component.get('ports') or operation.get('ports') or DEFAULT_PORTS.get(ctype, ['1', '2']))
+    component['ports'] = _normalize_ports(
+        component.get('ports') or operation.get('ports') or DEFAULT_PORTS.get(ctype, ['1', '2'])
+    )
 
     properties = operation.get('properties')
     if isinstance(properties, dict):
@@ -287,7 +298,9 @@ def _set_property(state: dict[str, Any], operation: dict[str, Any]) -> dict[str,
     for key, value in properties.items():
         key = str(key)
         if key in RESERVED_COMPONENT_PROPERTIES:
-            return _reject('reserved_property', f'Component property {key} cannot be changed with set_property.')
+            return _reject(
+                'reserved_property', f'Component property {key} cannot be changed with set_property.'
+            )
         item[key] = deepcopy(value)
     return _ok('set_property', item.get('id'))
 
@@ -370,7 +383,8 @@ def _delete_component(state: dict[str, Any], operation: dict[str, Any]) -> dict[
     state['connections'] = [
         item
         for item in state['connections']
-        if _endpoint_component_id(item.get('from')) != component_id and _endpoint_component_id(item.get('to')) != component_id
+        if _endpoint_component_id(item.get('from')) != component_id
+        and _endpoint_component_id(item.get('to')) != component_id
     ]
     return _ok('delete_component', component_id)
 
@@ -388,7 +402,9 @@ def _set_net(state: dict[str, Any], operation: dict[str, Any]) -> dict[str, Any]
                 source = _canonical_endpoint_for_component(source, source_component)
             if target_component:
                 target = _canonical_endpoint_for_component(target, target_component)
-            wire = next((item for item in state['connections'] if _same_connection(item, source, target)), None)
+            wire = next(
+                (item for item in state['connections'] if _same_connection(item, source, target)), None
+            )
     if wire is None:
         return _reject('missing_wire', 'set_net requires an existing wire id or endpoint pair.')
     label = operation.get('net') or operation.get('net_label') or operation.get('label')
@@ -434,7 +450,12 @@ def _wire_by_id(state: dict[str, Any], wire_id: Any) -> dict[str, Any] | None:
 def _normalize_endpoint(endpoint: Any) -> dict[str, str] | None:
     if not isinstance(endpoint, dict):
         return None
-    component = endpoint.get('compId') or endpoint.get('component') or endpoint.get('component_id') or endpoint.get('id')
+    component = (
+        endpoint.get('compId')
+        or endpoint.get('component')
+        or endpoint.get('component_id')
+        or endpoint.get('id')
+    )
     port = endpoint.get('portId') or endpoint.get('port') or endpoint.get('pin') or endpoint.get('terminal')
     if component is None or port is None:
         return None
@@ -450,10 +471,7 @@ def _endpoint_port_exists(component: dict[str, Any], port_id: str) -> bool:
     ports = component.get('ports')
     if not isinstance(ports, list) or not ports:
         return True
-    known = {
-        str(port.get('id')) if isinstance(port, dict) else str(port)
-        for port in ports
-    }
+    known = {str(port.get('id')) if isinstance(port, dict) else str(port) for port in ports}
     return str(port_id) in known
 
 
@@ -496,7 +514,11 @@ def _next_component_id(state: dict[str, Any], component_type: str) -> str:
 
 
 def _next_wire_id(state: dict[str, Any]) -> str:
-    used = {str(item.get('id')) for item in state.get('connections') or [] if isinstance(item, dict) and item.get('id') is not None}
+    used = {
+        str(item.get('id'))
+        for item in state.get('connections') or []
+        if isinstance(item, dict) and item.get('id') is not None
+    }
     for index in range(1, 10000):
         candidate = f'W{index}'
         if candidate not in used:
@@ -560,7 +582,7 @@ def _mark_programmatic_metadata(state: dict[str, Any], report: dict[str, Any]) -
     if not isinstance(programmatic, dict):
         programmatic = {}
         metadata['programmatic'] = programmatic
-    programmatic['last_applied_at'] = datetime.now(timezone.utc).isoformat()
+    programmatic['last_applied_at'] = datetime.now(UTC).isoformat()
     programmatic['last_operation_count'] = report.get('applied_count', 0)
     programmatic['last_rejected_count'] = report.get('rejected_count', 0)
 

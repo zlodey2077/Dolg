@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/pyright/main/packages/vscode-pyright/schemas/pyrightconfig.schema.json",
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "off",
+  "include": [
+    "Dolg_APP",
+    "Dolg_PR",
+    "accounts",
+    "knowledge",
+    "moderation",
+    "orders",
+    "shop",
+    "scripts"
+  ],
+  "exclude": [
+    "**/.git",
+    "**/.venv",
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/node_modules",
+    "**/staticfiles",
+    "**/media",
+    "backups",
+    "htmlcov",
+    "docs/final/generated"
+  ],
+  "reportOptionalSubscript": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalCall": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownVariableType": "none"
+}
