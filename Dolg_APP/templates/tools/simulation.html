@@ -1102,6 +1102,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             </div>
             <div class="server-engine-summary" id="server-engine-summary"></div>
             <div class="server-engine-router" id="server-engine-router"></div>
+            <div class="server-engine-runner" id="server-engine-runner"></div>
             <div class="server-engine-tabs" id="server-engine-tabs" role="tablist" aria-label="Категории движков"></div>
             <div class="server-engine-grid" id="server-engine-grid"></div>
         </div>
@@ -1208,6 +1209,128 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     background: rgba(0, 0, 0, 0.22);
     border-radius: 4px;
     padding: 1px 4px;
+}
+.server-engine-runner {
+    background: rgba(8, 13, 31, 0.76);
+    border: 1px solid rgba(166, 255, 203, 0.22);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+.server-engine-runner__controls {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.4fr) minmax(130px, 0.8fr) auto auto;
+    gap: 8px;
+    align-items: end;
+}
+.server-engine-runner label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: #93a4c4;
+    font-size: 0.74rem;
+}
+.server-engine-runner select {
+    min-width: 0;
+    background: rgba(10, 14, 39, 0.92);
+    border: 1px solid rgba(127, 219, 255, 0.42);
+    border-radius: 6px;
+    color: #e8f6ff;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+}
+.server-engine-runner button,
+.server-engine-card-action {
+    border: 1px solid rgba(127, 219, 255, 0.46);
+    background: rgba(127, 219, 255, 0.10);
+    color: #dff8ff;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    min-height: 36px;
+}
+.server-engine-runner button:hover,
+.server-engine-card-action:hover {
+    background: rgba(127, 219, 255, 0.22);
+    color: #fff;
+}
+.server-engine-runner button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+.server-engine-job-status {
+    margin-top: 10px;
+    border-top: 1px solid rgba(127, 219, 255, 0.16);
+    padding-top: 10px;
+    color: #c7d3e8;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+.server-engine-job-status__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.server-engine-job-status__badge {
+    border-radius: 999px;
+    padding: 2px 8px;
+    color: #08101f;
+    background: #7fdbff;
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+.server-engine-job-status[data-status="success"] .server-engine-job-status__badge { background: #a6ffcb; }
+.server-engine-job-status[data-status="error"] .server-engine-job-status__badge { background: #ffb1b1; }
+.server-engine-job-status[data-status="queued"] .server-engine-job-status__badge,
+.server-engine-job-status[data-status="running"] .server-engine-job-status__badge { background: #ffd38a; }
+.server-engine-job-progress {
+    height: 5px;
+    background: rgba(127, 219, 255, 0.12);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 7px 0;
+}
+.server-engine-job-progress span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #7fdbff, #a6ffcb);
+    width: 0%;
+}
+.server-engine-result-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 0.78rem;
+}
+.server-engine-result-table th,
+.server-engine-result-table td {
+    border-bottom: 1px solid rgba(127, 219, 255, 0.12);
+    padding: 4px 6px;
+    text-align: left;
+}
+.server-engine-result-table th {
+    color: #7fdbff;
+    font-weight: 600;
+}
+.server-engine-result-table code,
+.server-engine-result-metrics code {
+    color: #a6ffcb;
+}
+.server-engine-result-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+.server-engine-result-metrics span {
+    border: 1px solid rgba(127, 219, 255, 0.18);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: #b9c8e3;
+    font-size: 0.72rem;
 }
 .server-engine-tabs {
     display: flex;
@@ -1425,6 +1548,13 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
     }
     .server-engine-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .server-engine-runner__controls {
+        grid-template-columns: 1fr;
+    }
+    .server-engine-job-status__head {
+        align-items: flex-start;
+        flex-direction: column;
     }
     .server-engine-grid {
         grid-template-columns: 1fr;
@@ -9606,7 +9736,16 @@ function downloadNetlist() {
 
 let _serverEngineCatalog = null;
 let _serverEngineActiveCategory = '';
+let _serverEngineSelectedId = 'dolg-numpy-mna';
 let _serverEngineRecommendedIds = new Set();
+let _serverEngineCurrentJob = null;
+let _serverEnginePollTimer = null;
+
+const SERVER_ENGINE_JOB_API = {
+    jobs: '{% url "hello:api_engine_jobs" %}',
+    detail: (id) => `/api/sim/jobs/${id}/`,
+    result: (id) => `/api/sim/jobs/${id}/result/`,
+};
 
 function getServerEngineCatalog() {
     if (_serverEngineCatalog) return _serverEngineCatalog;
@@ -9647,6 +9786,7 @@ function renderServerEngineCatalog(category) {
 
     renderServerEngineSummary(summary, router);
     renderServerEngineRouter(router);
+    renderServerEngineRunner(engines, router);
     renderServerEngineTabs(categories, active);
     renderServerEngineGrid(filtered, router);
 }
@@ -9680,6 +9820,338 @@ function renderServerEngineRouter(router) {
         <br><strong>Fallback:</strong> ${fallback || '<code>xyce</code> → <code>pyspice</code>'}
         <br><strong>Docker/Kubernetes:</strong> ${docker || '<code>engine-gateway</code> <code>xyce-worker</code>'}
     `;
+}
+
+function renderServerEngineRunner(engines, router) {
+    const box = document.getElementById('server-engine-runner');
+    if (!box) return;
+    const list = Array.isArray(engines) ? engines : [];
+    const currentAnalysis = getServerEngineAnalysisValue();
+    const fallbackId = (router && router.primary_engine) || 'dolg-numpy-mna';
+    const hasSelected = list.some(engine => engine.id === _serverEngineSelectedId);
+    if (!hasSelected) {
+        _serverEngineSelectedId = list.some(engine => engine.id === 'dolg-numpy-mna')
+            ? 'dolg-numpy-mna'
+            : fallbackId;
+    }
+    if (!list.some(engine => engine.id === _serverEngineSelectedId) && list.length) {
+        _serverEngineSelectedId = list[0].id;
+    }
+
+    const options = list.map(engine => {
+        const badge = engine.id === 'dolg-numpy-mna'
+            ? 'local'
+            : (engine.status_label || engine.status || '');
+        return `<option value="${escapeHtml(engine.id)}" ${engine.id === _serverEngineSelectedId ? 'selected' : ''}>${escapeHtml(engine.name)}${badge ? ' · ' + escapeHtml(badge) : ''}</option>`;
+    }).join('');
+
+    box.innerHTML = `
+        <div class="server-engine-runner__controls">
+            <label>
+                <span>Движок</span>
+                <select id="server-engine-run-engine" onchange="selectServerEngine(this.value)">
+                    ${options || '<option value="dolg-numpy-mna">DOLG NumPy MNA · local</option>'}
+                </select>
+            </label>
+            <label>
+                <span>Анализ</span>
+                <select id="server-engine-run-analysis" onchange="syncServerEngineAnalysis(this.value)">
+                    <option value="dc" ${currentAnalysis === 'dc' ? 'selected' : ''}>DC</option>
+                    <option value="transient" ${currentAnalysis === 'transient' ? 'selected' : ''}>Transient</option>
+                    <option value="ac" ${currentAnalysis === 'ac' ? 'selected' : ''}>AC</option>
+                    <option value="tolerance" ${currentAnalysis === 'tolerance' ? 'selected' : ''}>Tolerance</option>
+                </select>
+            </label>
+            <button type="button" id="server-engine-submit-job" onclick="submitServerEngineJob()">Запустить job</button>
+            <button type="button" id="server-engine-refresh-job" onclick="refreshServerEngineJob()" ${_serverEngineCurrentJob ? '' : 'disabled'}>Статус</button>
+        </div>
+        <div class="server-engine-job-status" id="server-engine-job-status" data-status="idle"></div>
+    `;
+    renderServerEngineJobStatus(_serverEngineCurrentJob);
+}
+
+function selectServerEngine(engineId) {
+    _serverEngineSelectedId = String(engineId || 'dolg-numpy-mna').trim() || 'dolg-numpy-mna';
+    const select = document.getElementById('server-engine-run-engine');
+    if (select && select.value !== _serverEngineSelectedId) select.value = _serverEngineSelectedId;
+    const engine = getServerEngineById(_serverEngineSelectedId);
+    renderServerEngineJobStatus(_serverEngineCurrentJob);
+    if (engine && typeof showNotification === 'function') {
+        showNotification(`Движок: ${engine.name}`, 'info');
+    }
+}
+
+function syncServerEngineAnalysis(value) {
+    const analysis = normalizeServerEngineAnalysis(value);
+    const select = document.getElementById('server-engine-run-analysis');
+    if (select && select.value !== analysis) select.value = analysis;
+}
+
+function getServerEngineById(engineId) {
+    const payload = getServerEngineCatalog();
+    return (payload.engines || []).find(engine => engine.id === engineId) || null;
+}
+
+function getServerEngineAnalysisValue() {
+    const runnerSelect = document.getElementById('server-engine-run-analysis');
+    const panelSelect = document.getElementById('analysis-type');
+    return normalizeServerEngineAnalysis((runnerSelect && runnerSelect.value) || (panelSelect && panelSelect.value) || 'dc');
+}
+
+function normalizeServerEngineAnalysis(value) {
+    const raw = String(value || 'dc').trim().toLowerCase();
+    if (raw === 'tran' || raw === 'transient' || raw === 'pulse') return 'transient';
+    if (raw === 'ac') return 'ac';
+    if (raw === 'tolerance' || raw === 'monte-carlo' || raw === 'monte_carlo') return 'tolerance';
+    return 'dc';
+}
+
+function buildServerEngineJobOptions(analysis) {
+    const simTimeEl = document.getElementById('sim-time');
+    const simTimeMs = Number((simTimeEl && simTimeEl.value) || 1000);
+    const tStop = Math.max(Number.isFinite(simTimeMs) ? simTimeMs : 1000, 1) / 1000;
+    const options = {
+        source: 'simulation-ui',
+        max_points: 1024,
+    };
+    if (analysis === 'transient') {
+        options.t_stop = tStop;
+        options.dt = Math.max(tStop / 200, 1e-9);
+    } else if (analysis === 'ac') {
+        options.f_start = 1;
+        options.f_stop = 1000000;
+        options.points = 60;
+    } else if (analysis === 'tolerance') {
+        options.iterations = 500;
+        options.tolerance = 0.05;
+    }
+    return options;
+}
+
+function buildServerEngineJobPayload(engineId, analysis) {
+    const schemeData = typeof buildSchemeData === 'function' ? buildSchemeData() : {
+        version: 2,
+        components,
+        connections,
+    };
+    const options = buildServerEngineJobOptions(analysis);
+    let netlist = '';
+    const frontendWarnings = [];
+    try {
+        const built = buildSpiceNetlist({ analysisType: analysis });
+        if (built.errors && built.errors.length) {
+            frontendWarnings.push(...built.errors.map(err => `netlist: ${err}`));
+        } else {
+            netlist = built.netlist || '';
+            frontendWarnings.push(...(built.warnings || []));
+        }
+    } catch (e) {
+        frontendWarnings.push(`netlist: ${e.message || e}`);
+    }
+    if (frontendWarnings.length) options.frontend_warnings = frontendWarnings.slice(0, 12);
+
+    const payload = {
+        engine_id: engineId,
+        analysis_type: analysis,
+        scheme_data: schemeData,
+        netlist,
+        options,
+        source: 'simulation-ui',
+    };
+    if (currentProject && currentProject.id) payload.project_id = currentProject.id;
+    return payload;
+}
+
+async function submitServerEngineJob() {
+    if (components.length === 0) {
+        showNotification('⚠️ Добавьте компоненты на схему', 'warning');
+        return;
+    }
+    const engineId = _serverEngineSelectedId || 'dolg-numpy-mna';
+    const analysis = getServerEngineAnalysisValue();
+    const submitBtn = document.getElementById('server-engine-submit-job');
+    try {
+        if (submitBtn) submitBtn.disabled = true;
+        renderServerEngineJobStatus({
+            engine_id: engineId,
+            engine_name: (getServerEngineById(engineId) || {}).name || engineId,
+            analysis_type: analysis,
+            status: 'queued',
+            progress_percent: 0,
+            message: 'Отправка задания...',
+        });
+        const data = await simApiFetch(SERVER_ENGINE_JOB_API.jobs, {
+            method: 'POST',
+            body: JSON.stringify(buildServerEngineJobPayload(engineId, analysis)),
+        });
+        _serverEngineCurrentJob = data.job;
+        renderServerEngineJobStatus(_serverEngineCurrentJob);
+        showNotification(`✓ Job #${data.job.id} поставлен`, 'success');
+        scheduleServerEngineJobPoll(data.job.id, 800);
+    } catch (e) {
+        renderServerEngineJobError(e);
+        showNotification('Server engine: ' + (e.message || e), 'warning');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+async function refreshServerEngineJob() {
+    if (!_serverEngineCurrentJob || !_serverEngineCurrentJob.id) return;
+    try {
+        await pollServerEngineJob(_serverEngineCurrentJob.id);
+    } catch (e) {
+        renderServerEngineJobError(e);
+    }
+}
+
+function scheduleServerEngineJobPoll(jobId, delayMs) {
+    if (_serverEnginePollTimer) clearTimeout(_serverEnginePollTimer);
+    _serverEnginePollTimer = setTimeout(() => {
+        pollServerEngineJob(jobId).catch(e => renderServerEngineJobError(e));
+    }, delayMs || 1500);
+}
+
+async function pollServerEngineJob(jobId) {
+    const data = await simApiFetch(SERVER_ENGINE_JOB_API.detail(jobId), { method: 'GET' });
+    _serverEngineCurrentJob = data.job;
+    renderServerEngineJobStatus(_serverEngineCurrentJob);
+    if (['queued', 'running'].includes(_serverEngineCurrentJob.status)) {
+        scheduleServerEngineJobPoll(jobId, 1600);
+    } else if (_serverEngineCurrentJob.status === 'success') {
+        publishServerEngineResult(_serverEngineCurrentJob);
+    }
+}
+
+function renderServerEngineJobStatus(job) {
+    const box = document.getElementById('server-engine-job-status');
+    const refreshBtn = document.getElementById('server-engine-refresh-job');
+    if (refreshBtn) refreshBtn.disabled = !(job && job.id);
+    if (!box) return;
+    if (!job) {
+        const engine = getServerEngineById(_serverEngineSelectedId);
+        box.dataset.status = 'idle';
+        box.innerHTML = `
+            <div class="server-engine-job-status__head">
+                <strong>${escapeHtml(engine ? engine.name : _serverEngineSelectedId)}</strong>
+                <span class="server-engine-job-status__badge">ready</span>
+            </div>
+            <div>Job не создан.</div>
+        `;
+        return;
+    }
+    const status = String(job.status || 'queued');
+    const progress = Math.max(0, Math.min(Number(job.progress_percent || 0), 100));
+    box.dataset.status = status;
+    box.innerHTML = `
+        <div class="server-engine-job-status__head">
+            <strong>${job.id ? `Job #${escapeHtml(job.id)}` : 'Job'} · ${escapeHtml(job.engine_name || job.engine_id || '')}</strong>
+            <span class="server-engine-job-status__badge">${escapeHtml(status)}</span>
+        </div>
+        <div>${escapeHtml(job.analysis_type || '')}${job.worker ? ' · worker ' + escapeHtml(job.worker) : ''}</div>
+        <div class="server-engine-job-progress"><span style="width:${progress}%"></span></div>
+        ${job.message ? `<div>${escapeHtml(job.message)}</div>` : ''}
+        ${job.error ? `<div style="color:#ffb1b1;">${escapeHtml(job.error)}</div>` : ''}
+        ${renderServerEngineWarnings(job.warnings)}
+        ${status === 'success' ? renderServerEngineResult(job.result || {}, job) : ''}
+    `;
+}
+
+function renderServerEngineJobError(error) {
+    const box = document.getElementById('server-engine-job-status');
+    if (!box) return;
+    box.dataset.status = 'error';
+    box.innerHTML = `
+        <div class="server-engine-job-status__head">
+            <strong>Job</strong>
+            <span class="server-engine-job-status__badge">error</span>
+        </div>
+        <div style="color:#ffb1b1;">${escapeHtml(error.message || error)}</div>
+    `;
+}
+
+function renderServerEngineWarnings(warnings) {
+    const list = Array.isArray(warnings) ? warnings.filter(Boolean).slice(0, 6) : [];
+    if (!list.length) return '';
+    return list.map(w => `<div style="color:#ffd38a;">⚠ ${escapeHtml(w)}</div>`).join('');
+}
+
+function publishServerEngineResult(job) {
+    const panel = document.getElementById('results-panel');
+    if (panel && job && job.result) {
+        panel.innerHTML = renderServerEngineResult(job.result, job);
+    }
+    window._lastServerEngineJob = job;
+    if (typeof showNotification === 'function') showNotification(`✓ Job #${job.id} завершён`, 'success');
+}
+
+function renderServerEngineResult(result, job) {
+    if (!result || typeof result !== 'object') return '';
+    const nodes = normalizeServerEngineRows(result.nodes, result.node_voltages, 'voltage_v', 'V');
+    const branches = normalizeServerEngineRows(result.branches, result.currents_a, 'current_a', 'A');
+    const metrics = Object.entries(result.metrics || {})
+        .filter(([, value]) => value !== null && value !== undefined && value !== '')
+        .slice(0, 10)
+        .map(([key, value]) => `<span>${escapeHtml(key)}: <code>${escapeHtml(formatServerEngineValue(value))}</code></span>`)
+        .join('');
+    return `
+        <div class="server-engine-result">
+            <div class="server-engine-job-status__head">
+                <strong>${escapeHtml((job && job.engine_name) || result.engine_name || result.engine || 'server engine')}</strong>
+                <span class="server-engine-job-status__badge">${escapeHtml(result.analysis_type || (job && job.analysis_type) || 'result')}</span>
+            </div>
+            ${metrics ? `<div class="server-engine-result-metrics">${metrics}</div>` : ''}
+            ${nodes.length ? renderServerEngineTable('Узлы', nodes) : ''}
+            ${branches.length ? renderServerEngineTable('Ветви', branches) : ''}
+            ${renderServerEngineWarnings(result.warnings)}
+        </div>
+    `;
+}
+
+function normalizeServerEngineRows(rows, mapRows, valueKey, unit) {
+    if (Array.isArray(rows)) {
+        return rows.slice(0, 16).map(row => ({
+            id: row.id || row.name || 'value',
+            value: row[valueKey] !== undefined ? row[valueKey] : (row.value !== undefined ? row.value : row.samples),
+            unit: row.unit || unit,
+        }));
+    }
+    if (rows && typeof rows === 'object') {
+        return Object.entries(rows).slice(0, 16).map(([id, value]) => ({ id, value, unit }));
+    }
+    if (mapRows && typeof mapRows === 'object') {
+        return Object.entries(mapRows).slice(0, 16).map(([id, value]) => ({ id, value, unit }));
+    }
+    return [];
+}
+
+function renderServerEngineTable(title, rows) {
+    const body = rows.map(row => `
+        <tr>
+            <td><code>${escapeHtml(row.id)}</code></td>
+            <td>${escapeHtml(formatServerEngineValue(row.value))}</td>
+            <td>${escapeHtml(row.unit || '')}</td>
+        </tr>
+    `).join('');
+    return `
+        <table class="server-engine-result-table">
+            <thead><tr><th>${escapeHtml(title)}</th><th>Значение</th><th>Ед.</th></tr></thead>
+            <tbody>${body}</tbody>
+        </table>
+    `;
+}
+
+function formatServerEngineValue(value) {
+    if (Array.isArray(value)) return value.length ? `${formatServerEngineValue(value[0])} … (${value.length})` : '[]';
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) return String(value);
+        const abs = Math.abs(value);
+        if (abs > 0 && abs < 0.001) return value.toExponential(4);
+        if (abs >= 100000) return value.toExponential(4);
+        return Number(value.toPrecision(6)).toString();
+    }
+    if (typeof value === 'object' && value !== null) return JSON.stringify(value).slice(0, 80);
+    return String(value);
 }
 
 function renderServerEngineTabs(categories, active) {
@@ -9722,6 +10194,7 @@ function renderServerEngineCard(engine, primaryId) {
                 <dt>Выход</dt><dd>${escapeHtml(outputs || 'JSON/artifacts')}</dd>
                 <dt>Лицензия</dt><dd>${escapeHtml(engine.license || '—')}</dd>
             </dl>
+            <button type="button" class="server-engine-card-action" onclick="selectServerEngine('${escapeHtml(engine.id)}')">Выбрать</button>
             <div class="server-engine-tags">${tags}</div>
         </article>
     `;
