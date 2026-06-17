@@ -102,6 +102,32 @@ def _measurements_section(measurements: list) -> tuple[str, list[str]] | None:
     return ('Измерения', rows)
 
 
+def _run_field(run, key: str, default=None):
+    if isinstance(run, dict):
+        return run.get(key, default)
+    return getattr(run, key, default)
+
+
+def _simulation_runs_section(simulation_runs: list) -> tuple[str, list[str]] | None:
+    rows = []
+    for run in simulation_runs or []:
+        analysis = _run_field(run, 'analysis_type') or _run_field(run, 'type') or 'unknown'
+        engine = _run_field(run, 'engine') or 'local'
+        status = _run_field(run, 'status') or 'success'
+        elapsed = _run_field(run, 'elapsed_ms')
+        created = _run_field(run, 'created_at') or _run_field(run, 'created')
+        if hasattr(created, 'strftime'):
+            created = created.strftime('%Y-%m-%d %H:%M')
+        elapsed_text = f'{_fmt(elapsed, digits=3)} мс' if elapsed not in (None, '') else '—'
+        rows.append(f'| {analysis} | {engine} | {status} | {elapsed_text} | {created or "—"} |')
+    if not rows:
+        return None
+    return (
+        'Запуски симуляции',
+        ['| Анализ | Движок | Статус | Время | Дата |', '|---|---|---|---|---|'] + rows,
+    )
+
+
 def _lab_section(lab_calcs: list) -> tuple[str, list[str]] | None:
     lines = []
     for calc in lab_calcs or []:
@@ -145,6 +171,7 @@ def build_protocol(
     scheme_data: dict | None = None,
     *,
     include_dc: bool = True,
+    simulation_runs: list | None = None,
     measurements: list | None = None,
     lab_calcs: list | None = None,
     findings: list | None = None,
@@ -166,6 +193,9 @@ def build_protocol(
             sec = _dc_section(scheme_data)
             if sec:
                 sections.append(sec)
+    sec = _simulation_runs_section(simulation_runs or [])
+    if sec:
+        sections.append(sec)
     for builder, arg in (
         (_measurements_section, measurements),
         (_lab_section, lab_calcs),

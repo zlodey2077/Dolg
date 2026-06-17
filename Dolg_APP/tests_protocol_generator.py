@@ -104,6 +104,26 @@ def test_measurements_and_notes_sections():
     assert 'Vout' in p['markdown'] and 'работоспособна' in p['markdown']
 
 
+def test_simulation_runs_section_renders_engine_history():
+    p = build_protocol(
+        'Project protocol',
+        simulation_runs=[
+            {
+                'analysis_type': 'tran',
+                'engine': 'xyce-worker',
+                'status': 'success',
+                'elapsed_ms': 42,
+                'created': '2026-06-17 08:15',
+            }
+        ],
+    )
+
+    assert any('симуляц' in section.lower() for section in p['sections'])
+    assert 'tran' in p['markdown']
+    assert 'xyce-worker' in p['markdown']
+    assert '42' in p['markdown']
+
+
 def test_synergy_with_engineering_lab_derating():
     # Авто-протокол = лабораторный отчёт: реальный результат calculate_lab → секция.
     from knowledge.services.engineering_lab import calculate_lab

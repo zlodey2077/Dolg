@@ -710,6 +710,54 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('text/markdown', response['Content-Type'])
         self.assertIn('attachment', response['Content-Disposition'])
 
+    def test_generate_protocol_can_collect_project_context(self):
+        SimulationRun.objects.create(
+            project=self.project,
+            user=self.user,
+            analysis_type='tran',
+            engine='xyce-worker',
+            elapsed_ms=42,
+            status='success',
+        )
+        ProjectMeasurement.objects.create(
+            project=self.project,
+            user=self.user,
+            metric='node_voltage',
+            label='Vout',
+            value=3.02,
+            unit='V',
+            status='ok',
+        )
+
+        response = self.client.post(
+            reverse('hello:api_generate_protocol'),
+            data=json.dumps({'project_id': self.project.id, 'include_dc': False}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['project']['id'], self.project.id)
+        self.assertGreaterEqual(data['meta']['section_count'], 4)
+        self.assertIn('Review LED', data['markdown'])
+        self.assertIn('xyce-worker', data['markdown'])
+        self.assertIn('Vout', data['markdown'])
+        self.assertIn('Engineering review:', data['markdown'])
+
+    def test_generate_protocol_rejects_unreadable_project(self):
+        other = User.objects.create_user('protocol-other', 'protocol-other@x', 'pw')
+        project = SchematicProject.objects.create(user=other, name='Private protocol', scheme_data=self.scheme)
+
+        response = self.client.post(
+            reverse('hello:api_generate_protocol'),
+            data=json.dumps({'project_id': project.id}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(response.json()['ok'])
+
     def test_cad_import_preview_parses_spice_subset(self):
         source = 'V1 in 0 DC 9\nR1 in out 1k\nR2 out 0 2k\n.ac dec 10 1 1k'
         result = import_preview('ltspice', source)

@@ -242,6 +242,52 @@ Pro-аналитика в интерфейсе может сохранить к�
 
 ---
 
+## Engineering protocol
+
+### `POST /api/sim/protocol/`
+Генерирует Markdown-протокол проектирования. Требует логин. Есть два режима:
+ручной payload (`scheme_data`, `measurements`, `lab_calcs`, `findings`) и проектный
+режим через `project_id`.
+
+В проектном режиме endpoint использует те же правила доступа, что проектные API:
+чужой private-проект вернет `404`. Если доступ есть, протокол сам подтягивает
+`scheme_data`, последние `SimulationRun`, сохраненные `ProjectMeasurement` и
+in-memory Engineering Review findings. Review не сохраняется в БД, чтобы генерация
+отчета не засоряла историю проекта.
+
+**Request:**
+```json
+{
+    "project_id": 7,
+    "include_dc": true,
+    "include_review": true,
+    "download": false
+}
+```
+
+**Response:**
+```json
+{
+    "ok": true,
+    "project": {"id": 7, "name": "Review LED"},
+    "sections": [
+        "Состав схемы",
+        "Расчет рабочей точки (DC, MNA)",
+        "Запуски симуляции",
+        "Измерения",
+        "Проверки (DRC / review)",
+        "Выводы"
+    ],
+    "meta": {"section_count": 6, "has_findings": true},
+    "markdown": "# Протокол проектирования: Review LED\n..."
+}
+```
+
+Если `download: true`, ответ возвращается как `text/markdown` с attachment filename
+`dolg_protocol_project_<id>.md` для проектного режима или `protocol.md` для ручного.
+
+---
+
 ## Server engine catalog
 
 ### `GET /api/sim/server-engines/`

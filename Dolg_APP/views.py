@@ -2932,6 +2932,43 @@ def api_engineering_review(request):
     )
 
 
+def _protocol_findings_from_review(review_report):
+    findings = []
+    for message in review_report.get('errors') or []:
+        findings.append({'severity': 'error', 'message': str(message)})
+    for message in review_report.get('warnings') or []:
+        findings.append({'severity': 'warning', 'message': str(message)})
+    for fault in review_report.get('faults') or []:
+        if isinstance(fault, dict):
+            findings.append(
+                {
+                    'rule_id': fault.get('code') or fault.get('rule_id') or '',
+                    'severity': 'error',
+                    'message': fault.get('title') or fault.get('message') or str(fault),
+                    'recommendation': fault.get('recommendation') or '',
+                }
+            )
+    for finding in review_report.get('expert_findings') or []:
+        if not isinstance(finding, dict):
+            continue
+        severity = finding.get('severity') or finding.get('level') or 'info'
+        if severity in {'critical', 'error'}:
+            severity = 'error'
+        elif severity in {'risk', 'warning'}:
+            severity = 'warning'
+        else:
+            severity = 'info'
+        findings.append(
+            {
+                'rule_id': finding.get('rule_id') or '',
+                'severity': severity,
+                'message': finding.get('title') or finding.get('message') or str(finding),
+                'recommendation': finding.get('recommendation') or '',
+            }
+        )
+    return findings[:40]
+
+
 @login_required(login_url='accounts:login')
 @require_POST
 def api_generate_protocol(request):
@@ -2949,23 +2986,65 @@ def api_generate_protocol(request):
     except (json.JSONDecodeError, ValueError):
         return _json_error('Invalid JSON')
 
+    project = None
+    project_id = data.get('project_id')
+    if project_id not in (None, ''):
+        try:
+            project = _project_for_read(request.user, int(project_id))
+        except (Http404, TypeError, ValueError):
+            return _json_error('Project not found', status=404)
+
     scheme_data = data.get('scheme_data') if isinstance(data.get('scheme_data'), dict) else None
+    simulation_runs = data.get('simulation_runs') if isinstance(data.get('simulation_runs'), list) else None
+    measurements = data.get('measurements') if isinstance(data.get('measurements'), list) else None
+    findings = data.get('findings') if isinstance(data.get('findings'), list) else None
+    notes = data.get('notes')
+    title = str(data.get('title') or 'Протокол проектирования')[:200]
+
+    if project is not None:
+        saved_runs = list(project.simulation_runs.all()[:10])
+        saved_measurements = list(project.measurements.all()[:50])
+        scheme_data = scheme_data or project.scheme_data
+        simulation_runs = simulation_runs or saved_runs
+        measurements = measurements or [_measurement_to_dict(item) for item in saved_measurements]
+        title = str(data.get('title') or f'Протокол проектирования: {project.name}')[:200]
+
+        if data.get('include_review', True):
+            try:
+                review_report = build_design_review(
+                    project,
+                    simulation_runs=saved_runs,
+                    measurements=saved_measurements,
+                    import_summary=None,
+                )
+                findings = (findings or []) + _protocol_findings_from_review(review_report)
+                if not notes and review_report.get('summary'):
+                    score = review_report.get('score')
+                    status = review_report.get('status_label') or review_report.get('status')
+                    notes = f'Engineering review: {score}/100 - {status}. {review_report.get("summary")}'
+            except Exception:
+                logger.exception('Project protocol review build failed')
     result = build_protocol(
-        title=str(data.get('title') or 'Протокол проектирования')[:200],
+        title=title,
         scheme_data=scheme_data,
         include_dc=bool(data.get('include_dc', True)),
-        measurements=data.get('measurements') if isinstance(data.get('measurements'), list) else None,
+        simulation_runs=simulation_runs,
+        measurements=measurements,
         lab_calcs=data.get('lab_calcs') if isinstance(data.get('lab_calcs'), list) else None,
-        findings=data.get('findings') if isinstance(data.get('findings'), list) else None,
-        notes=data.get('notes'),
+        findings=findings,
+        notes=notes,
         author=getattr(request.user, 'username', None),
     )
 
     if data.get('download'):
         response = HttpResponse(result['markdown'], content_type='text/markdown; charset=utf-8')
-        response['Content-Disposition'] = 'attachment; filename="protocol.md"'
+        filename = f'dolg_protocol_project_{project.id}.md' if project else 'protocol.md'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-    return JsonResponse({'ok': True, 'markdown': result['markdown'], 'sections': result['sections']})
+    payload = {'ok': True, 'markdown': result['markdown'], 'sections': result['sections'], 'meta': result['meta']}
+    if project is not None:
+        payload['project'] = {'id': project.id, 'name': project.name}
+    return JsonResponse(payload)
 
 
 @login_required(login_url='accounts:login')
