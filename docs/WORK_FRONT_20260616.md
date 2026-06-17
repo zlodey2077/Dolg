@@ -37,6 +37,8 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 - В VS Code добавлены задачи `Engine worker: once (local)` и `Engine worker: watch (local)`.
 - Проверки: `Dolg_APP/tests_server_engines.py` - 14 passed; `manage.py check` - OK; `makemigrations --check --dry-run` - no changes.
 - PR-проверка 2026-06-17: на GitHub открыт только Dependabot PR #3 (`pypdf 6.10.2 -> 6.12.0`), refs PR загружены локально, релевантные проверки прошли, изменение вынесено в отдельный commit `34f8d9e`.
+- UI серверных движков доведен до первого end-to-end сценария: выбор engine/analysis, submit в `/api/sim/jobs/`, polling queued/running/success/error, компактный вывод `nodes`, `branches`, `metrics`, `warnings`.
+- Успешный `EngineJob`, привязанный к проекту, теперь сохраняется в `SimulationRun` и пишет событие `ProjectEvent(simulation_run)`. Проверки после изменения: `Dolg_APP/tests_server_engines.py` - 15 passed; `manage.py check` - OK.
 
 ## Новый план после PR-проверки
 
@@ -53,10 +55,10 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Не переписывать историю опубликованной ветки без явного решения; если понадобится force-push, использовать `--force-with-lease`.
 
 3. Довести EngineJob до видимого пользовательского сценария.
-   - UI polling в `simulation.html`: submit -> queued/running/success/error.
-   - Кнопка/режим запуска локального `dolg-numpy-mna` worker через dev task или management command.
-   - Отображение нормализованного результата: `nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`.
-   - Сохранение успешного результата в историю `SimulationRun`, если job привязан к проекту.
+   - Готово: UI polling в `simulation.html`: submit -> queued/running/success/error.
+   - Готово: отображение нормализованного результата: `nodes`, `branches`, `metrics`, `warnings`; `waveforms`/`artifacts` оставить для следующих worker'ов.
+   - Готово: сохранение успешного результата в историю `SimulationRun`, если job привязан к проекту.
+   - Осталось: отдельный удобный режим запуска локального `dolg-numpy-mna` worker через dev task/management command; не запускать процессы из web request.
 
 4. Закрыть системные блокеры без остановки разработки.
    - Docker Desktop не запускать во время обычной работы, пока он снова не начинает стабильно отвечать.
@@ -91,11 +93,11 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Снять stale-пункты из старых roadmap, чтобы не чинить уже закрытое.
 
 3. Server engine gateway - первый вертикальный слой.
-   - Текущий статус: каталог движков, REST-информация, `EngineJob` model, `/api/sim/jobs/` submit/list/status/result и локальный worker для `dolg-numpy-mna` уже есть.
+   - Текущий статус: каталог движков, REST-информация, `EngineJob` model, `/api/sim/jobs/` submit/list/status/result, UI runner в симуляторе и локальный worker для `dolg-numpy-mna` уже есть.
    - Команды: `python manage.py run_engine_worker --once --limit 5` для разового прохода и `python manage.py run_engine_worker --limit 5 --sleep 2` для локального watch-режима. В VS Code есть такие же tasks.
    - Вынести запуск внешних движков в отдельный worker/process, не внутрь web request.
    - Следующий внешний worker: Xyce CLI в Docker; PySpice - adapter/bridge; ngspice.wasm остается быстрым интерактивным режимом.
-   - Result payload уже нормализуется для локального worker: `nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`; расширить этот контракт на Xyce/PySpice после восстановления Docker.
+   - Result payload уже нормализуется для локального worker и сохраняется в историю проекта: `nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`; расширить этот контракт на Xyce/PySpice после восстановления Docker.
 
 4. Авто-протокол `.md`/PDF.
    - Собрать из схемы, параметров, симуляции, review, графиков, BOM и sources.
