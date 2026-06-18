@@ -62,7 +62,9 @@
     <p class="pcb-meta">
         Авто-разводка (MVP) из принципиальной схемы.
         <a href="{% url 'hello:projects' %}" style="color:#7fdbff;">← К проектам</a> ·
-        <a href="{% url 'hello:simulation' %}" style="color:#7fdbff;">⚙️ Открыть в симуляторе</a>
+        <a href="{% url 'hello:simulation' %}?project={{ project.id }}" style="color:#7fdbff;">⚙️ Открыть в симуляторе</a>
+        ·
+        <a href="{% url 'hello:simulation' %}?project={{ project.id }}&view=3d#3d" style="color:#7fdbff;">🎬 Открыть 3D</a>
     </p>
 
     <div class="pcb-warning">
@@ -103,6 +105,10 @@
                 title="A* по сетке 0.5мм с штрафом за поворот — трассы реально обходят компоненты.">
             🤖 Auto-route (A*)
         </button>
+        <a class="secondary" href="{% url 'hello:simulation' %}?project={{ project.id }}&view=3d#3d"
+           title="Открыть эту же схему в 3D-просмотре платы">
+            🎬 3D-плата
+        </a>
         <button class="secondary" onclick="window.print()">🖨️ Печать SVG</button>
     </div>
 

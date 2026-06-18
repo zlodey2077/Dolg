@@ -497,6 +497,9 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 <button class="tool-btn" id="scheme3d-btn" onclick="showScheme3D()" title="3D-просмотр платы (Three.js)">
                     <span>🎬</span> 3D
                 </button>
+                <button class="tool-btn" id="pcb-flow-btn" onclick="openProjectPcb()" title="Сохранить текущую схему и открыть PCB-разводку проекта">
+                    <span>🧬</span> PCB
+                </button>
                 {% comment %}
                 2026-05-31 recovery: «🛠 Инженер ревью» — открывает /projects/<id>/review/
                 если есть текущий проект. Иначе — quick-DRC + просьба сохранить.
@@ -5455,7 +5458,10 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         // Загружаем проект если он был передан из раздела проектов.
         // Если currentProjectId нет — пробуем восстановить autosave из localStorage.
-        if (sessionStorage.getItem('currentProjectId')) {
+        const bootProjectId = new URLSearchParams(location.search).get('project')
+            || new URLSearchParams(location.search).get('project_id')
+            || sessionStorage.getItem('currentProjectId');
+        if (bootProjectId) {
             loadProjectIfExists();
         } else {
             restoreSchemeAutosave();
@@ -6136,7 +6142,8 @@ function renderProjectHeader() {
 }
 
 async function loadProjectIfExists() {
-    const urlProjectId = new URLSearchParams(location.search).get('project');
+    const urlParams = new URLSearchParams(location.search);
+    const urlProjectId = urlParams.get('project') || urlParams.get('project_id');
     const projectId = urlProjectId || sessionStorage.getItem('currentProjectId');
     if (!projectId) return;
 
@@ -6160,6 +6167,11 @@ async function loadProjectIfExists() {
         renderProjectHeader();
         resetMode();
         showNotification(`📂 Проект "${currentProject.name}" загружен`);
+        if (urlParams.get('view') === '3d' || location.hash === '#3d') {
+            setTimeout(() => {
+                if (typeof showScheme3D === 'function') showScheme3D();
+            }, 250);
+        }
     } catch (e) {
         console.error('Ошибка при загрузке проекта:', e);
         showNotification('⚠️ Не удалось загрузить проект: ' + e.message, 'warning');
@@ -15798,6 +15810,53 @@ async function loadScheme() {
 
 // ---------- Модалка выбора проекта ----------
 let pickerMode = null; // 'save' | 'load'
+let pendingProjectAction = null; // e.g. 'open_pcb' after save-as flow
+
+async function ensureProjectSavedForPcb() {
+    if (IS_GUEST_DEMO) {
+        showNotification('🔑 Войдите в аккаунт, чтобы открыть PCB для сохранённого проекта', 'warning');
+        return null;
+    }
+    if (!components.length) {
+        showNotification('⚠️ Сначала добавьте компоненты на схему', 'warning');
+        return null;
+    }
+    if (!currentProject || !currentProject.id || currentProject.is_demo) {
+        pendingProjectAction = 'open_pcb';
+        openProjectPicker('save');
+        showNotification('💾 Сначала сохраните схему как проект — потом открою PCB автоматически', 'info');
+        return null;
+    }
+    markSchemeSyncing();
+    try {
+        const payload = buildSchemeData();
+        await simApiFetch(PROJECTS_API.save(currentProject.id), {
+            method: 'POST',
+            body: JSON.stringify({ scheme_data: payload }),
+        });
+        _lastServerSavedSnap = JSON.stringify(payload);
+        markSchemeSaved();
+        return currentProject.id;
+    } catch (e) {
+        markSchemeDirty();
+        showNotification('❌ Не удалось сохранить схему перед PCB: ' + (e.message || e), 'warning');
+        return null;
+    }
+}
+
+async function openProjectPcb() {
+    const projectId = await ensureProjectSavedForPcb();
+    if (!projectId) return;
+    window.location.href = `/pcb/${projectId}/`;
+}
+
+function runPendingProjectAction() {
+    const action = pendingProjectAction;
+    pendingProjectAction = null;
+    if (action === 'open_pcb' && currentProject && currentProject.id) {
+        window.location.href = `/pcb/${currentProject.id}/`;
+    }
+}
 
 async function openProjectPicker(mode) {
     pickerMode = mode;
@@ -15851,9 +15910,10 @@ async function openProjectPicker(mode) {
     }
 }
 
-function closeProjectPicker() {
+function closeProjectPicker(clearPending = true) {
     document.getElementById('project-picker-modal').style.display = 'none';
     pickerMode = null;
+    if (clearPending) pendingProjectAction = null;
 }
 
 async function pickProject(projectId) {
@@ -15865,8 +15925,9 @@ async function pickProject(projectId) {
             });
             currentProject = data.project;
             updateSimHeader();
-            closeProjectPicker();
+            closeProjectPicker(false);
             showNotification(`✓ Сохранено в "${data.project.name}"`, 'success');
+            runPendingProjectAction();
         } catch (e) {
             // Если backend вернул 404 — почти наверняка попали в демо-проект
             // (фронт должен помечать их disabled, но это defensive guard).
@@ -15909,10 +15970,11 @@ async function confirmSaveAsNew() {
         });
         currentProject = data.project;
         updateSimHeader();
-        closeProjectPicker();
+        closeProjectPicker(false);
         document.getElementById('new-project-name').value = '';
         document.getElementById('new-project-desc').value = '';
         showNotification(`✓ Проект "${data.project.name}" создан`, 'success');
+        runPendingProjectAction();
     } catch (e) {
         showNotification('❌ ' + e.message, 'warning');
     }
