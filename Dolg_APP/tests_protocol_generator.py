@@ -67,6 +67,43 @@ def test_bom_readiness_section_renders_catalog_metadata():
     assert 'R0603_RES' in p['markdown']
 
 
+def test_pcb_drc_section_renders_width_issue():
+    scheme = {
+        'board': {'clearance_mm': 0.3, 'min_trace_width_mm': 0.15},
+        'components': [
+            {
+                'id': 'r1',
+                'type': 'resistor',
+                'label': 'R1',
+                'x': 80,
+                'y': 100,
+                'ports': [{'id': 'a', 'x': -20, 'y': 0}, {'id': 'b', 'x': 20, 'y': 0}],
+            },
+            {
+                'id': 'led1',
+                'type': 'led',
+                'label': 'LED1',
+                'x': 240,
+                'y': 100,
+                'ports': [{'id': 'a', 'x': -20, 'y': 0}, {'id': 'k', 'x': 20, 'y': 0}],
+            },
+        ],
+        'connections': [
+            {
+                'from': {'compId': 'r1', 'portId': 'b'},
+                'to': {'compId': 'led1', 'portId': 'a'},
+                'width_mm': 0.2,
+                'current_a': 2.0,
+            }
+        ],
+    }
+    p = build_protocol('PCB protocol', scheme, include_dc=False)
+
+    assert 'PCB DRC' in p['sections']
+    assert 'trace_width_current' in p['markdown']
+    assert 'errors=1' in p['markdown']
+
+
 def test_sources_section_renders_finding_references():
     p = build_protocol(
         'Sources protocol',

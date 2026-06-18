@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import time
 
+from ..pcb_layout import analyze_pcb_drc, compute_pcb_layout
+
 _VALUE_FIELDS = ('resistance', 'capacitance', 'inductance', 'voltage', 'current', 'value', 'part_number')
 _SEVERITY_ORDER = {'error': 0, 'warning': 1, 'info': 2}
 _SEVERITY_LABEL = {'error': 'ошибка', 'warning': 'предупреждение', 'info': 'инфо'}
@@ -137,6 +139,54 @@ def _bom_section(scheme_data: dict) -> tuple[str, list[str]] | None:
     ]
     lines.extend(rows)
     return ('BOM и источники компонентов', lines)
+
+
+def _pcb_drc_section(scheme_data: dict) -> tuple[str, list[str]] | None:
+    components = (scheme_data or {}).get('components') or []
+    if not components:
+        return None
+    try:
+        layout = compute_pcb_layout(scheme_data)
+        drc = analyze_pcb_drc(layout, scheme_data)
+    except Exception:
+        return None
+
+    summary = drc.get('summary') or {}
+    rules = drc.get('rules') or {}
+    status = drc.get('status') or 'unknown'
+    status_label = {
+        'pass': 'OK',
+        'warn': 'есть предупреждения',
+        'fail': 'есть ошибки',
+    }.get(status, status)
+    lines = [
+        (
+            f'Статус: **{status_label}**; errors={summary.get("errors", 0)}, '
+            f'warnings={summary.get("warnings", 0)}, info={summary.get("info", 0)}.'
+        ),
+        (
+            f'Правила: clearance={_fmt(rules.get("clearance_mm"))} мм; '
+            f'min trace={_fmt(rules.get("min_trace_width_mm"))} мм; '
+            f'copper={_fmt(rules.get("copper_oz"))} oz; '
+            f'temp rise={_fmt(rules.get("temp_rise_c"))} °C.'
+        ),
+    ]
+    issues = [issue for issue in (drc.get('issues') or []) if isinstance(issue, dict)]
+    if issues:
+        lines.extend(['', '| Severity | Code | Finding |', '|---|---|---|'])
+        for issue in issues[:10]:
+            severity = _SEVERITY_LABEL.get(issue.get('severity'), issue.get('severity') or 'info')
+            title = issue.get('title') or issue.get('code') or 'DRC'
+            detail = issue.get('detail') or ''
+            finding = f'{title}: {detail}' if detail else title
+            lines.append(
+                f'| {_md_cell(severity)} | {_md_cell(issue.get("code"))} | {_md_cell(finding)} |'
+            )
+        if len(issues) > 10:
+            lines.append(f'Показано 10 из {len(issues)} DRC-сообщений.')
+    else:
+        lines.append('Критичных нарушений базового PCB DRC не найдено.')
+    return ('PCB DRC', lines)
 
 
 def _dc_section(scheme_data: dict) -> tuple[str, list[str]] | None:
@@ -436,6 +486,9 @@ def build_protocol(
         if sec:
             sections.append(sec)
         sec = _bom_section(scheme_data)
+        if sec:
+            sections.append(sec)
+        sec = _pcb_drc_section(scheme_data)
         if sec:
             sections.append(sec)
         if include_dc:

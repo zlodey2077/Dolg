@@ -64,7 +64,7 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Готово: отображение нормализованного результата: `nodes`, `branches`, `metrics`, `warnings`; `waveforms`/`artifacts` оставить для следующих worker'ов.
    - Готово: сохранение успешного результата в историю `SimulationRun`, если job привязан к проекту.
    - Готово: видимая очередь EngineJob в UI с counts и быстрым выбором последнего job.
-   - Осталось: отдельный удобный режим запуска локального `dolg-numpy-mna` worker через dev task/management command; не запускать процессы из web request.
+   - Готово: локальный `dolg-numpy-mna` worker запускается через `run_engine_worker` и VS Code tasks (`once`/`watch`); web request только ставит `EngineJob` в очередь.
 
 4. Закрыть системные блокеры без остановки разработки.
    - Docker Desktop не запускать во время обычной работы, пока он снова не начинает стабильно отвечать.
@@ -115,7 +115,8 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Один клик из схемы в плату и 3D без ощущения "три разные страницы".
    - Готово 2026-06-18: симулятор сохраняет текущий проект перед переходом в `/pcb/<id>/`, PCB-страница ведет обратно в симулятор и прямой 3D-режим через `?project=<id>&view=3d#3d`, direct URL загружает проект из query.
    - Готово 2026-06-18: серверный PCB DRC contract в `pcb_layout.analyze_pcb_drc()` проверяет clearance, минимальную/токовую ширину дорожек по IPC-2221, decoupling distance и split ground; PCB UI показывает summary/issues, autoroute API возвращает свежий `drc`.
-   - Осталось по DRC: net classes, профили производителей, keep-out zones/pours/via rules и экспорт DRC-отчета в протокол.
+   - Готово 2026-06-18: авто-протокол включает секцию `PCB DRC` с rules, summary и первыми issues.
+   - Осталось по DRC: net classes, профили производителей, keep-out zones/pours/via rules и отдельный DRC-export artifact.
    - Полировка визуала: медь, soldermask, шелкография, 45-градусные дорожки, realistic board.
 
 6. AI/ML короткий пакет.
