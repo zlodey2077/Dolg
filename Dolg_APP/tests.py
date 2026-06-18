@@ -602,6 +602,26 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('Добавьте GND', finding['recommendation'])
         self.assertEqual(finding['severity_label'], 'ошибка')
 
+    def test_review_deduplicates_missing_ground_recommendations(self):
+        project = SchematicProject(
+            name='No GND dedup',
+            scheme_data={
+                'components': [
+                    {'id': 'v1', 'type': 'battery', 'voltage': '5V'},
+                    {'id': 'r1', 'type': 'resistor', 'resistance': '1k'},
+                ],
+                'connections': [
+                    {'from': {'compId': 'v1'}, 'to': {'compId': 'r1'}},
+                ],
+            },
+        )
+
+        review = build_design_review(project, simulation_runs=[], measurements=[])
+        gnd_recommendations = [item for item in review['recommendations'] if 'GND' in item]
+
+        self.assertEqual(len(gnd_recommendations), 1)
+        self.assertIn('доверять симуляции', gnd_recommendations[0])
+
     def test_review_api_saves_snapshot_and_returns_report_url(self):
         response = self.client.post(
             reverse('hello:api_project_review_create', args=[self.project.id]),

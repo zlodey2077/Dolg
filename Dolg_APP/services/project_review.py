@@ -682,6 +682,44 @@ def _score_status(score, errors_count, critical_count):
     return 'ready'
 
 
+def _recommendation_core(message):
+    text = str(message or '').lower()
+    if 'gnd' in text or 'ground' in text:
+        return 'missing_ground'
+    return None
+
+
+def _rule_recommendation_core(rule_id):
+    return {
+        'erc.missing_ground': 'missing_ground',
+    }.get(str(rule_id or ''))
+
+
+def _dedupe_recommendations_against_expert(recommendations, expert_findings):
+    """Prefer expert-rule recommendations over older generic/fault text."""
+    expert_core_text = {}
+    for finding in expert_findings or []:
+        recommendation = finding.get('recommendation')
+        if not recommendation:
+            continue
+        core = _rule_recommendation_core(finding.get('rule_id')) or _recommendation_core(recommendation)
+        if core and core not in expert_core_text:
+            expert_core_text[core] = recommendation
+
+    out = []
+    seen = set()
+    for recommendation in recommendations or []:
+        core = _recommendation_core(recommendation)
+        if core in expert_core_text and recommendation != expert_core_text[core]:
+            continue
+        norm = re.sub(r'\s+', ' ', str(recommendation).strip()).lower()
+        if not norm or norm in seen:
+            continue
+        seen.add(norm)
+        out.append(recommendation)
+    return out
+
+
 BASE_FAILURE_RATES = {
     'resistor': 0.02e-6,
     'capacitor': 0.05e-6,
@@ -931,6 +969,9 @@ def build_design_review(
         recommendation = finding.get('recommendation')
         if recommendation and recommendation not in recommendations:
             recommendations.append(recommendation)
+    recommendations = _dedupe_recommendations_against_expert(
+        recommendations, expert.get('findings') or []
+    )
 
     thermal_margins = [
         issue.get('limit') - issue.get('value')
