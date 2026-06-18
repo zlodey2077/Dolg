@@ -39,7 +39,7 @@ from Dolg_APP.models import (
     SimulationRun,
     Subscription,
 )
-from Dolg_APP.pcb_layout import compute_pcb_layout, to_gerber_drill, to_gerber_top_copper
+from Dolg_APP.pcb_layout import analyze_pcb_drc, compute_pcb_layout, to_gerber_drill, to_gerber_top_copper
 from Dolg_APP.services.cad_import import (
     import_eagle_xml,
     import_kicad_sexpr,
@@ -198,6 +198,37 @@ class PCBLayoutTests(TestCase):
             ],
         }
 
+    def _routed_scheme(self, width_mm=0.5, current_a=None):
+        connection = {
+            'from': {'compId': 'r1', 'portId': 'b'},
+            'to': {'compId': 'led1', 'portId': 'a'},
+            'width_mm': width_mm,
+        }
+        if current_a is not None:
+            connection['current_a'] = current_a
+        return {
+            'board': {'clearance_mm': 0.3, 'min_trace_width_mm': 0.25},
+            'components': [
+                {
+                    'id': 'r1',
+                    'type': 'resistor',
+                    'label': 'R1',
+                    'x': 80,
+                    'y': 100,
+                    'ports': [{'id': 'a', 'x': -20, 'y': 0}, {'id': 'b', 'x': 20, 'y': 0}],
+                },
+                {
+                    'id': 'led1',
+                    'type': 'led',
+                    'label': 'LED1',
+                    'x': 240,
+                    'y': 100,
+                    'ports': [{'id': 'a', 'x': -20, 'y': 0}, {'id': 'k', 'x': 20, 'y': 0}],
+                },
+            ],
+            'connections': [connection],
+        }
+
     def test_compute_layout_returns_dict(self):
         layout = compute_pcb_layout(self._basic_scheme())
         self.assertIsInstance(layout, dict)
@@ -232,6 +263,22 @@ class PCBLayoutTests(TestCase):
     def test_layout_empty_scheme_safe(self):
         layout = compute_pcb_layout({'components': [], 'connections': []})
         self.assertEqual(layout['comps'], [])
+
+    def test_pcb_drc_passes_simple_route(self):
+        scheme = self._routed_scheme()
+        layout = compute_pcb_layout(scheme)
+        drc = analyze_pcb_drc(layout, scheme)
+        self.assertIn('summary', drc)
+        self.assertEqual(drc['summary']['errors'], 0)
+        self.assertIn(drc['status'], {'pass', 'warn'})
+
+    def test_pcb_drc_flags_trace_width_for_current(self):
+        scheme = self._routed_scheme(width_mm=0.2, current_a=2.0)
+        layout = compute_pcb_layout(scheme)
+        drc = analyze_pcb_drc(layout, scheme)
+        codes = {issue['code'] for issue in drc['issues']}
+        self.assertIn('trace_width_current', codes)
+        self.assertEqual(drc['status'], 'fail')
 
 
 class DemoProjectsCommandTests(TestCase):

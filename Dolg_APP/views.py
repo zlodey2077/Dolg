@@ -968,9 +968,11 @@ def pcb_view(request, project_id):
 
     project = _project_for_read(request.user, project_id)
     layout = pcb_layout.compute_pcb_layout(project.scheme_data)
+    drc = pcb_layout.analyze_pcb_drc(layout, project.scheme_data)
     context = {
         'project': project,
         'layout': layout,
+        'drc': drc,
         'page_title': f'PCB: {project.name}',
     }
     return render(request, 'tools/pcb.html', context)
@@ -1059,11 +1061,13 @@ def api_pcb_autoroute(request, project_id):
     base_layout = pcb_layout.compute_pcb_layout(project.scheme_data)
     connections = (project.scheme_data or {}).get('connections', []) or []
     new_layout = autoroute_layout(base_layout, connections)
+    drc = pcb_layout.analyze_pcb_drc(new_layout, project.scheme_data)
     return JsonResponse(
         {
             'ok': True,
             'stats': new_layout.get('autoroute_stats', {}),
             'traces': new_layout.get('traces', []),
+            'drc': drc,
             'pcb_w_mm': new_layout.get('pcb_w_mm'),
             'pcb_h_mm': new_layout.get('pcb_h_mm'),
         }

@@ -114,7 +114,8 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
 5. Вау-пайплайн схема -> PCB -> 3D.
    - Один клик из схемы в плату и 3D без ощущения "три разные страницы".
    - Готово 2026-06-18: симулятор сохраняет текущий проект перед переходом в `/pcb/<id>/`, PCB-страница ведет обратно в симулятор и прямой 3D-режим через `?project=<id>&view=3d#3d`, direct URL загружает проект из query.
-   - Серверный PCB DRC по IPC-2221: clearance, ширина дорожки по току, decoupling distance, ground split.
+   - Готово 2026-06-18: серверный PCB DRC contract в `pcb_layout.analyze_pcb_drc()` проверяет clearance, минимальную/токовую ширину дорожек по IPC-2221, decoupling distance и split ground; PCB UI показывает summary/issues, autoroute API возвращает свежий `drc`.
+   - Осталось по DRC: net classes, профили производителей, keep-out zones/pours/via rules и экспорт DRC-отчета в протокол.
    - Полировка визуала: медь, soldermask, шелкография, 45-градусные дорожки, realistic board.
 
 6. AI/ML короткий пакет.

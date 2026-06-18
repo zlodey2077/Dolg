@@ -55,6 +55,32 @@
 }
 .pcb-autoroute-info.visible { display: block; }
 .pcb-autoroute-info b { color: #fff; }
+.pcb-drc-panel {
+    background: rgba(15, 22, 45, 0.88);
+    border: 1px solid rgba(127, 219, 255, 0.24);
+    border-left: 4px solid #7fdbff;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 1rem 0;
+}
+.pcb-drc-panel.pass { border-left-color: #4ade80; }
+.pcb-drc-panel.warn { border-left-color: #ffd166; }
+.pcb-drc-panel.fail { border-left-color: #ff7676; }
+.pcb-drc-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #fff; }
+.pcb-drc-rules { color: #aab; font-size: 0.82rem; }
+.pcb-drc-status { margin-top: 8px; color: #dce8ff; font-size: 0.9rem; }
+.pcb-drc-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.pcb-drc-issue {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+}
+.pcb-drc-issue b { display: block; color: #fff; margin-bottom: 3px; }
+.pcb-drc-issue span { color: #ccd6f6; font-size: 0.86rem; }
+.pcb-drc-issue.error { border-left: 3px solid #ff7676; }
+.pcb-drc-issue.warning { border-left: 3px solid #ffd166; }
+.pcb-drc-issue.info { border-left: 3px solid #7fdbff; }
 </style>
 
 <div class="pcb-wrap">
@@ -89,6 +115,12 @@
             <div class="pcb-stat-label">Трасс</div>
             <div class="pcb-stat-value">{{ layout.traces|length }}</div>
         </div>
+        <div class="pcb-stat">
+            <div class="pcb-stat-label">DRC</div>
+            <div class="pcb-stat-value">
+                {% if drc.status == "pass" %}OK{% elif drc.status == "warn" %}{{ drc.summary.warnings }} warn{% else %}{{ drc.summary.errors }} err{% endif %}
+            </div>
+        </div>
     </div>
 
     <div class="pcb-actions">
@@ -113,6 +145,34 @@
     </div>
 
     <div class="pcb-autoroute-info" id="pcb-autoroute-info"></div>
+
+    <div class="pcb-drc-panel {{ drc.status }}">
+        <div class="pcb-drc-head">
+            <strong>Server DRC</strong>
+            <span class="pcb-drc-rules">
+                clearance {{ drc.rules.clearance_mm|floatformat:2 }} мм · min trace {{ drc.rules.min_trace_width_mm|floatformat:2 }} мм · Cu {{ drc.rules.copper_oz|floatformat:1 }} oz
+            </span>
+        </div>
+        <div class="pcb-drc-status">
+            {% if drc.status == "pass" %}
+                Ошибок не найдено: базовые clearance/trace/decoupling/ground checks проходят.
+            {% elif drc.status == "warn" %}
+                Найдены предупреждения: {{ drc.summary.warnings }}. Gerber можно смотреть, но лучше проверить замечания.
+            {% else %}
+                Найдены ошибки: {{ drc.summary.errors }} и предупреждения: {{ drc.summary.warnings }}. Перед экспортом исправьте DRC.
+            {% endif %}
+        </div>
+        {% if drc.issues %}
+        <ul class="pcb-drc-list">
+            {% for issue in drc.issues|slice:":10" %}
+            <li class="pcb-drc-issue {{ issue.severity }}">
+                <b>{{ issue.title }}</b>
+                <span>{{ issue.detail }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
 
     <div class="pcb-svg-wrap">
         {% comment %}
@@ -230,6 +290,7 @@
                 + `средняя длина <b>${s.avg_length_mm} мм</b> · `
                 + `всего <b>${s.total_length_mm} мм</b> · `
                 + `grid ${s.grid_w}×${s.grid_h} (${s.cells_per_mm} cells/мм)`
+                + (data.drc ? ` · DRC ${data.drc.summary.errors} err / ${data.drc.summary.warnings} warn` : '')
             );
             info.classList.add('visible');
         } catch (err) {

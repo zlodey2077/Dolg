@@ -20,6 +20,8 @@ DRC-проверками, через-platы, mask-слоями. Но файл п
 проверки большинства gerber-viewer-ов и достаточен для демонстрации.
 """
 
+import math
+from collections import defaultdict
 from io import StringIO
 
 # Масштаб: 1 единица в scheme_data ≈ ? мм на PCB. Схема в редакторе живёт в
@@ -147,6 +149,468 @@ def _pin_count(package, fallback):
 
     match = re.search(r'(?:DIP|SOIC|SOP|TSSOP|SSOP|QFP|QFN|SOT)-?\s*(\d+)', package or '', re.I)
     return max(2, int(match.group(1))) if match else fallback
+
+
+def _as_float(value, default=0.0):
+    try:
+        if value is None or value == '':
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _distance(a, b):
+    return math.hypot(float(a[0]) - float(b[0]), float(a[1]) - float(b[1]))
+
+
+def _point_segment_distance(px, py, ax, ay, bx, by):
+    dx = bx - ax
+    dy = by - ay
+    if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+        return math.hypot(px - ax, py - ay)
+    t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)
+    t = max(0.0, min(1.0, t))
+    nearest_x = ax + t * dx
+    nearest_y = ay + t * dy
+    return math.hypot(px - nearest_x, py - nearest_y)
+
+
+def _orientation(ax, ay, bx, by, cx, cy):
+    value = (by - ay) * (cx - bx) - (bx - ax) * (cy - by)
+    if abs(value) < 1e-9:
+        return 0
+    return 1 if value > 0 else 2
+
+
+def _on_segment(ax, ay, bx, by, cx, cy):
+    return (
+        min(ax, cx) - 1e-9 <= bx <= max(ax, cx) + 1e-9
+        and min(ay, cy) - 1e-9 <= by <= max(ay, cy) + 1e-9
+    )
+
+
+def _segments_intersect(a, b, c, d):
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+    dx, dy = d
+    o1 = _orientation(ax, ay, bx, by, cx, cy)
+    o2 = _orientation(ax, ay, bx, by, dx, dy)
+    o3 = _orientation(cx, cy, dx, dy, ax, ay)
+    o4 = _orientation(cx, cy, dx, dy, bx, by)
+    if o1 != o2 and o3 != o4:
+        return True
+    if o1 == 0 and _on_segment(ax, ay, cx, cy, bx, by):
+        return True
+    if o2 == 0 and _on_segment(ax, ay, dx, dy, bx, by):
+        return True
+    if o3 == 0 and _on_segment(cx, cy, ax, ay, dx, dy):
+        return True
+    if o4 == 0 and _on_segment(cx, cy, bx, by, dx, dy):
+        return True
+    return False
+
+
+def _segment_distance(a, b, c, d):
+    if _segments_intersect(a, b, c, d):
+        return 0.0
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+    dx, dy = d
+    return min(
+        _point_segment_distance(ax, ay, cx, cy, dx, dy),
+        _point_segment_distance(bx, by, cx, cy, dx, dy),
+        _point_segment_distance(cx, cy, ax, ay, bx, by),
+        _point_segment_distance(dx, dy, ax, ay, bx, by),
+    )
+
+
+def _point_rect_distance(px, py, rect):
+    x0, y0, x1, y1 = rect
+    dx = max(x0 - px, 0.0, px - x1)
+    dy = max(y0 - py, 0.0, py - y1)
+    return math.hypot(dx, dy)
+
+
+def _rect_distance(a, b):
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    dx = max(bx0 - ax1, ax0 - bx1, 0.0)
+    dy = max(by0 - ay1, ay0 - by1, 0.0)
+    return math.hypot(dx, dy)
+
+
+def _segment_rect_distance(a, b, rect):
+    ax, ay = a
+    bx, by = b
+    x0, y0, x1, y1 = rect
+    if x0 <= ax <= x1 and y0 <= ay <= y1:
+        return 0.0
+    if x0 <= bx <= x1 and y0 <= by <= y1:
+        return 0.0
+    edges = (
+        ((x0, y0), (x1, y0)),
+        ((x1, y0), (x1, y1)),
+        ((x1, y1), (x0, y1)),
+        ((x0, y1), (x0, y0)),
+    )
+    if any(_segments_intersect(a, b, edge_a, edge_b) for edge_a, edge_b in edges):
+        return 0.0
+    return min(
+        _point_rect_distance(ax, ay, rect),
+        _point_rect_distance(bx, by, rect),
+        *(_point_segment_distance(x, y, ax, ay, bx, by) for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))),
+    )
+
+
+def _ipc2221_external_width_mm(current_a, copper_oz=1.0, temp_rise_c=10.0):
+    """Approximate IPC-2221 external trace width for current carrying checks."""
+    current_a = _as_float(current_a, 0.0)
+    copper_oz = max(_as_float(copper_oz, 1.0), 0.25)
+    temp_rise_c = max(_as_float(temp_rise_c, 10.0), 1.0)
+    if current_a <= 0:
+        return 0.0
+    area_mil2 = (current_a / (0.048 * (temp_rise_c**0.44))) ** (1 / 0.725)
+    copper_thickness_mil = 1.378 * copper_oz
+    width_mil = area_mil2 / copper_thickness_mil
+    return round(width_mil * 0.0254, 3)
+
+
+def _component_rect(comp, expand_mm=0.0):
+    x0 = _as_float(comp.get('x_left_mm'), _as_float(comp.get('x_mm')) - _as_float(comp.get('w_mm')) / 2)
+    y0 = _as_float(comp.get('y_top_mm'), _as_float(comp.get('y_mm')) - _as_float(comp.get('h_mm')) / 2)
+    x1 = x0 + _as_float(comp.get('w_mm'))
+    y1 = y0 + _as_float(comp.get('h_mm'))
+    return (x0 - expand_mm, y0 - expand_mm, x1 + expand_mm, y1 + expand_mm)
+
+
+def _endpoint_key(endpoint):
+    endpoint = endpoint or {}
+    return (
+        endpoint.get('compId') or endpoint.get('componentId') or endpoint.get('id'),
+        endpoint.get('portId')
+        or endpoint.get('pinId')
+        or endpoint.get('port')
+        or endpoint.get('pin')
+        or '',
+    )
+
+
+def _component_kind(comp):
+    text = ' '.join(
+        str(comp.get(key) or '')
+        for key in ('type', 'label', 'name', 'package', 'footprint', 'catalog_package', 'package_type')
+    ).lower()
+    return text
+
+
+def analyze_pcb_drc(layout, scheme_data=None):
+    """Headless PCB DRC for generated layouts.
+
+    The checks are intentionally conservative and deterministic: they do not
+    replace KiCad/Altium DRC, but catch obvious issues before Gerber export and
+    provide a reusable server-side contract for protocol/PDF generation.
+    """
+    layout = layout or {}
+    scheme_data = scheme_data or {}
+    board_opts = scheme_data.get('board') or {}
+    clearance_mm = _as_float(layout.get('clearance_mm'), TRACE_CLEARANCE_MM)
+    min_trace_width_mm = _as_float(
+        board_opts.get('min_trace_width_mm') or board_opts.get('minTraceWidthMm'),
+        min(TRACE_WIDTH_MM, _as_float(layout.get('trace_width_mm'), TRACE_WIDTH_MM)),
+    )
+    copper_oz = _as_float(board_opts.get('copper_oz') or board_opts.get('copperOz'), 1.0)
+    temp_rise_c = _as_float(board_opts.get('temp_rise_c') or board_opts.get('tempRiseC'), 10.0)
+    decoupling_max_mm = _as_float(
+        board_opts.get('decoupling_max_distance_mm') or board_opts.get('decouplingMaxDistanceMm'),
+        15.0,
+    )
+    pcb_w_mm = _as_float(layout.get('pcb_w_mm'), MIN_BOARD_MM)
+    pcb_h_mm = _as_float(layout.get('pcb_h_mm'), MIN_BOARD_MM)
+    components = layout.get('comps', []) or []
+    pads = layout.get('pads', []) or []
+    traces = layout.get('traces', []) or []
+    connections = scheme_data.get('connections', []) or []
+
+    issues = []
+    issue_limits = defaultdict(int)
+    suppressed = defaultdict(int)
+
+    def add_issue(severity, code, title, detail, refs=None, value=None, limit=8):
+        if issue_limits[code] >= limit:
+            suppressed[code] += 1
+            return
+        issue_limits[code] += 1
+        issues.append(
+            {
+                'severity': severity,
+                'code': code,
+                'title': title,
+                'detail': detail,
+                'refs': refs or [],
+                'value': value,
+            }
+        )
+
+    conn_by_route = {index: conn for index, conn in enumerate(connections)}
+    conn_endpoints = {
+        index: {_endpoint_key(conn.get('from')), _endpoint_key(conn.get('to'))}
+        for index, conn in enumerate(connections)
+    }
+
+    trace_segments = []
+    for index, tr in enumerate(traces):
+        start = (_as_float((tr.get('from') or {}).get('x_mm')), _as_float((tr.get('from') or {}).get('y_mm')))
+        end = (_as_float((tr.get('to') or {}).get('x_mm')), _as_float((tr.get('to') or {}).get('y_mm')))
+        route_index = tr.get('route_index')
+        if route_index is None:
+            route_index = tr.get('conn_index')
+        route_index = int(route_index) if isinstance(route_index, int) or str(route_index).isdigit() else None
+        conn_key = tr.get('conn_id') if tr.get('conn_id') is not None else route_index
+        trace_segments.append(
+            {
+                'index': index,
+                'start': start,
+                'end': end,
+                'layer': tr.get('layer') or 'top',
+                'width_mm': _as_float(tr.get('width_mm'), _as_float(layout.get('trace_width_mm'), TRACE_WIDTH_MM)),
+                'conn_key': conn_key,
+                'route_index': route_index,
+            }
+        )
+
+    for tr in trace_segments:
+        width_mm = tr['width_mm']
+        if width_mm < min_trace_width_mm:
+            add_issue(
+                'error',
+                'trace_width_min',
+                'Дорожка уже минимального правила',
+                f'Сегмент #{tr["index"] + 1}: {width_mm:.2f} мм < {min_trace_width_mm:.2f} мм.',
+                refs=[f'trace:{tr["index"]}'],
+                value={'actual_mm': width_mm, 'required_mm': min_trace_width_mm},
+            )
+        for point in (tr['start'], tr['end']):
+            x_mm, y_mm = point
+            if x_mm < 0 or y_mm < 0 or x_mm > pcb_w_mm or y_mm > pcb_h_mm:
+                add_issue(
+                    'error',
+                    'trace_outside_board',
+                    'Дорожка выходит за контур платы',
+                    f'Сегмент #{tr["index"] + 1}: точка ({x_mm:.2f}; {y_mm:.2f}) вне {pcb_w_mm:.1f}x{pcb_h_mm:.1f} мм.',
+                    refs=[f'trace:{tr["index"]}'],
+                )
+
+    for route_index, conn in conn_by_route.items():
+        current_a = _as_float(
+            conn.get('current_a')
+            or conn.get('currentA')
+            or conn.get('expected_current_a')
+            or conn.get('max_current_a'),
+            0.0,
+        )
+        required_width = _ipc2221_external_width_mm(current_a, copper_oz=copper_oz, temp_rise_c=temp_rise_c)
+        if required_width <= 0:
+            continue
+        actual_width = min(
+            (tr['width_mm'] for tr in trace_segments if tr['route_index'] == route_index),
+            default=_as_float(layout.get('trace_width_mm'), TRACE_WIDTH_MM),
+        )
+        if actual_width + 1e-9 < required_width:
+            label = conn.get('label') or conn.get('net') or conn.get('id') or f'net #{route_index + 1}'
+            add_issue(
+                'error',
+                'trace_width_current',
+                'Дорожка тонкая для заданного тока',
+                f'{label}: {actual_width:.2f} мм, нужно около {required_width:.2f} мм по IPC-2221 для {current_a:.2f} А.',
+                refs=[f'connection:{route_index}'],
+                value={'actual_mm': actual_width, 'required_mm': required_width, 'current_a': current_a},
+            )
+
+    for i, first in enumerate(trace_segments):
+        for second in trace_segments[i + 1 :]:
+            if first['layer'] != second['layer']:
+                continue
+            if first['conn_key'] is not None and first['conn_key'] == second['conn_key']:
+                continue
+            required = clearance_mm + (first['width_mm'] + second['width_mm']) / 2
+            actual = _segment_distance(first['start'], first['end'], second['start'], second['end'])
+            if actual + 1e-9 < required:
+                add_issue(
+                    'error',
+                    'trace_clearance',
+                    'Между дорожками недостаточный зазор',
+                    f'Сегменты #{first["index"] + 1} и #{second["index"] + 1}: {actual:.2f} мм < {required:.2f} мм.',
+                    refs=[f'trace:{first["index"]}', f'trace:{second["index"]}'],
+                    value={'actual_mm': round(actual, 3), 'required_mm': round(required, 3)},
+                )
+
+    for i, first in enumerate(pads):
+        first_xy = (_as_float(first.get('x_mm')), _as_float(first.get('y_mm')))
+        first_radius = _as_float(first.get('diameter_mm'), PAD_DIAMETER_MM) / 2
+        for second in pads[i + 1 :]:
+            if first.get('comp_id') == second.get('comp_id'):
+                continue
+            second_xy = (_as_float(second.get('x_mm')), _as_float(second.get('y_mm')))
+            second_radius = _as_float(second.get('diameter_mm'), PAD_DIAMETER_MM) / 2
+            actual = _distance(first_xy, second_xy)
+            required = clearance_mm + first_radius + second_radius
+            if actual + 1e-9 < required:
+                add_issue(
+                    'error',
+                    'pad_clearance',
+                    'Контактные площадки слишком близко',
+                    f'{first.get("comp_id")}:{first.get("port_id")} и {second.get("comp_id")}:{second.get("port_id")}: '
+                    f'{actual:.2f} мм < {required:.2f} мм.',
+                    refs=[f'pad:{first.get("comp_id")}:{first.get("port_id")}', f'pad:{second.get("comp_id")}:{second.get("port_id")}'],
+                    value={'actual_mm': round(actual, 3), 'required_mm': round(required, 3)},
+                )
+
+    for tr in trace_segments:
+        endpoint_keys = conn_endpoints.get(tr['route_index']) or set()
+        for pad in pads:
+            pad_key = (pad.get('comp_id'), pad.get('port_id'))
+            if pad_key in endpoint_keys:
+                continue
+            pad_xy = (_as_float(pad.get('x_mm')), _as_float(pad.get('y_mm')))
+            required = clearance_mm + _as_float(pad.get('diameter_mm'), PAD_DIAMETER_MM) / 2 + tr['width_mm'] / 2
+            actual = _point_segment_distance(*pad_xy, *tr['start'], *tr['end'])
+            if actual + 1e-9 < required:
+                add_issue(
+                    'error',
+                    'trace_pad_clearance',
+                    'Дорожка слишком близко к чужому pad',
+                    f'Сегмент #{tr["index"] + 1} и pad {pad.get("comp_id")}:{pad.get("port_id")}: '
+                    f'{actual:.2f} мм < {required:.2f} мм.',
+                    refs=[f'trace:{tr["index"]}', f'pad:{pad.get("comp_id")}:{pad.get("port_id")}'],
+                    value={'actual_mm': round(actual, 3), 'required_mm': round(required, 3)},
+                )
+
+    for i, first in enumerate(components):
+        first_rect = _component_rect(first)
+        for second in components[i + 1 :]:
+            actual = _rect_distance(first_rect, _component_rect(second))
+            if actual + 1e-9 < clearance_mm:
+                add_issue(
+                    'warning',
+                    'component_courtyard',
+                    'Футпринты компонентов слишком близко',
+                    f'{first.get("label") or first.get("id")} и {second.get("label") or second.get("id")}: '
+                    f'{actual:.2f} мм < {clearance_mm:.2f} мм.',
+                    refs=[f'component:{first.get("id")}', f'component:{second.get("id")}'],
+                )
+
+    component_rects = [(comp, _component_rect(comp, clearance_mm)) for comp in components]
+    for tr in trace_segments:
+        endpoint_component_ids = {key[0] for key in (conn_endpoints.get(tr['route_index']) or set())}
+        for comp, rect in component_rects:
+            if comp.get('id') in endpoint_component_ids:
+                continue
+            actual = _segment_rect_distance(tr['start'], tr['end'], rect)
+            if actual <= 1e-9:
+                add_issue(
+                    'warning',
+                    'trace_component_courtyard',
+                    'Дорожка пересекает keep-out компонента',
+                    f'Сегмент #{tr["index"] + 1} проходит через область {comp.get("label") or comp.get("id")}.',
+                    refs=[f'trace:{tr["index"]}', f'component:{comp.get("id")}'],
+                )
+
+    capacitors = [comp for comp in components if 'capacitor' in _component_kind(comp) or str(comp.get('label') or '').upper().startswith('C')]
+    ic_like = [
+        comp
+        for comp in components
+        if any(
+            token in _component_kind(comp)
+            for token in ('ic', 'mcu', 'microcontroller', 'processor', 'opamp', 'op-amp', 'adc', 'dac', 'regulator')
+        )
+    ]
+    for comp in ic_like:
+        comp_xy = (_as_float(comp.get('x_mm')), _as_float(comp.get('y_mm')))
+        nearest = min((_distance(comp_xy, (_as_float(cap.get('x_mm')), _as_float(cap.get('y_mm')))) for cap in capacitors), default=None)
+        if nearest is None or nearest > decoupling_max_mm:
+            detail = (
+                f'{comp.get("label") or comp.get("id")}: нет развязывающего конденсатора ближе {decoupling_max_mm:.1f} мм.'
+                if nearest is None
+                else f'{comp.get("label") or comp.get("id")}: ближайший конденсатор {nearest:.1f} мм, лимит {decoupling_max_mm:.1f} мм.'
+            )
+            add_issue(
+                'warning',
+                'decoupling_distance',
+                'Развязка питания далеко от IC/MCU',
+                detail,
+                refs=[f'component:{comp.get("id")}'],
+            )
+
+    graph = defaultdict(set)
+    ground_nodes = []
+    component_by_id = {comp.get('id'): comp for comp in components}
+    for conn in connections:
+        a = _endpoint_key(conn.get('from'))
+        b = _endpoint_key(conn.get('to'))
+        graph[a].add(b)
+        graph[b].add(a)
+    for comp_id, comp in component_by_id.items():
+        kind = _component_kind(comp)
+        if 'ground' in kind or 'gnd' in kind:
+            comp_pads = [key for key in graph if key[0] == comp_id]
+            ground_nodes.extend(comp_pads or [(comp_id, '')])
+    if len(ground_nodes) > 1:
+        seen = set()
+        stack = [ground_nodes[0]]
+        while stack:
+            node = stack.pop()
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.extend(graph.get(node, set()) - seen)
+        missing = [node for node in ground_nodes if node not in seen]
+        if missing:
+            add_issue(
+                'warning',
+                'ground_split',
+                'Земля разбита на несвязанные участки',
+                f'Найдено {len(missing)} GND-точек вне основной связной группы.',
+                refs=[f'pad:{node[0]}:{node[1]}' for node in missing[:5]],
+            )
+
+    for code, count in suppressed.items():
+        add_issue(
+            'info',
+            'issues_suppressed',
+            'Часть однотипных DRC-сообщений скрыта',
+            f'{code}: скрыто ещё {count} сообщений, чтобы отчёт оставался читаемым.',
+            refs=[],
+            limit=99,
+        )
+
+    summary = {
+        'errors': sum(1 for issue in issues if issue['severity'] == 'error'),
+        'warnings': sum(1 for issue in issues if issue['severity'] == 'warning'),
+        'info': sum(1 for issue in issues if issue['severity'] == 'info'),
+        'total': len(issues),
+    }
+    if summary['errors']:
+        status = 'fail'
+    elif summary['warnings']:
+        status = 'warn'
+    else:
+        status = 'pass'
+    return {
+        'ok': status != 'fail',
+        'status': status,
+        'summary': summary,
+        'issues': issues,
+        'rules': {
+            'clearance_mm': clearance_mm,
+            'min_trace_width_mm': min_trace_width_mm,
+            'copper_oz': copper_oz,
+            'temp_rise_c': temp_rise_c,
+            'decoupling_max_mm': decoupling_max_mm,
+        },
+    }
 
 
 def compute_pcb_layout(scheme_data):
@@ -356,6 +820,7 @@ def compute_pcb_layout(scheme_data):
                     'from': {'x_mm': ax, 'y_mm': ay},
                     'to': {'x_mm': bx, 'y_mm': by},
                     'conn_id': conn.get('id'),
+                    'route_index': route_index,
                     'layer': seg_layer,
                     'width_mm': trace_w,
                 }
