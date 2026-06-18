@@ -165,8 +165,10 @@ def _pcb_drc_section(scheme_data: dict) -> tuple[str, list[str]] | None:
             f'warnings={summary.get("warnings", 0)}, info={summary.get("info", 0)}.'
         ),
         (
-            f'Правила: clearance={_fmt(rules.get("clearance_mm"))} мм; '
+            f'Правила ({rules.get("profile_label") or rules.get("profile_id") or "profile"}): '
+            f'clearance={_fmt(rules.get("clearance_mm"))} мм; '
             f'min trace={_fmt(rules.get("min_trace_width_mm"))} мм; '
+            f'min drill={_fmt(rules.get("min_drill_mm"))} мм; '
             f'copper={_fmt(rules.get("copper_oz"))} oz; '
             f'temp rise={_fmt(rules.get("temp_rise_c"))} °C.'
         ),

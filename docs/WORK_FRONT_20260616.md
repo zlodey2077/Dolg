@@ -116,7 +116,8 @@ roadmap/backlog/research черновики сжаты в `docs/DEVELOPMENT_HIST
    - Готово 2026-06-18: симулятор сохраняет текущий проект перед переходом в `/pcb/<id>/`, PCB-страница ведет обратно в симулятор и прямой 3D-режим через `?project=<id>&view=3d#3d`, direct URL загружает проект из query.
    - Готово 2026-06-18: серверный PCB DRC contract в `pcb_layout.analyze_pcb_drc()` проверяет clearance, минимальную/токовую ширину дорожек по IPC-2221, decoupling distance и split ground; PCB UI показывает summary/issues, autoroute API возвращает свежий `drc`.
    - Готово 2026-06-18: авто-протокол включает секцию `PCB DRC` с rules, summary и первыми issues.
-   - Осталось по DRC: net classes, профили производителей, keep-out zones/pours/via rules и отдельный DRC-export artifact.
+   - Готово 2026-06-18: DRC поддерживает fab-профили `jlcpcb_standard_2layer`, `pcbway_standard_2layer`, `oshpark_2layer` с min trace/clearance/drill/annular ring.
+   - Осталось по DRC: net classes, расширяемые профили производителей, keep-out zones/pours и отдельный DRC-export artifact.
    - Полировка визуала: медь, soldermask, шелкография, 45-градусные дорожки, realistic board.
 
 6. AI/ML короткий пакет.

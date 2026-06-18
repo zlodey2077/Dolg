@@ -150,7 +150,7 @@
         <div class="pcb-drc-head">
             <strong>Server DRC</strong>
             <span class="pcb-drc-rules">
-                clearance {{ drc.rules.clearance_mm|floatformat:2 }} мм · min trace {{ drc.rules.min_trace_width_mm|floatformat:2 }} мм · Cu {{ drc.rules.copper_oz|floatformat:1 }} oz
+                {{ drc.rules.profile_label }} · clearance {{ drc.rules.clearance_mm|floatformat:2 }} мм · min trace {{ drc.rules.min_trace_width_mm|floatformat:2 }} мм · drill {{ drc.rules.min_drill_mm|floatformat:2 }} мм · Cu {{ drc.rules.copper_oz|floatformat:1 }} oz
             </span>
         </div>
         <div class="pcb-drc-status">

@@ -280,6 +280,19 @@ class PCBLayoutTests(TestCase):
         self.assertIn('trace_width_current', codes)
         self.assertEqual(drc['status'], 'fail')
 
+    def test_pcb_drc_uses_fabrication_profile_rules(self):
+        scheme = self._routed_scheme(width_mm=0.1)
+        scheme['board'] = {'fabrication_profile': 'jlcpcb_standard_2layer'}
+        layout = compute_pcb_layout(scheme)
+        layout['vias'].append({'x_mm': 10, 'y_mm': 10, 'diameter_mm': 0.4, 'hole_mm': 0.2})
+        drc = analyze_pcb_drc(layout, scheme)
+        codes = {issue['code'] for issue in drc['issues']}
+
+        self.assertEqual(drc['rules']['profile_id'], 'jlcpcb_standard_2layer')
+        self.assertLess(drc['rules']['min_trace_width_mm'], 0.2)
+        self.assertIn('trace_width_min', codes)
+        self.assertIn('via_drill_min', codes)
+
 
 class DemoProjectsCommandTests(TestCase):
     """populate_demo_projects — массовая загрузка demo-схем в БД."""

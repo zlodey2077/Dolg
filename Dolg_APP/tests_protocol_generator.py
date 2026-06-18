@@ -69,7 +69,11 @@ def test_bom_readiness_section_renders_catalog_metadata():
 
 def test_pcb_drc_section_renders_width_issue():
     scheme = {
-        'board': {'clearance_mm': 0.3, 'min_trace_width_mm': 0.15},
+        'board': {
+            'fabrication_profile': 'jlcpcb_standard_2layer',
+            'clearance_mm': 0.3,
+            'min_trace_width_mm': 0.15,
+        },
         'components': [
             {
                 'id': 'r1',
@@ -100,6 +104,7 @@ def test_pcb_drc_section_renders_width_issue():
     p = build_protocol('PCB protocol', scheme, include_dc=False)
 
     assert 'PCB DRC' in p['sections']
+    assert 'JLCPCB standard 2-layer' in p['markdown']
     assert 'trace_width_current' in p['markdown']
     assert 'errors=1' in p['markdown']
 

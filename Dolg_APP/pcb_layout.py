@@ -39,6 +39,53 @@ MIN_BOARD_MM = 50.0
 # Минимальное «поле» вокруг bbox схемы (мм) — чтобы pads не упирались в край.
 PCB_MARGIN_MM = 5.0
 
+FABRICATION_RULE_PROFILES = {
+    'default': {
+        'label': 'DOLG default prototype',
+        'clearance_mm': TRACE_CLEARANCE_MM,
+        'min_trace_width_mm': TRACE_WIDTH_MM,
+        'min_drill_mm': HOLE_DIAMETER_MM,
+        'min_annular_ring_mm': 0.2,
+    },
+    'jlcpcb_standard_2layer': {
+        'label': 'JLCPCB standard 2-layer',
+        'clearance_mm': 0.127,
+        'min_trace_width_mm': 0.127,
+        'min_drill_mm': 0.3,
+        'min_annular_ring_mm': 0.15,
+    },
+    'pcbway_standard_2layer': {
+        'label': 'PCBWay standard 2-layer',
+        'clearance_mm': 0.152,
+        'min_trace_width_mm': 0.152,
+        'min_drill_mm': 0.3,
+        'min_annular_ring_mm': 0.15,
+    },
+    'oshpark_2layer': {
+        'label': 'OSH Park 2-layer',
+        'clearance_mm': 0.1524,
+        'min_trace_width_mm': 0.1524,
+        'min_drill_mm': 0.254,
+        'min_annular_ring_mm': 0.127,
+    },
+}
+
+
+def _fabrication_profile(board_opts):
+    profile_id = (
+        (board_opts or {}).get('fabrication_profile')
+        or (board_opts or {}).get('fabricationProfile')
+        or (board_opts or {}).get('manufacturer_profile')
+        or (board_opts or {}).get('manufacturerProfile')
+        or 'default'
+    )
+    profile_id = str(profile_id or 'default').strip().lower()
+    profile = FABRICATION_RULE_PROFILES.get(profile_id)
+    if not profile:
+        profile_id = 'default'
+        profile = FABRICATION_RULE_PROFILES[profile_id]
+    return profile_id, dict(profile)
+
 
 def _scale(px):
     """Editor pixels → PCB millimeters."""
@@ -316,10 +363,18 @@ def analyze_pcb_drc(layout, scheme_data=None):
     layout = layout or {}
     scheme_data = scheme_data or {}
     board_opts = scheme_data.get('board') or {}
-    clearance_mm = _as_float(layout.get('clearance_mm'), TRACE_CLEARANCE_MM)
+    profile_id, profile = _fabrication_profile(board_opts)
+    profile_clearance_mm = _as_float(profile.get('clearance_mm'), TRACE_CLEARANCE_MM)
+    profile_min_trace_width_mm = _as_float(profile.get('min_trace_width_mm'), TRACE_WIDTH_MM)
+    min_drill_mm = _as_float(profile.get('min_drill_mm'), HOLE_DIAMETER_MM)
+    min_annular_ring_mm = _as_float(profile.get('min_annular_ring_mm'), 0.2)
+    clearance_mm = _as_float(
+        board_opts.get('clearance_mm') or board_opts.get('clearanceMm'),
+        profile_clearance_mm,
+    )
     min_trace_width_mm = _as_float(
         board_opts.get('min_trace_width_mm') or board_opts.get('minTraceWidthMm'),
-        min(TRACE_WIDTH_MM, _as_float(layout.get('trace_width_mm'), TRACE_WIDTH_MM)),
+        profile_min_trace_width_mm,
     )
     copper_oz = _as_float(board_opts.get('copper_oz') or board_opts.get('copperOz'), 1.0)
     temp_rise_c = _as_float(board_opts.get('temp_rise_c') or board_opts.get('tempRiseC'), 10.0)
@@ -450,6 +505,26 @@ def analyze_pcb_drc(layout, scheme_data=None):
     for i, first in enumerate(pads):
         first_xy = (_as_float(first.get('x_mm')), _as_float(first.get('y_mm')))
         first_radius = _as_float(first.get('diameter_mm'), PAD_DIAMETER_MM) / 2
+        first_hole = _as_float(first.get('hole_mm'), HOLE_DIAMETER_MM)
+        if first_hole + 1e-9 < min_drill_mm:
+            add_issue(
+                'error',
+                'pad_drill_min',
+                'Отверстие pad меньше фабричного минимума',
+                f'{first.get("comp_id")}:{first.get("port_id")}: {first_hole:.2f} мм < {min_drill_mm:.2f} мм.',
+                refs=[f'pad:{first.get("comp_id")}:{first.get("port_id")}'],
+                value={'actual_mm': first_hole, 'required_mm': min_drill_mm},
+            )
+        first_annular = first_radius - first_hole / 2
+        if first_annular + 1e-9 < min_annular_ring_mm:
+            add_issue(
+                'error',
+                'pad_annular_ring',
+                'Annular ring pad меньше фабричного минимума',
+                f'{first.get("comp_id")}:{first.get("port_id")}: {first_annular:.2f} мм < {min_annular_ring_mm:.2f} мм.',
+                refs=[f'pad:{first.get("comp_id")}:{first.get("port_id")}'],
+                value={'actual_mm': round(first_annular, 3), 'required_mm': min_annular_ring_mm},
+            )
         for second in pads[i + 1 :]:
             if first.get('comp_id') == second.get('comp_id'):
                 continue
@@ -467,6 +542,29 @@ def analyze_pcb_drc(layout, scheme_data=None):
                     refs=[f'pad:{first.get("comp_id")}:{first.get("port_id")}', f'pad:{second.get("comp_id")}:{second.get("port_id")}'],
                     value={'actual_mm': round(actual, 3), 'required_mm': round(required, 3)},
                 )
+
+    for index, via in enumerate(layout.get('vias', []) or []):
+        diameter = _as_float(via.get('diameter_mm'), 1.1)
+        hole = _as_float(via.get('hole_mm'), 0.45)
+        if hole + 1e-9 < min_drill_mm:
+            add_issue(
+                'error',
+                'via_drill_min',
+                'Отверстие via меньше фабричного минимума',
+                f'Via #{index + 1}: {hole:.2f} мм < {min_drill_mm:.2f} мм.',
+                refs=[f'via:{index}'],
+                value={'actual_mm': hole, 'required_mm': min_drill_mm},
+            )
+        annular = diameter / 2 - hole / 2
+        if annular + 1e-9 < min_annular_ring_mm:
+            add_issue(
+                'error',
+                'via_annular_ring',
+                'Annular ring via меньше фабричного минимума',
+                f'Via #{index + 1}: {annular:.2f} мм < {min_annular_ring_mm:.2f} мм.',
+                refs=[f'via:{index}'],
+                value={'actual_mm': round(annular, 3), 'required_mm': min_annular_ring_mm},
+            )
 
     for tr in trace_segments:
         endpoint_keys = conn_endpoints.get(tr['route_index']) or set()
@@ -604,8 +702,12 @@ def analyze_pcb_drc(layout, scheme_data=None):
         'summary': summary,
         'issues': issues,
         'rules': {
+            'profile_id': profile_id,
+            'profile_label': profile.get('label') or profile_id,
             'clearance_mm': clearance_mm,
             'min_trace_width_mm': min_trace_width_mm,
+            'min_drill_mm': min_drill_mm,
+            'min_annular_ring_mm': min_annular_ring_mm,
             'copper_oz': copper_oz,
             'temp_rise_c': temp_rise_c,
             'decoupling_max_mm': decoupling_max_mm,
