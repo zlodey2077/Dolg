@@ -1,21 +1,11 @@
 {% extends "shop/base.html" %}
-{% load static %}
 {% load socialaccount %}
 
 {% block title %}Вход{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="auth-form-container">
+<div class="auth-form-card">
         <h1>Вход</h1>
-        
-        {% if messages %}
-            <div class="messages" role="status" aria-live="polite">
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-        {% endif %}
 
         <form method="post" class="auth-form" aria-label="Форма входа">
             {% csrf_token %}
@@ -48,7 +38,7 @@
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-success" style="width:100%;">Войти</button>
+            <button type="submit" class="btn btn-success auth-submit">Войти</button>
 
             {% comment %}
             Компактный footer формы: «Забыли пароль» слева, «Регистрация» справа.
@@ -56,28 +46,11 @@
             из-за этого ссылка съезжала в нижний-левый угол и выглядела как лишний
             элемент. Теперь обе ссылки на одной строке, центрированы под кнопкой.
             {% endcomment %}
-            <div class="auth-form-footer"
-                 style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;font-size:0.9rem;flex-wrap:wrap;gap:0.5rem;">
+            <div class="auth-form-footer">
                 <a href="{% url 'accounts:password_reset' %}">🔑 Забыли пароль?</a>
                 <a href="{% url 'accounts:register' %}">📝 Регистрация →</a>
             </div>
         </form>
-
-        <script>
-        // Show-password toggle: иконка глаза переключает type=password/text.
-        // Применяется ко всем .password-toggle на странице (login + register).
-        document.querySelectorAll('.password-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = document.getElementById(btn.dataset.target);
-                if (!target) return;
-                const showing = target.type === 'text';
-                target.type = showing ? 'password' : 'text';
-                btn.textContent = showing ? '👁' : '🙈';
-                btn.setAttribute('aria-label', showing ? 'Показать пароль' : 'Скрыть пароль');
-                btn.title = showing ? 'Показать пароль' : 'Скрыть пароль';
-            });
-        });
-        </script>
 
         {% comment %}
         SSO кнопки — показываются ТОЛЬКО когда admin создал хотя бы один
@@ -86,26 +59,22 @@
         view передаёт has_sso в context — см. accounts/views.py:login_view.
         {% endcomment %}
         {% if has_sso %}
-        <div class="sso-divider" style="display:flex;align-items:center;gap:0.7rem;margin:1.2rem 0;">
-            <hr style="flex:1;border:none;border-top:1px solid rgba(255,255,255,.15);">
-            <span style="color:var(--text-light,#a4b3d0);font-size:.85rem;">или войти через</span>
-            <hr style="flex:1;border:none;border-top:1px solid rgba(255,255,255,.15);">
+        <div class="sso-divider">
+            <hr>
+            <span>или войти через</span>
+            <hr>
         </div>
-        <div class="sso-buttons" style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;">
-            <a href="{% provider_login_url 'google' %}" class="sso-btn"
-               style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;background:#fff;color:#333;border-radius:6px;text-decoration:none;font-size:.9rem;border:1px solid #ddd;">
-                🟦 Google
+        <div class="sso-buttons">
+            <a href="{% provider_login_url 'google' %}" class="sso-btn sso-btn--google">
+                Google
             </a>
-            <a href="{% provider_login_url 'microsoft' %}" class="sso-btn"
-               style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;background:#0078d4;color:#fff;border-radius:6px;text-decoration:none;font-size:.9rem;">
-                🪟 Microsoft
+            <a href="{% provider_login_url 'microsoft' %}" class="sso-btn sso-btn--microsoft">
+                Microsoft
             </a>
-            <a href="{% provider_login_url 'github' %}" class="sso-btn"
-               style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.9rem;background:#24292e;color:#fff;border-radius:6px;text-decoration:none;font-size:.9rem;">
-                🐙 GitHub
+            <a href="{% provider_login_url 'github' %}" class="sso-btn sso-btn--github">
+                GitHub
             </a>
         </div>
         {% endif %}
-    </div>
 </div>
 {% endblock %}

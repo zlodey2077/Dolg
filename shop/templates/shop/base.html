@@ -14,7 +14,7 @@
     горизонтально из-за каскадного flex). Без query-string браузер тянет
     закэшированную версию CSS. Подбивать строку при каждом next-fix навигации.
     {% endcomment %}
-    <link rel="stylesheet" href="{% static 'shop/cosmic_theme.css' %}?v=20260530-navfix4">
+    <link rel="stylesheet" href="{% static 'shop/cosmic_theme.css' %}?v=20260618-uxnav2">
     {% comment %}extra_head: link/script из дочерних шаблонов; extra_css: inline-CSS (каждый шаблон сам в <style>). Без двойной обёртки.{% endcomment %}
     {% block extra_head %}{% endblock %}
     {% block extra_css %}{% endblock %}
@@ -57,6 +57,16 @@
         <div class="container">
             <div class="header-content">
                 <a href="{% url 'shop:about' %}" class="logo">🎓 О проекте</a>
+                <button
+                    type="button"
+                    class="nav-menu-toggle"
+                    data-nav-menu-toggle
+                    aria-controls="dolg-main-nav"
+                    aria-expanded="false"
+                >
+                    <span class="nav-menu-toggle__icon" aria-hidden="true"></span>
+                    <span class="nav-menu-toggle__text">Меню</span>
+                </button>
                 <form class="header-search" action="{% url 'shop:global_search' %}" method="get" role="search">
                     <input
                         id="header-search-input"
@@ -71,7 +81,7 @@
                     <button type="submit">Найти</button>
                     <div id="header-search-suggest" class="header-search-suggest"></div>
                 </form>
-                <nav class="nav">
+                <nav class="nav" id="dolg-main-nav" aria-label="Основная навигация">
                     <ul>
                         {% comment %}
                         🛒 Магазин — dropdown с каталогом + сравнением. Раньше
@@ -80,7 +90,7 @@
                         работает только с товарами из каталога), объединяем.
                         {% endcomment %}
                         <li class="dropdown">
-                            <a href="#" class="dropdown-toggle">🛒 Магазин{% if compare_count %}<span class="cart-count">{{ compare_count }}</span>{% endif %}</a>
+                            <a href="#" class="dropdown-toggle" role="button" aria-haspopup="true" aria-expanded="false">🛒 Магазин{% if compare_count %}<span class="cart-count">{{ compare_count }}</span>{% endif %}</a>
                             <ul class="dropdown-menu">
                                 <li><a href="{% url 'shop:index' %}">🛒 Каталог товаров</a></li>
                                 <li><a href="{% url 'shop:compare' %}">⚖️ Сравнение{% if compare_count %}<span class="cart-count">{{ compare_count }}</span>{% endif %}</a></li>
@@ -91,7 +101,7 @@
                         раздела про теорию/практику. Логично в одно меню.
                         {% endcomment %}
                         <li class="dropdown">
-                            <a href="#" class="dropdown-toggle">📚 Знания</a>
+                            <a href="#" class="dropdown-toggle" role="button" aria-haspopup="true" aria-expanded="false">📚 Знания</a>
                             <ul class="dropdown-menu">
                                 <li><a href="{% url 'knowledge:index' %}">📚 Энциклопедия</a></li>
                                 <li><a href="{% url 'knowledge:engineering_lab' %}">🧮 Лаборатория</a></li>
@@ -105,7 +115,7 @@
                         — нет смысла guest'у видеть пустой список без save.
                         {% endcomment %}
                         <li class="dropdown">
-                            <a href="#" class="dropdown-toggle">🔧 Инструменты</a>
+                            <a href="#" class="dropdown-toggle" role="button" aria-haspopup="true" aria-expanded="false">🔧 Инструменты</a>
                             <ul class="dropdown-menu">
                                 <li><a href="{% url 'hello:simulation' %}">⚙️ Симуляция</a></li>
                                 <li><a href="{% url 'hello:cad' %}">📐 2D Чертеж</a></li>
@@ -122,7 +132,7 @@
                         форум, рейтинги) без новых top-level пунктов nav.
                         {% endcomment %}
                         <li class="dropdown">
-                            <a href="#" class="dropdown-toggle">💬 Сообщество</a>
+                            <a href="#" class="dropdown-toggle" role="button" aria-haspopup="true" aria-expanded="false">💬 Сообщество</a>
                             <ul class="dropdown-menu">
                                 <li><a href="{% url 'hello:chat_list' %}">💬 Чат</a></li>
                                 {# 2026-06-02 фикс: реальный раздел /news/ вместо редиректа на Энциклопедию #}
@@ -138,7 +148,7 @@
                             {% with orgs=user|user_orgs %}
                             {% if orgs %}
                             <li class="dropdown nav-org-dropdown">
-                                <a href="#" class="dropdown-toggle">⚙ Организации</a>
+                                <a href="#" class="dropdown-toggle" role="button" aria-haspopup="true" aria-expanded="false">⚙ Организации</a>
                                 <ul class="dropdown-menu">
                                     {% for m in orgs %}
                                     <li><a href="{% url 'hello:org_dashboard' m.organization.slug %}">
@@ -162,7 +172,7 @@
                             «есть товары» без раскрытия меню.
                             {% endcomment %}
                             <li class="dropdown nav-user-dropdown">
-                                <a href="#" class="dropdown-toggle">
+                                <a href="#" class="dropdown-toggle" role="button" aria-haspopup="true" aria-expanded="false">
                                     👤 {{ user.username }}{% if user|is_pro_user %}<span class="nav-pro-badge" title="Pro-подписка активна">💎</span>{% endif %}{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}
                                 </a>
                                 <ul class="dropdown-menu">
@@ -264,10 +274,136 @@
     <script>try { localStorage.removeItem('dolg_guest_sim_count'); } catch (e) {}</script>
     {% endif %}
     <script>
+    (function () {
+        'use strict';
+
+        function ready(fn) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', fn);
+            } else {
+                fn();
+            }
+        }
+
+        ready(function () {
+            var nav = document.getElementById('dolg-main-nav');
+            var menuToggle = document.querySelector('[data-nav-menu-toggle]');
+            if (!nav || !menuToggle) return;
+
+            var dropdowns = Array.prototype.slice.call(nav.querySelectorAll('.dropdown'));
+            var dropdownToggles = Array.prototype.slice.call(nav.querySelectorAll('.dropdown-toggle'));
+            document.body.classList.add('dolg-nav-ready');
+
+            function closeDropdowns(except) {
+                dropdowns.forEach(function (dropdown) {
+                    if (except && dropdown === except) return;
+                    dropdown.classList.remove('is-open');
+                    var toggle = dropdown.querySelector('.dropdown-toggle');
+                    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+                });
+            }
+
+            function setMenu(open) {
+                nav.classList.toggle('is-open', open);
+                menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (!open) closeDropdowns();
+            }
+
+            menuToggle.addEventListener('click', function () {
+                setMenu(!nav.classList.contains('is-open'));
+            });
+
+            dropdownToggles.forEach(function (toggle) {
+                toggle.addEventListener('click', function (event) {
+                    var dropdown = toggle.closest('.dropdown');
+                    if (!dropdown) return;
+                    event.preventDefault();
+                    var willOpen = !dropdown.classList.contains('is-open');
+                    closeDropdowns(dropdown);
+                    dropdown.classList.toggle('is-open', willOpen);
+                    toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                    if (willOpen && window.dolgPositionDropdown) {
+                        window.dolgPositionDropdown(dropdown);
+                    }
+                });
+            });
+
+            document.addEventListener('click', function (event) {
+                if (nav.contains(event.target) || menuToggle.contains(event.target)) return;
+                setMenu(false);
+                closeDropdowns();
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== 'Escape') return;
+                setMenu(false);
+                closeDropdowns();
+                if (window.getComputedStyle(menuToggle).display !== 'none') {
+                    menuToggle.focus();
+                }
+            });
+
+            window.addEventListener('resize', function () {
+                var width = window.innerWidth || document.documentElement.clientWidth;
+                if (width > 768) {
+                    setMenu(false);
+                    closeDropdowns();
+                }
+            });
+        });
+    })();
+    </script>
+    <script>
+    (function () {
+        'use strict';
+
+        function ready(fn) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', fn);
+            } else {
+                fn();
+            }
+        }
+
+        function bindPasswordToggles(root) {
+            var scope = root || document;
+            var buttons = scope.querySelectorAll('.password-toggle[data-target]');
+            for (var i = 0; i < buttons.length; i++) {
+                var btn = buttons[i];
+                if (btn._dolgPasswordToggleBound) continue;
+                btn._dolgPasswordToggleBound = true;
+                btn.addEventListener('click', function () {
+                    var target = document.getElementById(this.dataset.target);
+                    if (!target) return;
+                    var showing = target.type === 'text';
+                    target.type = showing ? 'password' : 'text';
+                    this.textContent = '👁';
+                    this.classList.toggle('is-visible', !showing);
+                    this.setAttribute('aria-label', showing ? 'Показать пароль' : 'Скрыть пароль');
+                    this.title = showing ? 'Показать пароль' : 'Скрыть пароль';
+                });
+            }
+        }
+
+        window.dolgBindPasswordToggles = bindPasswordToggles;
+        ready(function () { bindPasswordToggles(document); });
+    })();
+    </script>
+    <script>
     // Глобальный header-search live-suggest. Дебаунс 180 мс, минимум 2 симв.
     window.__DOLG_HDR_SUGGEST_BOOTED = true;
     function dolgInitHeaderSuggest() {
         const TAG = '[hdr-suggest]';
+        const nativeConsole = window.console || { log: function () {}, warn: function () {}, error: function () {} };
+        const DEBUG = (function () {
+            try { return localStorage.getItem('dolg_debug_header_search') === '1'; }
+            catch (e) { return false; }
+        })();
+        const console = {
+            log: DEBUG && nativeConsole.debug ? nativeConsole.debug.bind(nativeConsole) : function () {},
+            warn: DEBUG && nativeConsole.warn ? nativeConsole.warn.bind(nativeConsole) : function () {},
+            error: nativeConsole.error ? nativeConsole.error.bind(nativeConsole) : function () {}
+        };
         console.log(TAG, 'init at readyState=', document.readyState);
         const input = document.getElementById('header-search-input');
         const box = document.getElementById('header-search-suggest');
@@ -280,9 +416,6 @@
         // input (раньше URL был зашит внутрь скрипта, отладка вслепую).
         const URL_SUGGEST = input.getAttribute('data-suggest-url') || '/api/lookup/';
         console.log(TAG, 'endpoint:', URL_SUGGEST);
-        // ВИДИМЫЙ маркер для юзера — placeholder меняется когда listeners готовы.
-        // Это позволяет проверить работу скрипта БЕЗ DevTools.
-        input.placeholder = '🔍 ' + input.placeholder;
         // Ручной тест из консоли: dolgTestSuggest('резистор')
         window.dolgTestSuggest = (q) => fetch(URL_SUGGEST + '?q=' + encodeURIComponent(q || 'ne555')).then(r => r.json()).then(d => { console.log(TAG, 'manual test:', d); return d; });
         let timer = null;
@@ -428,6 +561,7 @@
                 }
             });
         }
+        window.dolgPositionDropdown = position;
         function bindAll() {
             var ddl = document.querySelectorAll('.dropdown');
             for (var i = 0; i < ddl.length; i++) {
@@ -449,7 +583,7 @@
         }
         // Re-bind на случай динамического добавления dropdown'ов
         window.addEventListener('resize', function () {
-            var open = document.querySelectorAll('.dropdown:hover');
+            var open = document.querySelectorAll('.dropdown:hover, .dropdown.is-open');
             for (var i = 0; i < open.length; i++) position(open[i]);
         });
     })();
