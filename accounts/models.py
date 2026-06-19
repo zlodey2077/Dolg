@@ -34,6 +34,36 @@ class UserProfile(models.Model):
         ('review', 'Инженерный review'),
         ('demo', 'Для защиты'),
     ]
+    INTERFACE_DENSITY_CHOICES = [
+        ('compact', 'Компактно'),
+        ('comfortable', 'Комфортно'),
+        ('spacious', 'Свободно'),
+    ]
+    WORKSPACE_LAYOUT_CHOICES = [
+        ('balanced', 'Сбалансированно'),
+        ('focus', 'Фокус на холсте'),
+        ('lab', 'Лаборатория и приборы'),
+        ('review', 'Инженерное ревью'),
+    ]
+    AI_BACKEND_CHOICES = [
+        ('auto', 'Автоматически'),
+        ('local', 'Локальный AI'),
+        ('cloud', 'Облачный AI'),
+        ('disabled', 'Отключить AI'),
+    ]
+    SIM_ENGINE_CHOICES = [
+        ('auto', 'Автоматически'),
+        ('browser_ngspice', 'Browser NGSpice'),
+        ('pyspice', 'PySpice'),
+        ('xyce', 'Xyce'),
+        ('gnucap', 'GnuCap'),
+        ('openmodelica', 'OpenModelica'),
+    ]
+    RENDER_MODE_CHOICES = [
+        ('auto', 'Автоматически'),
+        ('canvas2d', 'Canvas 2D'),
+        ('webgl', 'WebGL / Pixi'),
+    ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone = models.CharField(
@@ -54,6 +84,17 @@ class UserProfile(models.Model):
     default_unit_system = models.CharField(max_length=20, choices=UNIT_SYSTEM_CHOICES, default='engineering')
     start_page = models.CharField(max_length=20, choices=START_PAGE_CHOICES, default='catalog')
     ai_tone = models.CharField(max_length=20, choices=AI_TONE_CHOICES, default='explained')
+    interface_density = models.CharField(
+        max_length=20, choices=INTERFACE_DENSITY_CHOICES, default='comfortable'
+    )
+    workspace_layout = models.CharField(max_length=20, choices=WORKSPACE_LAYOUT_CHOICES, default='balanced')
+    ai_backend = models.CharField(max_length=20, choices=AI_BACKEND_CHOICES, default='auto')
+    preferred_sim_engine = models.CharField(max_length=40, choices=SIM_ENGINE_CHOICES, default='auto')
+    preferred_render_mode = models.CharField(max_length=20, choices=RENDER_MODE_CHOICES, default='auto')
+    enable_workspace_animations = models.BooleanField(default=True)
+    reduce_motion = models.BooleanField(default=False)
+    show_advanced_tools = models.BooleanField(default=True)
+    workspace_settings = models.JSONField(default=dict, blank=True)
     show_profile_public = models.BooleanField(default=False)
     show_engineering_badges = models.BooleanField(default=True)
     allow_ai_training = models.BooleanField(default=False)

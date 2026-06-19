@@ -127,6 +127,13 @@ class MLAdminViewsTests(TestCase):
         self.assertContains(response, 'MLJob admin')
         self.assertContains(response, 'Runtime')
 
+    def test_staff_data_console_loads(self):
+        response = self.client.get(reverse('hello:staff_data_console'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'DOLG Data Console')
+        self.assertContains(response, 'Database backend')
+        self.assertContains(response, 'Media storage')
+
     def test_django_admin_index_shows_ops_monitoring(self):
         response = self.client.get(reverse('admin:index'))
 
@@ -134,6 +141,7 @@ class MLAdminViewsTests(TestCase):
         self.assertContains(response, 'Операционный мониторинг DOLG')
         self.assertContains(response, 'RSS memory')
         self.assertContains(response, 'Открыть полный Ops Dashboard')
+        self.assertContains(response, 'Data Console')
 
     def test_ops_snapshot_service_contains_core_sections(self):
         MLJob.objects.create(job_type='training', status='success', progress_percent=100)

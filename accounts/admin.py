@@ -25,6 +25,14 @@ class UserProfileInline(admin.StackedInline):
         'default_unit_system',
         'start_page',
         'ai_tone',
+        'interface_density',
+        'workspace_layout',
+        'ai_backend',
+        'preferred_sim_engine',
+        'preferred_render_mode',
+        'enable_workspace_animations',
+        'reduce_motion',
+        'show_advanced_tools',
         'show_profile_public',
         'show_engineering_badges',
         'allow_ai_training',
@@ -69,6 +77,10 @@ class UserProfileAdmin(admin.ModelAdmin):
         'country',
         'preferred_theme',
         'accent_color',
+        'interface_density',
+        'workspace_layout',
+        'ai_backend',
+        'preferred_sim_engine',
         'created_at',
     )
     list_filter = (
@@ -78,6 +90,14 @@ class UserProfileAdmin(admin.ModelAdmin):
         'accent_color',
         'default_unit_system',
         'ai_tone',
+        'interface_density',
+        'workspace_layout',
+        'ai_backend',
+        'preferred_sim_engine',
+        'preferred_render_mode',
+        'show_advanced_tools',
+        'enable_workspace_animations',
+        'reduce_motion',
         'created_at',
     )
     search_fields = ('user__username', 'user__email', 'display_name', 'headline', 'phone')
@@ -90,14 +110,30 @@ class UserProfileAdmin(admin.ModelAdmin):
         ('Контакты', {'fields': ('display_name', 'headline', 'phone', 'avatar', 'bio')}),
         ('Адрес по умолчанию', {'fields': ('address', 'city', 'postal_code', 'country')}),
         (
-            'Персонализация',
+            'Рабочая среда и интерфейс',
             {
                 'fields': (
                     'preferred_theme',
                     'accent_color',
+                    'interface_density',
+                    'workspace_layout',
                     'default_unit_system',
                     'start_page',
+                    'preferred_render_mode',
+                    'enable_workspace_animations',
+                    'reduce_motion',
+                    'show_advanced_tools',
+                )
+            },
+        ),
+        (
+            'AI и серверные движки',
+            {
+                'fields': (
                     'ai_tone',
+                    'ai_backend',
+                    'preferred_sim_engine',
+                    'workspace_settings',
                     'show_profile_public',
                     'show_engineering_badges',
                     'allow_ai_training',

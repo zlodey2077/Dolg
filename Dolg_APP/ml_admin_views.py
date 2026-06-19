@@ -17,14 +17,19 @@ URL-ы (см. Dolg_APP/urls.py):
 from __future__ import annotations
 
 import json
+import mimetypes
 import os
 import threading
 import time
 from pathlib import Path
 
+from django.apps import apps
+from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import connection
+from django.db.models.fields.files import FileField
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -103,7 +108,7 @@ def _progress_percent(payload: dict) -> int:
     try:
         if total and current is not None:
             return max(0, min(100, int(float(current) / float(total) * 100)))
-    except (TypeError, ValueError, ZeroDivisionError):
+    except TypeError, ValueError, ZeroDivisionError:
         pass
     return 0
 
@@ -320,6 +325,222 @@ def _tiny_model_status() -> dict:
     except Exception as exc:
         result['meta_error'] = str(exc)
     return result
+
+
+def _format_bytes(size: int | float | None) -> str:
+    try:
+        value = float(size or 0)
+    except TypeError, ValueError:
+        value = 0
+    for unit in ('B', 'KB', 'MB', 'GB'):
+        if value < 1024 or unit == 'GB':
+            return f'{value:.1f} {unit}' if unit != 'B' else f'{int(value)} B'
+        value /= 1024
+    return f'{value:.1f} GB'
+
+
+def _database_console_snapshot() -> dict:
+    """Read-only database overview for staff Data Console."""
+    engine = connection.settings_dict.get('ENGINE', '')
+    name = connection.settings_dict.get('NAME', '')
+    host = connection.settings_dict.get('HOST', '')
+    vendor = connection.vendor
+    snapshot = {
+        'vendor': vendor,
+        'engine': engine,
+        'name': str(name),
+        'host': host or 'local file',
+        'is_postgres': vendor == 'postgresql',
+        'tables': [],
+        'models': [],
+        'file_fields': [],
+        'postgres': {},
+    }
+
+    with connection.cursor() as cursor:
+        table_names = connection.introspection.table_names(cursor)
+        quote = connection.ops.quote_name
+        for table in sorted(table_names):
+            row_count = None
+            try:
+                cursor.execute(f'SELECT COUNT(*) FROM {quote(table)}')
+                row_count = cursor.fetchone()[0]
+            except Exception:
+                row_count = None
+            snapshot['tables'].append({'name': table, 'rows': row_count})
+
+        if vendor == 'postgresql':
+            try:
+                cursor.execute('SELECT version()')
+                snapshot['postgres']['version'] = cursor.fetchone()[0]
+            except Exception:
+                snapshot['postgres']['version'] = ''
+            try:
+                cursor.execute('SELECT pg_database_size(current_database())')
+                snapshot['postgres']['size'] = _format_bytes(cursor.fetchone()[0])
+            except Exception:
+                snapshot['postgres']['size'] = ''
+
+    for model in apps.get_models():
+        opts = model._meta
+        if opts.proxy or not opts.managed:
+            continue
+        count = None
+        try:
+            count = model._default_manager.count()
+        except Exception:
+            count = None
+        snapshot['models'].append(
+            {
+                'label': opts.label,
+                'app_label': opts.app_label,
+                'model_name': opts.model_name,
+                'db_table': opts.db_table,
+                'rows': count,
+                'admin_url': f'/admin/{opts.app_label}/{opts.model_name}/',
+            }
+        )
+        for field in opts.fields:
+            if isinstance(field, FileField):
+                filled = None
+                try:
+                    filled = (
+                        model._default_manager.exclude(**{field.name: ''})
+                        .exclude(**{f'{field.name}__isnull': True})
+                        .count()
+                    )
+                except Exception:
+                    filled = None
+                snapshot['file_fields'].append(
+                    {
+                        'model': opts.label,
+                        'field': field.name,
+                        'upload_to': str(field.upload_to),
+                        'filled': filled,
+                        'admin_url': f'/admin/{opts.app_label}/{opts.model_name}/',
+                    }
+                )
+
+    snapshot['models'].sort(key=lambda item: (item['app_label'], item['model_name']))
+    snapshot['file_fields'].sort(key=lambda item: (item['model'], item['field']))
+    return snapshot
+
+
+def _safe_media_path(raw_path: str = '') -> tuple[Path, str]:
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    raw = (raw_path or '').strip().replace('\\', '/').strip('/')
+    candidate = (media_root / raw).resolve()
+    try:
+        rel = candidate.relative_to(media_root).as_posix()
+    except ValueError:
+        candidate = media_root
+        rel = ''
+    return candidate, rel
+
+
+def _storage_console_snapshot(path: str = '', preview_file: str = '') -> dict:
+    """Small media file browser: directory listing + optional safe preview."""
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    current, rel = _safe_media_path(path)
+    if not current.exists() or not current.is_dir():
+        current, rel = media_root, ''
+
+    dirs = []
+    files = []
+    try:
+        children = sorted(current.iterdir(), key=lambda item: (item.is_file(), item.name.lower()))
+    except OSError:
+        children = []
+
+    for item in children:
+        try:
+            stat = item.stat()
+            item_rel = item.relative_to(media_root).as_posix()
+        except OSError:
+            continue
+        if item.is_dir():
+            dirs.append(
+                {
+                    'name': item.name,
+                    'path': item_rel,
+                    'mtime': timezone.datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.get_current_timezone()
+                    ),
+                }
+            )
+        elif item.is_file():
+            mime, _enc = mimetypes.guess_type(item.name)
+            files.append(
+                {
+                    'name': item.name,
+                    'path': item_rel,
+                    'size': stat.st_size,
+                    'size_label': _format_bytes(stat.st_size),
+                    'mime': mime or 'application/octet-stream',
+                    'mtime': timezone.datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.get_current_timezone()
+                    ),
+                    'url': settings.MEDIA_URL.rstrip('/') + '/' + item_rel,
+                }
+            )
+
+    breadcrumbs = []
+    accum = []
+    for part in rel.split('/') if rel else []:
+        accum.append(part)
+        breadcrumbs.append({'name': part, 'path': '/'.join(accum)})
+
+    preview = None
+    if preview_file:
+        selected, selected_rel = _safe_media_path(preview_file)
+        try:
+            selected.relative_to(current)
+        except ValueError:
+            selected = None
+        if selected and selected.exists() and selected.is_file():
+            stat = selected.stat()
+            mime, _enc = mimetypes.guess_type(selected.name)
+            mime = mime or 'application/octet-stream'
+            preview = {
+                'name': selected.name,
+                'path': selected_rel,
+                'size_label': _format_bytes(stat.st_size),
+                'mime': mime,
+                'url': settings.MEDIA_URL.rstrip('/') + '/' + selected_rel,
+                'text': '',
+                'is_image': mime.startswith('image/'),
+            }
+            if stat.st_size <= 200 * 1024 and (
+                mime.startswith('text/') or mime in {'application/json', 'application/xml', 'image/svg+xml'}
+            ):
+                try:
+                    preview['text'] = selected.read_text(encoding='utf-8', errors='replace')[:12000]
+                except OSError:
+                    preview['text'] = ''
+
+    total_size = 0
+    total_files = 0
+    try:
+        for item in media_root.rglob('*'):
+            if item.is_file():
+                total_files += 1
+                total_size += item.stat().st_size
+    except OSError:
+        pass
+
+    return {
+        'root': str(media_root),
+        'current_path': rel,
+        'parent_path': str(Path(rel).parent).replace('\\', '/')
+        if rel and str(Path(rel).parent) != '.'
+        else '',
+        'breadcrumbs': breadcrumbs,
+        'dirs': dirs,
+        'files': files,
+        'preview': preview,
+        'total_files': total_files,
+        'total_size_label': _format_bytes(total_size),
+    }
 
 
 def _train_in_background(
@@ -555,13 +776,28 @@ def staff_ops_dashboard(request):
 
 
 @staff_member_required
+def staff_data_console(request):
+    """Read-only database + media explorer for staff operations."""
+    path = request.GET.get('path', '')
+    preview = request.GET.get('preview', '')
+    return render(
+        request,
+        'admin/data_console.html',
+        {
+            'db_snapshot': _database_console_snapshot(),
+            'storage_snapshot': _storage_console_snapshot(path=path, preview_file=preview),
+        },
+    )
+
+
+@staff_member_required
 @require_GET
 def staff_ops_snapshot_api(request):
     from Dolg_APP.services.ops_metrics import collect_ops_snapshot
 
     try:
         period_days = int(request.GET.get('period_days', 7))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         period_days = 7
     period_days = max(1, min(90, period_days))
     return JsonResponse(
@@ -580,7 +816,7 @@ def _validate_dataset_path(raw: str | None) -> Path | None:
         candidate = Path(raw).resolve()
         root = DATASET_ROOT.resolve()
         candidate.relative_to(root)
-    except (ValueError, OSError):
+    except ValueError, OSError:
         return None
     return candidate if candidate.exists() else None
 
@@ -602,7 +838,7 @@ def ml_training_start(request):
     try:
         epochs = int(request.POST.get('epochs', 200))
         size = int(request.POST.get('size', 240))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return JsonResponse({'ok': False, 'error': 'Невалидные параметры.'}, status=400)
 
     epochs = max(10, min(1000, epochs))
@@ -756,7 +992,7 @@ def ml_dataset_import(request):
         return JsonResponse({'ok': False, 'error': f'Неподдерживаемый source: {source}'}, status=400)
     try:
         limit = int(request.POST.get('limit', 500))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return JsonResponse({'ok': False, 'error': 'Невалидный limit.'}, status=400)
     limit = max(1, min(5000, limit))
     persist = request.POST.get('persist') in ('1', 'true', 'on', 'yes')
@@ -764,7 +1000,7 @@ def ml_dataset_import(request):
     as_projects = request.POST.get('as_projects') in ('1', 'true', 'on', 'yes')
     try:
         project_min_quality = int(request.POST.get('project_min_quality', 60))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         project_min_quality = 60
     project_min_quality = max(0, min(100, project_min_quality))
     job = _create_ml_job(

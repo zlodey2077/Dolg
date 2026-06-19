@@ -337,6 +337,22 @@ def edit_profile(request):
         )
         profile.start_page = _profile_choice(profile, 'start_page', request.POST.get('start_page'))
         profile.ai_tone = _profile_choice(profile, 'ai_tone', request.POST.get('ai_tone'))
+        profile.interface_density = _profile_choice(
+            profile, 'interface_density', request.POST.get('interface_density')
+        )
+        profile.workspace_layout = _profile_choice(
+            profile, 'workspace_layout', request.POST.get('workspace_layout')
+        )
+        profile.ai_backend = _profile_choice(profile, 'ai_backend', request.POST.get('ai_backend'))
+        profile.preferred_sim_engine = _profile_choice(
+            profile, 'preferred_sim_engine', request.POST.get('preferred_sim_engine')
+        )
+        profile.preferred_render_mode = _profile_choice(
+            profile, 'preferred_render_mode', request.POST.get('preferred_render_mode')
+        )
+        profile.enable_workspace_animations = request.POST.get('enable_workspace_animations') == 'on'
+        profile.reduce_motion = request.POST.get('reduce_motion') == 'on'
+        profile.show_advanced_tools = request.POST.get('show_advanced_tools') == 'on'
         profile.show_profile_public = request.POST.get('show_profile_public') == 'on'
         profile.show_engineering_badges = request.POST.get('show_engineering_badges') == 'on'
         profile.allow_ai_training = request.POST.get('allow_ai_training') == 'on'
@@ -413,6 +429,11 @@ def edit_profile(request):
         'unit_system_choices': profile.UNIT_SYSTEM_CHOICES,
         'start_page_choices': profile.START_PAGE_CHOICES,
         'ai_tone_choices': profile.AI_TONE_CHOICES,
+        'interface_density_choices': profile.INTERFACE_DENSITY_CHOICES,
+        'workspace_layout_choices': profile.WORKSPACE_LAYOUT_CHOICES,
+        'ai_backend_choices': profile.AI_BACKEND_CHOICES,
+        'sim_engine_choices': profile.SIM_ENGINE_CHOICES,
+        'render_mode_choices': profile.RENDER_MODE_CHOICES,
     }
     return render(request, 'accounts/edit_profile.html', context)
 

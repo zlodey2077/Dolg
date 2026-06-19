@@ -32,7 +32,7 @@
     <div class="profile-tabs" aria-label="Разделы профиля">
         <a href="#overview">Обзор</a>
         <a href="#subscription">Подписка</a>
-        <a href="#customization">Кастомизация</a>
+        <a href="#customization">Рабочая среда</a>
         <a href="#delivery">Доставка</a>
     </div>
 
@@ -121,15 +121,22 @@
 
         <section class="profile-panel" id="customization">
             <div class="panel-head">
-                <h2>Кастомизация</h2>
+                <h2>Рабочая среда</h2>
                 <a href="{% url 'accounts:edit_profile' %}">Изменить</a>
             </div>
             <dl class="profile-list">
                 <div><dt>Тема</dt><dd>{{ profile.get_preferred_theme_display }}</dd></div>
                 <div><dt>Акцент</dt><dd><span class="accent-dot accent-dot--{{ profile.accent_color }}"></span>{{ profile.get_accent_color_display }}</dd></div>
+                <div><dt>Плотность UI</dt><dd>{{ profile.get_interface_density_display }}</dd></div>
+                <div><dt>Макет инструментов</dt><dd>{{ profile.get_workspace_layout_display }}</dd></div>
                 <div><dt>Единицы</dt><dd>{{ profile.get_default_unit_system_display }}</dd></div>
                 <div><dt>Стартовый раздел</dt><dd>{{ profile.get_start_page_display }}</dd></div>
                 <div><dt>Тон AI</dt><dd>{{ profile.get_ai_tone_display }}</dd></div>
+                <div><dt>AI backend</dt><dd>{{ profile.get_ai_backend_display }}</dd></div>
+                <div><dt>Движок симуляции</dt><dd>{{ profile.get_preferred_sim_engine_display }}</dd></div>
+                <div><dt>Рендер</dt><dd>{{ profile.get_preferred_render_mode_display }}</dd></div>
+                <div><dt>Анимации</dt><dd>{% if profile.enable_workspace_animations and not profile.reduce_motion %}включены{% else %}снижены{% endif %}</dd></div>
+                <div><dt>Расширенные инструменты</dt><dd>{% if profile.show_advanced_tools %}показывать{% else %}скрывать базово{% endif %}</dd></div>
                 <div><dt>Публичность</dt><dd>{% if profile.show_profile_public %}профиль можно показывать{% else %}закрытый профиль{% endif %}</dd></div>
                 <div><dt>AI-обучение</dt><dd>{% if profile.allow_ai_training %}схемы можно включать в локальный датасет{% else %}схемы не используются для обучения{% endif %}</dd></div>
             </dl>

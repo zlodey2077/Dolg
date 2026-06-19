@@ -24,6 +24,13 @@
     {% if user.is_authenticated %}
     data-profile-theme="{{ user.profile.preferred_theme|default:'dark' }}"
     data-profile-accent="{{ user.profile.accent_color|default:'cyan' }}"
+    data-interface-density="{{ user.profile.interface_density|default:'comfortable' }}"
+    data-workspace-layout="{{ user.profile.workspace_layout|default:'balanced' }}"
+    data-ai-backend="{{ user.profile.ai_backend|default:'auto' }}"
+    data-sim-engine="{{ user.profile.preferred_sim_engine|default:'auto' }}"
+    data-render-mode="{{ user.profile.preferred_render_mode|default:'auto' }}"
+    data-workspace-animations="{{ user.profile.enable_workspace_animations|yesno:'on,off,on' }}"
+    data-reduce-motion="{{ user.profile.reduce_motion|yesno:'on,off,off' }}"
     {% endif %}
 >
     {% if user.is_authenticated %}
@@ -50,6 +57,25 @@
         body[data-profile-theme="light"] {
             background: #eef4f8;
             color: #14213d;
+        }
+        body[data-interface-density="compact"] {
+            --space-xs: 0.2rem;
+            --space-sm: 0.4rem;
+            --space-md: 0.7rem;
+            --radius-md: 6px;
+        }
+        body[data-interface-density="spacious"] {
+            --space-xs: 0.45rem;
+            --space-sm: 0.8rem;
+            --space-md: 1.15rem;
+            --radius-md: 10px;
+        }
+        body[data-reduce-motion="on"] *,
+        body[data-workspace-animations="off"] * {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.001ms !important;
         }
     </style>
     {% endif %}

@@ -73,7 +73,7 @@
         </section>
 
         <section class="settings-section">
-            <h2>Кастомизация сайта</h2>
+            <h2>Рабочая среда, AI и движки</h2>
             <div class="settings-grid">
                 <label>
                     <span>Тема интерфейса</span>
@@ -88,6 +88,22 @@
                     <select name="accent_color" class="form-control">
                         {% for value, label in accent_choices %}
                             <option value="{{ value }}" {% if profile.accent_color == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Плотность интерфейса</span>
+                    <select name="interface_density" class="form-control">
+                        {% for value, label in interface_density_choices %}
+                            <option value="{{ value }}" {% if profile.interface_density == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Макет инструментов</span>
+                    <select name="workspace_layout" class="form-control">
+                        {% for value, label in workspace_layout_choices %}
+                            <option value="{{ value }}" {% if profile.workspace_layout == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </label>
@@ -115,7 +131,43 @@
                         {% endfor %}
                     </select>
                 </label>
+                <label>
+                    <span>AI backend</span>
+                    <select name="ai_backend" class="form-control">
+                        {% for value, label in ai_backend_choices %}
+                            <option value="{{ value }}" {% if profile.ai_backend == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Движок симуляции</span>
+                    <select name="preferred_sim_engine" class="form-control">
+                        {% for value, label in sim_engine_choices %}
+                            <option value="{{ value }}" {% if profile.preferred_sim_engine == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Рендер холста</span>
+                    <select name="preferred_render_mode" class="form-control">
+                        {% for value, label in render_mode_choices %}
+                            <option value="{{ value }}" {% if profile.preferred_render_mode == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
                 <div class="toggle-list">
+                    <label class="toggle-row">
+                        <input type="checkbox" name="show_advanced_tools" {% if profile.show_advanced_tools %}checked{% endif %}>
+                        <span>Показывать расширенные инструменты CAD, симулятора и лаборатории</span>
+                    </label>
+                    <label class="toggle-row">
+                        <input type="checkbox" name="enable_workspace_animations" {% if profile.enable_workspace_animations %}checked{% endif %}>
+                        <span>Включить анимации приборов и интерактивных панелей</span>
+                    </label>
+                    <label class="toggle-row">
+                        <input type="checkbox" name="reduce_motion" {% if profile.reduce_motion %}checked{% endif %}>
+                        <span>Снизить движение и отключить лишние переходы</span>
+                    </label>
                     <label class="toggle-row">
                         <input type="checkbox" name="show_profile_public" {% if profile.show_profile_public %}checked{% endif %}>
                         <span>Разрешить показывать публичный профиль</span>

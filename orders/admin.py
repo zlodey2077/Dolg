@@ -47,6 +47,34 @@ def mark_cancelled(modeladmin, request, queryset):
     _bulk_mark_orders(modeladmin, request, queryset, OrderStatus.CANCELLED)
 
 
+@admin.action(description='Отметить как оплаченные')
+def mark_paid(modeladmin, request, queryset):
+    updated = queryset.update(is_paid=True)
+    AuditLog.log(
+        actor=request.user,
+        action='admin.orders.bulk_paid_update',
+        object_type='order',
+        object_id='bulk',
+        payload={'is_paid': True, 'updated': updated},
+        request=request,
+    )
+    modeladmin.message_user(request, f'Orders marked paid: {updated}.')
+
+
+@admin.action(description='Снять оплату')
+def mark_unpaid(modeladmin, request, queryset):
+    updated = queryset.update(is_paid=False)
+    AuditLog.log(
+        actor=request.user,
+        action='admin.orders.bulk_paid_update',
+        object_type='order',
+        object_id='bulk',
+        payload={'is_paid': False, 'updated': updated},
+        request=request,
+    )
+    modeladmin.message_user(request, f'Orders marked unpaid: {updated}.')
+
+
 def _bulk_mark_orders(modeladmin, request, queryset, status_name):
     status = OrderStatus.get(status_name)
     order_ids = list(queryset.values_list('id', flat=True))
@@ -76,7 +104,7 @@ class OrderAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     autocomplete_fields = ('user',)
     list_select_related = ('user', 'status')
-    actions = [mark_confirmed, mark_shipped, mark_delivered, mark_cancelled]
+    actions = [mark_confirmed, mark_shipped, mark_delivered, mark_cancelled, mark_paid, mark_unpaid]
     change_list_template = 'admin/orders/order/change_list.html'
 
     fieldsets = (

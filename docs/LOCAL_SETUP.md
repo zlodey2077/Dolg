@@ -121,6 +121,43 @@ docker compose logs -f web
 
 Полная документация по prod-деплою — [DEPLOYMENT.md](DEPLOYMENT.md).
 
+## PostgreSQL для локальной разработки
+
+По умолчанию локальный Django использует SQLite (`db.sqlite3`), чтобы проект
+стартовал без внешних сервисов. Для проверки будущего production-поведения
+можно поднять только PostgreSQL, не запуская весь Docker-стек DOLG:
+
+```powershell
+# Создаст deploy/.env.postgres.local и поднимет Postgres на 127.0.0.1:5432
+powershell -ExecutionPolicy Bypass -File scripts/postgres_dev.ps1 up
+
+# Показать строку подключения
+powershell -ExecutionPolicy Bypass -File scripts/postgres_dev.ps1 url
+
+# Переключить текущую shell-сессию Django на Postgres и применить миграции
+$env:DATABASE_URL="postgresql://dolg:<password>@127.0.0.1:5432/dolg"
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+Если нужен визуальный SQL-инструмент:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/postgres_dev.ps1 up -WithPgAdmin
+```
+
+pgAdmin будет доступен на `http://127.0.0.1:5050/`, пароль лежит в
+`deploy/.env.postgres.local`. Остановить контейнеры:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/postgres_dev.ps1 down
+```
+
+Удалять volume с данными нужно только осознанно:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/postgres_dev.ps1 down -RemoveVolumes
+```
+
 ## Структура проекта
 
 ```

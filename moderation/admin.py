@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 
 from .models import (
     ModerationAction,
@@ -30,6 +31,24 @@ def reject_cases(modeladmin, request, queryset):
         )
 
 
+@admin.action(description='Assign selected cases to me')
+def assign_cases_to_me(modeladmin, request, queryset):
+    updated = queryset.update(assigned_to=request.user, status='in_review')
+    modeladmin.message_user(request, f'Cases assigned to you: {updated}.')
+
+
+@admin.action(description='Close selected cases as resolved')
+def resolve_cases(modeladmin, request, queryset):
+    updated = queryset.update(status='resolved', resolved_at=timezone.now())
+    modeladmin.message_user(request, f'Cases resolved: {updated}.')
+
+
+@admin.action(description='Reopen selected cases')
+def reopen_cases(modeladmin, request, queryset):
+    updated = queryset.update(status='open', resolved_at=None)
+    modeladmin.message_user(request, f'Cases reopened: {updated}.')
+
+
 @admin.register(ModerationCase)
 class ModerationCaseAdmin(admin.ModelAdmin):
     list_display = ('id', 'summary', 'status', 'scope', 'organization', 'target_label', 'created_at')
@@ -38,7 +57,7 @@ class ModerationCaseAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at', 'resolved_at')
     autocomplete_fields = ('opened_by', 'assigned_to', 'organization')
     list_select_related = ('opened_by', 'assigned_to', 'organization')
-    actions = (hide_cases, restore_cases, reject_cases)
+    actions = (assign_cases_to_me, resolve_cases, reopen_cases, hide_cases, restore_cases, reject_cases)
     date_hierarchy = 'created_at'
 
     def target_label(self, obj):

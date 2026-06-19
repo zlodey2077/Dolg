@@ -1,0 +1,299 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}DOLG Data Console{% endblock %}
+
+{% block extrastyle %}
+<style>
+    .data-console {
+        max-width: 1280px;
+        margin: 24px auto 42px;
+        padding: 0 20px;
+        color: #e8eef9;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .data-console h1 {
+        margin: 0;
+        color: #7fdbff;
+        font-size: 28px;
+    }
+    .data-console p {
+        color: #9fb0cc;
+    }
+    .dc-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+    }
+    .dc-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+    .dc-actions a,
+    .dc-link {
+        color: #bff4ff;
+        font-weight: 700;
+        text-decoration: none;
+    }
+    .dc-actions a {
+        padding: 8px 12px;
+        border: 1px solid rgba(127, 219, 255, .24);
+        border-radius: 8px;
+        background: rgba(127, 219, 255, .08);
+        font-size: 12px;
+    }
+    .dc-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, .55fr);
+        gap: 14px;
+        align-items: start;
+    }
+    .dc-card {
+        background: linear-gradient(180deg, #1a1f2e, #151a28);
+        border: 1px solid rgba(0, 212, 255, .18);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+        margin-bottom: 14px;
+    }
+    .dc-card h2 {
+        color: #72ffad;
+        margin: 0 0 12px;
+        font-size: 16px;
+    }
+    .dc-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 8px;
+    }
+    .dc-meta div,
+    .dc-row,
+    .dc-file {
+        border-top: 1px solid rgba(127, 219, 255, .09);
+        padding: 7px 0;
+        color: #cbd5e1;
+        font-size: 12px;
+    }
+    .dc-meta div {
+        border: 1px solid rgba(127, 219, 255, .12);
+        border-radius: 8px;
+        padding: 10px;
+        background: rgba(0, 0, 0, .12);
+    }
+    .dc-meta strong,
+    .dc-row strong {
+        color: #fff;
+    }
+    .dc-table {
+        display: grid;
+        gap: 0;
+        max-height: 560px;
+        overflow: auto;
+    }
+    .dc-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 90px;
+        gap: 12px;
+        align-items: center;
+    }
+    .dc-row code {
+        color: #9ee8ff;
+        overflow-wrap: anywhere;
+    }
+    .dc-badge {
+        display: inline-flex;
+        width: fit-content;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid rgba(127, 219, 255, .22);
+        color: #9ee8ff;
+        background: rgba(127, 219, 255, .10);
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    .dc-breadcrumbs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 10px;
+        font-size: 12px;
+    }
+    .dc-files {
+        max-height: 460px;
+        overflow: auto;
+    }
+    .dc-file {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+    }
+    .dc-file small {
+        display: block;
+        color: #9fb0cc;
+        margin-top: 2px;
+    }
+    .dc-preview img {
+        max-width: 100%;
+        border-radius: 8px;
+        border: 1px solid rgba(127, 219, 255, .18);
+        background: rgba(255, 255, 255, .04);
+    }
+    .dc-preview pre {
+        max-height: 360px;
+        overflow: auto;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, .28);
+        border: 1px solid rgba(127, 219, 255, .14);
+        color: #dbeafe;
+        font-size: 12px;
+    }
+    @media (max-width: 900px) {
+        .dc-head,
+        .dc-grid { display: block; }
+        .dc-actions { justify-content: flex-start; margin-top: 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="data-console">
+    <div class="dc-head">
+        <div>
+            <h1>DOLG Data Console</h1>
+            <p>Read-only обзор SQL backend, Django-моделей, FileField и media-хранилища.</p>
+        </div>
+        <div class="dc-actions">
+            <a href="{% url 'hello:staff_ops_dashboard' %}">Ops Dashboard</a>
+            <a href="{% url 'admin:index' %}">Django admin</a>
+            <a href="{% url 'hello:staff_data_console' %}">Корень media</a>
+        </div>
+    </div>
+
+    <section class="dc-card">
+        <h2>Database backend</h2>
+        <div class="dc-meta">
+            <div><span class="dc-badge">{{ db_snapshot.vendor }}</span><br><strong>{{ db_snapshot.engine }}</strong></div>
+            <div><span>NAME</span><br><strong>{{ db_snapshot.name }}</strong></div>
+            <div><span>HOST</span><br><strong>{{ db_snapshot.host }}</strong></div>
+            <div><span>TABLES</span><br><strong>{{ db_snapshot.tables|length }}</strong></div>
+            {% if db_snapshot.is_postgres %}
+            <div><span>POSTGRES SIZE</span><br><strong>{{ db_snapshot.postgres.size|default:"-" }}</strong></div>
+            {% else %}
+            <div><span>POSTGRES</span><br><strong>не активен в текущем окружении</strong></div>
+            {% endif %}
+        </div>
+        {% if db_snapshot.postgres.version %}
+            <p><code>{{ db_snapshot.postgres.version }}</code></p>
+        {% endif %}
+    </section>
+
+    <div class="dc-grid">
+        <div>
+            <section class="dc-card">
+                <h2>Django models</h2>
+                <div class="dc-table">
+                    {% for model in db_snapshot.models %}
+                    <div class="dc-row">
+                        <div>
+                            <a class="dc-link" href="{{ model.admin_url }}">{{ model.label }}</a>
+                            <small><code>{{ model.db_table }}</code></small>
+                        </div>
+                        <strong>{{ model.rows|default:"-" }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="dc-card">
+                <h2>SQL tables</h2>
+                <div class="dc-table">
+                    {% for table in db_snapshot.tables %}
+                    <div class="dc-row">
+                        <code>{{ table.name }}</code>
+                        <strong>{{ table.rows|default:"-" }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <div>
+            <section class="dc-card">
+                <h2>Media storage</h2>
+                <div class="dc-meta">
+                    <div><span>ROOT</span><br><strong>{{ storage_snapshot.root }}</strong></div>
+                    <div><span>FILES</span><br><strong>{{ storage_snapshot.total_files }}</strong></div>
+                    <div><span>SIZE</span><br><strong>{{ storage_snapshot.total_size_label }}</strong></div>
+                </div>
+                <div class="dc-breadcrumbs">
+                    <a class="dc-link" href="{% url 'hello:staff_data_console' %}">media</a>
+                    {% for crumb in storage_snapshot.breadcrumbs %}
+                        <span>/</span><a class="dc-link" href="?path={{ crumb.path|urlencode }}">{{ crumb.name }}</a>
+                    {% endfor %}
+                    {% if storage_snapshot.current_path %}
+                        <span>/</span><a class="dc-link" href="?path={{ storage_snapshot.parent_path|urlencode }}">..</a>
+                    {% endif %}
+                </div>
+                <div class="dc-files">
+                    {% for dir in storage_snapshot.dirs %}
+                    <div class="dc-file">
+                        <a class="dc-link" href="?path={{ dir.path|urlencode }}">📁 {{ dir.name }}</a>
+                        <small>{{ dir.mtime|date:"Y-m-d H:i" }}</small>
+                    </div>
+                    {% endfor %}
+                    {% for file in storage_snapshot.files %}
+                    <div class="dc-file">
+                        <span>
+                            <a class="dc-link" href="?path={{ storage_snapshot.current_path|urlencode }}&preview={{ file.path|urlencode }}">📄 {{ file.name }}</a>
+                            <small>{{ file.mime }} · {{ file.size_label }}</small>
+                        </span>
+                        <a class="dc-link" href="{{ file.url }}" target="_blank" rel="noopener">open</a>
+                    </div>
+                    {% empty %}
+                        {% if not storage_snapshot.dirs %}<p>В этой папке нет файлов.</p>{% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="dc-card">
+                <h2>File fields</h2>
+                <div class="dc-table">
+                    {% for field in db_snapshot.file_fields %}
+                    <div class="dc-row">
+                        <div>
+                            <a class="dc-link" href="{{ field.admin_url }}">{{ field.model }}.{{ field.field }}</a>
+                            <small>{{ field.upload_to }}</small>
+                        </div>
+                        <strong>{{ field.filled|default:"-" }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% if storage_snapshot.preview %}
+            <section class="dc-card dc-preview">
+                <h2>Preview: {{ storage_snapshot.preview.name }}</h2>
+                <p>{{ storage_snapshot.preview.mime }} · {{ storage_snapshot.preview.size_label }}</p>
+                {% if storage_snapshot.preview.is_image %}
+                    <img src="{{ storage_snapshot.preview.url }}" alt="{{ storage_snapshot.preview.name }}">
+                {% elif storage_snapshot.preview.text %}
+                    <pre>{{ storage_snapshot.preview.text }}</pre>
+                {% else %}
+                    <p>Для этого типа доступно только открытие файла.</p>
+                    <a class="dc-link" href="{{ storage_snapshot.preview.url }}" target="_blank" rel="noopener">Открыть файл</a>
+                {% endif %}
+            </section>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

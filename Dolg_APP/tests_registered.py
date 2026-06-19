@@ -288,6 +288,13 @@ class ProfileCustomizationTests(TestCase):
                 'default_unit_system': 'engineering',
                 'start_page': 'simulation',
                 'ai_tone': 'review',
+                'interface_density': 'compact',
+                'workspace_layout': 'lab',
+                'ai_backend': 'local',
+                'preferred_sim_engine': 'xyce',
+                'preferred_render_mode': 'webgl',
+                'show_advanced_tools': 'on',
+                'enable_workspace_animations': 'on',
                 'show_profile_public': 'on',
                 'show_engineering_badges': 'on',
                 'allow_ai_training': 'on',
@@ -300,6 +307,14 @@ class ProfileCustomizationTests(TestCase):
         self.assertEqual(user.profile.accent_color, 'green')
         self.assertEqual(user.profile.start_page, 'simulation')
         self.assertEqual(user.profile.ai_tone, 'review')
+        self.assertEqual(user.profile.interface_density, 'compact')
+        self.assertEqual(user.profile.workspace_layout, 'lab')
+        self.assertEqual(user.profile.ai_backend, 'local')
+        self.assertEqual(user.profile.preferred_sim_engine, 'xyce')
+        self.assertEqual(user.profile.preferred_render_mode, 'webgl')
+        self.assertTrue(user.profile.show_advanced_tools)
+        self.assertTrue(user.profile.enable_workspace_animations)
+        self.assertFalse(user.profile.reduce_motion)
         self.assertTrue(user.profile.allow_ai_training)
 
     def test_opt_in_scheme_can_be_collected_for_ai_training(self):

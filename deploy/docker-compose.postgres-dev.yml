@@ -1,0 +1,47 @@
+# Local database-only profile for development.
+#
+# Usage:
+#   powershell -ExecutionPolicy Bypass -File scripts/postgres_dev.ps1 up
+#   set DATABASE_URL=postgresql://dolg:local-postgres-password@127.0.0.1:5432/dolg
+#   python manage.py migrate
+
+name: dolg-postgres-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-dolg}"
+      POSTGRES_USER: "${POSTGRES_USER:-dolg}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-local-postgres-password}"
+    ports:
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dolg} -d ${POSTGRES_DB:-dolg}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_EMAIL:-admin@dolg.local}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_PASSWORD:-local-pgadmin-password}"
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_BIND:-127.0.0.1}:${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+  pgadmin_dev_data:

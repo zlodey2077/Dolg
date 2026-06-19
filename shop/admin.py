@@ -79,6 +79,10 @@ class ProductAdmin(admin.ModelAdmin):
         'mark_needs_data_review',
         'clear_needs_data_review',
         'mark_lifecycle_active',
+        'mark_lifecycle_nrnd',
+        'mark_lifecycle_eol',
+        'mark_lifecycle_obsolete',
+        'mark_out_of_stock',
     )
     fieldsets = (
         (None, {'fields': ('name', 'slug', 'category', 'description', 'image')}),
@@ -207,6 +211,26 @@ class ProductAdmin(admin.ModelAdmin):
     def mark_lifecycle_active(self, request, queryset):
         updated = queryset.update(lifecycle_status='active')
         self.message_user(request, f'Lifecycle Active установлен для {updated} товаров.')
+
+    @admin.action(description='Lifecycle: NRND')
+    def mark_lifecycle_nrnd(self, request, queryset):
+        updated = queryset.update(lifecycle_status='nrnd')
+        self.message_user(request, f'Lifecycle NRND установлен для {updated} товаров.')
+
+    @admin.action(description='Lifecycle: EOL')
+    def mark_lifecycle_eol(self, request, queryset):
+        updated = queryset.update(lifecycle_status='eol')
+        self.message_user(request, f'Lifecycle EOL установлен для {updated} товаров.')
+
+    @admin.action(description='Lifecycle: Obsolete')
+    def mark_lifecycle_obsolete(self, request, queryset):
+        updated = queryset.update(lifecycle_status='obsolete')
+        self.message_user(request, f'Lifecycle Obsolete установлен для {updated} товаров.')
+
+    @admin.action(description='Остаток: 0')
+    def mark_out_of_stock(self, request, queryset):
+        updated = queryset.update(stock=0)
+        self.message_user(request, f'Остаток обнулён для {updated} товаров.')
 
 
 @admin.register(CartItem)

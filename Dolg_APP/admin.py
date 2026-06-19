@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.db.models import Count
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
@@ -55,8 +56,20 @@ class SchematicProjectAdmin(admin.ModelAdmin):
         'updated_at',
     )
     search_fields = ('name', 'description', 'user__username', 'user__email')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('quick_links', 'created_at', 'updated_at')
     list_select_related = ('user', 'organization')
+    list_editable = ('status', 'approval_state', 'visibility', 'difficulty')
+    actions = (
+        'mark_inprogress',
+        'mark_completed',
+        'submit_for_review',
+        'approve_projects',
+        'reject_projects',
+        'publish_projects',
+        'make_private',
+        'restore_projects',
+        'soft_delete_projects',
+    )
     change_list_template = 'admin/dolg_app/schematicproject/change_list.html'
     fieldsets = (
         (None, {'fields': ('user', 'organization', 'name', 'description')}),
@@ -64,21 +77,20 @@ class SchematicProjectAdmin(admin.ModelAdmin):
             'Классификация',
             {'fields': ('category', 'status', 'approval_state', 'visibility', 'difficulty', 'is_demo')},
         ),
-        ('Публикация и доступ', {'fields': ('share_token', 'deleted_at'), 'classes': ('collapse',)}),
+        (
+            'Публикация и доступ',
+            {'fields': ('share_token', 'deleted_at', 'quick_links'), 'classes': ('collapse',)},
+        ),
         ('Данные схемы', {'fields': ('scheme_data',), 'classes': ('collapse',)}),
         ('Метаданные', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 
     def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .annotate(
-                _versions_count=Count('versions', distinct=True),
-                _runs_count=Count('simulation_runs', distinct=True),
-                _reviews_count=Count('reviews', distinct=True),
-                _measurements_count=Count('measurements', distinct=True),
-            )
+        return SchematicProject.all_objects.select_related('user', 'organization').annotate(
+            _versions_count=Count('versions', distinct=True),
+            _runs_count=Count('simulation_runs', distinct=True),
+            _reviews_count=Count('reviews', distinct=True),
+            _measurements_count=Count('measurements', distinct=True),
         )
 
     def changelist_view(self, request, extra_context=None):
@@ -114,6 +126,103 @@ class SchematicProjectAdmin(admin.ModelAdmin):
     @admin.display(description='Измерений', ordering='_measurements_count')
     def measurements_count(self, obj):
         return getattr(obj, '_measurements_count', obj.measurements.count())
+
+    @admin.display(description='Связанные данные')
+    def quick_links(self, obj):
+        if not obj.pk:
+            return 'Сохраните проект, чтобы увидеть ссылки.'
+        links = [
+            ('Версии', reverse('admin:Dolg_APP_projectversion_changelist') + f'?project__id__exact={obj.pk}'),
+            (
+                'Симуляции',
+                reverse('admin:Dolg_APP_simulationrun_changelist') + f'?project__id__exact={obj.pk}',
+            ),
+            ('Engine jobs', reverse('admin:Dolg_APP_enginejob_changelist') + f'?project__id__exact={obj.pk}'),
+            ('Review', reverse('admin:Dolg_APP_projectreview_changelist') + f'?project__id__exact={obj.pk}'),
+            (
+                'Измерения',
+                reverse('admin:Dolg_APP_projectmeasurement_changelist') + f'?project__id__exact={obj.pk}',
+            ),
+        ]
+        return format_html(
+            ' · '.join('<a href="{}">{}</a>' for _label, _url in links),
+            *[value for link in links for value in (link[1], link[0])],
+        )
+
+    def _bulk_project_update(self, request, queryset, *, action, message, **fields):
+        ids = list(queryset.values_list('id', flat=True)[:50])
+        updated = queryset.update(**fields)
+        AuditLog.log(
+            actor=request.user,
+            action=f'admin.projects.{action}',
+            object_type='schematic_project',
+            object_id='bulk',
+            payload={'updated': updated, 'sample_ids': ids, 'fields': fields},
+            request=request,
+        )
+        self.message_user(request, f'{message}: {updated}.')
+
+    @admin.action(description='Статус: в работе')
+    def mark_inprogress(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='mark_inprogress', message='Проектов в работе', status='inprogress'
+        )
+
+    @admin.action(description='Статус: завершено')
+    def mark_completed(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='mark_completed', message='Проектов завершено', status='completed'
+        )
+
+    @admin.action(description='Отправить на ревью')
+    def submit_for_review(self, request, queryset):
+        self._bulk_project_update(
+            request,
+            queryset,
+            action='submit_for_review',
+            message='Проектов отправлено на ревью',
+            approval_state='pending_review',
+        )
+
+    @admin.action(description='Одобрить проекты')
+    def approve_projects(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='approve', message='Проектов одобрено', approval_state='approved'
+        )
+
+    @admin.action(description='Отклонить проекты')
+    def reject_projects(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='reject', message='Проектов отклонено', approval_state='rejected'
+        )
+
+    @admin.action(description='Сделать публичными')
+    def publish_projects(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='publish', message='Проектов опубликовано', visibility='public'
+        )
+
+    @admin.action(description='Сделать приватными')
+    def make_private(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='make_private', message='Проектов скрыто', visibility='private'
+        )
+
+    @admin.action(description='Восстановить из корзины')
+    def restore_projects(self, request, queryset):
+        self._bulk_project_update(
+            request, queryset, action='restore', message='Проектов восстановлено', deleted_at=None
+        )
+
+    @admin.action(description='Soft-delete выбранные')
+    def soft_delete_projects(self, request, queryset):
+        self._bulk_project_update(
+            request,
+            queryset,
+            action='soft_delete',
+            message='Проектов перенесено в корзину',
+            deleted_at=timezone.now(),
+        )
 
 
 class OrganizationMemberInline(admin.TabularInline):
@@ -181,6 +290,8 @@ class SimulationRunAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'started_at', 'finished_at')
     autocomplete_fields = ('project', 'user')
     list_select_related = ('project', 'user')
+    date_hierarchy = 'created_at'
+    actions = ('mark_success', 'mark_error', 'mark_cancelled')
 
     @admin.display(description='Прогресс')
     def progress_badge(self, obj):
@@ -188,6 +299,21 @@ class SimulationRunAdmin(admin.ModelAdmin):
         if obj.status == 'error':
             color = '#b3261e'
         return format_html('<strong style="color:{};">{}%</strong>', color, obj.progress_percent)
+
+    @admin.action(description='Симуляции: success')
+    def mark_success(self, request, queryset):
+        updated = queryset.update(status='success', progress_percent=100, message='Marked success from admin')
+        self.message_user(request, f'Симуляций помечено success: {updated}.')
+
+    @admin.action(description='Симуляции: error')
+    def mark_error(self, request, queryset):
+        updated = queryset.update(status='error', message='Marked error from admin')
+        self.message_user(request, f'Симуляций помечено error: {updated}.')
+
+    @admin.action(description='Симуляции: cancelled')
+    def mark_cancelled(self, request, queryset):
+        updated = queryset.update(status='cancelled', message='Marked cancelled from admin')
+        self.message_user(request, f'Симуляций помечено cancelled: {updated}.')
 
 
 @admin.register(EngineJob)
@@ -208,6 +334,7 @@ class EngineJobAdmin(admin.ModelAdmin):
     autocomplete_fields = ('project', 'user')
     list_select_related = ('project', 'user')
     date_hierarchy = 'created_at'
+    actions = ('retry_jobs', 'mark_cancelled', 'mark_stale', 'mark_success')
 
     @admin.display(description='Progress')
     def progress_badge(self, obj):
@@ -215,6 +342,53 @@ class EngineJobAdmin(admin.ModelAdmin):
         if obj.status == 'error':
             color = '#b3261e'
         return format_html('<strong style="color:{};">{}%</strong>', color, obj.progress_percent)
+
+    @admin.action(description='Повторить jobs: queued')
+    def retry_jobs(self, request, queryset):
+        updated = queryset.update(
+            status='queued',
+            progress_percent=0,
+            message='Retried from Django admin',
+            started_at=None,
+            heartbeat_at=None,
+            finished_at=None,
+            error='',
+        )
+        self.message_user(request, f'Engine jobs поставлено в очередь: {updated}.')
+
+    @admin.action(description='Отменить jobs')
+    def mark_cancelled(self, request, queryset):
+        now = timezone.now()
+        updated = queryset.update(
+            status='cancelled',
+            heartbeat_at=now,
+            finished_at=now,
+            message='Cancelled from Django admin',
+        )
+        self.message_user(request, f'Engine jobs отменено: {updated}.')
+
+    @admin.action(description='Пометить stale')
+    def mark_stale(self, request, queryset):
+        now = timezone.now()
+        updated = queryset.update(
+            status='stale',
+            heartbeat_at=now,
+            finished_at=now,
+            message='Marked stale from Django admin',
+        )
+        self.message_user(request, f'Engine jobs stale: {updated}.')
+
+    @admin.action(description='Пометить success')
+    def mark_success(self, request, queryset):
+        now = timezone.now()
+        updated = queryset.update(
+            status='success',
+            progress_percent=100,
+            heartbeat_at=now,
+            finished_at=now,
+            message='Marked success from Django admin',
+        )
+        self.message_user(request, f'Engine jobs success: {updated}.')
 
 
 @admin.register(ProjectMeasurement)
@@ -255,6 +429,8 @@ class ProjectReviewAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'finding_summary')
     autocomplete_fields = ('project', 'user')
     list_select_related = ('project', 'user')
+    date_hierarchy = 'created_at'
+    actions = ('mark_ready', 'mark_needs_review', 'mark_risk', 'mark_critical')
     fieldsets = (
         (None, {'fields': ('project', 'user', 'score', 'status', 'summary', 'finding_summary')}),
         (
@@ -309,6 +485,26 @@ class ProjectReviewAdmin(admin.ModelAdmin):
             len(obj.recommendations or []),
             len(obj.faults or []),
         )
+
+    @admin.action(description='Review status: ready')
+    def mark_ready(self, request, queryset):
+        updated = queryset.update(status='ready')
+        self.message_user(request, f'Review ready: {updated}.')
+
+    @admin.action(description='Review status: needs_review')
+    def mark_needs_review(self, request, queryset):
+        updated = queryset.update(status='needs_review')
+        self.message_user(request, f'Review needs_review: {updated}.')
+
+    @admin.action(description='Review status: risk')
+    def mark_risk(self, request, queryset):
+        updated = queryset.update(status='risk')
+        self.message_user(request, f'Review risk: {updated}.')
+
+    @admin.action(description='Review status: critical')
+    def mark_critical(self, request, queryset):
+        updated = queryset.update(status='critical')
+        self.message_user(request, f'Review critical: {updated}.')
 
 
 @admin.register(ProjectEvent)
@@ -678,8 +874,11 @@ class MLJobAdmin(admin.ModelAdmin):
 class AnnouncementAdmin(admin.ModelAdmin):
     list_display = ('title', 'level', 'is_published', 'is_pinned', 'expires_at', 'created_at')
     list_filter = ('level', 'is_published', 'is_pinned', 'created_at')
+    list_editable = ('is_published', 'is_pinned')
     search_fields = ('title', 'body')
     readonly_fields = ('created_at',)
+    date_hierarchy = 'created_at'
+    actions = ('publish', 'unpublish', 'pin', 'unpin', 'expire_now')
     fieldsets = (
         (None, {'fields': ('title', 'body', 'level')}),
         ('Публикация', {'fields': ('is_published', 'is_pinned', 'expires_at')}),
@@ -690,6 +889,31 @@ class AnnouncementAdmin(admin.ModelAdmin):
         if not obj.author_id:
             obj.author = request.user
         super().save_model(request, obj, form, change)
+
+    @admin.action(description='Опубликовать объявления')
+    def publish(self, request, queryset):
+        updated = queryset.update(is_published=True)
+        self.message_user(request, f'Объявлений опубликовано: {updated}.')
+
+    @admin.action(description='Снять с публикации')
+    def unpublish(self, request, queryset):
+        updated = queryset.update(is_published=False)
+        self.message_user(request, f'Объявлений скрыто: {updated}.')
+
+    @admin.action(description='Закрепить')
+    def pin(self, request, queryset):
+        updated = queryset.update(is_pinned=True)
+        self.message_user(request, f'Объявлений закреплено: {updated}.')
+
+    @admin.action(description='Открепить')
+    def unpin(self, request, queryset):
+        updated = queryset.update(is_pinned=False)
+        self.message_user(request, f'Объявлений откреплено: {updated}.')
+
+    @admin.action(description='Истечь сейчас')
+    def expire_now(self, request, queryset):
+        updated = queryset.update(expires_at=timezone.now())
+        self.message_user(request, f'Объявлений завершено: {updated}.')
 
 
 @admin.register(ChatTopic)
