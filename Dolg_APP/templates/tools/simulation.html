@@ -301,37 +301,37 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 </button>
                 <div class="tool-dropdown-menu components-drawer-menu" role="menu">
                     <div class="components-drawer-grid">
-                        <button class="component-btn" data-component="resistor" title="Резистор (R)">
+                        <button class="component-btn" data-component="resistor" title="Резистор (R)" aria-label="Добавить резистор">
                             <span>Резистор</span><small>R</small>
                         </button>
-                        <button class="component-btn" data-component="capacitor" title="Конденсатор (C)">
+                        <button class="component-btn" data-component="capacitor" title="Конденсатор (C)" aria-label="Добавить конденсатор">
                             <span>Конденсатор</span><small>C</small>
                         </button>
-                        <button class="component-btn" data-component="inductor" title="Индуктор (L)">
+                        <button class="component-btn" data-component="inductor" title="Индуктор (L)" aria-label="Добавить индуктор">
                             <span>Индуктор</span><small>L</small>
                         </button>
-                        <button class="component-btn" data-component="diode" title="Диод (D)">
+                        <button class="component-btn" data-component="diode" title="Диод (D)" aria-label="Добавить диод">
                             <span>Диод</span><small>D</small>
                         </button>
-                        <button class="component-btn" data-component="battery" title="Источник напряжения / батарея (V)">
+                        <button class="component-btn" data-component="battery" title="Источник напряжения / батарея (V)" aria-label="Добавить источник напряжения">
                             <span>Батарея</span><small>V</small>
                         </button>
-                        <button class="component-btn" data-component="ground" title="Опорный узел / земля (GND)">
+                        <button class="component-btn" data-component="ground" title="Опорный узел / земля (GND)" aria-label="Добавить землю">
                             <span>Земля</span><small>GND</small>
                         </button>
-                        <button class="component-btn" data-component="led" title="Светодиод">
+                        <button class="component-btn" data-component="led" title="Светодиод" aria-label="Добавить светодиод">
                             <span>LED</span><small>LED</small>
                         </button>
-                        <button class="component-btn" data-component="switch" title="Переключатель (S)">
+                        <button class="component-btn" data-component="switch" title="Переключатель (S)" aria-label="Добавить переключатель">
                             <span>Переключатель</span><small>S</small>
                         </button>
-                        <button class="component-btn" data-component="npn" title="Биполярный транзистор NPN (Q)">
+                        <button class="component-btn" data-component="npn" title="Биполярный транзистор NPN (Q)" aria-label="Добавить NPN транзистор">
                             <span>Транзистор NPN</span><small>Q</small>
                         </button>
-                        <button class="component-btn" data-component="pnp" title="Биполярный транзистор PNP (Q)">
+                        <button class="component-btn" data-component="pnp" title="Биполярный транзистор PNP (Q)" aria-label="Добавить PNP транзистор">
                             <span>Транзистор PNP</span><small>Q</small>
                         </button>
-                        <button class="component-btn" data-component="node" title="Соединительный узел / точка">
+                        <button class="component-btn" data-component="node" title="Соединительный узел / точка" aria-label="Добавить узел">
                             <span>Узел</span><small>•</small>
                         </button>
                     </div>
@@ -388,7 +388,8 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 <div class="tool-dropdown" id="hamburger-menu">
                     <button class="tool-btn tool-btn--menu tool-btn--dropdown" type="button"
                             data-dropdown-toggle="hamburger-menu" id="hamburger-menu-btn"
-                            title="Меню: настройки симуляции, файл, импорт/экспорт, прочее">
+                            title="Меню: настройки симуляции, файл, импорт/экспорт, прочее"
+                            aria-label="Открыть меню симулятора">
                         <span>☰</span>
                     </button>
                     <div class="tool-dropdown-menu hamburger-menu-panel" role="menu">
@@ -486,10 +487,10 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 </button>
                 <span class="tool-divider"></span>
 
-                <button class="tool-btn" id="undo-btn" onclick="undoSchemeAction()" title="Отменить (Ctrl+Z)">
+                <button class="tool-btn" id="undo-btn" onclick="undoSchemeAction()" title="Отменить (Ctrl+Z)" aria-label="Отменить действие">
                     <span>↶</span>
                 </button>
-                <button class="tool-btn" id="redo-btn" onclick="redoSchemeAction()" title="Повторить (Ctrl+Y)">
+                <button class="tool-btn" id="redo-btn" onclick="redoSchemeAction()" title="Повторить (Ctrl+Y)" aria-label="Повторить действие">
                     <span>↷</span>
                 </button>
                 <span class="tool-divider"></span>
@@ -888,6 +889,10 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
             <span class="sim-status-icon">📍</span>
             <span id="status-cursor-x">x: —</span>
             <span id="status-cursor-y">y: —</span>
+        </div>
+        <div class="sim-status-cell sim-status-mode" title="Текущий режим работы холста">
+            <span class="sim-status-icon">⌁</span>
+            <span id="status-mode">Выбор</span>
         </div>
         <div class="sim-status-cell sim-status-counts" title="Количество компонентов и проводов в схеме">
             <span class="sim-status-icon">🧩</span>
@@ -2974,6 +2979,19 @@ body.sim-sticky-add .sticky-add-toggle {
     background: rgba(40, 167, 69, 0.55);
     box-shadow: 0 0 8px rgba(40, 167, 69, 0.6) inset;
 }
+.component-btn:focus-visible,
+.tool-btn:focus-visible,
+.sticky-add-toggle:focus-within,
+.sim-dock-tab:focus-visible,
+.sim-dock-tab-action:focus-visible,
+.float-panel__btn:focus-visible,
+.float-panel__tab:focus-visible,
+.context-menu button:focus-visible,
+.tool-dropdown-menu button:focus-visible {
+    outline: 2px solid rgba(127, 219, 255, 0.92);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.18);
+}
 /* Export-кнопки (PNG/SVG/PDF) — отдельная цветовая группа, чтобы их было
    заметно отличить от инструментов редактора в одной панели. */
 .tool-btn--export {
@@ -3191,6 +3209,24 @@ body.sim-sticky-add .sticky-add-toggle {
     line-height: 1;
     opacity: .85;
 }
+.sim-status-mode span:not(.sim-status-icon) {
+    color: #ffffff;
+    font-weight: 700;
+}
+.sim-status-mode {
+    padding: 2px 7px;
+    border: 1px solid rgba(0, 212, 255, 0.22);
+    border-radius: 6px;
+    background: rgba(0, 212, 255, 0.08);
+}
+.sim-status-mode.is-add {
+    border-color: rgba(127, 219, 255, 0.52);
+    background: rgba(0, 212, 255, 0.16);
+}
+.sim-status-mode.is-wire {
+    border-color: rgba(255, 208, 110, 0.56);
+    background: rgba(255, 208, 110, 0.14);
+}
 .sim-status-spacer {
     flex: 1 1 auto;
     min-width: 8px;
@@ -3212,10 +3248,10 @@ body.sim-sticky-add .sticky-add-toggle {
     color: #7fdbff;
     animation: dolg-3d-pulse 1.2s ease-in-out infinite;
 }
-/* Скрываем bar на узких экранах — компактные стили пока не делаем. */
+/* На узких экранах оставляем только координаты, режим и счётчики. */
 @media (max-width: 720px) {
     .sim-status-bar { font-size: 10.5px; gap: 8px; padding: 3px 10px; }
-    .sim-status-cell:not(.sim-status-cursor):not(.sim-status-counts) { display: none; }
+    .sim-status-cell:not(.sim-status-cursor):not(.sim-status-mode):not(.sim-status-counts) { display: none; }
 }
 
 /* ===== Floating panels — Properties Editor + Results Window =====
@@ -5567,6 +5603,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.component-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             document.getElementById('modeIndicator').textContent = `✚ Кликните на холсте, чтобы поставить ${this.querySelector('span').textContent}. Зажмите Shift, чтобы продолжить добавлять подряд.`;
+            updateStatusBar();
         });
     });
 
@@ -5621,6 +5658,20 @@ function updateStatusCursor(wx, wy) {
 }
 
 function updateStatusBar() {
+    const sm = document.getElementById('status-mode');
+    if (sm) {
+        const modeCell = sm.closest('.sim-status-mode');
+        if (modeCell) modeCell.classList.remove('is-add', 'is-wire');
+        if (wireMode) {
+            sm.textContent = wireStartPort ? 'Провод: выберите второй порт' : 'Провод';
+            if (modeCell) modeCell.classList.add('is-wire');
+        } else if (addMode) {
+            sm.textContent = `Добавление: ${getComponentName(addMode)}`;
+            if (modeCell) modeCell.classList.add('is-add');
+        } else {
+            sm.textContent = 'Выбор';
+        }
+    }
     const sc = document.getElementById('status-count-components');
     if (sc) sc.textContent = `${components.length} комп.`;
     const sw = document.getElementById('status-count-wires');
@@ -5640,7 +5691,7 @@ function updateStatusBar() {
     const sz = document.getElementById('status-zoom');
     if (sz && typeof zoom === 'number') sz.textContent = `${Math.round(zoom * 100)}%`;
     const sr = document.getElementById('status-render');
-    if (sr) sr.textContent = (typeof renderModeOverride === 'string' && renderModeOverride) ? renderModeOverride : 'auto';
+    if (sr) sr.textContent = (typeof renderModeOverride === 'string' && renderModeOverride) ? renderModeOverride : (renderMode || 'auto');
 }
 
 // Внешний API для обновления DRC-ячейки (вызывается из buildSpiceNetlist
@@ -6074,6 +6125,7 @@ function selectComponentMode(btn) {
     addMode = btn.dataset.component;
     canvas.style.cursor = 'crosshair';
     document.getElementById('modeIndicator').textContent = `✚ Кликните на холсте для добавления ${btn.querySelector('span').textContent}`;
+    updateStatusBar();
 }
 
 // Рендерит заголовок симулятора по currentProject. Делает имя проекта
@@ -6217,6 +6269,7 @@ function resetMode() {
     canvas.style.cursor = 'default';
     document.getElementById('modeIndicator').textContent = '💡 Выберите компонент из панели слева';
     updateProperties();
+    updateStatusBar();
     drawCanvas();
 }
 
@@ -6230,6 +6283,7 @@ function activateWireMode() {
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     canvas.style.cursor = 'crosshair';
     document.getElementById('modeIndicator').textContent = '🔌 Нажмите на порт первого компонента';
+    updateStatusBar();
     drawCanvas();
 }
 
@@ -6751,29 +6805,34 @@ function handleWireClickOnPort(port) {
         }
         wireStartPort = port;
         showNotification('🔌 Начало провода. Нажмите на свободный порт или на провод для T-узла.');
+        updateStatusBar();
         drawCanvas();
         return;
     }
     if (port.compId === wireStartPort.compId && port.portId === wireStartPort.portId) {
         wireStartPort = null;
+        updateStatusBar();
         drawCanvas();
         return;
     }
     if (port.compId === wireStartPort.compId) {
         showNotification('⚠️ Это короткое замыкание: оба порта одного и того же компонента нельзя соединять напрямую', 'warning');
         wireStartPort = null;
+        updateStatusBar();
         drawCanvas();
         return;
     }
     if (isPortOccupied(port.compId, port.portId)) {
         showNotification(occupiedMsg, 'warning');
         wireStartPort = null;
+        updateStatusBar();
         drawCanvas();
         return;
     }
     if (isDuplicateConnection(wireStartPort, port)) {
         showNotification('⚠️ Такой провод уже есть', 'warning');
         wireStartPort = null;
+        updateStatusBar();
         drawCanvas();
         return;
     }
@@ -6782,6 +6841,7 @@ function handleWireClickOnPort(port) {
     showNotification('✓ Провод подключен');
     snapshotScheme();
     wireStartPort = null;
+    updateStatusBar();
     drawCanvas();
 }
 
@@ -7667,9 +7727,7 @@ function clearWaypoints() {
         panY = y - (y - panY) * (zoom / oldZoom);
 
         drawCanvas();
-        // Bottom status-bar: обновим zoom-ячейку.
-        const sz = document.getElementById('status-zoom');
-        if (sz) sz.textContent = `${Math.round(zoom * 100)}%`;
+        updateStatusBar();
     }
 
     function onCanvasMouseDown(e) {
@@ -9671,6 +9729,7 @@ function updateStats() {
     document.getElementById('components-count').textContent = components.length;
     document.getElementById('wires-count').textContent = connections.length;  // НОВОЕ: показываем соединения
     document.getElementById('nodes-count').textContent = components.filter(c => c.type === 'node').length;
+    if (typeof updateStatusBar === 'function') updateStatusBar();
 }
 
 // =============================================================

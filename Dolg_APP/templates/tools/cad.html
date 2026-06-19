@@ -129,11 +129,42 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 8px;
         padding: 8px 14px;
         border-bottom: 1px solid rgba(0, 212, 255, 0.4);
         background: linear-gradient(180deg, rgba(0, 212, 255, 0.12), rgba(0, 212, 255, 0.04));
         font-size: 0.85rem;
         color: #cfe;
+        flex-wrap: wrap;
+    }
+
+    .cad-canvas-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    .cad-status-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 3px 8px;
+        border: 1px solid rgba(0, 212, 255, 0.28);
+        border-radius: 6px;
+        background: rgba(0, 212, 255, 0.08);
+        color: #dff8ff;
+        font-size: 0.78rem;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    .cad-status-pill--strong {
+        border-color: rgba(34, 211, 238, 0.54);
+        background: rgba(34, 211, 238, 0.14);
+        color: #ffffff;
+        font-weight: 700;
     }
 
     #canvas {
@@ -1051,9 +1082,15 @@
         overflow-x: auto;
         overflow-y: hidden;
         overscroll-behavior: contain;
+        scroll-snap-type: x proximity;
         scrollbar-width: thin;
         background: linear-gradient(180deg, rgba(9, 24, 45, 0.98), rgba(6, 17, 31, 0.98));
         border-color: var(--cad-border);
+    }
+
+    .top-controls > .control-group,
+    .cad-settings-drawer {
+        scroll-snap-align: start;
     }
 
     .top-controls > .control-group + .control-group {
@@ -1102,6 +1139,16 @@
         border: 1px solid rgba(0, 212, 255, 0.34);
         border-radius: 7px;
         background: linear-gradient(180deg, rgba(0, 212, 255, 0.10), rgba(0, 212, 255, 0.03));
+    }
+
+    .tool-btn:focus-visible,
+    .btn-small:focus-visible,
+    .cad-mode-tab:focus-visible,
+    .cad-view-tab:focus-visible,
+    .cad-settings-drawer > summary:focus-visible {
+        outline: 2px solid rgba(34, 211, 238, 0.9);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.16);
     }
 
     .cad-settings-drawer > summary::-webkit-details-marker { display: none; }
@@ -1256,6 +1303,22 @@
         min-height: 36px;
     }
 
+    .cad-canvas-status {
+        max-width: 100%;
+    }
+
+    .cad-status-pill {
+        background: rgba(4, 12, 24, 0.62);
+        border-color: rgba(0, 212, 255, 0.24);
+        color: var(--cad-muted);
+    }
+
+    .cad-status-pill--strong {
+        background: rgba(34, 211, 238, 0.14);
+        border-color: rgba(34, 211, 238, 0.5);
+        color: var(--cad-text);
+    }
+
     #canvas {
         background: #f4f7fb;
         border-top: 1px solid rgba(0, 212, 255, 0.22);
@@ -1353,6 +1416,22 @@
         .top-controls { max-height: none; }
         .top-controls .cad-actions-group {
             justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .canvas-header {
+            align-items: stretch;
+            padding: 7px 9px;
+        }
+        .cad-canvas-status {
+            width: 100%;
+            justify-content: space-between;
+        }
+        .cad-status-pill {
+            flex: 1 1 auto;
+            justify-content: center;
+            min-width: max-content;
         }
     }
 </style>
@@ -1557,20 +1636,20 @@
     <div class="cad-layout">
         <!-- Левая панель инструментов -->
         <div class="tools-panel">
-            <button class="tool-btn active" data-tool="pointer" title="Указатель">→</button>
-            <button class="tool-btn" data-tool="line" title="Линия">╱</button>
-            <button class="tool-btn" data-tool="netlabel" title="Метка цепи: GND, +5V, OUT">Цепь</button>
-            <button class="tool-btn" data-tool="gnd" title="Земля / общий провод">GND</button>
-            <button class="tool-btn" data-tool="probe" title="Пробник цепи">Проба</button>
-            <button class="tool-btn" data-tool="rectangle" title="Прямоугольник">▭</button>
-            <button class="tool-btn" data-tool="circle" title="Окружность">●</button>
-            <button class="tool-btn" data-tool="ellipse" title="Эллипс">⬭</button>
-            <button class="tool-btn" data-tool="arc" title="Дуга">⌒</button>
-            <button class="tool-btn" data-tool="polygon" title="Многоугольник">▢</button>
-            <button class="tool-btn" data-tool="text" title="Текст">A</button>
-            <button class="tool-btn" data-tool="dimension" title="Размер (со стрелками, в мм)">⌯</button>
-            <button class="tool-btn" data-tool="leader" title="Выноска (линия со стрелкой и текстом)">⤴</button>
-            <button class="tool-btn" data-tool="delete" title="Удалить">✕</button>
+            <button class="tool-btn active" data-tool="pointer" title="Указатель" aria-label="Указатель">→</button>
+            <button class="tool-btn" data-tool="line" title="Линия" aria-label="Линия">╱</button>
+            <button class="tool-btn" data-tool="netlabel" title="Метка цепи: GND, +5V, OUT" aria-label="Метка цепи">Цепь</button>
+            <button class="tool-btn" data-tool="gnd" title="Земля / общий провод" aria-label="Земля">GND</button>
+            <button class="tool-btn" data-tool="probe" title="Пробник цепи" aria-label="Пробник цепи">Проба</button>
+            <button class="tool-btn" data-tool="rectangle" title="Прямоугольник" aria-label="Прямоугольник">▭</button>
+            <button class="tool-btn" data-tool="circle" title="Окружность" aria-label="Окружность">●</button>
+            <button class="tool-btn" data-tool="ellipse" title="Эллипс" aria-label="Эллипс">⬭</button>
+            <button class="tool-btn" data-tool="arc" title="Дуга" aria-label="Дуга">⌒</button>
+            <button class="tool-btn" data-tool="polygon" title="Многоугольник" aria-label="Многоугольник">▢</button>
+            <button class="tool-btn" data-tool="text" title="Текст" aria-label="Текст">A</button>
+            <button class="tool-btn" data-tool="dimension" title="Размер (со стрелками, в мм)" aria-label="Размер">⌯</button>
+            <button class="tool-btn" data-tool="leader" title="Выноска (линия со стрелкой и текстом)" aria-label="Выноска">⤴</button>
+            <button class="tool-btn" data-tool="delete" title="Удалить" aria-label="Удалить">✕</button>
         </div>
 
         <!-- Центральная область с canvas -->
@@ -1594,8 +1673,15 @@
                 <span class="cad-view-info" id="cadViewInfo">Top side</span>
             </div>
             <div class="canvas-header">
-                <span id="objCountSpan">Объектов: 0</span>
-                <span id="coordsDisplay">X: 0, Y: 0</span>
+                <div class="cad-canvas-status" aria-label="Текущее состояние CAD">
+                    <span class="cad-status-pill cad-status-pill--strong" id="cadActiveTool">Инструмент: Указатель</span>
+                    <span class="cad-status-pill" id="cadSnapStatus">Snap: к сетке</span>
+                    <span class="cad-status-pill" id="cadZoomStatus">100%</span>
+                </div>
+                <div class="cad-canvas-status">
+                    <span class="cad-status-pill" id="objCountSpan">Объектов: 0</span>
+                    <span class="cad-status-pill" id="coordsDisplay">X: 0, Y: 0</span>
+                </div>
             </div>
             <canvas id="canvas"></canvas>
             {% comment %}
@@ -2521,6 +2607,40 @@ const State = {
     _lastSelectionKey: ''
 };
 
+const CAD_TOOL_LABELS = {
+    pointer: 'Указатель',
+    line: 'Провод',
+    netlabel: 'Метка цепи',
+    gnd: 'GND',
+    probe: 'Пробник',
+    rectangle: 'Прямоугольник',
+    circle: 'Окружность',
+    ellipse: 'Эллипс',
+    arc: 'Дуга',
+    polygon: 'Многоугольник',
+    text: 'Текст',
+    dimension: 'Размер',
+    leader: 'Выноска',
+    delete: 'Удаление',
+};
+
+const CAD_SNAP_LABELS = {
+    grid: 'к сетке',
+    none: 'свободно',
+    ortho: 'ортогонально',
+    object: 'к объектам',
+    polar: 'полярно',
+};
+
+function updateCadHud() {
+    const toolEl = document.getElementById('cadActiveTool');
+    const snapEl = document.getElementById('cadSnapStatus');
+    const zoomEl = document.getElementById('cadZoomStatus');
+    if (toolEl) toolEl.textContent = `Инструмент: ${CAD_TOOL_LABELS[State.tool] || State.tool}`;
+    if (snapEl) snapEl.textContent = `Snap: ${CAD_SNAP_LABELS[State.snapMode] || State.snapMode}`;
+    if (zoomEl) zoomEl.textContent = `${Math.round(State.zoom * 100)}%`;
+}
+
 // Персистенс настроек CAD в localStorage. Загружаются один раз при init.
 const CAD_SETTINGS_KEY = 'dolg.cad.settings';
 function saveCadSettings() {
@@ -3072,6 +3192,7 @@ function onWheel(e) {
     State.zoom = nz;
     document.getElementById('zoomSlider').value = State.zoom;
     document.getElementById('zoomValue').textContent = Math.round(State.zoom * 100) + '%';
+    updateCadHud();
     render();
 }
 
@@ -4074,6 +4195,7 @@ function fitView() {
     State.panY = (ph - (maxY + minY) * State.zoom) / 2;
     document.getElementById('zoomSlider').value = State.zoom;
     document.getElementById('zoomValue').textContent = Math.round(State.zoom * 100) + '%';
+    updateCadHud();
     render();
 }
 
@@ -5457,6 +5579,7 @@ function focusCadObject(obj) {
     State.panY = State.canvas.height / 2 - (obj.y + (obj.height || 0) / 2) * State.zoom;
     document.getElementById('zoomSlider').value = State.zoom;
     document.getElementById('zoomValue').textContent = Math.round(State.zoom * 100) + '%';
+    updateCadHud();
     renderSelectedObjPanel();
     render();
 }
@@ -5641,6 +5764,7 @@ function init() {
     sync('cadBgColor',      State.bgColor);
     sync('cadAutoFitTpl',   State.autoFitTemplate, 'checked');
     State.canvas.style.background = State.bgColor;
+    updateCadHud();
 
     requestAnimationFrame(() => { resizeCanvas(); });
     window.addEventListener('resize', resizeCanvas);
@@ -5658,8 +5782,8 @@ function init() {
         }
         const cursors = { pointer: 'default', delete: 'not-allowed' };
         State.canvas.style.cursor = cursors[State.tool] || 'crosshair';
-        const names = { pointer: 'Указатель', line: 'Провод', netlabel: 'Метка цепи', gnd: 'GND', probe: 'Пробник цепи', rectangle: 'Прямоугольник', circle: 'Окружность', ellipse: 'Эллипс', arc: 'Дуга', polygon: 'Многоугольник', text: 'Текст', dimension: 'Размер (мм)', leader: 'Выноска', delete: 'Удаление' };
-        document.getElementById('helpText').textContent = `Инструмент: ${names[State.tool] || State.tool}`;
+        document.getElementById('helpText').textContent = `Инструмент: ${CAD_TOOL_LABELS[State.tool] || State.tool}`;
+        updateCadHud();
     }));
 
     State.canvas.addEventListener('mousedown', onMouseDown);
@@ -5705,6 +5829,7 @@ function init() {
         State.snapMode = e.target.value;
         updatePolarVisibility();
         saveCadSettings();
+        updateCadHud();
     });
     if (polarSel) polarSel.addEventListener('change', e => {
         const v = parseInt(e.target.value, 10);
@@ -5802,6 +5927,7 @@ function init() {
     document.getElementById('zoomSlider').addEventListener('input', e => {
         State.zoom = parseFloat(e.target.value);
         document.getElementById('zoomValue').textContent = Math.round(State.zoom * 100) + '%';
+        updateCadHud();
         render();
     });
     document.getElementById('fitCanvasBtn').addEventListener('click', fitView);
@@ -5809,6 +5935,7 @@ function init() {
         State.zoom = 1; State.panX = 0; State.panY = 0;
         document.getElementById('zoomSlider').value = 1;
         document.getElementById('zoomValue').textContent = '100%';
+        updateCadHud();
         render();
     });
     document.getElementById('cad3DBtn').addEventListener('click', showCad3D);
