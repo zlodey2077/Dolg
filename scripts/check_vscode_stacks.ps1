@@ -36,6 +36,30 @@ function Test-CommandExists {
     return $false
 }
 
+function Get-InstalledExtensionsFromDisk {
+    $extensionRoot = Join-Path $env:USERPROFILE ".vscode\extensions"
+    if (-not (Test-Path -LiteralPath $extensionRoot)) {
+        return @()
+    }
+
+    $ids = New-Object System.Collections.Generic.List[string]
+    Get-ChildItem -LiteralPath $extensionRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+        $packagePath = Join-Path $_.FullName "package.json"
+        if (-not (Test-Path -LiteralPath $packagePath)) {
+            return
+        }
+        try {
+            $package = Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json
+            if ($package.publisher -and $package.name) {
+                $ids.Add(("{0}.{1}" -f $package.publisher, $package.name).ToLowerInvariant())
+            }
+        }
+        catch {
+        }
+    }
+    return @($ids | Sort-Object -Unique)
+}
+
 function Invoke-WithTimeout {
     param(
         [string]$FilePath,
@@ -112,11 +136,13 @@ Write-Host "VS Code extensions"
 $installed = @()
 $codeList = Invoke-WithTimeout -FilePath "cmd.exe" -Arguments @("/d", "/c", "code", "--list-extensions") -TimeoutSeconds 20
 if ($codeList.ExitCode -eq 0) {
-    $installed = $codeList.Stdout -split "`r?`n" | Where-Object { $_ }
+    $installed = $codeList.Stdout -split "`r?`n" | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() }
 } elseif ($codeList.TimedOut) {
-    Write-Result "FAIL" "code --list-extensions" "timed out; restart VS Code or check the code CLI"
+    Write-Result "WARN" "code --list-extensions" "timed out; falling back to %USERPROFILE%\.vscode\extensions"
+    $installed = Get-InstalledExtensionsFromDisk
 } else {
-    Write-Result "FAIL" "code --list-extensions" $codeList.Stderr
+    Write-Result "WARN" "code --list-extensions" "$($codeList.Stderr); falling back to %USERPROFILE%\.vscode\extensions"
+    $installed = Get-InstalledExtensionsFromDisk
 }
 $requiredExtensions = @(
     "batisteo.vscode-django",
@@ -124,12 +150,15 @@ $requiredExtensions = @(
     "editorconfig.editorconfig",
     "humao.rest-client",
     "mikestead.dotenv",
+    "ms-azuretools.vscode-containers",
     "ms-azuretools.vscode-docker",
     "ms-kubernetes-tools.vscode-kubernetes-tools",
     "ms-playwright.playwright",
     "ms-python.python",
     "ms-python.vscode-pylance",
     "ms-vscode.powershell",
+    "ms-vscode-remote.remote-containers",
+    "ms-vscode-remote.remote-wsl",
     "mtxr.sqltools",
     "mtxr.sqltools-driver-sqlite",
     "qwtel.sqlite-viewer",
@@ -138,7 +167,7 @@ $requiredExtensions = @(
     "wholroyd.jinja"
 )
 foreach ($extension in $requiredExtensions) {
-    if ($installed -contains $extension) {
+    if ($installed -contains $extension.ToLowerInvariant()) {
         Write-Result "PASS" "extension:$extension"
     } else {
         Write-Result "FAIL" "extension:$extension" "missing"
@@ -187,6 +216,24 @@ if (Test-Path (Join-Path $root "frontend\package.json")) {
 
 Write-Host ""
 Write-Host "Docker"
+$serviceNames = @("hns", "vmcompute", "LxssManager", "com.docker.service")
+$services = Get-Service -Name $serviceNames -ErrorAction SilentlyContinue |
+    Select-Object Name, Status, StartType
+foreach ($serviceName in $serviceNames) {
+    $service = $services | Where-Object { $_.Name -eq $serviceName }
+    if ($service) {
+        $status = "$($service.Status), startup=$($service.StartType)"
+        if ($serviceName -eq "com.docker.service" -and $service.Status -ne "Running") {
+            Write-Result "WARN" "service:$serviceName" "$status; run task Stacks: prepare Lxss Docker Kubernetes (admin)"
+        } elseif ($serviceName -in @("LxssManager", "vmcompute", "hns") -and $service.Status -ne "Running") {
+            Write-Result "FAIL" "service:$serviceName" "$status; run task Stacks: prepare Lxss Docker Kubernetes (admin)"
+        } else {
+            Write-Result "PASS" "service:$serviceName" $status
+        }
+    } else {
+        Write-Result "FAIL" "service:$serviceName" "missing; run task Stacks: prepare Lxss Docker Kubernetes (admin)"
+    }
+}
 $docker = Get-Command "docker" -ErrorAction SilentlyContinue
 if ($docker) {
     $dockerTimedOut = $false
@@ -195,7 +242,7 @@ if ($docker) {
         Write-Result "PASS" "docker daemon" "server $($dockerInfo.Stdout)"
     } elseif ($dockerInfo.TimedOut) {
         $dockerTimedOut = $true
-        Write-Result "FAIL" "docker daemon" "CLI timed out; Docker Desktop backend is not responding. Run scripts\run_windows_stack_repair_as_admin.cmd, restart Windows if requested, then open Docker Desktop."
+        Write-Result "FAIL" "docker daemon" "CLI timed out; run VS Code task Stacks: prepare Lxss Docker Kubernetes (admin), restart Windows if requested, then open Docker Desktop."
     } else {
         Write-Result "FAIL" "docker daemon" $dockerInfo.Stderr
     }
@@ -240,7 +287,12 @@ if ($kubectl) {
     if ($context.ExitCode -eq 0 -and $context.Stdout) {
         Write-Result "PASS" "kubectl context" $context.Stdout
     } else {
-        Write-Result "FAIL" "kubectl context" "no current context; enable Docker Desktop Kubernetes or set kubeconfig. Current %USERPROFILE%\.kube\config is missing/empty."
+        $kubeconfig = Join-Path $env:USERPROFILE ".kube\config"
+        if (-not (Test-Path -LiteralPath $kubeconfig)) {
+            Write-Result "FAIL" "kubectl context" "no current context and kubeconfig is missing at $kubeconfig; run task Stacks: prepare Lxss Docker Kubernetes (admin), then enable Docker Desktop Kubernetes."
+        } else {
+            Write-Result "FAIL" "kubectl context" "no current context in $kubeconfig; enable Docker Desktop Kubernetes or set kubeconfig."
+        }
     }
     $kustomize = Invoke-WithTimeout -FilePath $kubectl.Source -Arguments @("kustomize", "deploy/k8s") -TimeoutSeconds 60
     if ($kustomize.ExitCode -eq 0 -and $kustomize.Stdout) {

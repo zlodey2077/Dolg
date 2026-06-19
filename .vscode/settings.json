@@ -88,6 +88,15 @@
       "previewLimit": 50
     }
   ],
+  "vs-kubernetes.namespace": "dolg",
+  "vs-kubernetes.kubectl-path.windows": "C:\\Program Files\\Docker\\Docker\\resources\\bin\\kubectl.exe",
+  "vscode-kubernetes.kubectl-path-windows": "C:\\Program Files\\Docker\\Docker\\resources\\bin\\kubectl.exe",
+  "vs-kubernetes.kubeconfig": "${env:USERPROFILE}\\.kube\\config",
+  "vs-kubernetes.knownKubeconfigs": [
+    "${env:USERPROFILE}\\.kube\\config"
+  ],
+  "vs-kubernetes.kubectlVersioning": "user-provided",
+  "vs-kubernetes.outputFormat": "yaml",
   "terminal.integrated.defaultProfile.windows": "PowerShell",
   "terminal.integrated.env.windows": {
     "PYTHONUTF8": "1"

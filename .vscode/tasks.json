@@ -84,6 +84,16 @@
       "problemMatcher": []
     },
     {
+      "label": "Stacks: prepare Lxss Docker Kubernetes (admin)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\run_lxss_docker_k8s_prepare_as_admin.cmd",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Docker: stop stuck Desktop (admin)",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\stop_docker_desktop_as_admin.cmd",
