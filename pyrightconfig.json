@@ -23,7 +23,12 @@
     "**/node_modules",
     "**/staticfiles",
     "**/media",
+    "Dolg_APP/ml/dataset/external",
+    "Dolg_APP/ml/dataset/hf_cache",
+    "Dolg_APP/ml/dataset/cache",
     "backups",
+    "logs",
+    ".tmp",
     "htmlcov",
     "docs/final/generated"
   ],

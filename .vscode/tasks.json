@@ -19,6 +19,61 @@
       "problemMatcher": []
     },
     {
+      "label": "System: diagnose load",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\diagnose_system_load.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "System: Windows health + Defender quick scan",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\diagnose_windows_health.ps1",
+        "-QuickScan"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "System: stop stale dev processes",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\stop_heavy_dev_services.ps1",
+        "-Apply",
+        "-IncludePlaywright",
+        "-IncludePylance"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Stacks: repair Windows Docker/WSL (admin)",
       "type": "shell",
       "command": "${workspaceFolder}\\scripts\\run_windows_stack_repair_as_admin.cmd",
