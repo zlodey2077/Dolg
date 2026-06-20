@@ -28,8 +28,16 @@ def test_dc_labels_divider_physics_correct():
     assert dc['engine'] == 'dolg-numpy-mna'
 
 
-def test_dc_labels_unsolvable_returns_none():
-    assert t.dc_labels({'components': [], 'connections': []}) is None
+def test_dc_labels_empty_is_trivial_ground():
+    # пустая схема тривиально решаема (только ground-узел 0 В), а не падение
+    dc = t.dc_labels({'components': [], 'connections': []})
+    assert dc is not None
+    assert dc['n_nodes'] <= 1
+
+
+def test_dc_labels_malformed_returns_none():
+    # кривой вход → graceful None (движок бросает, учитель не падает)
+    assert t.dc_labels(12345) is None
 
 
 def test_topology_label_divider():
