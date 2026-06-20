@@ -1,0 +1,1 @@
+{"name":"dolg-build","private":true,"type":"module","dependencies":{"@huggingface/transformers":"^4.2.0"}}
