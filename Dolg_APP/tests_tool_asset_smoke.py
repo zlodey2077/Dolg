@@ -136,7 +136,8 @@ class ToolAssetSmokeTests(TestCase):
 
         data = response.json()
         self.assertTrue(data['ok'])
-        self.assertEqual(data['router_profile']['primary_engine'], 'xyce')
+        self.assertEqual(data['router_profile']['primary_engine'], 'dolg-engine-router')
+        self.assertEqual(data['router_profile']['primary_external_engine'], 'xyce')
         self.assertIn('engines', data)
 
     def test_server_engine_recommend_api_contract(self):

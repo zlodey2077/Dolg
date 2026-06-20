@@ -201,6 +201,16 @@
 - Verification: `ruff check Dolg_APP\tests_tool_asset_smoke.py`, `pytest Dolg_APP\tests_tool_asset_smoke.py -q`, Node syntax check for `server-engine-ui.js`, and `git diff --check` for touched files.
 - Next active item in `WORK_FRONT_20260619.md`: Session 3, EngineJob MVP-2.
 
+### 2026-06-21 - EngineJob MVP-2 and first server engine
+
+- Added `dolg-engine-router` to the server-engine catalog as the first real server-side engine entrypoint. Its worker adapter currently delegates to `dolg-numpy-mna`, records the route in result metrics/artifacts, and gives us a stable place to attach Xyce/PySpice/GnuCap/GNN workers later.
+- Extended `EngineJob` with `reason`, `retry_count`, `max_retries`, `result_contract_version` and `audit_log`; added migration `0021_enginejob_mvp2`.
+- Added lifecycle helpers for retry, stale heartbeat detection and audit events. `run_engine_worker --mark-stale --stale-after N` can now clean orphaned running jobs before processing the queue.
+- Added API retry endpoint `/api/sim/jobs/<id>/retry/`, richer job serialization, terminal result status handling, and admin visibility for retry/reason/audit fields.
+- Result payloads now normalize to `dolg.engine.result` contract v1, so future external workers can return the same shape.
+- Verification: focused ruff, `manage.py check`, `makemigrations --check --dry-run`, and `pytest Dolg_APP/tests_server_engines.py Dolg_APP/tests_tool_asset_smoke.py -q` (`23 passed`).
+- Next active item in `WORK_FRONT_20260619.md`: Session 4, security/data-protection report for targeted attacks.
+
 ## Шаблон новой записи
 
 ```markdown

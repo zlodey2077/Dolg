@@ -15,6 +15,7 @@ import time
 from typing import Any
 
 from django.db import connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from Dolg_APP.models import EngineJob, ProjectEvent, SimulationRun
@@ -28,7 +29,12 @@ from .monte_carlo import (
     solve_transient,
 )
 
-LOCAL_ENGINE_IDS = ('dolg-numpy-mna',)
+ENGINE_RESULT_CONTRACT = {
+    'kind': 'dolg.engine.result',
+    'version': 1,
+}
+ENGINE_JOB_STALE_AFTER_SECONDS = 180
+LOCAL_ENGINE_IDS = ('dolg-engine-router', 'dolg-numpy-mna')
 TERMINAL_STATUSES = {'success', 'error', 'cancelled', 'stale'}
 
 
@@ -73,7 +79,122 @@ def claim_next_engine_job(
         if not updated:
             return None
         job.refresh_from_db()
+        append_job_audit(
+            job,
+            'claimed',
+            actor=worker_id,
+            message='Worker claimed queued job.',
+            meta={'worker': worker_id},
+        )
         return job
+
+
+def append_job_audit(
+    job: EngineJob,
+    action: str,
+    *,
+    actor: str = 'system',
+    message: str = '',
+    meta: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Append a compact audit event to EngineJob.audit_log."""
+    entry = {
+        'at': timezone.now().isoformat(),
+        'action': str(action or 'event')[:64],
+        'actor': str(actor or 'system')[:120],
+        'message': str(message or '')[:260],
+        'meta': _json_safe(meta or {}),
+    }
+    current = job.audit_log if isinstance(job.audit_log, list) else []
+    next_log = [*current, entry][-60:]
+    EngineJob.objects.filter(pk=job.pk).update(audit_log=next_log)
+    job.audit_log = next_log
+    return next_log
+
+
+def retry_engine_job(
+    job: EngineJob,
+    *,
+    actor: str = 'system',
+    reason: str = 'Retry requested.',
+) -> tuple[bool, str]:
+    """Reset a terminal job to queued while preserving a short audit trail."""
+    if job.status in {'queued', 'running'}:
+        return False, 'job is already active'
+    retry_count = int(job.retry_count or 0)
+    max_retries = int(job.max_retries or 0)
+    if max_retries >= 0 and retry_count >= max_retries:
+        message = f'max retries reached ({retry_count}/{max_retries})'
+        EngineJob.objects.filter(pk=job.pk).update(reason=message, message=message)
+        job.reason = message
+        job.message = message
+        append_job_audit(job, 'retry_rejected', actor=actor, message=message)
+        return False, message
+
+    now_reason = str(reason or 'Retry requested.')[:180]
+    EngineJob.objects.filter(pk=job.pk).update(
+        status='queued',
+        progress_percent=0,
+        message=now_reason,
+        reason=now_reason,
+        retry_count=retry_count + 1,
+        external_id='',
+        worker='',
+        result={},
+        result_contract_version=ENGINE_RESULT_CONTRACT['version'],
+        warnings=[],
+        artifacts=[],
+        error='',
+        started_at=None,
+        heartbeat_at=None,
+        finished_at=None,
+    )
+    job.refresh_from_db()
+    append_job_audit(
+        job,
+        'retry',
+        actor=actor,
+        message=now_reason,
+        meta={'retry_count': job.retry_count, 'max_retries': job.max_retries},
+    )
+    return True, now_reason
+
+
+def mark_stale_engine_jobs(
+    *,
+    max_age_seconds: int = ENGINE_JOB_STALE_AFTER_SECONDS,
+    actor: str = 'system',
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Mark running jobs stale when their heartbeat is older than the cutoff."""
+    now = timezone.now()
+    cutoff = now - timezone.timedelta(seconds=max(1, int(max_age_seconds or ENGINE_JOB_STALE_AFTER_SECONDS)))
+    candidates = (
+        EngineJob.objects.filter(status='running')
+        .filter(Q(heartbeat_at__lt=cutoff) | Q(heartbeat_at__isnull=True, started_at__lt=cutoff))
+        .order_by('heartbeat_at', 'started_at', 'id')[: max(1, min(int(limit or 100), 1000))]
+    )
+    stale_jobs = []
+    for job in candidates:
+        reason = f'Heartbeat stale for more than {max_age_seconds} seconds.'
+        EngineJob.objects.filter(pk=job.pk, status='running').update(
+            status='stale',
+            progress_percent=max(0, min(int(job.progress_percent or 0), 99)),
+            message=reason,
+            reason=reason[:180],
+            heartbeat_at=now,
+            finished_at=now,
+        )
+        job.refresh_from_db()
+        append_job_audit(
+            job,
+            'stale',
+            actor=actor,
+            message=reason,
+            meta={'cutoff': cutoff.isoformat(), 'max_age_seconds': max_age_seconds},
+        )
+        stale_jobs.append(_job_outcome(job))
+    return {'marked': len(stale_jobs), 'jobs': stale_jobs, 'cutoff': cutoff.isoformat()}
 
 
 def run_due_engine_jobs(
@@ -126,7 +247,39 @@ def execute_engine_job(job: EngineJob) -> tuple[dict[str, Any], list[str], list[
         raise EngineJobExecutionError(
             f'No local adapter for engine "{job.engine_id}". Run a dedicated Docker/CLI worker for this engine.'
         )
+    if job.engine_id == 'dolg-engine-router':
+        return _run_engine_router_adapter(job)
     return _run_numpy_mna_adapter(job)
+
+
+def _run_engine_router_adapter(job: EngineJob) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
+    """First real server-engine router: stable local route now, Docker routes later."""
+    options = job.options or {}
+    target_engine = str(options.get('target_engine') or options.get('delegate_engine') or 'dolg-numpy-mna').strip()
+    if target_engine not in {'', 'dolg-numpy-mna'}:
+        raise EngineJobExecutionError(
+            f'dolg-engine-router route "{target_engine}" is not connected yet; use a dedicated worker.'
+        )
+
+    _touch_job(job, progress_percent=45, message='Router delegated job to NumPy MNA adapter.')
+    result, warnings, artifacts = _run_numpy_mna_adapter(job)
+    metrics = result.setdefault('metrics', {})
+    metrics['router_engine'] = 'dolg-engine-router'
+    metrics['delegated_engine'] = 'dolg-numpy-mna'
+    result['engine_router'] = {
+        'id': 'dolg-engine-router',
+        'delegated_engine': 'dolg-numpy-mna',
+        'route_reason': 'local MVP route for DC/AC/transient/tolerance before Docker workers',
+    }
+    artifacts = [
+        *artifacts,
+        {
+            'kind': 'route',
+            'engine': 'dolg-engine-router',
+            'delegated_engine': 'dolg-numpy-mna',
+        },
+    ]
+    return result, warnings, artifacts
 
 
 def _run_numpy_mna_adapter(job: EngineJob) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
@@ -351,20 +504,30 @@ def _finish_success(
     started: float,
 ) -> None:
     elapsed_ms = int((time.perf_counter() - started) * 1000)
+    normalized_result = normalize_engine_result(job, result, warnings=warnings, artifacts=artifacts)
     EngineJob.objects.filter(pk=job.pk).update(
         status='success',
         progress_percent=100,
         message=f'Completed by local worker in {elapsed_ms} ms.',
-        result=_json_safe(result),
-        warnings=[str(item) for item in warnings],
-        artifacts=_json_safe(artifacts),
+        reason='',
+        result=_json_safe(normalized_result),
+        result_contract_version=ENGINE_RESULT_CONTRACT['version'],
+        warnings=[str(item) for item in normalized_result.get('warnings') or warnings],
+        artifacts=_json_safe(normalized_result.get('artifacts') or artifacts),
         error='',
         heartbeat_at=timezone.now(),
         finished_at=timezone.now(),
     )
     job.refresh_from_db()
+    append_job_audit(
+        job,
+        'success',
+        actor=job.worker or 'worker',
+        message=f'Completed in {elapsed_ms} ms.',
+        meta={'elapsed_ms': elapsed_ms, 'contract_version': ENGINE_RESULT_CONTRACT['version']},
+    )
     try:
-        _persist_simulation_run(job, result, warnings, elapsed_ms)
+        _persist_simulation_run(job, normalized_result, normalized_result.get('warnings') or warnings, elapsed_ms)
     except Exception as exc:  # pragma: no cover - history is useful, not job-critical.
         saved_warnings = [str(item) for item in warnings]
         saved_warnings.append(f'SimulationRun history save failed: {exc}')
@@ -446,15 +609,51 @@ def _count_result_rows(value: Any) -> int:
 
 def _finish_error(job: EngineJob, error: str, started: float) -> None:
     elapsed_ms = int((time.perf_counter() - started) * 1000)
+    reason = str(error or 'worker error')[:180]
     EngineJob.objects.filter(pk=job.pk).update(
         status='error',
         progress_percent=100,
         message=f'Worker failed after {elapsed_ms} ms.',
+        reason=reason,
         error=error[:4000],
         heartbeat_at=timezone.now(),
         finished_at=timezone.now(),
     )
     job.refresh_from_db()
+    append_job_audit(
+        job,
+        'error',
+        actor=job.worker or 'worker',
+        message=reason,
+        meta={'elapsed_ms': elapsed_ms},
+    )
+
+
+def normalize_engine_result(
+    job: EngineJob,
+    result: dict[str, Any] | None,
+    *,
+    warnings: list[str] | None = None,
+    artifacts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Normalize adapter output for future Xyce/PySpice/GnuCap workers."""
+    payload = _json_safe(result or {})
+    if not isinstance(payload, dict):
+        payload = {'raw': payload}
+    payload['ok'] = bool(payload.get('ok', True))
+    payload['schema_version'] = int(payload.get('schema_version') or ENGINE_RESULT_CONTRACT['version'])
+    payload['contract'] = dict(ENGINE_RESULT_CONTRACT)
+    payload['engine_job_id'] = job.id
+    payload['engine'] = payload.get('engine') or job.engine_id
+    payload['engine_name'] = payload.get('engine_name') or job.engine_name
+    payload['analysis_type'] = payload.get('analysis_type') or job.analysis_type
+    payload.setdefault('nodes', [])
+    payload.setdefault('branches', [])
+    payload.setdefault('waveforms', [])
+    payload.setdefault('metrics', {})
+    payload['warnings'] = [str(item) for item in (warnings or payload.get('warnings') or [])]
+    payload['artifacts'] = _json_safe(artifacts or payload.get('artifacts') or [])
+    return payload
 
 
 def _job_outcome(job: EngineJob) -> dict[str, Any]:

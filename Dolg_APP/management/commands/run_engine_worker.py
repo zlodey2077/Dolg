@@ -6,7 +6,7 @@ import time
 
 from django.core.management.base import BaseCommand
 
-from Dolg_APP.services.engine_jobs import default_worker_id, run_due_engine_jobs
+from Dolg_APP.services.engine_jobs import default_worker_id, mark_stale_engine_jobs, run_due_engine_jobs
 
 
 class Command(BaseCommand):
@@ -20,6 +20,17 @@ class Command(BaseCommand):
             '--max-loops', type=int, default=0, help='Stop after N polling passes; 0 means forever.'
         )
         parser.add_argument('--worker-id', default='', help='Stable worker name stored on EngineJob.worker.')
+        parser.add_argument(
+            '--mark-stale',
+            action='store_true',
+            help='Mark stale running EngineJob records before processing queued jobs.',
+        )
+        parser.add_argument(
+            '--stale-after',
+            type=int,
+            default=180,
+            help='Seconds without heartbeat before a running job becomes stale.',
+        )
         parser.add_argument(
             '--engine',
             action='append',
@@ -38,6 +49,13 @@ class Command(BaseCommand):
         loop = 0
         while True:
             loop += 1
+            if options.get('mark_stale'):
+                stale = mark_stale_engine_jobs(
+                    max_age_seconds=int(options.get('stale_after') or 180),
+                    actor=worker_id,
+                )
+                if stale['marked']:
+                    self.stdout.write(self.style.WARNING(f'stale={stale["marked"]} worker={worker_id}'))
             outcome = run_due_engine_jobs(limit=limit, worker_id=worker_id, engine_ids=engines)
             processed = outcome['processed']
             if processed:

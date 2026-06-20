@@ -8,9 +8,10 @@ from io import StringIO
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 
 from Dolg_APP.models import EngineJob, ProjectEvent, SchematicProject, SimulationRun
-from Dolg_APP.services.engine_jobs import run_due_engine_jobs
+from Dolg_APP.services.engine_jobs import mark_stale_engine_jobs, run_due_engine_jobs
 from Dolg_APP.services.server_engines import (
     recommend_server_engines,
     server_engine_ids,
@@ -50,9 +51,11 @@ class ServerEngineCatalogTests(SimpleTestCase):
     def test_catalog_has_xyce_pyspice_and_router_profile(self):
         payload = server_engine_payload()
         engine_ids = {engine['id'] for engine in payload['engines']}
+        self.assertIn('dolg-engine-router', engine_ids)
         self.assertIn('xyce', engine_ids)
         self.assertIn('pyspice', engine_ids)
-        self.assertEqual(payload['router_profile']['primary_engine'], 'xyce')
+        self.assertEqual(payload['router_profile']['primary_engine'], 'dolg-engine-router')
+        self.assertEqual(payload['router_profile']['primary_external_engine'], 'xyce')
         self.assertIn('xyce-worker', payload['router_profile']['docker_services'])
 
     def test_xyce_is_primary_candidate(self):
@@ -84,7 +87,7 @@ class ServerEngineApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['ok'])
-        self.assertEqual(data['router_profile']['primary_engine'], 'xyce')
+        self.assertEqual(data['router_profile']['primary_engine'], 'dolg-engine-router')
 
     def test_recommend_api_accepts_in_memory_scheme(self):
         response = self.client.post(
@@ -122,6 +125,9 @@ class ServerEngineApiTests(TestCase):
         job = EngineJob.objects.get()
         self.assertEqual(job.user, self.user)
         self.assertEqual(job.analysis_type, 'tran')
+        self.assertEqual(job.reason, 'queued')
+        self.assertEqual(job.max_retries, 2)
+        self.assertEqual(job.audit_log[0]['action'], 'queued')
         self.assertIn('xyce', data['router_profile']['fallback_order'])
 
     def test_engine_job_detail_and_pending_result(self):
@@ -182,6 +188,82 @@ class ServerEngineApiTests(TestCase):
         self.assertEqual(job.result['analysis_type'], 'dc')
         voltages = [float(value) for value in job.result['node_voltages'].values()]
         self.assertTrue(any(abs(value - 5.0) < 1e-6 for value in voltages))
+        self.assertEqual(job.result['contract']['kind'], 'dolg.engine.result')
+        self.assertEqual(job.result['contract']['version'], 1)
+        self.assertTrue(any(item['action'] == 'success' for item in job.audit_log))
+
+    def test_local_engine_router_delegates_to_numpy_mna(self):
+        job = EngineJob.objects.create(
+            user=self.user,
+            engine_id='dolg-engine-router',
+            engine_name='DOLG Engine Router',
+            analysis_type='dc',
+            scheme_data=_divider_scheme(),
+        )
+
+        outcome = run_due_engine_jobs(limit=1, worker_id='pytest-router')
+
+        self.assertEqual(outcome['processed'], 1)
+        job.refresh_from_db()
+        self.assertEqual(job.status, 'success')
+        self.assertEqual(job.worker, 'pytest-router')
+        self.assertEqual(job.result['contract']['kind'], 'dolg.engine.result')
+        self.assertEqual(job.result['engine_router']['delegated_engine'], 'dolg-numpy-mna')
+        self.assertEqual(job.result['metrics']['router_engine'], 'dolg-engine-router')
+        self.assertTrue(any(item.get('kind') == 'route' for item in job.artifacts))
+
+    def test_mark_stale_engine_jobs_uses_heartbeat(self):
+        old = timezone.now() - timezone.timedelta(minutes=10)
+        job = EngineJob.objects.create(
+            user=self.user,
+            engine_id='dolg-engine-router',
+            engine_name='DOLG Engine Router',
+            analysis_type='dc',
+            status='running',
+            progress_percent=50,
+            started_at=old,
+            heartbeat_at=old,
+            worker='lost-worker',
+        )
+
+        outcome = mark_stale_engine_jobs(max_age_seconds=60, actor='pytest-stale')
+
+        self.assertEqual(outcome['marked'], 1)
+        job.refresh_from_db()
+        self.assertEqual(job.status, 'stale')
+        self.assertIn('Heartbeat stale', job.reason)
+        self.assertTrue(any(item['action'] == 'stale' for item in job.audit_log))
+
+    def test_retry_endpoint_requeues_terminal_job(self):
+        self.client.force_login(self.user)
+        job = EngineJob.objects.create(
+            user=self.user,
+            engine_id='dolg-engine-router',
+            engine_name='DOLG Engine Router',
+            analysis_type='dc',
+            status='error',
+            progress_percent=100,
+            reason='adapter failed',
+            error='adapter failed',
+            retry_count=0,
+            max_retries=2,
+        )
+
+        response = self.client.post(
+            f'/api/sim/jobs/{job.id}/retry/',
+            data=json.dumps({'reason': 'try router again'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 202)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        job.refresh_from_db()
+        self.assertEqual(job.status, 'queued')
+        self.assertEqual(job.retry_count, 1)
+        self.assertEqual(job.reason, 'try router again')
+        self.assertEqual(job.error, '')
+        self.assertTrue(any(item['action'] == 'retry' for item in job.audit_log))
 
     def test_local_worker_persists_project_simulation_run(self):
         project = SchematicProject.objects.create(

@@ -239,10 +239,13 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
 2. Сессия 2: закрыта - первый малый вынос из `simulation.html` сделан:
    `server-engine-ui.js` в `shop/static/simulation`, сохранён `window.*`
    контракт, добавлен focused Node VM smoke.
-3. Сессия 3: следующий активный пункт - EngineJob MVP-2:
-   stale/retry/heartbeat/reason/audit, единый
-   result contract для будущих Xyce/PySpice/GnuCap workers.
-4. Сессия 4: доклад по защите данных от целевых атак: OWASP ASVS/Top 10 +
+3. Сессия 3: закрыта - добавлен первый реальный server-side engine
+   `dolg-engine-router`, который уже проходит через `EngineJob` и локальный
+   worker, делегируя MVP-маршрут в NumPy MNA. `EngineJob` получил
+   stale/retry/heartbeat/reason/audit и единый `dolg.engine.result` contract v1
+   для будущих Xyce/PySpice/GnuCap workers.
+4. Сессия 4: следующий активный пункт - доклад по защите данных от целевых атак:
+   OWASP ASVS/Top 10 +
    NIST CSF 2.0, реальные активы DOLG, threat model, gaps, меры и текст для
    защиты.
 5. Сессия 5: Admin/Data Console v2: безопасный поиск/фильтры, JSONField и

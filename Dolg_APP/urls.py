@@ -291,6 +291,11 @@ urlpatterns = [
         lazy_view('Dolg_APP.views.api_engine_job_result'),
         name='api_engine_job_result',
     ),
+    path(
+        'api/sim/jobs/<int:job_id>/retry/',
+        lazy_view('Dolg_APP.views.api_engine_job_retry'),
+        name='api_engine_job_retry',
+    ),
     # Block D2: server-side Monte Carlo DC analysis (numpy MNA, 1000+ iter/sec).
     path('api/sim/monte_carlo/', lazy_view('Dolg_APP.views.api_monte_carlo'), name='api_monte_carlo'),
     # RF S-параметры 2-портовых фильтров через scikit-rf (S21/S11, −3дБ).

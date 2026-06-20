@@ -23,10 +23,14 @@ ENGINE_CATEGORIES = [
 ]
 
 ENGINE_ROUTER_PROFILE = {
-    'primary_engine': 'xyce',
+    'primary_engine': 'dolg-engine-router',
+    'primary_external_engine': 'xyce',
     'interactive_engine': 'dolg-ngspice-wasm',
     'python_bridge': 'pyspice',
-    'strategy': 'Xyce-first для серверных SPICE-задач, ngspice.wasm для интерактива, PySpice как Python-адаптер.',
+    'strategy': (
+        'DOLG Engine Router принимает server-side jobs, локально делегирует в NumPy MNA, '
+        'а для тяжёлых SPICE-задач готовит Xyce/PySpice/GnuCap workers.'
+    ),
     'contract': {
         'submit': 'POST /engines/{engine_id}/jobs',
         'status': 'GET /engines/jobs/{job_id}',
@@ -49,10 +53,26 @@ ENGINE_ROUTER_PROFILE = {
         'Redis/Celery queue or Kubernetes Jobs for async runs',
         'PersistentVolume/S3-compatible storage for raw traces and reports',
     ],
-    'fallback_order': ['xyce', 'pyspice', 'gnucap', 'dolg-ngspice-wasm', 'dolg-numpy-mna'],
+    'fallback_order': ['dolg-engine-router', 'xyce', 'pyspice', 'gnucap', 'dolg-ngspice-wasm', 'dolg-numpy-mna'],
 }
 
 SERVER_ENGINE_CATALOG = [
+    {
+        'id': 'dolg-engine-router',
+        'name': 'DOLG Engine Router',
+        'category': 'core',
+        'status': 'connected',
+        'status_label': 'серверный MVP',
+        'task': 'Единая server-side точка входа для EngineJob и будущих Docker/Kubernetes workers.',
+        'fit': 'Маршрутизация DC/AC/transient/tolerance задач, единый result contract, retries, stale и audit.',
+        'integration': 'Django worker сегодня делегирует в NumPy MNA; позже выбирает Xyce/PySpice/GnuCap/GNN.',
+        'license': 'internal',
+        'source_url': '',
+        'endpoint': '/api/sim/jobs/',
+        'outputs': ['DOLG engine result v1', 'job audit', 'worker heartbeat'],
+        'tags': ['electronics', 'spice', 'mna', 'server-engine', 'router', 'docker', 'kubernetes'],
+        'priority': 12,
+    },
     {
         'id': 'dolg-ngspice-wasm',
         'name': 'ngspice.wasm',

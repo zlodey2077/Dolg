@@ -324,13 +324,15 @@ class EngineJobAdmin(admin.ModelAdmin):
         'analysis_type',
         'status',
         'progress_badge',
+        'retry_count',
         'project',
         'user',
+        'heartbeat_at',
         'created_at',
     )
     list_filter = ('engine_id', 'analysis_type', 'status', 'created_at')
     search_fields = ('engine_id', 'engine_name', 'project__name', 'user__username', 'netlist', 'external_id')
-    readonly_fields = ('created_at', 'updated_at', 'started_at', 'heartbeat_at', 'finished_at')
+    readonly_fields = ('created_at', 'updated_at', 'started_at', 'heartbeat_at', 'finished_at', 'audit_log')
     autocomplete_fields = ('project', 'user')
     list_select_related = ('project', 'user')
     date_hierarchy = 'created_at'
@@ -345,16 +347,21 @@ class EngineJobAdmin(admin.ModelAdmin):
 
     @admin.action(description='Повторить jobs: queued')
     def retry_jobs(self, request, queryset):
-        updated = queryset.update(
-            status='queued',
-            progress_percent=0,
-            message='Retried from Django admin',
-            started_at=None,
-            heartbeat_at=None,
-            finished_at=None,
-            error='',
-        )
-        self.message_user(request, f'Engine jobs поставлено в очередь: {updated}.')
+        from Dolg_APP.services.engine_jobs import retry_engine_job
+
+        updated = 0
+        rejected = 0
+        for job in queryset:
+            ok, _message = retry_engine_job(
+                job,
+                actor=request.user.get_username() or 'admin',
+                reason='Retried from Django admin',
+            )
+            if ok:
+                updated += 1
+            else:
+                rejected += 1
+        self.message_user(request, f'Engine jobs поставлено в очередь: {updated}; rejected: {rejected}.')
 
     @admin.action(description='Отменить jobs')
     def mark_cancelled(self, request, queryset):
@@ -364,6 +371,7 @@ class EngineJobAdmin(admin.ModelAdmin):
             heartbeat_at=now,
             finished_at=now,
             message='Cancelled from Django admin',
+            reason='Cancelled from Django admin',
         )
         self.message_user(request, f'Engine jobs отменено: {updated}.')
 
@@ -375,6 +383,7 @@ class EngineJobAdmin(admin.ModelAdmin):
             heartbeat_at=now,
             finished_at=now,
             message='Marked stale from Django admin',
+            reason='Marked stale from Django admin',
         )
         self.message_user(request, f'Engine jobs stale: {updated}.')
 
@@ -387,6 +396,7 @@ class EngineJobAdmin(admin.ModelAdmin):
             heartbeat_at=now,
             finished_at=now,
             message='Marked success from Django admin',
+            reason='',
         )
         self.message_user(request, f'Engine jobs success: {updated}.')
 

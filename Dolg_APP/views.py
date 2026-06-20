@@ -39,6 +39,7 @@ from .quotas import (
 )
 from .schematic_validation import COMPONENT_TO_CATEGORY, validate_scheme_data
 from .services.cad_import import import_preview
+from .services.engine_jobs import retry_engine_job
 from .services.entitlements import (
     feature_denied_response,
     feature_summary,
@@ -2720,6 +2721,10 @@ def _engine_job_to_dict(job, *, include_input=False, include_result=False):
         'status': job.status,
         'progress_percent': job.progress_percent,
         'message': job.message,
+        'reason': job.reason,
+        'retry_count': job.retry_count,
+        'max_retries': job.max_retries,
+        'result_contract_version': job.result_contract_version,
         'external_id': job.external_id,
         'worker': job.worker,
         'project_id': job.project_id,
@@ -2731,9 +2736,11 @@ def _engine_job_to_dict(job, *, include_input=False, include_result=False):
         'warnings': job.warnings or [],
         'artifacts': job.artifacts or [],
         'error': job.error,
+        'audit_log': job.audit_log or [],
         'links': {
             'status': reverse('hello:api_engine_job_detail', args=[job.id]),
             'result': reverse('hello:api_engine_job_result', args=[job.id]),
+            'retry': reverse('hello:api_engine_job_retry', args=[job.id]),
         },
     }
     if include_input:
@@ -2805,6 +2812,10 @@ def api_engine_jobs(request):
 
     analysis_type = str(data.get('analysis_type') or data.get('analysis') or 'unknown').strip().lower()[:32]
     netlist = str(data.get('netlist') or '')
+    try:
+        max_retries = max(0, min(int(data.get('max_retries', 2)), 10))
+    except (TypeError, ValueError):
+        max_retries = 2
     job = EngineJob.objects.create(
         project=project,
         user=request.user,
@@ -2814,6 +2825,8 @@ def api_engine_jobs(request):
         status='queued',
         progress_percent=0,
         message='Queued for external engine worker; no CLI process is started inside the web request.',
+        reason='queued',
+        max_retries=max_retries,
         netlist=netlist,
         scheme_data=scheme_data if isinstance(scheme_data, dict) else {},
         options=options if isinstance(options, dict) else {},
@@ -2822,6 +2835,15 @@ def api_engine_jobs(request):
             'expected_outputs': engine.get('outputs', []),
             'source': data.get('source') or 'api',
         },
+        audit_log=[
+            {
+                'at': timezone.now().isoformat(),
+                'action': 'queued',
+                'actor': request.user.get_username() or 'user',
+                'message': 'Queued from simulation API.',
+                'meta': {'engine_id': engine['id'], 'source': data.get('source') or 'api'},
+            }
+        ],
     )
     return JsonResponse(
         {
@@ -2848,15 +2870,35 @@ def api_engine_job_detail(request, job_id):
 @require_GET
 def api_engine_job_result(request, job_id):
     job = get_object_or_404(_engine_jobs_for_user(request.user), pk=job_id)
-    status = 200 if job.status == 'success' else 202
+    if job.status == 'success':
+        status = 200
+    elif job.status in {'error', 'cancelled', 'stale'}:
+        status = 409
+    else:
+        status = 202
     return JsonResponse(
         {
             'ok': job.status == 'success',
             'job': _engine_job_to_dict(job, include_result=True),
             'result': job.result or {},
             'pending': job.status in {'queued', 'running'},
+            'terminal': job.status in {'success', 'error', 'cancelled', 'stale'},
         },
         status=status,
+        json_dumps_params={'ensure_ascii': False},
+    )
+
+
+@login_required(login_url='accounts:login')
+@require_POST
+def api_engine_job_retry(request, job_id):
+    job = get_object_or_404(_engine_jobs_for_user(request.user), pk=job_id)
+    data = _read_json_payload(request)
+    reason = str(data.get('reason') or 'Retry requested from simulation API.')[:180]
+    ok, message = retry_engine_job(job, actor=request.user.get_username() or 'user', reason=reason)
+    return JsonResponse(
+        {'ok': ok, 'message': message, 'job': _engine_job_to_dict(job, include_input=True)},
+        status=202 if ok else 409,
         json_dumps_params={'ensure_ascii': False},
     )
 
