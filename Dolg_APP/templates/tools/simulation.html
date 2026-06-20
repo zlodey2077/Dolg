@@ -37,6 +37,10 @@ scheme-* всё равно доступны для inline-JS в нашем DOMCo
 <script src="{% static 'simulation/scheme-lab.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'simulation/ml-toolbar.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'lib/qrcode.min.js' %}?v=1.0.0" defer></script>
+{# Ф3 семантика: клиентские нейро-эмбеддинги (Transformers.js). ESM-модули, ставят #}
+{# window.DolgEmbeddings/DolgSemantic. Модель грузится лениво при 1-м семантическом запросе. #}
+<script type="module" src="{% static 'ai/dolg-embeddings.js' %}?v=20260616"></script>
+<script type="module" src="{% static 'ai/dolg-semantic.js' %}?v=20260616"></script>
 <script id="server-engine-catalog-data" type="application/json">{{ server_engine_catalog_json|safe }}</script>
 
 {# ============== Keyboard shortcuts panel (нажми ? для справки) ============== #}
@@ -19634,6 +19638,22 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                     actions: data.quick_actions || [],
                     render: Array.isArray(data.render) ? data.render : [],
                 });
+                // Ф3: клиентский семантический grounding (нейро-эмбеддинги в браузере,
+                // Transformers.js). Fire-and-forget — модель грузится лениво, чат не блокирует;
+                // если модель/эмбеддинги недоступны → тихий no-op (серверный TF-IDF остаётся).
+                (async () => {
+                    try {
+                        if (!window.DolgSemantic) return;
+                        const hits = await window.DolgSemantic.search(text, 3);
+                        const lines = (hits || [])
+                            .filter(h => h.score > 0.35)
+                            .map(h => `- [${h.title}](${h.url || '#'}) _(${Math.round(h.score * 100)}%)_`);
+                        if (lines.length) pushAndShow({
+                            role: 'assistant', kind: 'bot',
+                            content: '🔎 **Семантически близкое из базы:**\n' + lines.join('\n'),
+                        });
+                    } catch (_) { /* семантика опциональна */ }
+                })();
                 if (data.session_summary) sessionSummaries[currentMode] = data.session_summary;
                 if (data.intent) lastIntents[currentMode] = data.intent;
                 // Накапливаем счётчик токенов сессии для UI-индикатора.
