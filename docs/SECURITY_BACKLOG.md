@@ -14,9 +14,12 @@
 
 ---
 
-## Статус HIGH-tier на 2026-06-06 (проверено по коду)
+## Статус HIGH-tier на 2026-06-21 (проверено по коду)
 
-Все 9 рекомендованных до защиты HIGH-пунктов закрыты и подтверждены в коде:
+8 из 9 рекомендованных до защиты HIGH-пунктов закрыты и подтверждены в коде.
+Исключение: CSP/inline-JS остаётся частично закрытым, потому что текущий
+`Dolg_PR/settings.py` всё ещё вынужден разрешать `'unsafe-inline'` для
+тяжёлых рабочих страниц симулятора.
 
 | HIGH | Статус | Подтверждение |
 |---|---|---|
@@ -28,9 +31,263 @@
 | H6 SSRF guard (1.5) | ✅ | commit `1629e95` |
 | H7 AI prompt injection (11.1) | ✅ | commit `fa0ee38` |
 | H8 SPICE/formula eval sandbox (11.2) | ✅ | commit `a73f7df` (sympify sandbox) |
-| H9 CSP nonce для inline-JS (1.3) | ✅ | commit `55ef51a` (simulation.html — post-defense split) |
+| H9 CSP nonce для inline-JS (1.3) | 🟡 | `Dolg_PR/settings.py:252-273` включает CSP только opt-in и оставляет `'unsafe-inline'`; нужна дальнейшая декомпозиция `simulation.html` |
 
 Следующий уровень риска — MEDIUM (rate limits на `/api/ai/chat/` и `/cad/api/import/`, GDPR cascade delete, log scrubbing, JSON body-size limit, file-upload MIME/size, open-redirect `next=`). Не блокирует защиту.
+
+---
+
+## Доклад 2026-06-21: комплексная защита данных от целевых атак
+
+### Executive summary
+
+DOLG уже не выглядит как проект "только с токенами": в коде есть рабочие
+слои защиты для сессий, CSRF, продовых cookie-флагов, Stripe webhook
+signatures, SSRF-guard, audit log, hashed organization API tokens, RBAC/org
+permissions и безопасный async-контур для server engines. Это хорошая база для
+защиты перед комиссией.
+
+Главный вывод: против целевого атакующего надо защищать не один endpoint, а
+цепочку. Реалистичная атака будет идти через credential stuffing -> захват
+админской/организационной роли -> IDOR/tenant escape -> выгрузку БД/media/logs
+или через supply-chain/worker/parser -> RCE/SSRF -> lateral movement в будущих
+Docker/Kubernetes сервисах. Поэтому следующий уровень защиты — это
+defense-in-depth: строгий CSP, hardened uploads, лимиты тела/частоты запросов,
+централизованный audit/alerting, supply-chain checks, sandbox для движков,
+PostgreSQL backup/encryption policy и incident runbook.
+
+Каркас контроля: OWASP ASVS 5.0 для проверяемых требований к приложению,
+OWASP Top 10/Cheat Sheets для типовых web/appsec атак, NIST CSF 2.0 для цикла
+Govern/Identify/Protect/Detect/Respond/Recover.
+
+### Активы и границы доверия
+
+Активы:
+
+- Пользовательские аккаунты, session cookies, 2FA state, SSO-связки.
+- Проекты схем, BOM, PCB/3D artifacts, симуляции, `EngineJob` payload/result.
+- Заказы, платежи, Stripe customer/subscription/payment identifiers.
+- Organization API tokens, `METRICS_TOKEN`, Stripe keys/webhook secrets,
+  AI/provider tokens, future Docker/K8s secrets.
+- БД SQLite/PostgreSQL, media/uploads, backups, logs, CI/CD artifacts.
+- Админка, Data Console, ML/admin tools, management commands.
+
+Границы доверия:
+
+- Browser -> Django: формы, fetch API, CSRF, session auth.
+- Django -> DB/media/cache/logs: ORM, FileField/ImageField, audit trails.
+- Django -> Stripe: webhook signature вместо CSRF.
+- Django -> outbound HTTP: SSRF-sensitive imports/downloads.
+- Django -> EngineJob workers: сейчас local worker, позже Docker/K8s workers.
+- GitHub/CI -> deploy/runtime: dependencies, secrets, workflow permissions.
+
+### Что уже есть в коде
+
+- Production baseline частично fail-closed: `SECRET_KEY` и `ALLOWED_HOSTS`
+  проверяются при `DEBUG=False` (`Dolg_PR/settings.py:51-87`).
+- CSRF middleware включён (`Dolg_PR/settings.py:198-210`); AJAX-сценарии
+  осознанно читают CSRF cookie из JS (`Dolg_PR/settings.py:623-647`).
+- Secure cookie/header baseline для prod: `SESSION_COOKIE_SECURE`,
+  `CSRF_COOKIE_SECURE`, SSL redirect, HSTS, `X_FRAME_OPTIONS='DENY'`,
+  nosniff/referrer/COOP (`Dolg_PR/settings.py:622-656`).
+- Optional brute-force/CSP middleware подключаются через env-флаги
+  (`Dolg_PR/settings.py:163-185`, `Dolg_PR/settings.py:241-273`).
+- Stripe webhook заменяет CSRF подписью Stripe и reject'ит отсутствующую
+  signature (`orders/payment_views.py:158-190`).
+- SSRF guard разрешает только HTTPS, запрещает private/link-local/metadata IP,
+  ограничивает порты, redirects, timeout и размер ответа
+  (`Dolg_APP/services/ssrf_guard.py:31-145`).
+- Organization API tokens генерируются случайно, хранятся хешем и сравниваются
+  через `hmac.compare_digest` (`Dolg_APP/models.py:448-475`).
+- Audit trail уже есть для org actions и project events
+  (`Dolg_APP/models.py:341-388`, `Dolg_APP/models.py:927-952`).
+- EngineJob API ограничивает видимость owner/staff scope и пишет job audit
+  (`Dolg_APP/views.py:2760-2845`).
+- Data Console использует DB introspection и quoting table names для read-only
+  подсчётов, а не raw user SQL (`Dolg_APP/ml_admin_views.py:360-384`).
+
+### Findings
+
+**DA-01. High - CSP пока не защищает от полноценного XSS-сценария.**
+
+Impact: при найденном DOM/template XSS атакующий сможет читать действия
+пользователя в той же сессии, запускать state-changing fetch и атаковать
+админские/проектные API.
+
+Evidence: CSP middleware включается только при `ENABLE_CSP`, а `script-src`
+оставляет `'unsafe-inline'` из-за тяжёлого `simulation.html`
+(`Dolg_PR/settings.py:252-273`). `server-engine-ui.js` ещё генерирует HTML с
+inline `onclick` handlers (`shop/static/simulation/server-engine-ui.js:121-161`).
+
+Fix: продолжать вынос inline JS из `simulation.html`/CAD в внешние файлы,
+переводить inline handlers на `addEventListener`, затем включить nonce/hash CSP
+без `'unsafe-inline'`. Для защиты: сначала Report-Only на staging, затем enforce.
+
+False positive notes: текущий риск частично снижен Django autoescape и ручным
+escaping в `server-engine-ui.js`, но CSP как второй слой сейчас слабый.
+
+**DA-02. High - upload pipeline проверяет размер и browser MIME, но не делает
+полный content-sniff/quarantine.**
+
+Impact: вредный файл под видом изображения/материала может стать stored XSS,
+malware carrier, decompression bomb или атакой на будущие PDF/Gerber/worker
+парсеры.
+
+Evidence: avatar/logo checks используют `avatar.content_type`/`logo.content_type`
+и size limit (`accounts/views.py:360-400`). В проекте есть несколько
+`ImageField`/`FileField` (`accounts/models.py:78`, `accounts/models.py:104`,
+`Dolg_APP/models.py:190`, `knowledge/models.py:95`, `shop/models.py:121`).
+
+Fix: единый upload service: extension allowlist + magic-byte sniff + Pillow
+`verify()`/re-encode for images + max pixels + quarantine path + malware scan
+hook. Media отдавать как attachment там, где файл не должен исполняться в
+браузере.
+
+False positive notes: Django storage сам нормализует имена файлов, но это не
+заменяет проверку содержимого.
+
+**DA-03. High - admin/Data Console/ML tools являются high-value target и требуют
+отдельного режима усиления.**
+
+Impact: компрометация staff-аккаунта даёт обзор БД, jobs, media, модерации,
+заказов и ML/admin инструментов; это быстрее всего превращается в data
+exfiltration.
+
+Evidence: Data Console читает таблицы/модели/файловые поля
+(`Dolg_APP/ml_admin_views.py:344-384`). Brute-force protection через Axes
+подключается только при `ENABLE_AXES` (`Dolg_PR/settings.py:163-185`,
+`Dolg_PR/settings.py:241-250`).
+
+Fix: для staff/admin включить обязательную 2FA, sudo-mode для опасных действий,
+rate-limit на login/admin, IP allowlist/VPN для публичной демки, отдельные audit
+events на login/logout/password/2FA/admin actions и alerts на массовый export.
+
+False positive notes: многие views уже закрыты decorators, но целевой атакующий
+обычно бьёт не только authorization, а захват роли + тихую выгрузку.
+
+**DA-04. Medium - Stripe demo defaults должны fail-closed в prod/demo-live.**
+
+Impact: если `STRIPE_WEBHOOK_SECRET` случайно останется `demo_mode` при живом
+платёжном контуре, webhook endpoint принимает событие без проверки подписи.
+
+Evidence: `STRIPE_WEBHOOK_SECRET` имеет default `demo_mode`
+(`Dolg_PR/settings.py:555`), а webhook при demo secret сразу возвращает success
+(`orders/payment_views.py:165-167`).
+
+Fix: при `DEBUG=False` и включённом платёжном backend падать на старте, если
+Stripe secret/webhook secret равны `demo_mode`; для локального demo оставить
+явный `ALLOW_DEMO_PAYMENTS=1`.
+
+False positive notes: сейчас это удобно для локальной защиты/демо, но для
+production-like демо лучше отделить "нет Stripe" и "Stripe live".
+
+**DA-05. Medium - reverse-proxy trust нужно закрепить runtime-чеком.**
+
+Impact: если Django окажется напрямую доступен извне, spoofed
+`X-Forwarded-Proto`/`X-Forwarded-Host` может исказить `is_secure()` и абсолютные
+URL; это влияет на cookies, redirects, email links и CSRF assumptions.
+
+Evidence: `SECURE_PROXY_SSL_HEADER` и `USE_X_FORWARDED_HOST` включены глобально
+ради Cloudflare/ngrok (`Dolg_PR/settings.py:648-660`).
+
+Fix: документировать обязательное условие "proxy strips forwarded headers",
+добавить env-флаг `TRUST_X_FORWARDED_HOST=1` для prod-like deployments и
+health-check, который показывает effective scheme/host только staff.
+
+False positive notes: для Cloudflare Tunnel это практично и нужно; риск появляется
+при смене topology.
+
+**DA-06. Medium - future Docker/K8s server engines должны считаться untrusted
+compute.**
+
+Impact: внешний Xyce/PySpice/GnuCap/OpenModelica/GNU Radio worker будет парсить
+netlist/model/archive от пользователя; это типичная точка RCE, SSRF и lateral
+movement к БД/secrets.
+
+Evidence: проект уже имеет `dolg-engine-router` и `EngineJob` result contract,
+а `EngineJob` принимает `netlist`, `scheme_data`, `options`
+(`Dolg_APP/views.py:2791-2837`).
+
+Fix: запускать engines только в отдельном worker-контуре: read-only image,
+non-root user, no host mounts, CPU/RAM/time limits, deny egress by default,
+ephemeral FS, signed job/result envelope, artifact allowlist, audit log,
+container image scan, K8s NetworkPolicy/PodSecurity.
+
+False positive notes: текущий local router делегирует в NumPy MNA и не запускает
+внешний CLI внутри web request, что уже снижает риск.
+
+**DA-07. Medium - security monitoring пока не собран в единый incident loop.**
+
+Impact: даже при хороших контролях атака может пройти незамеченной, если нет
+alerts по anomalous login, token use, массовым exports, webhook errors,
+EngineJob failures и suspicious admin reads.
+
+Evidence: есть `AuditLog`/`ProjectEvent` и webhook mismatch logging
+(`Dolg_APP/models.py:341-388`, `Dolg_APP/models.py:927-952`,
+`orders/payment_views.py:183-190`), но нет единого alerting/runbook в этом
+документе.
+
+Fix: добавить incident runbook: severity matrix, кто смотрит, где логи, как
+отзывать tokens/sessions, как ротировать secrets, как останавливать workers, как
+восстанавливать из backup. Минимум alerts: failed login spike, staff login,
+new/revoked API token, bulk data access, worker stale/error spike, Stripe
+signature mismatch.
+
+False positive notes: для дипломного MVP достаточно документа + минимальных
+логов; production потребует Sentry/SIEM/Prometheus alerts.
+
+### P0/P1 план усиления
+
+P0, до публичной демки/защиты:
+
+1. Зафиксировать этот доклад как официальный раздел безопасности и использовать
+   его в ответах комиссии.
+2. Включить проверку `DEBUG=False` + non-demo `SECRET_KEY`, `ALLOWED_HOSTS`,
+   Stripe secrets для production-like запуска.
+3. Добавить body-size/rate-limit guard для тяжёлых JSON/API: AI chat, CAD import,
+   simulation job submit.
+4. Ввести upload service для avatar/logo/materials/products с magic-byte sniff и
+   max pixels.
+5. Staff/admin hardening: обязательная 2FA, sudo-mode для критичных действий,
+   audit events на login/logout/password/2FA/admin.
+
+P1, сразу после:
+
+1. CSP migration: убрать inline handlers, включить nonce/hash CSP без
+   `'unsafe-inline'`, добавить Trusted Types backlog для рабочих страниц.
+2. Server engine sandbox: Docker/K8s worker profile с NetworkPolicy, limits,
+   non-root, artifact allowlist и image scanning.
+3. Supply-chain: GitHub CodeQL/Dependabot/secret scanning/push protection,
+   `pip-audit`, SBOM, container scan.
+4. Postgres protection: отдельный least-privilege DB user, backups, restore drill,
+   encryption policy, audit/log retention.
+5. Incident runbook + alerts: auth anomalies, token lifecycle, Stripe signature
+   mismatch, mass exports, worker failures.
+
+### Что сказать комиссии простыми словами
+
+> В проекте защита построена не одной проверкой, а слоями. Пользовательские
+> действия защищены сессиями, CSRF, правами доступа и audit log. Платёжные
+> события принимаются только по подписи Stripe. Любые будущие тяжёлые движки
+> вынесены в очередь `EngineJob`, чтобы не запускать внешние процессы внутри
+> web-запроса. Следующий уровень — изолировать Docker/Kubernetes workers,
+> усилить CSP, проверку загрузок, мониторинг и реагирование. То есть проект
+> проектируется не только против случайных ошибок, но и против цепочки целевой
+> атаки: захват аккаунта, обход прав, вредный файл, SSRF/RCE, выгрузка данных.
+
+### Источники контроля
+
+- OWASP ASVS 5.0: https://owasp.org/www-project-application-security-verification-standard/
+- OWASP Cheat Sheet: Content Security Policy:
+  https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html
+- OWASP Cheat Sheet: File Upload:
+  https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
+- OWASP Cheat Sheet: SSRF Prevention:
+  https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+- NIST Cybersecurity Framework 2.0:
+  https://www.nist.gov/cyberframework
+- NIST CSF 2.0 PDF:
+  https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf
 
 ---
 

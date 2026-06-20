@@ -17,8 +17,9 @@
   включается через `DATABASE_URL`. Для dev Postgres добавлены
   `scripts/postgres_dev.ps1` и `deploy/docker-compose.postgres-dev.yml`.
 - Server engine gateway уже имеет каталог движков, API `/api/sim/server-engines/`,
-  `/api/sim/jobs/`, модель `EngineJob`, локальный worker `dolg-numpy-mna` и VS Code
-  tasks `Engine worker: once/watch`.
+  `/api/sim/jobs/`, модель `EngineJob`, первый server-side router
+  `dolg-engine-router`, локальный worker `dolg-numpy-mna` и VS Code tasks
+  `Engine worker: once/watch`.
 - Внешние SPICE/моделирующие движки пока adapter-ready: Xyce primary-candidate,
   PySpice bridge, GnuCap/OpenModelica/Sigrok и остальные ждут Docker/worker
   контура.
@@ -150,12 +151,12 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
    - Сформировать стабильный contract для будущих приборов: scope, generator,
      multimeter, probes, state badges, reduced motion.
 
-2. Server engine gateway MVP-2.
-   - Добавить нормальный stale/retry flow для `EngineJob`: heartbeat, retry count,
+2. [x] Server engine gateway MVP-2.
+   - [x] Добавить нормальный stale/retry flow для `EngineJob`: heartbeat, retry count,
      reason, audit log.
-   - Сохранить единый result contract для всех будущих workers:
+   - [x] Сохранить единый result contract для всех будущих workers:
      `nodes`, `branches`, `waveforms`, `metrics`, `warnings`, `artifacts`.
-   - Подготовить Xyce adapter interface без обязательного Docker runtime:
+   - [ ] Подготовить Xyce adapter interface без обязательного Docker runtime:
      command builder, parser contract, fixtures, tests.
 
 3. PCB/3D pipeline.
@@ -173,25 +174,25 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
      pages.
    - Не превращать Data Console в write-инструмент до отдельного permission audit.
 
-5. Доклад: комплексная защита данных от целевых атак.
-   - Не ограничиваться базовыми токенами и "защитой от случайных ошибок".
+5. [x] Доклад: комплексная защита данных от целевых атак.
+   - [x] Не ограничиваться базовыми токенами и "защитой от случайных ошибок".
      Сформировать defense-in-depth доклад по модели целевого атакующего:
      credential stuffing, кража сессии, IDOR/tenant escape, supply-chain,
      SSRF/cloud metadata, вредные ECAD/SPICE/архивы, prompt injection, RCE через
      парсеры/воркеры, exfiltration из БД/media/logs/backups, CI/CD secrets,
      Docker/K8s lateral movement и insider/stolen laptop scenarios.
-   - Структура доклада: активы и секреты; модель угроз; текущие защиты в коде;
+   - [x] Структура доклада: активы и секреты; модель угроз; текущие защиты в коде;
      gaps; приоритетные меры; сценарии обнаружения и реагирования; что сказать
      комиссии простыми словами.
-   - Каркас контроля: OWASP ASVS 5.0 как проверяемые требования,
+   - [x] Каркас контроля: OWASP ASVS 5.0 как проверяемые требования,
      OWASP Top 10/Cheat Sheets как карта web/appsec атак, NIST CSF 2.0 как цикл
      Govern/Identify/Protect/Detect/Respond/Recover.
-   - Привязать к проекту: `SECURITY.md`, `docs/SECURITY_BACKLOG.md`,
+   - [x] Привязать к проекту: `SECURITY.md`, `docs/SECURITY_BACKLOG.md`,
      `ssrf_guard.py`, webhook signatures, 2FA/SSO, RBAC/org isolation,
      `AuditLog`/`ProjectEvent`, CSP split-plan, gitleaks/pre-commit, Docker/K8s
      hardening и future Vault/Postgres/backup encryption.
-   - Итоговый формат: один аккуратный раздел/доклад, без россыпи новых файлов;
-     если потребуется отдельный артефакт, вынести в существующие security docs.
+   - [x] Итоговый формат: один аккуратный раздел/доклад в
+     `docs/SECURITY_BACKLOG.md`, без россыпи новых файлов.
 
 ## P2 - данные, AI и каталог
 
@@ -244,12 +245,12 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
    worker, делегируя MVP-маршрут в NumPy MNA. `EngineJob` получил
    stale/retry/heartbeat/reason/audit и единый `dolg.engine.result` contract v1
    для будущих Xyce/PySpice/GnuCap workers.
-4. Сессия 4: следующий активный пункт - доклад по защите данных от целевых атак:
-   OWASP ASVS/Top 10 +
-   NIST CSF 2.0, реальные активы DOLG, threat model, gaps, меры и текст для
-   защиты.
-5. Сессия 5: Admin/Data Console v2: безопасный поиск/фильтры, JSONField и
-   artifact preview, быстрые ссылки в admin changelist/change.
+4. Сессия 4: закрыта - доклад по защите данных от целевых атак добавлен в
+   `docs/SECURITY_BACKLOG.md`: OWASP ASVS/Top 10, NIST CSF 2.0, реальные
+   активы DOLG, threat model, gaps, меры и текст для защиты.
+5. Сессия 5: следующий активный пункт - Admin/Data Console v2: безопасный
+   поиск/фильтры, JSONField и artifact preview, быстрые ссылки в admin
+   changelist/change.
 6. Сессия 6: CAD/simulation UX pass: применить профильные настройки
    density/layout/render/animations к реальному интерфейсу, подготовить базовый
    contract для будущих приборных анимаций.

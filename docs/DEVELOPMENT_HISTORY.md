@@ -211,6 +211,16 @@
 - Verification: focused ruff, `manage.py check`, `makemigrations --check --dry-run`, and `pytest Dolg_APP/tests_server_engines.py Dolg_APP/tests_tool_asset_smoke.py -q` (`23 passed`).
 - Next active item in `WORK_FRONT_20260619.md`: Session 4, security/data-protection report for targeted attacks.
 
+### 2026-06-21 - Targeted attack data-protection report
+
+- Added a full targeted-attack data-protection report to `docs/SECURITY_BACKLOG.md` instead of creating another standalone document.
+- Mapped DOLG's real assets and trust boundaries against OWASP ASVS 5.0, OWASP Cheat Sheets/Top 10 themes, and NIST CSF 2.0.
+- Documented current controls in code: production settings guardrails, CSRF/security headers, Stripe webhook signatures, SSRF guard, hashed organization API tokens, audit logs, project event logs and `EngineJob` audit/result boundaries.
+- Prioritized the remaining gaps: strict CSP migration, hardened upload pipeline, admin/Data Console hardening, Stripe demo fail-closed behavior, proxy trust checks, future Docker/K8s worker sandboxing and incident monitoring.
+- Corrected the security backlog status for CSP: it is still partial because `settings.py` keeps `'unsafe-inline'` until the heavy simulation UI is decomposed.
+- Verification: documentation diff review and `git diff --check` for the touched markdown files.
+- Next active item in `WORK_FRONT_20260619.md`: Session 5, Admin/Data Console v2.
+
 ## Шаблон новой записи
 
 ```markdown
