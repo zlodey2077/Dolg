@@ -79,7 +79,7 @@ def _parse_voltage(component: dict) -> float | None:
             continue
         try:
             return float(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     return None
 
@@ -95,7 +95,15 @@ def build_net_union(scheme_data: Any) -> tuple[_UnionFind, dict[str, set]]:
         if ctype in {'ground', 'node'}:
             anchor = _port_key(cid, 'a')
             uf.find(anchor)
-            for port in ('b', 'c', 'd', 'in', 'out'):
+            # Канвас-пины + РЕАЛЬНЫЕ порты компонента: процедурные/импортные схемы
+            # используют '1','+', и т.п.; без этого пин '1' остаётся отдельным нетом
+            # и связь с землёй теряется (ложный source_no_return_path).
+            extra_ports = [
+                p.get('id')
+                for p in (component.get('ports') or [])
+                if isinstance(p, dict) and p.get('id') not in (None, '', 'a')
+            ]
+            for port in ('b', 'c', 'd', 'in', 'out', *extra_ports):
                 uf.union(anchor, _port_key(cid, port))
 
     for conn in _connections(scheme_data):
@@ -121,8 +129,29 @@ def _ground_nets(scheme_data: Any, uf: _UnionFind) -> set[str]:
     return nets
 
 
-def _battery_terminal_nets(component_id: str, uf: _UnionFind) -> tuple[str, str]:
-    return uf.find(_port_key(component_id, 'a')), uf.find(_port_key(component_id, 'b'))
+def _battery_terminal_nets(
+    component_id: str, uf: _UnionFind, components: dict[str, dict] | None = None
+) -> tuple[str, str]:
+    """Неты (+, −)-терминалов батареи.
+
+    Порты берём из самого компонента: канвас DOLG использует 'a'/'b', но процедурные
+    и импортные схемы — '+'/'−', '1'/'2', 'p'/'n'. Хардкод 'a'/'b' ловил пустой
+    синглтон-нет на таких схемах → ложный `source_no_return_path`. Без components —
+    обратная совместимость на 'a'/'b'.
+    """
+    pos_port, neg_port = 'a', 'b'
+    comp = components.get(component_id) if isinstance(components, dict) else None
+    ports = comp.get('ports') if isinstance(comp, dict) else None
+    if (
+        isinstance(ports, list)
+        and len(ports) >= 2
+        and isinstance(ports[0], dict)
+        and isinstance(ports[1], dict)
+        and ports[0].get('id') not in (None, '')
+        and ports[1].get('id') not in (None, '')
+    ):
+        pos_port, neg_port = ports[0]['id'], ports[1]['id']
+    return uf.find(_port_key(component_id, pos_port)), uf.find(_port_key(component_id, neg_port))
 
 
 def detect_led_reverse_polarity(scheme_data: Any, uf: _UnionFind | None = None) -> dict[str, Any]:
@@ -138,7 +167,7 @@ def detect_led_reverse_polarity(scheme_data: Any, uf: _UnionFind | None = None) 
     source_pos_nets = set()
     for cid, comp in components.items():
         if normalize_component_type(comp.get('type')) == 'battery':
-            pos_net, _neg = _battery_terminal_nets(cid, uf)
+            pos_net, _neg = _battery_terminal_nets(cid, uf, components)
             source_pos_nets.add(pos_net)
 
     refs = []
@@ -170,7 +199,7 @@ def detect_parallel_voltage_sources(scheme_data: Any, uf: _UnionFind | None = No
     for cid, comp in components.items():
         if normalize_component_type(comp.get('type')) != 'battery':
             continue
-        pos_net, neg_net = _battery_terminal_nets(cid, uf)
+        pos_net, neg_net = _battery_terminal_nets(cid, uf, components)
         voltage = _parse_voltage(comp)
         batteries.append({'id': cid, 'ref': _label(comp), 'pos': pos_net, 'neg': neg_net, 'v': voltage})
 
@@ -236,7 +265,7 @@ def detect_source_short_to_ground(scheme_data: Any, uf: _UnionFind | None = None
     for cid, comp in components.items():
         if normalize_component_type(comp.get('type')) != 'battery':
             continue
-        pos_net, _neg_net = _battery_terminal_nets(cid, uf)
+        pos_net, _neg_net = _battery_terminal_nets(cid, uf, components)
         # Direct short: '+' is on the same net as ground.
         if pos_net in ground_nets:
             for ground_id, gcomp in components.items():
@@ -300,7 +329,7 @@ def detect_transistor_pinout_swap(scheme_data: Any, uf: _UnionFind | None = None
     for cid, comp in components.items():
         if normalize_component_type(comp.get('type')) != 'battery':
             continue
-        pos_net, neg_net = _battery_terminal_nets(cid, uf)
+        pos_net, neg_net = _battery_terminal_nets(cid, uf, components)
         source_pos_nets.add(pos_net)
         source_neg_nets.add(neg_net)
 
@@ -463,8 +492,8 @@ def detect_power_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[
     for i in range(len(batteries)):
         for j in range(i + 1, len(batteries)):
             bi, bj = batteries[i], batteries[j]
-            ni_p, ni_n = _battery_terminal_nets(bi['id'], uf)
-            nj_p, nj_n = _battery_terminal_nets(bj['id'], uf)
+            ni_p, ni_n = _battery_terminal_nets(bi['id'], uf, comps)
+            nj_p, nj_n = _battery_terminal_nets(bj['id'], uf, comps)
             if ni_p == nj_p and ni_n == nj_n:
                 vi, vj = _parse_voltage(bi), _parse_voltage(bj)
                 if vi is not None and vj is not None and abs(vi - vj) < 0.01:
@@ -476,7 +505,7 @@ def detect_power_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[
     ground_set = _ground_nets(scheme_data, uf)
     no_return = 0
     for b in batteries:
-        n_plus, n_minus = _battery_terminal_nets(b['id'], uf)
+        n_plus, n_minus = _battery_terminal_nets(b['id'], uf, comps)
         if n_minus not in ground_set and n_plus not in ground_set:
             no_return += 1
     evidence['source_without_return'] = no_return
@@ -485,7 +514,7 @@ def detect_power_extras(scheme_data: Any, uf: _UnionFind | None = None) -> dict[
     # и − не к GND — это вероятная обратная полярность нагрузки.
     reverse_pol = 0
     for b in batteries:
-        n_plus, n_minus = _battery_terminal_nets(b['id'], uf)
+        n_plus, n_minus = _battery_terminal_nets(b['id'], uf, comps)
         if n_plus in ground_set and n_minus not in ground_set:
             reverse_pol += 1
     evidence['reverse_battery_polarity'] = reverse_pol

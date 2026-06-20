@@ -54,6 +54,15 @@ def test_expert_risk_differentiates_missing_ground():
     assert any('ground' in r for r in bad_risk[1])
 
 
+def test_no_false_positive_source_no_return_on_valid_divider():
+    # Регресс convention-mismatch: делитель с портами батареи '+'/'-' и землёй '1'
+    # НЕ должен ложно срабатывать power.source_no_return_path (порты резолвятся реально).
+    risk = t.expert_risk(_divider_scheme(9.0, 1000, 2000))
+    assert risk is not None
+    assert 'power.source_no_return_path' not in risk[1]
+    assert risk[0] == 0.0
+
+
 def test_expert_risk_serious_only_not_saturated():
     # риск не насыщается до 1.0 на корректной схеме из-за docs/layout-гигиены
     div_risk = t.expert_risk(_divider_scheme(9.0, 1000, 2000))
