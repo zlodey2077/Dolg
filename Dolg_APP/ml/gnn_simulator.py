@@ -183,17 +183,22 @@ def build_model():
                 nn.Linear(32, 1),
             )
 
-        def forward(self, node_features, edge_index, edge_features):
+        def forward(self, node_features, edge_index, edge_features, ground_mask=None):
             h = self.node_embed(node_features)
             h = self.gconv1(h, edge_index, edge_features)
             h = self.gconv2(h, edge_index, edge_features)
             h = self.gconv3(h, edge_index, edge_features)
             h = torch.cat([h, node_features], dim=-1)
             voltages = self.voltage_head(h).squeeze(-1)
-            # net 0 = ground = 0 В: жёстко зануляем (физическое ограничение).
+            # Зануляем ground-узлы (физика: V_ground = 0). Без маски — один граф,
+            # ground = net 0. В батче (блочно-диагональная склейка) ground каждого
+            # подграфа задаётся через ground_mask (0 на ground-узлах, 1 иначе).
             if voltages.numel():
-                mask = torch.ones_like(voltages)
-                mask[0] = 0.0
+                if ground_mask is None:
+                    mask = torch.ones_like(voltages)
+                    mask[0] = 0.0
+                else:
+                    mask = ground_mask
                 voltages = voltages * mask
             return voltages
 
@@ -234,6 +239,118 @@ def _build_training_samples(schemes):
     return samples
 
 
+def iter_corpus_schemes(max_schemes: int, *, dataset_root=None):
+    """Стрим схем из локальных JSON-датасетов БЕЗ загрузки всего корпуса в память.
+
+    Один файл парсится за раз и сразу отпускается; держим не больше `max_schemes`
+    отданных схем суммарно. Это снимает OOM, который ронял загрузку всех ~65k схем
+    одним списком. Битые/нечитаемые файлы тихо пропускаются.
+    """
+    import json
+
+    root = Path(dataset_root or 'Dolg_APP/ml/dataset')
+    yielded = 0
+    for path in sorted(root.rglob('*.json')):
+        if yielded >= max_schemes:
+            return
+        try:
+            payload = json.loads(path.read_text(encoding='utf-8'))
+        except OSError, ValueError:
+            continue
+        items = payload if isinstance(payload, list) else (payload.get('schemes') or [])
+        for item in items:
+            if isinstance(item, dict) and item.get('components'):
+                yield item
+                yielded += 1
+                if yielded >= max_schemes:
+                    return
+
+
+def build_corpus_training_samples(max_schemes: int = 4000, *, max_samples: int = 1500, dataset_root=None):
+    """Стрим из реального корпуса → MNA-решаемые (graph, voltages) с физ-метками.
+
+    Память ограничена: держим только готовые сэмплы (≤ max_samples), схемы не
+    накапливаем. Returns (samples, scanned) — scanned = сколько схем просмотрено.
+    """
+    from Dolg_APP.services import monte_carlo
+
+    samples = []
+    scanned = 0
+    for scheme in iter_corpus_schemes(max_schemes, dataset_root=dataset_root):
+        scanned += 1
+        try:
+            circuit = monte_carlo.scheme_to_circuit(scheme)
+            graph = build_graph_from_circuit(circuit)
+            if graph is None:
+                continue
+            voltages = monte_carlo.solve_dc(circuit)['voltages']
+        except ValueError, KeyError, TypeError, IndexError, ZeroDivisionError, AttributeError:
+            continue  # незамкнутые/вырожденные/нечисловые схемы — не годятся для физ-меток
+        n_nodes = graph[3]
+        labels = [float(voltages.get(net, 0.0)) for net in range(n_nodes)]
+        samples.append((graph, labels))
+        if len(samples) >= max_samples:
+            break
+    return samples, scanned
+
+
+def benchmark_samples(model, samples) -> dict:
+    """Точность модели vs MNA-метки на готовых сэмплах (без повторного solve_dc).
+
+    Метки уже = напряжения MNA, поэтому считаем ошибку прямо по ним. Ground-узлы и
+    нулевые потенциалы не идут в rel-err (деление на ~0). Returns mean/max abs+rel err.
+    """
+    torch, _ = _require_torch()
+    abs_errs, rel_errs = [], []
+    model.eval()
+    for graph, labels in samples:
+        x, ei, ef = _to_tensors(graph)
+        with torch.no_grad():
+            pred = model(x, ei, ef) * VOLTAGE_SCALE
+        for net in range(len(labels)):
+            diff = abs(float(pred[net].item()) - labels[net])
+            abs_errs.append(diff)
+            if abs(labels[net]) > 1e-6:
+                rel_errs.append(diff / abs(labels[net]))
+    return {
+        'test_samples': len(samples),
+        'test_nodes': len(abs_errs),
+        'mean_abs_err': round(sum(abs_errs) / len(abs_errs), 5) if abs_errs else None,
+        'max_abs_err': round(max(abs_errs), 5) if abs_errs else None,
+        'mean_rel_err': round(sum(rel_errs) / len(rel_errs), 5) if rel_errs else None,
+    }
+
+
+def collate_graphs(batch):
+    """Блочно-диагональная склейка графов в один большой разреженный граф.
+
+    batch: list of ((x, edge_index, edge_features), y). Рёбра не пересекают
+    подграфы (блочно-диагонально), поэтому message passing идёт независимо внутри
+    каждого. ground_mask зануляет ground-узел (локальный индекс 0) каждого подграфа.
+    Returns ((x, edge_index, edge_features, ground_mask), y).
+    """
+    torch, _ = _require_torch()
+    xs, eis, efs, ys, masks = [], [], [], [], []
+    offset = 0
+    for (x, ei, ef), y in batch:
+        n = x.shape[0]
+        xs.append(x)
+        if ei.numel():
+            eis.append(ei + offset)
+        efs.append(ef)
+        ys.append(y)
+        m = torch.ones(n, dtype=torch.float32)
+        m[0] = 0.0
+        masks.append(m)
+        offset += n
+    x = torch.cat(xs, dim=0)
+    edge_index = torch.cat(eis, dim=1) if eis else torch.zeros((2, 0), dtype=torch.long)
+    edge_features = torch.cat(efs, dim=0) if efs else torch.zeros((0, EDGE_FEATURE_DIM), dtype=torch.float32)
+    y = torch.cat(ys, dim=0)
+    ground_mask = torch.cat(masks, dim=0)
+    return (x, edge_index, edge_features, ground_mask), y
+
+
 def train_gnn(
     schemes,
     *,
@@ -241,15 +358,39 @@ def train_gnn(
     lr: float = 0.01,
     seed: int = 42,
     val_split: float = 0.15,
+    batch_size: int = 16,
 ) -> tuple:
     """Обучает GNN предсказывать напряжения узлов (MSE vs MNA solve_dc).
 
-    Returns (model, metrics). metrics: {samples, train_loss, val_loss, history, ...}.
+    Тонкая обёртка: строит сэмплы из схем (через MNA) и зовёт train_gnn_on_samples.
+    Returns (model, metrics).
     """
+    samples = _build_training_samples(schemes)
+    return train_gnn_on_samples(
+        samples, epochs=epochs, lr=lr, seed=seed, val_split=val_split, batch_size=batch_size
+    )
+
+
+def train_gnn_on_samples(
+    samples,
+    *,
+    epochs: int = 60,
+    lr: float = 0.01,
+    seed: int = 42,
+    val_split: float = 0.15,
+    batch_size: int = 16,
+) -> tuple:
+    """Обучение GNN на готовых сэмплах [(graph, label_voltages)] минибатчами.
+
+    Минибатчинг (блочно-диагональная склейка) ускоряет и стабилизирует обучение по
+    сравнению с per-sample SGD — критично для тысяч сэмплов из реального корпуса.
+    Returns (model, metrics): {samples, train_samples, val_samples, epochs,
+    final_train_loss, best_val_loss, history}.
+    """
+    import random as _random
+
     torch, nn = _require_torch()
     torch.manual_seed(seed)
-
-    samples = _build_training_samples(schemes)
     if len(samples) < 4:
         raise ValueError(f'too few solvable schemes for training: {len(samples)}')
 
@@ -259,35 +400,40 @@ def train_gnn(
     ]
     n_val = max(1, int(len(tensors) * val_split))
     val_set = tensors[:n_val]
-    train_set = tensors[n_val:]
+    train_set = tensors[n_val:] or tensors[:1]
 
     model = build_model()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     loss_fn = nn.MSELoss()
+    rng = _random.Random(seed)
+    batch_size = max(1, int(batch_size))
 
     history = []
     best_val = math.inf
     best_state = None
     for epoch in range(epochs):
         model.train()
+        order = list(range(len(train_set)))
+        rng.shuffle(order)
         total = 0.0
-        for (x, ei, ef), y in train_set:
+        n_batches = 0
+        for start in range(0, len(order), batch_size):
+            batch = [train_set[j] for j in order[start : start + batch_size]]
+            (x, ei, ef, gm), y = collate_graphs(batch)
             optimizer.zero_grad()
-            pred = model(x, ei, ef)
-            loss = loss_fn(pred, y)
+            loss = loss_fn(model(x, ei, ef, gm), y)
             loss.backward()
             optimizer.step()
             total += float(loss.item())
+            n_batches += 1
         scheduler.step()
 
         model.eval()
-        vtotal = 0.0
         with torch.no_grad():
-            for (x, ei, ef), y in val_set:
-                vtotal += float(loss_fn(model(x, ei, ef), y).item())
-        train_loss = total / max(1, len(train_set))
-        val_loss = vtotal / max(1, len(val_set))
+            (vx, vei, vef, vgm), vy = collate_graphs(val_set)
+            val_loss = float(loss_fn(model(vx, vei, vef, vgm), vy).item())
+        train_loss = total / max(1, n_batches)
         history.append(
             {'epoch': epoch + 1, 'train_loss': round(train_loss, 5), 'val_loss': round(val_loss, 5)}
         )
@@ -302,6 +448,7 @@ def train_gnn(
         'train_samples': len(train_set),
         'val_samples': len(val_set),
         'epochs': epochs,
+        'batch_size': batch_size,
         'final_train_loss': history[-1]['train_loss'] if history else None,
         'best_val_loss': round(best_val, 5),
         'history': history,
