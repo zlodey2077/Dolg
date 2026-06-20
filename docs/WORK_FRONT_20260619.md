@@ -106,20 +106,24 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
      слишком тяжёлый URLConf из-за импортов views/templates.
    - Цель: `manage.py check` до 20-30 секунд на текущей машине, затем ниже.
 
-2. Сделать браузерный asset-smoke для simulation/CAD.
-   - Проверить, что `/simulation/` реально загружает `shop/static/simulation/*`,
-     `shop/static/lib/*`, wasm worker и Vite bundle без 404.
-   - Добавить тест или management smoke, который ловит missing static до ручной
-     проверки браузером.
-   - Синхронизировать README/docs: писать `shop/static/simulation`, если именно
-     там лежит источник.
+2. [x] Сделать быстрый asset-smoke для simulation/CAD.
+   - Добавлен `Dolg_APP/tests_tool_asset_smoke.py`: `/simulation/` и `/cad/`
+     рендерятся через Django test client без Playwright-heavy прогона.
+   - Smoke проверяет HTML static refs, `shop/static/simulation/*`,
+     `shop/static/lib/*`, `shop/static/ai/*`, worker/wasm assets, базовые DOM
+     markers и API `/api/sim/server-engines/`.
+   - Источник static зафиксирован как `shop/static/simulation` и
+     `shop/static/lib`; missing static теперь ловится до ручной проверки
+     браузером.
 
 3. Начать декомпозицию `simulation.html` без большого переписывания.
-   - Вынести один самодостаточный блок: server-engine modal или instrument
-     animation/controller.
-   - Оставить обратную совместимость через `window.*` namespace и существующие
-     inline handlers.
-   - Добавить минимум Vitest/pytest coverage на вынесенный контракт.
+   - [x] Вынести один самодостаточный блок: server-engine UI render helpers
+     переехали в `shop/static/simulation/server-engine-ui.js`.
+   - [x] Оставить обратную совместимость через `window.*` namespace и
+     существующие inline handlers: старые функции в `simulation.html` остались
+     адаптерами вокруг `window.DolgServerEngineUI`.
+   - [x] Добавить минимум coverage на вынесенный контракт:
+     `Dolg_APP/tests_tool_asset_smoke.py` гоняет Node VM contract smoke.
    - Не делать полную TS-миграцию одним прыжком.
 
 4. Проверить Docker/PostgreSQL после стабилизации dev-loop.
@@ -169,6 +173,26 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
      pages.
    - Не превращать Data Console в write-инструмент до отдельного permission audit.
 
+5. Доклад: комплексная защита данных от целевых атак.
+   - Не ограничиваться базовыми токенами и "защитой от случайных ошибок".
+     Сформировать defense-in-depth доклад по модели целевого атакующего:
+     credential stuffing, кража сессии, IDOR/tenant escape, supply-chain,
+     SSRF/cloud metadata, вредные ECAD/SPICE/архивы, prompt injection, RCE через
+     парсеры/воркеры, exfiltration из БД/media/logs/backups, CI/CD secrets,
+     Docker/K8s lateral movement и insider/stolen laptop scenarios.
+   - Структура доклада: активы и секреты; модель угроз; текущие защиты в коде;
+     gaps; приоритетные меры; сценарии обнаружения и реагирования; что сказать
+     комиссии простыми словами.
+   - Каркас контроля: OWASP ASVS 5.0 как проверяемые требования,
+     OWASP Top 10/Cheat Sheets как карта web/appsec атак, NIST CSF 2.0 как цикл
+     Govern/Identify/Protect/Detect/Respond/Recover.
+   - Привязать к проекту: `SECURITY.md`, `docs/SECURITY_BACKLOG.md`,
+     `ssrf_guard.py`, webhook signatures, 2FA/SSO, RBAC/org isolation,
+     `AuditLog`/`ProjectEvent`, CSP split-plan, gitleaks/pre-commit, Docker/K8s
+     hardening и future Vault/Postgres/backup encryption.
+   - Итоговый формат: один аккуратный раздел/доклад, без россыпи новых файлов;
+     если потребуется отдельный артефакт, вынести в существующие security docs.
+
 ## P2 - данные, AI и каталог
 
 1. AI/ML curation.
@@ -205,14 +229,29 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
 
 ## Рекомендуемый порядок ближайших сессий
 
-0. Сессия 0: системная стабилизация P-1 - диагностика нагрузки, остановка
-   лишних фоновых процессов, минимальный VS Code профиль, baseline в `logs/`.
-1. Сессия 1: ускорить Django/dev-loop и зафиксировать профиль до/после.
-2. Сессия 2: asset-smoke `/simulation/` + синхронизация README/API/docs.
-3. Сессия 3: первый вынос блока из `simulation.html` в static/TS с тестом.
-4. Сессия 4: Docker/Postgres dev run и Data Console на Postgres.
-5. Сессия 5: EngineJob retry/stale/audit или Xyce adapter interface.
-6. Сессия 6: CAD/simulation UX pass с реальным применением настроек профиля.
+0. Сессия 0: P-1/P0 стабилизация закрыта до безопасного минимума:
+   лишние dev-процессы вынесены в helper-скрипты, Django URLConf переведены
+   на lazy imports, HTML-check стал opt-in, VS Code Python tasks получили
+   быстрые CLI env-флаги. Текущий ориентир: `django.setup` около 8 секунд,
+   `manage.py check` около 3-4 секунд в fast-режиме.
+1. Сессия 1: закрыта - asset-smoke `/simulation/` и `/cad/` добавлен в
+   `Dolg_APP/tests_tool_asset_smoke.py`; verified ruff + focused pytest.
+2. Сессия 2: закрыта - первый малый вынос из `simulation.html` сделан:
+   `server-engine-ui.js` в `shop/static/simulation`, сохранён `window.*`
+   контракт, добавлен focused Node VM smoke.
+3. Сессия 3: следующий активный пункт - EngineJob MVP-2:
+   stale/retry/heartbeat/reason/audit, единый
+   result contract для будущих Xyce/PySpice/GnuCap workers.
+4. Сессия 4: доклад по защите данных от целевых атак: OWASP ASVS/Top 10 +
+   NIST CSF 2.0, реальные активы DOLG, threat model, gaps, меры и текст для
+   защиты.
+5. Сессия 5: Admin/Data Console v2: безопасный поиск/фильтры, JSONField и
+   artifact preview, быстрые ссылки в admin changelist/change.
+6. Сессия 6: CAD/simulation UX pass: применить профильные настройки
+   density/layout/render/animations к реальному интерфейсу, подготовить базовый
+   contract для будущих приборных анимаций.
+7. Сессия 7: Docker/Postgres после защиты/после BIOS virtualization: не
+   блокировать продукт, держать SQLite + local worker как основной dev-flow.
 
 ## Правила работы
 

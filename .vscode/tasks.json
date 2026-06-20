@@ -54,6 +54,23 @@
       "problemMatcher": []
     },
     {
+      "label": "System: driver audit",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\audit_windows_drivers.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
       "label": "System: stop stale dev processes",
       "type": "shell",
       "command": "powershell",
@@ -65,8 +82,19 @@
         "${workspaceFolder}\\scripts\\stop_heavy_dev_services.ps1",
         "-Apply",
         "-IncludePlaywright",
+        "-IncludeTraining",
         "-IncludePylance"
       ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "System: apply performance fixes (admin)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\run_system_performance_fixes_as_admin.cmd",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -104,6 +132,16 @@
       "problemMatcher": []
     },
     {
+      "label": "Docker: reset Desktop runtime cache (admin)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\reset_docker_desktop_runtime_as_admin.cmd",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Django: check",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
@@ -112,7 +150,13 @@
         "check"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "group": "test",
       "problemMatcher": []
@@ -128,7 +172,13 @@
         "--dry-run"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "group": "test",
       "problemMatcher": []
@@ -143,7 +193,13 @@
         "-q"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "FAST_TESTS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "group": "test",
       "problemMatcher": []
@@ -159,7 +215,14 @@
         "-q"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
+          "FAST_TESTS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "group": "test",
       "problemMatcher": []
@@ -176,7 +239,13 @@
         "5"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "group": "build",
       "problemMatcher": []
@@ -194,7 +263,13 @@
         "2"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "group": "build",
       "problemMatcher": []
@@ -337,7 +412,13 @@
         "from django.db import connection; print(connection.vendor, connection.settings_dict.get('NAME')); print('\\n'.join(connection.introspection.table_names()[:30]))"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "DOLG_SKIP_ASGI": "1",
+          "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
+          "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
+          "PYTHONUTF8": "1"
+        }
       },
       "problemMatcher": []
     }

@@ -35,6 +35,7 @@ scheme-* всё равно доступны для inline-JS в нашем DOMCo
 <script src="{% static 'simulation/scheme-3d-components.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'simulation/scheme-3d.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'simulation/scheme-lab.js' %}?v=20260601-recovery21" defer></script>
+<script src="{% static 'simulation/server-engine-ui.js' %}?v=20260620" defer></script>
 <script src="{% static 'simulation/ml-toolbar.js' %}?v=20260601-recovery21" defer></script>
 <script src="{% static 'lib/qrcode.min.js' %}?v=1.0.0" defer></script>
 {# Ф3 семантика: клиентские нейро-эмбеддинги (Transformers.js). ESM-модули, ставят #}
@@ -9989,32 +9990,13 @@ function renderServerEngineCatalog(category) {
 function renderServerEngineSummary(summary, router) {
     const box = document.getElementById('server-engine-summary');
     if (!box) return;
-    const connected = (summary.by_status && summary.by_status.connected) || 0;
-    const adapters = ((summary.by_status && summary.by_status['adapter-ready']) || 0)
-        + ((summary.by_status && summary.by_status['primary-candidate']) || 0);
-    box.innerHTML = [
-        ['Всего движков', summary.total || 0],
-        ['Docker/REST готовы', summary.docker_rest_ready || adapters],
-        ['Уже подключены', connected],
-        ['Основной серверный', router.primary_engine || summary.primary_candidate || 'xyce'],
-    ].map(([label, value]) => (
-        `<div class="server-engine-stat"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></div>`
-    )).join('');
+    box.innerHTML = window.DolgServerEngineUI.renderSummary(summary || {}, router || {});
 }
 
 function renderServerEngineRouter(router) {
     const box = document.getElementById('server-engine-router');
     if (!box) return;
-    const docker = (router.docker_services || []).map(x => `<code>${escapeHtml(x)}</code>`).join(' ');
-    const fallback = (router.fallback_order || []).map(x => `<code>${escapeHtml(x)}</code>`).join(' → ');
-    box.innerHTML = `
-        <strong>Единый контур:</strong> ${escapeHtml(router.strategy || 'engine-router выбирает backend под задачу.')}
-        <br><strong>REST-контракт:</strong> <code>${escapeHtml((router.contract || {}).submit || 'POST /engines/{engine_id}/jobs')}</code>,
-        <code>${escapeHtml((router.contract || {}).status || 'GET /engines/jobs/{job_id}')}</code>,
-        <code>${escapeHtml((router.contract || {}).result || 'GET /engines/jobs/{job_id}/result')}</code>
-        <br><strong>Fallback:</strong> ${fallback || '<code>xyce</code> → <code>pyspice</code>'}
-        <br><strong>Docker/Kubernetes:</strong> ${docker || '<code>engine-gateway</code> <code>xyce-worker</code>'}
-    `;
+    box.innerHTML = window.DolgServerEngineUI.renderRouter(router || {});
 }
 
 function renderServerEngineRunner(engines, router) {
@@ -10112,27 +10094,11 @@ function renderServerEngineQueue(error) {
 }
 
 function renderServerEngineQueueItem(job) {
-    const status = String(job.status || 'queued');
-    const title = `Job #${job.id || ''}`;
-    const engine = job.engine_name || job.engine_id || '';
-    const analysis = job.analysis_type || '';
-    const progress = Number(job.progress_percent || 0);
-    return `
-        <button type="button" class="server-engine-queue__item" onclick="selectServerEngineJob(${Number(job.id) || 0})">
-            <code>${escapeHtml(title)}</code>
-            <span>${escapeHtml(engine)}</span>
-            <span>${escapeHtml(analysis)} · ${Math.max(0, Math.min(progress, 100))}%</span>
-            <span class="server-engine-queue__badge" data-status="${escapeHtml(status)}">${escapeHtml(status)}</span>
-        </button>
-    `;
+    return window.DolgServerEngineUI.renderQueueItem(job || {});
 }
 
 function countServerEngineJobs(jobs) {
-    return (jobs || []).reduce((acc, job) => {
-        const status = String(job.status || 'queued');
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-    }, {});
+    return window.DolgServerEngineUI.countJobs(jobs || []);
 }
 
 async function selectServerEngineJob(jobId) {
@@ -10351,9 +10317,7 @@ function renderServerEngineJobError(error) {
 }
 
 function renderServerEngineWarnings(warnings) {
-    const list = Array.isArray(warnings) ? warnings.filter(Boolean).slice(0, 6) : [];
-    if (!list.length) return '';
-    return list.map(w => `<div style="color:#ffd38a;">⚠ ${escapeHtml(w)}</div>`).join('');
+    return window.DolgServerEngineUI.renderWarnings(warnings);
 }
 
 function publishServerEngineResult(job) {
@@ -10366,82 +10330,24 @@ function publishServerEngineResult(job) {
 }
 
 function renderServerEngineResult(result, job) {
-    if (!result || typeof result !== 'object') return '';
-    const nodes = normalizeServerEngineRows(result.nodes, result.node_voltages, 'voltage_v', 'V');
-    const branches = normalizeServerEngineRows(result.branches, result.currents_a, 'current_a', 'A');
-    const metrics = Object.entries(result.metrics || {})
-        .filter(([, value]) => value !== null && value !== undefined && value !== '')
-        .slice(0, 10)
-        .map(([key, value]) => `<span>${escapeHtml(key)}: <code>${escapeHtml(formatServerEngineValue(value))}</code></span>`)
-        .join('');
-    return `
-        <div class="server-engine-result">
-            <div class="server-engine-job-status__head">
-                <strong>${escapeHtml((job && job.engine_name) || result.engine_name || result.engine || 'server engine')}</strong>
-                <span class="server-engine-job-status__badge">${escapeHtml(result.analysis_type || (job && job.analysis_type) || 'result')}</span>
-            </div>
-            ${metrics ? `<div class="server-engine-result-metrics">${metrics}</div>` : ''}
-            ${nodes.length ? renderServerEngineTable('Узлы', nodes) : ''}
-            ${branches.length ? renderServerEngineTable('Ветви', branches) : ''}
-            ${renderServerEngineWarnings(result.warnings)}
-        </div>
-    `;
+    return window.DolgServerEngineUI.renderResult(result, job);
 }
 
 function normalizeServerEngineRows(rows, mapRows, valueKey, unit) {
-    if (Array.isArray(rows)) {
-        return rows.slice(0, 16).map(row => ({
-            id: row.id || row.name || 'value',
-            value: row[valueKey] !== undefined ? row[valueKey] : (row.value !== undefined ? row.value : row.samples),
-            unit: row.unit || unit,
-        }));
-    }
-    if (rows && typeof rows === 'object') {
-        return Object.entries(rows).slice(0, 16).map(([id, value]) => ({ id, value, unit }));
-    }
-    if (mapRows && typeof mapRows === 'object') {
-        return Object.entries(mapRows).slice(0, 16).map(([id, value]) => ({ id, value, unit }));
-    }
-    return [];
+    return window.DolgServerEngineUI.normalizeRows(rows, mapRows, valueKey, unit);
 }
 
 function renderServerEngineTable(title, rows) {
-    const body = rows.map(row => `
-        <tr>
-            <td><code>${escapeHtml(row.id)}</code></td>
-            <td>${escapeHtml(formatServerEngineValue(row.value))}</td>
-            <td>${escapeHtml(row.unit || '')}</td>
-        </tr>
-    `).join('');
-    return `
-        <table class="server-engine-result-table">
-            <thead><tr><th>${escapeHtml(title)}</th><th>Значение</th><th>Ед.</th></tr></thead>
-            <tbody>${body}</tbody>
-        </table>
-    `;
+    return window.DolgServerEngineUI.renderTable(title, rows || []);
 }
 
 function formatServerEngineValue(value) {
-    if (Array.isArray(value)) return value.length ? `${formatServerEngineValue(value[0])} … (${value.length})` : '[]';
-    if (typeof value === 'number') {
-        if (!Number.isFinite(value)) return String(value);
-        const abs = Math.abs(value);
-        if (abs > 0 && abs < 0.001) return value.toExponential(4);
-        if (abs >= 100000) return value.toExponential(4);
-        return Number(value.toPrecision(6)).toString();
-    }
-    if (typeof value === 'object' && value !== null) return JSON.stringify(value).slice(0, 80);
-    return String(value);
+    return window.DolgServerEngineUI.formatValue(value);
 }
-
 function renderServerEngineTabs(categories, active) {
     const box = document.getElementById('server-engine-tabs');
     if (!box) return;
-    const all = `<button type="button" class="server-engine-tab ${active ? '' : 'active'}" onclick="renderServerEngineCatalog('')">Все</button>`;
-    const buttons = categories.map(cat => (
-        `<button type="button" class="server-engine-tab ${active === cat.key ? 'active' : ''}" onclick="renderServerEngineCatalog('${escapeHtml(cat.key)}')">${escapeHtml(cat.label)}</button>`
-    )).join('');
-    box.innerHTML = all + buttons;
+    box.innerHTML = window.DolgServerEngineUI.renderTabs(categories || [], active || '');
 }
 
 function renderServerEngineGrid(engines, router) {
@@ -10456,28 +10362,10 @@ function renderServerEngineGrid(engines, router) {
 }
 
 function renderServerEngineCard(engine, primaryId) {
-    const tags = (engine.tags || []).slice(0, 5).map(tag => `<span>${escapeHtml(tag)}</span>`).join('');
-    const outputs = (engine.outputs || []).slice(0, 3).join(', ');
-    const recommended = _serverEngineRecommendedIds.has(engine.id);
-    const primary = engine.id === primaryId || engine.status === 'primary-candidate';
-    return `
-        <article class="server-engine-card ${primary ? 'server-engine-card--primary' : ''}">
-            <header>
-                <h3>${escapeHtml(engine.name)}${recommended ? ' · рекомендован' : ''}</h3>
-                <span class="server-engine-status" data-status="${escapeHtml(engine.status || '')}">${escapeHtml(engine.status_label || engine.status || 'status')}</span>
-            </header>
-            <p>${escapeHtml(engine.task || '')}</p>
-            <p>${escapeHtml(engine.fit || '')}</p>
-            <dl>
-                <dt>Интеграция</dt><dd>${escapeHtml(engine.integration || '')}</dd>
-                <dt>Endpoint</dt><dd><code>${escapeHtml(engine.endpoint || '—')}</code></dd>
-                <dt>Выход</dt><dd>${escapeHtml(outputs || 'JSON/artifacts')}</dd>
-                <dt>Лицензия</dt><dd>${escapeHtml(engine.license || '—')}</dd>
-            </dl>
-            <button type="button" class="server-engine-card-action" onclick="selectServerEngine('${escapeHtml(engine.id)}')">Выбрать</button>
-            <div class="server-engine-tags">${tags}</div>
-        </article>
-    `;
+    return window.DolgServerEngineUI.renderCard(engine || {}, {
+        primaryId,
+        recommended: _serverEngineRecommendedIds.has(engine.id),
+    });
 }
 
 async function refreshServerEngineRecommendations() {
@@ -10506,9 +10394,15 @@ async function refreshServerEngineRecommendations() {
 }
 
 function escapeHtml(s) {
-    return String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    if (window.DolgServerEngineUI && typeof window.DolgServerEngineUI.escapeHtml === 'function') {
+        return window.DolgServerEngineUI.escapeHtml(s);
+    }
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // =============================================================

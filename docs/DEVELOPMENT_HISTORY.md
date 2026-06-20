@@ -176,6 +176,31 @@
 - `knowledge/notes/circuit_datasets.md`
 - `knowledge/notes/eda_toolbar_settings.md`
 
+### 2026-06-20 - Django dev-loop acceleration
+
+- Project URLConfs moved heavy view modules to lazy URL callbacks, so URL checks no longer import simulation, ML/admin, org, SSO, 2FA, chat, shop, accounts, orders, knowledge and moderation views during ordinary Django startup.
+- The multi-line Django-template comment check is now opt-in through `DOLG_CHECK_DJANGO_COMMENTS=1` or active in CI, instead of scanning all HTML files on every local `manage.py check`.
+- CLI-only checks can set `DOLG_SKIP_SOCIALACCOUNT_PROVIDERS=1` to avoid importing heavy OAuth provider stacks; normal site startup keeps Google/Microsoft/GitHub providers enabled.
+- VS Code Python/Django tasks now pass fast local env flags for checks, migrations, focused pytest, engine worker and SQL inspect.
+- Verification: `.venv\Scripts\python.exe -m ruff check Dolg_APP\urls.py Dolg_APP\checks.py`, `manage.py check`, URL reverse/resolve smoke, `/simulation/` and `/cad/` smoke, Stripe webhook CSRF smoke.
+- Current light profile with ASGI, optional app probes and social providers skipped: `django.setup` ~8s, Django checks ~3-4s. Remaining startup weight is mostly Django core/admin/forms/model loading, so further cuts should be feature-specific rather than global.
+
+### 2026-06-20 - Simulation/CAD asset smoke
+
+- Added `Dolg_APP/tests_tool_asset_smoke.py` for fast `/simulation/` and `/cad/` smoke coverage without Playwright-heavy browser runs.
+- The smoke renders both workspaces, checks rendered `/static/...` references through Django staticfiles, verifies critical simulation worker/wasm/lib/AI assets, and confirms the server-engine catalog/recommend APIs.
+- During verification, stale ML training and VS Code `pytest --collect-only Dolg_APP` processes were stopped; VS Code Test Explorer now points at focused smoke/core test files instead of collecting the whole app by default.
+- Verification: `ruff check Dolg_APP\tests_tool_asset_smoke.py`, `pytest Dolg_APP\tests_tool_asset_smoke.py -q`, `.vscode/settings.json` JSON parse.
+- Next active item in `WORK_FRONT_20260619.md`: Session 2, first small extraction from `simulation.html` into `shop/static/simulation`.
+
+### 2026-06-20 - Simulation server-engine UI extraction
+
+- Extracted pure server-engine render helpers from `simulation.html` into `shop/static/simulation/server-engine-ui.js`.
+- Kept the old global function names and inline handler contract in `simulation.html`; they now delegate to `window.DolgServerEngineUI`, so the current UI keeps working while the template gets smaller.
+- Extended `Dolg_APP/tests_tool_asset_smoke.py` to verify the new static asset and run a Node VM contract smoke for result rendering, escaping, job counts and engine cards.
+- Verification: `ruff check Dolg_APP\tests_tool_asset_smoke.py`, `pytest Dolg_APP\tests_tool_asset_smoke.py -q`, Node syntax check for `server-engine-ui.js`, and `git diff --check` for touched files.
+- Next active item in `WORK_FRONT_20260619.md`: Session 3, EngineJob MVP-2.
+
 ## Шаблон новой записи
 
 ```markdown

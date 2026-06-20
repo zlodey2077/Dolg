@@ -54,6 +54,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', DEFAULT_INSECURE_SECRET_KEY)
 DEBUG = env_bool('DEBUG', True)
 ALLOW_MOCK_SSO = env_bool('ALLOW_MOCK_SSO', DEBUG or IS_TESTING)
 SKIP_OPTIONAL_APP_PROBES = env_bool('DOLG_SKIP_OPTIONAL_APP_PROBES', False)
+SKIP_SOCIALACCOUNT_PROVIDERS = env_bool('DOLG_SKIP_SOCIALACCOUNT_PROVIDERS', False)
 
 ALLOWED_HOSTS = env_list(
     'ALLOWED_HOSTS',
@@ -124,9 +125,15 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
-    'allauth.socialaccount.providers.google',
-    'allauth.socialaccount.providers.microsoft',
-    'allauth.socialaccount.providers.github',
+    *(
+        []
+        if SKIP_SOCIALACCOUNT_PROVIDERS
+        else [
+            'allauth.socialaccount.providers.google',
+            'allauth.socialaccount.providers.microsoft',
+            'allauth.socialaccount.providers.github',
+        ]
+    ),
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

@@ -1,22 +1,24 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path, reverse_lazy
 
-from . import views
+from Dolg_PR.url_utils import lazy_view
 
 app_name = 'accounts'
 
 urlpatterns = [
-    path('register/', views.register, name='register'),
-    path('login/', views.login_view, name='login'),
-    path('logout/', views.logout_view, name='logout'),
-    path('profile/', views.profile, name='profile'),
-    path('profile/edit/', views.edit_profile, name='edit_profile'),
-    path('address/add/', views.add_address, name='add_address'),
-    path('address/<int:address_id>/edit/', views.edit_address, name='edit_address'),
-    path('address/<int:address_id>/delete/', views.delete_address, name='delete_address'),
+    path('register/', lazy_view('accounts.views.register'), name='register'),
+    path('login/', lazy_view('accounts.views.login_view'), name='login'),
+    path('logout/', lazy_view('accounts.views.logout_view'), name='logout'),
+    path('profile/', lazy_view('accounts.views.profile'), name='profile'),
+    path('profile/edit/', lazy_view('accounts.views.edit_profile'), name='edit_profile'),
+    path('address/add/', lazy_view('accounts.views.add_address'), name='add_address'),
+    path('address/<int:address_id>/edit/', lazy_view('accounts.views.edit_address'), name='edit_address'),
+    path(
+        'address/<int:address_id>/delete/', lazy_view('accounts.views.delete_address'), name='delete_address'
+    ),
     # Email-verification: ссылка из письма + ручной перезапрос
-    path('verify-email/<str:token>/', views.verify_email, name='verify_email'),
-    path('resend-verification/', views.resend_verification, name='resend_verification'),
+    path('verify-email/<str:token>/', lazy_view('accounts.views.verify_email'), name='verify_email'),
+    path('resend-verification/', lazy_view('accounts.views.resend_verification'), name='resend_verification'),
     # Password reset flow — встроенные Django views + наши шаблоны.
     # Email отправляется через console-backend в DEBUG (видно в runserver-логе)
     # или SMTP в production.

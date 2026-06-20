@@ -2,6 +2,7 @@ param(
     [int]$DockerTimeoutSeconds = 300,
     [switch]$EnableFullHyperV,
     [switch]$InstallUbuntu,
+    [switch]$ResetDockerRuntime,
     [switch]$SkipDockerDesktopSettings
 )
 
@@ -36,6 +37,7 @@ function Invoke-ElevatedSelf {
     )
     if ($EnableFullHyperV) { $args += "-EnableFullHyperV" }
     if ($InstallUbuntu) { $args += "-InstallUbuntu" }
+    if ($ResetDockerRuntime) { $args += "-ResetDockerRuntime" }
     if ($SkipDockerDesktopSettings) { $args += "-SkipDockerDesktopSettings" }
     Start-Process powershell.exe -Verb RunAs -ArgumentList $args
 }
@@ -90,7 +92,7 @@ function Invoke-ProcessWithTimeout {
     try {
         $process = [System.Diagnostics.Process]::Start($startInfo)
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            Stop-ProcessTree -ProcessId $process.Id
             return @{ Ok = $false; TimedOut = $true; Output = "$FilePath $Arguments timed out" }
         }
         $out = $process.StandardOutput.ReadToEnd().Trim()
@@ -99,6 +101,91 @@ function Invoke-ProcessWithTimeout {
     }
     catch {
         return @{ Ok = $false; TimedOut = $false; Output = $_.Exception.Message }
+    }
+}
+
+function Get-ChildProcessIds {
+    param([int]$ProcessId)
+
+    $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue)
+    foreach ($child in $children) {
+        Get-ChildProcessIds -ProcessId $child.ProcessId
+        $child.ProcessId
+    }
+}
+
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    $ids = @(Get-ChildProcessIds -ProcessId $ProcessId)
+    [array]::Reverse($ids)
+    foreach ($id in $ids) {
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    }
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+function Stop-DockerCliProcesses {
+    $names = @(
+        "com.docker.backend",
+        "com.docker.build",
+        "com.docker.proxy",
+        "Docker Desktop",
+        "docker",
+        "docker-agent",
+        "docker-ai",
+        "docker-buildx",
+        "docker-compose",
+        "docker-debug",
+        "docker-desktop",
+        "docker-dhi",
+        "docker-extension",
+        "docker-init",
+        "docker-mcp",
+        "docker-model",
+        "docker-offload",
+        "docker-pass",
+        "docker-sandbox",
+        "docker-sbom",
+        "docker-scout",
+        "vpnkit"
+    )
+    Get-Process -Name $names -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
+function Test-HardwareVirtualization {
+    Write-Step "Check hardware virtualization"
+    try {
+        $cpu = Get-CimInstance Win32_Processor -ErrorAction Stop | Select-Object -First 1
+        if (-not $cpu) {
+            Write-Warning "CPU information is unavailable. Continuing, but Docker Desktop may fail."
+            return $true
+        }
+
+        Write-Host "CPU: $($cpu.Name)"
+        Write-Host "VM monitor extensions: $($cpu.VMMonitorModeExtensions)"
+        Write-Host "SLAT: $($cpu.SecondLevelAddressTranslationExtensions)"
+        Write-Host "Virtualization enabled in firmware: $($cpu.VirtualizationFirmwareEnabled)"
+
+        if ($cpu.VMMonitorModeExtensions -eq $false -or $cpu.SecondLevelAddressTranslationExtensions -eq $false) {
+            Write-Warning "This CPU does not report the virtualization features required by Docker Desktop."
+            return $false
+        }
+        if ($cpu.VirtualizationFirmwareEnabled -eq $false) {
+            Write-Warning "Hardware virtualization is disabled in BIOS/UEFI. Enable AMD-SVM/AMD-IOMMU or Intel VT-x/VT-d, save with F10, boot Windows, then re-run this script."
+            return $false
+        }
+
+        $computer = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+        if ($computer -and $computer.HypervisorPresent -eq $false) {
+            Write-Warning "Firmware virtualization is enabled, but Windows hypervisor is not currently loaded. A reboot may still be required after this script."
+        }
+        return $true
+    }
+    catch {
+        Write-Warning "Could not check hardware virtualization: $($_.Exception.Message)"
+        return $true
     }
 }
 
@@ -140,15 +227,21 @@ function Update-DockerDesktopSettings {
                     $changed = $true
                 }
             }
+            foreach ($key in @("EnableDockerAI", "DockerAIEnabled", "enableDockerAI")) {
+                if ($json.PSObject.Properties[$key]) {
+                    Set-JsonProperty $json $key $false
+                    $changed = $true
+                }
+            }
             if ($changed) {
                 $backup = "$path.bak-$(Get-Date -Format "yyyyMMdd-HHmmss")"
                 Copy-Item -LiteralPath $path -Destination $backup
                 [System.IO.File]::WriteAllText($path, ($json | ConvertTo-Json -Depth 50) + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
-                Write-Host "Updated Docker Desktop Kubernetes setting: $path"
+                Write-Host "Updated Docker Desktop settings: $path"
                 Write-Host "Backup: $backup"
             }
             else {
-                Write-Host "No known Kubernetes setting key found in $path"
+                Write-Host "No known managed setting key found in $path"
             }
         }
         catch {
@@ -157,11 +250,86 @@ function Update-DockerDesktopSettings {
     }
 }
 
+function Backup-And-MovePath {
+    param(
+        [string]$Path,
+        [string]$BackupRoot
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+    $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
+    $resolvedDockerLocal = (Resolve-Path -LiteralPath (Join-Path $env:LOCALAPPDATA "Docker")).Path
+    if (-not $resolvedPath.StartsWith($resolvedDockerLocal, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to move path outside Docker local data root: $resolvedPath"
+    }
+    if (-not (Test-Path -LiteralPath $BackupRoot)) {
+        New-Item -ItemType Directory -Path $BackupRoot | Out-Null
+    }
+    $target = Join-Path $BackupRoot (Split-Path -Leaf $resolvedPath)
+    try {
+        Move-Item -LiteralPath $resolvedPath -Destination $target -ErrorAction Stop
+        Write-Host "Moved $resolvedPath -> $target"
+    }
+    catch {
+        Write-Warning "Could not move ${resolvedPath}: $($_.Exception.Message)"
+    }
+}
+
+function Reset-DockerRuntimeCache {
+    if (-not $ResetDockerRuntime) {
+        return
+    }
+
+    Write-Step "Reset Docker Desktop runtime cache"
+    Write-Warning "ResetDockerRuntime is enabled. Docker Desktop runtime/cache paths will be moved to backup folders, not deleted."
+    try {
+        wsl.exe --shutdown 2>$null
+    }
+    catch {
+    }
+    foreach ($distro in @("docker-desktop", "docker-desktop-data")) {
+        try {
+            wsl.exe --unregister $distro 2>$null
+            Write-Host "Unregistered WSL distro if present: $distro"
+        }
+        catch {
+        }
+    }
+    foreach ($name in @("com.docker.service")) {
+        Stop-Service -Name $name -Force -ErrorAction SilentlyContinue
+    }
+    Stop-DockerCliProcesses
+    Get-Process -Name "docker", "Docker Desktop", "com.docker.backend", "com.docker.build", "com.docker.proxy", "docker-sandbox", "vpnkit", "docker-offload" -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+
+    Start-Sleep -Seconds 2
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $dockerLocal = Join-Path $env:LOCALAPPDATA "Docker"
+    $backupRoot = Join-Path $dockerLocal ("reset-backup-$stamp")
+    foreach ($path in @(
+        (Join-Path $dockerLocal "wsl"),
+        (Join-Path $dockerLocal "run"),
+        (Join-Path $dockerLocal "tasks"),
+        (Join-Path $dockerLocal "backend.lock"),
+        (Join-Path $dockerLocal "frontend.lock"),
+        (Join-Path $dockerLocal "launcher.lock"),
+        (Join-Path $dockerLocal "backendstacks.log")
+    )) {
+        Backup-And-MovePath -Path $path -BackupRoot $backupRoot
+    }
+    Write-Host "Docker runtime backup root: $backupRoot"
+}
+
 function Test-DockerReady {
     $result = Invoke-ProcessWithTimeout "docker.exe" 'info --format "{{.ServerVersion}} {{.OperatingSystem}}"' 10
     if ($result.Ok) {
         Write-Host "Docker Engine is ready: $($result.Output)"
         return $true
+    }
+    if ($result.TimedOut) {
+        Stop-DockerCliProcesses
     }
     Write-Host "Docker Engine not ready: $($result.Output)"
     return $false
@@ -180,10 +348,19 @@ Write-Host "DOLG Lxss/Docker/Kubernetes preparation"
 Write-Host "Root: $RepoRoot"
 Write-Host "Log: $LogPath"
 Write-Host "InstallUbuntu: $InstallUbuntu"
+Write-Host "ResetDockerRuntime: $ResetDockerRuntime"
 
 Write-Step "Stop stale Docker processes"
+Stop-DockerCliProcesses
 Get-Process -Name "docker", "Docker Desktop", "com.docker.backend", "com.docker.build", "com.docker.proxy", "docker-sandbox", "vpnkit" -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
+if (-not (Test-HardwareVirtualization)) {
+    Write-Warning "Docker preparation stopped before Engine startup because virtualization is disabled in firmware."
+    Stop-DockerCliProcesses
+    Stop-Transcript | Out-Null
+    exit 3
+}
+Reset-DockerRuntimeCache
 
 Write-Step "Enable Windows virtualization features"
 Enable-FeatureIfNeeded "Microsoft-Windows-Subsystem-Linux"

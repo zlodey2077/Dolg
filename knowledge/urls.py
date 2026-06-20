@@ -1,7 +1,7 @@
 from django.urls import path, register_converter
 from django.urls.converters import SlugConverter
 
-from . import views
+from Dolg_PR.url_utils import lazy_view
 
 
 class UnicodeSlugConverter(SlugConverter):
@@ -17,16 +17,18 @@ register_converter(UnicodeSlugConverter, 'uslug')
 app_name = 'knowledge'
 
 urlpatterns = [
-    path('', views.index, name='index'),
-    path('lab/', views.engineering_lab, name='engineering_lab'),
-    path('lab/api/', views.engineering_lab_api, name='engineering_lab_api'),
-    path('learning/', views.learning_index, name='learning_index'),
-    path('learning/<uslug:slug>/', views.learning_lesson_detail, name='learning_lesson'),
+    path('', lazy_view('knowledge.views.index'), name='index'),
+    path('lab/', lazy_view('knowledge.views.engineering_lab'), name='engineering_lab'),
+    path('lab/api/', lazy_view('knowledge.views.engineering_lab_api'), name='engineering_lab_api'),
+    path('learning/', lazy_view('knowledge.views.learning_index'), name='learning_index'),
+    path(
+        'learning/<uslug:slug>/', lazy_view('knowledge.views.learning_lesson_detail'), name='learning_lesson'
+    ),
     path(
         'learning/<uslug:slug>/task/<int:task_id>/check/',
-        views.learning_task_check,
+        lazy_view('knowledge.views.learning_task_check'),
         name='learning_task_check',
     ),
-    path('category/<uslug:slug>/', views.category_detail, name='category'),
-    path('article/<uslug:slug>/', views.article_detail, name='article'),
+    path('category/<uslug:slug>/', lazy_view('knowledge.views.category_detail'), name='category'),
+    path('article/<uslug:slug>/', lazy_view('knowledge.views.article_detail'), name='article'),
 ]

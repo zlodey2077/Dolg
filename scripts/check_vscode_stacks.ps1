@@ -36,6 +36,40 @@ function Test-CommandExists {
     return $false
 }
 
+function Test-HardwareVirtualization {
+    try {
+        $cpu = Get-CimInstance Win32_Processor -ErrorAction Stop | Select-Object -First 1
+        if (-not $cpu) {
+            Write-Result "WARN" "hardware virtualization" "CPU information is unavailable"
+            return $true
+        }
+        if ($cpu.VMMonitorModeExtensions -eq $false) {
+            Write-Result "FAIL" "hardware virtualization" "CPU does not report VM monitor extensions"
+            return $false
+        }
+        if ($cpu.SecondLevelAddressTranslationExtensions -eq $false) {
+            Write-Result "FAIL" "hardware virtualization" "CPU does not report SLAT support"
+            return $false
+        }
+        if ($cpu.VirtualizationFirmwareEnabled -eq $false) {
+            Write-Result "FAIL" "hardware virtualization" "disabled in BIOS/UEFI: enable AMD-SVM/AMD-IOMMU or Intel VT-x/VT-d, save with F10, then boot Windows"
+            return $false
+        }
+
+        $computer = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+        if ($computer -and $computer.HypervisorPresent -eq $false) {
+            Write-Result "WARN" "windows hypervisor" "firmware virtualization is enabled, but the Windows hypervisor is not currently loaded"
+        } else {
+            Write-Result "PASS" "hardware virtualization" "firmware virtualization enabled"
+        }
+        return $true
+    }
+    catch {
+        Write-Result "WARN" "hardware virtualization" $_.Exception.Message
+        return $true
+    }
+}
+
 function Get-InstalledExtensionsFromDisk {
     $extensionRoot = Join-Path $env:USERPROFILE ".vscode\extensions"
     if (-not (Test-Path -LiteralPath $extensionRoot)) {
@@ -216,6 +250,7 @@ if (Test-Path (Join-Path $root "frontend\package.json")) {
 
 Write-Host ""
 Write-Host "Docker"
+$hardwareVirtualizationOk = Test-HardwareVirtualization
 $serviceNames = @("hns", "vmcompute", "LxssManager", "com.docker.service")
 $services = Get-Service -Name $serviceNames -ErrorAction SilentlyContinue |
     Select-Object Name, Status, StartType
@@ -235,7 +270,7 @@ foreach ($serviceName in $serviceNames) {
     }
 }
 $docker = Get-Command "docker" -ErrorAction SilentlyContinue
-if ($docker) {
+if ($docker -and $hardwareVirtualizationOk) {
     $dockerTimedOut = $false
     $dockerInfo = Invoke-WithTimeout -FilePath $docker.Source -Arguments @("info", "--format", "{{.ServerVersion}}") -TimeoutSeconds 20
     if ($dockerInfo.ExitCode -eq 0 -and $dockerInfo.Stdout) {
@@ -277,30 +312,38 @@ if ($docker) {
             Write-Result "WARN" "docker compose config" $compose.Stderr
         }
     }
+} elseif ($docker -and -not $hardwareVirtualizationOk) {
+    Write-Result "WARN" "docker daemon" "skipped because hardware virtualization is disabled in firmware"
 }
 
 Write-Host ""
 Write-Host "Kubernetes"
 $kubectl = Get-Command "kubectl" -ErrorAction SilentlyContinue
-if ($kubectl) {
-    $context = Invoke-WithTimeout -FilePath $kubectl.Source -Arguments @("config", "current-context") -TimeoutSeconds 10
-    if ($context.ExitCode -eq 0 -and $context.Stdout) {
-        Write-Result "PASS" "kubectl context" $context.Stdout
+if (-not $kubectl) {
+    Write-Result "FAIL" "kubectl" "not found in PATH"
+} elseif (-not $hardwareVirtualizationOk) {
+    Write-Result "WARN" "kubectl context" "skipped because hardware virtualization is disabled in firmware"
+    Write-Result "WARN" "kubectl kustomize" "skipped until Docker/Kubernetes probes are safe to run"
+} else {
+    $kubeconfig = Join-Path $env:USERPROFILE ".kube\config"
+    if (-not (Test-Path -LiteralPath $kubeconfig)) {
+        Write-Result "FAIL" "kubectl context" "no current context and kubeconfig is missing at $kubeconfig; run task Stacks: prepare Lxss Docker Kubernetes (admin), then enable Docker Desktop Kubernetes."
     } else {
-        $kubeconfig = Join-Path $env:USERPROFILE ".kube\config"
-        if (-not (Test-Path -LiteralPath $kubeconfig)) {
-            Write-Result "FAIL" "kubectl context" "no current context and kubeconfig is missing at $kubeconfig; run task Stacks: prepare Lxss Docker Kubernetes (admin), then enable Docker Desktop Kubernetes."
+        $context = Invoke-WithTimeout -FilePath $kubectl.Source -Arguments @("config", "current-context") -TimeoutSeconds 10
+        if ($context.ExitCode -eq 0 -and $context.Stdout) {
+            Write-Result "PASS" "kubectl context" $context.Stdout
         } else {
             Write-Result "FAIL" "kubectl context" "no current context in $kubeconfig; enable Docker Desktop Kubernetes or set kubeconfig."
         }
-    }
-    $kustomize = Invoke-WithTimeout -FilePath $kubectl.Source -Arguments @("kustomize", "deploy/k8s") -TimeoutSeconds 60
-    if ($kustomize.ExitCode -eq 0 -and $kustomize.Stdout) {
-        Write-Result "PASS" "kubectl kustomize" "rendered deploy/k8s"
-    } elseif ($kustomize.TimedOut) {
-        Write-Result "FAIL" "kubectl kustomize" "timed out"
-    } else {
-        Write-Result "FAIL" "kubectl kustomize" $kustomize.Stderr
+
+        $kustomize = Invoke-WithTimeout -FilePath $kubectl.Source -Arguments @("kustomize", "deploy/k8s") -TimeoutSeconds 30
+        if ($kustomize.ExitCode -eq 0 -and $kustomize.Stdout) {
+            Write-Result "PASS" "kubectl kustomize" "rendered deploy/k8s"
+        } elseif ($kustomize.TimedOut) {
+            Write-Result "FAIL" "kubectl kustomize" "timed out"
+        } else {
+            Write-Result "FAIL" "kubectl kustomize" $kustomize.Stderr
+        }
     }
 }
 

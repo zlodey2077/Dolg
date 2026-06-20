@@ -56,6 +56,11 @@ _SKIP_DIR_NAMES = {
 }
 
 
+def _env_flag(name):
+    value = os.getenv(name)
+    return bool(value and value.strip().lower() in {'1', 'true', 'yes', 'on'})
+
+
 @register()
 def check_multi_line_django_comments(app_configs, **kwargs):
     """W001: ищет `{# ... #}` с переносом строки внутри.
@@ -65,6 +70,9 @@ def check_multi_line_django_comments(app_configs, **kwargs):
     юзеру как обычный текст. За проект наступали на это 4 раза (см. memory
     feedback_django_comments.md).
     """
+    if not (_env_flag('DOLG_CHECK_DJANGO_COMMENTS') or _env_flag('CI')):
+        return []
+
     project_root = Path(getattr(settings, 'BASE_DIR', '.'))
     problems = []
     html_files = []
