@@ -19,6 +19,13 @@ class Command(BaseCommand):
         )
         parser.add_argument('--max-curated', type=int, default=200)
         parser.add_argument(
+            '--max-schemes',
+            type=int,
+            default=6000,
+            help='Потолок числа подгружаемых из датасетов схем (память): весь корпус '
+            '(~65k) в один список не влезает и роняет процесс OOM. 0 = без лимита.',
+        )
+        parser.add_argument(
             '--dataset',
             type=str,
             default=None,
@@ -66,15 +73,23 @@ class Command(BaseCommand):
             else:
                 dataset_paths = []
 
+            max_schemes = int(options.get('max_schemes') or 0)
             total_added = 0
             for path in dataset_paths:
+                # Память: весь корпус (~65k) в один список роняет процесс OOM (жёсткий kill
+                # без трейсбэка). Грузим до потолка и больше файлы не открываем.
+                if max_schemes and len(extra_schemes) >= max_schemes:
+                    self.stdout.write(self.style.WARNING(f'Достигнут потолок --max-schemes={max_schemes}'))
+                    break
                 try:
                     schemes = _load_schemes(path)
                 except (_json.JSONDecodeError, OSError) as exc:
                     if options.get('all_datasets'):
-                        self.stdout.write(self.style.WARNING(f'  ⚠ пропуск {path.name}: {exc}'))
+                        self.stdout.write(self.style.WARNING(f'  пропуск {path.name}: {exc}'))
                         continue
                     raise CommandError(f'Невалидный JSON в {path}: {exc}') from exc
+                if max_schemes:
+                    schemes = schemes[: max_schemes - len(extra_schemes)]
                 extra_schemes.extend(schemes)
                 total_added += len(schemes)
                 self.stdout.write(self.style.SUCCESS(f'Подгружено {len(schemes)} схем из {path}'))
