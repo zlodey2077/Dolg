@@ -1,0 +1,16 @@
+{
+  // Markdownlint (VSCode-расширение его подхватывает). Гасим КОСМЕТИЧЕСКИЕ правила,
+  // которые шумят на плотных технических доках/таблицах и не влияют на рендер.
+  // Содержательные правила (уровни заголовков, trailing whitespace, дубли) остаются.
+  "default": true,
+  "MD013": false, // line-length: длинные строки в доках/таблицах допустимы
+  "MD022": false, // blanks-around-headings
+  "MD031": false, // blanks-around-fences
+  "MD032": false, // blanks-around-lists
+  "MD058": false, // blanks-around-tables
+  "MD060": false, // table-column-style: педантичные пробелы в пайпах таблиц
+  "MD034": false, // no-bare-urls: голые URL в доках допустимы
+  "MD041": false, // first-line-heading: первая строка не обязана быть H1
+  "MD040": false, // fenced-code-language: не требуем язык у code-fence
+  "MD036": false  // emphasis-as-heading
+}
