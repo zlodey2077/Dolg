@@ -167,12 +167,12 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
    - Полировать 3D визуал: soldermask/copper/silkscreen, realistic board,
      стабильное framing на desktop/mobile.
 
-4. Admin/Data Console v2.
-   - Добавить безопасные фильтры/поиск по моделям и таблицам.
-   - Добавить read-only preview для JSONField/project artifacts.
-   - Добавить быстрые ссылки из Data Console в связанные admin changelist/change
-     pages.
-   - Не превращать Data Console в write-инструмент до отдельного permission audit.
+4. [x] Admin/Data Console v2.
+   - [x] Добавить безопасные фильтры/поиск по моделям и таблицам.
+   - [x] Добавить read-only preview для JSONField/project artifacts.
+   - [x] Добавить быстрые ссылки из Data Console в связанные admin changelist/change
+      pages.
+   - [x] Не превращать Data Console в write-инструмент до отдельного permission audit.
 
 5. [x] Доклад: комплексная защита данных от целевых атак.
    - [x] Не ограничиваться базовыми токенами и "защитой от случайных ошибок".
@@ -248,12 +248,12 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
 4. Сессия 4: закрыта - доклад по защите данных от целевых атак добавлен в
    `docs/SECURITY_BACKLOG.md`: OWASP ASVS/Top 10, NIST CSF 2.0, реальные
    активы DOLG, threat model, gaps, меры и текст для защиты.
-5. Сессия 5: следующий активный пункт - Admin/Data Console v2: безопасный
-   поиск/фильтры, JSONField и artifact preview, быстрые ссылки в admin
+5. Сессия 5: закрыта - Admin/Data Console v2: безопасный поиск/фильтры,
+   JSONField preview, bounded media scan и быстрые ссылки в admin
    changelist/change.
-6. Сессия 6: CAD/simulation UX pass: применить профильные настройки
-   density/layout/render/animations к реальному интерфейсу, подготовить базовый
-   contract для будущих приборных анимаций.
+6. Сессия 6: следующий активный пункт - CAD/simulation UX pass: применить
+   профильные настройки density/layout/render/animations к реальному интерфейсу,
+   подготовить базовый contract для будущих приборных анимаций.
 7. Сессия 7: Docker/Postgres после защиты/после BIOS virtualization: не
    блокировать продукт, держать SQLite + local worker как основной dev-flow.
 

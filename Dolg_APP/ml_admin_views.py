@@ -25,13 +25,15 @@ from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.admin.utils import quote
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.cache import cache
 from django.core.management import call_command
-from django.db import connection
+from django.db import connection, models
 from django.db.models.fields.files import FileField
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
@@ -41,6 +43,10 @@ MLIMPORT_PROGRESS_KEY = 'dolg.ml.import.progress'
 MLIMPORT_LOCK_KEY = 'dolg.ml.import.lock'
 DATASET_ROOT = Path('Dolg_APP/ml/dataset')
 DEFAULT_DATASET = DATASET_ROOT / 'circuits.json'
+CONSOLE_QUERY_LIMIT = 80
+CONSOLE_JSON_SAMPLE_LIMIT = 3
+CONSOLE_JSON_PREVIEW_CHARS = 1600
+CONSOLE_STORAGE_SCAN_LIMIT = 5000
 
 
 def _staff_user(user):
@@ -53,6 +59,41 @@ def _json_safe(value):
         return value
     except TypeError:
         return str(value)
+
+
+def _console_query(value: str | None) -> str:
+    return (value or '').strip()[:CONSOLE_QUERY_LIMIT]
+
+
+def _matches_query(values, query: str) -> bool:
+    if not query:
+        return True
+    needle = query.lower()
+    return any(needle in str(value or '').lower() for value in values)
+
+
+def _admin_changelist_url(opts) -> str:
+    try:
+        return reverse(f'admin:{opts.app_label}_{opts.model_name}_changelist')
+    except NoReverseMatch:
+        return ''
+
+
+def _admin_change_url(opts, pk) -> str:
+    try:
+        return reverse(f'admin:{opts.app_label}_{opts.model_name}_change', args=[quote(pk)])
+    except NoReverseMatch:
+        return ''
+
+
+def _compact_json_preview(value) -> str:
+    try:
+        text = json.dumps(_json_safe(value), ensure_ascii=False, indent=2, sort_keys=True)
+    except TypeError:
+        text = str(value)
+    if len(text) > CONSOLE_JSON_PREVIEW_CHARS:
+        return text[:CONSOLE_JSON_PREVIEW_CHARS] + '\n...'
+    return text
 
 
 def _create_ml_job(*, job_type: str, user=None, source: str = '', parameters: dict | None = None):
@@ -339,8 +380,18 @@ def _format_bytes(size: int | float | None) -> str:
     return f'{value:.1f} GB'
 
 
-def _database_console_snapshot() -> dict:
+def _database_console_snapshot(
+    *,
+    model_query: str = '',
+    table_query: str = '',
+    field_query: str = '',
+    json_query: str = '',
+) -> dict:
     """Read-only database overview for staff Data Console."""
+    model_query = _console_query(model_query)
+    table_query = _console_query(table_query)
+    field_query = _console_query(field_query)
+    json_query = _console_query(json_query)
     engine = connection.settings_dict.get('ENGINE', '')
     name = connection.settings_dict.get('NAME', '')
     host = connection.settings_dict.get('HOST', '')
@@ -354,13 +405,29 @@ def _database_console_snapshot() -> dict:
         'tables': [],
         'models': [],
         'file_fields': [],
+        'json_fields': [],
         'postgres': {},
+        'filters': {
+            'model_q': model_query,
+            'table_q': table_query,
+            'field_q': field_query,
+            'json_q': json_query,
+        },
+        'counts': {
+            'tables_total': 0,
+            'models_total': 0,
+            'file_fields_total': 0,
+            'json_fields_total': 0,
+        },
     }
 
     with connection.cursor() as cursor:
         table_names = connection.introspection.table_names(cursor)
+        snapshot['counts']['tables_total'] = len(table_names)
         quote = connection.ops.quote_name
         for table in sorted(table_names):
+            if not _matches_query([table], table_query):
+                continue
             row_count = None
             try:
                 cursor.execute(f'SELECT COUNT(*) FROM {quote(table)}')
@@ -385,23 +452,45 @@ def _database_console_snapshot() -> dict:
         opts = model._meta
         if opts.proxy or not opts.managed:
             continue
-        count = None
-        try:
-            count = model._default_manager.count()
-        except Exception:
+        snapshot['counts']['models_total'] += 1
+        file_field_names = [field.name for field in opts.fields if isinstance(field, FileField)]
+        json_field_names = [field.name for field in opts.fields if isinstance(field, models.JSONField)]
+        if _matches_query(
+            [
+                opts.label,
+                opts.app_label,
+                opts.model_name,
+                opts.db_table,
+                opts.verbose_name,
+                ','.join(file_field_names),
+                ','.join(json_field_names),
+            ],
+            model_query,
+        ):
             count = None
-        snapshot['models'].append(
-            {
-                'label': opts.label,
-                'app_label': opts.app_label,
-                'model_name': opts.model_name,
-                'db_table': opts.db_table,
-                'rows': count,
-                'admin_url': f'/admin/{opts.app_label}/{opts.model_name}/',
-            }
-        )
+            try:
+                count = model._default_manager.count()
+            except Exception:
+                count = None
+            snapshot['models'].append(
+                {
+                    'label': opts.label,
+                    'app_label': opts.app_label,
+                    'model_name': opts.model_name,
+                    'verbose_name': str(opts.verbose_name),
+                    'db_table': opts.db_table,
+                    'rows': count,
+                    'fields_count': len(opts.fields),
+                    'file_fields': file_field_names,
+                    'json_fields': json_field_names,
+                    'admin_url': _admin_changelist_url(opts),
+                }
+            )
         for field in opts.fields:
             if isinstance(field, FileField):
+                snapshot['counts']['file_fields_total'] += 1
+                if not _matches_query([opts.label, field.name, field.upload_to], field_query):
+                    continue
                 filled = None
                 try:
                     filled = (
@@ -417,12 +506,49 @@ def _database_console_snapshot() -> dict:
                         'field': field.name,
                         'upload_to': str(field.upload_to),
                         'filled': filled,
-                        'admin_url': f'/admin/{opts.app_label}/{opts.model_name}/',
+                        'admin_url': _admin_changelist_url(opts),
+                    }
+                )
+            elif isinstance(field, models.JSONField):
+                snapshot['counts']['json_fields_total'] += 1
+                if not _matches_query([opts.label, field.name, opts.db_table], json_query):
+                    continue
+                filled = None
+                samples = []
+                try:
+                    filled_qs = model._default_manager.exclude(**{f'{field.name}__isnull': True})
+                    filled = filled_qs.count()
+                    for obj in filled_qs.order_by('-pk')[:CONSOLE_JSON_SAMPLE_LIMIT]:
+                        value = getattr(obj, field.name)
+                        samples.append(
+                            {
+                                'pk': obj.pk,
+                                'title': str(obj)[:120],
+                                'value_type': type(value).__name__,
+                                'preview': _compact_json_preview(value),
+                                'admin_url': _admin_change_url(opts, obj.pk),
+                            }
+                        )
+                except Exception:
+                    filled = None
+                snapshot['json_fields'].append(
+                    {
+                        'model': opts.label,
+                        'field': field.name,
+                        'db_table': opts.db_table,
+                        'filled': filled,
+                        'samples': samples,
+                        'admin_url': _admin_changelist_url(opts),
                     }
                 )
 
     snapshot['models'].sort(key=lambda item: (item['app_label'], item['model_name']))
     snapshot['file_fields'].sort(key=lambda item: (item['model'], item['field']))
+    snapshot['json_fields'].sort(key=lambda item: (item['model'], item['field']))
+    snapshot['counts']['tables_filtered'] = len(snapshot['tables'])
+    snapshot['counts']['models_filtered'] = len(snapshot['models'])
+    snapshot['counts']['file_fields_filtered'] = len(snapshot['file_fields'])
+    snapshot['counts']['json_fields_filtered'] = len(snapshot['json_fields'])
     return snapshot
 
 
@@ -520,11 +646,15 @@ def _storage_console_snapshot(path: str = '', preview_file: str = '') -> dict:
 
     total_size = 0
     total_files = 0
+    scan_capped = False
     try:
         for item in media_root.rglob('*'):
             if item.is_file():
                 total_files += 1
                 total_size += item.stat().st_size
+                if total_files >= CONSOLE_STORAGE_SCAN_LIMIT:
+                    scan_capped = True
+                    break
     except OSError:
         pass
 
@@ -540,6 +670,8 @@ def _storage_console_snapshot(path: str = '', preview_file: str = '') -> dict:
         'preview': preview,
         'total_files': total_files,
         'total_size_label': _format_bytes(total_size),
+        'scan_capped': scan_capped,
+        'scan_limit': CONSOLE_STORAGE_SCAN_LIMIT,
     }
 
 
@@ -780,11 +912,17 @@ def staff_data_console(request):
     """Read-only database + media explorer for staff operations."""
     path = request.GET.get('path', '')
     preview = request.GET.get('preview', '')
+    filters = {
+        'model_query': request.GET.get('model_q', ''),
+        'table_query': request.GET.get('table_q', ''),
+        'field_query': request.GET.get('field_q', ''),
+        'json_query': request.GET.get('json_q', ''),
+    }
     return render(
         request,
         'admin/data_console.html',
         {
-            'db_snapshot': _database_console_snapshot(),
+            'db_snapshot': _database_console_snapshot(**filters),
             'storage_snapshot': _storage_console_snapshot(path=path, preview_file=preview),
         },
     )

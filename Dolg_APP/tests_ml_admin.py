@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from Dolg_APP.ml_admin_views import MLIMPORT_PROGRESS_KEY, MLTRAIN_PROGRESS_KEY
-from Dolg_APP.models import MLJob
+from Dolg_APP.models import MLJob, SchematicProject
 from Dolg_APP.services.ops_metrics import collect_ops_snapshot
 
 User = get_user_model()
@@ -133,6 +133,29 @@ class MLAdminViewsTests(TestCase):
         self.assertContains(response, 'DOLG Data Console')
         self.assertContains(response, 'Database backend')
         self.assertContains(response, 'Media storage')
+        self.assertContains(response, 'JSON fields')
+
+    def test_staff_data_console_filters_and_json_preview(self):
+        SchematicProject.objects.create(
+            user=self.staff,
+            name='Console project',
+            scheme_data={'components': [{'id': 'r1', 'type': 'resistor'}], 'connections': []},
+        )
+
+        response = self.client.get(
+            reverse('hello:staff_data_console'),
+            {
+                'model_q': 'SchematicProject',
+                'table_q': 'schematicproject',
+                'json_q': 'scheme_data',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Dolg_APP.SchematicProject')
+        self.assertContains(response, 'scheme_data')
+        self.assertContains(response, 'Console project')
+        self.assertContains(response, 'resistor')
 
     def test_django_admin_index_shows_ops_monitoring(self):
         response = self.client.get(reverse('admin:index'))

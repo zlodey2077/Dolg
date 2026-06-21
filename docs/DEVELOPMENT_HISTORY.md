@@ -221,6 +221,16 @@
 - Verification: documentation diff review and `git diff --check` for the touched markdown files.
 - Next active item in `WORK_FRONT_20260619.md`: Session 5, Admin/Data Console v2.
 
+### 2026-06-21 - Admin/Data Console v2
+
+- Extended the staff Data Console with read-only filters for Django models, SQL tables, FileField entries and JSONField entries.
+- Added JSONField inventory and compact sample previews with safe admin change links, so staff can inspect project/engine/audit payloads without writing custom SQL.
+- Replaced hard-coded admin paths with reverse-resolved changelist/change URLs where the model is registered in Django admin.
+- Kept media browsing read-only and bounded the recursive media scan to avoid freezing the console on large artifact directories.
+- Added focused coverage for Data Console loading, filters and JSON preview.
+- Verification: `ruff check Dolg_APP\ml_admin_views.py Dolg_APP\tests_ml_admin.py`, `py_compile Dolg_APP\ml_admin_views.py`, `manage.py check`, `pytest Dolg_APP\tests_ml_admin.py -q` (`11 passed`), and `git diff --check`.
+- Next active item in `WORK_FRONT_20260619.md`: Session 6, CAD/simulation UX pass.
+
 ## Шаблон новой записи
 
 ```markdown

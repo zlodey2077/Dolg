@@ -45,6 +45,50 @@
         background: rgba(127, 219, 255, .08);
         font-size: 12px;
     }
+    .dc-filter {
+        margin-bottom: 14px;
+    }
+    .dc-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(130px, 1fr)) auto auto;
+        gap: 10px;
+        align-items: end;
+    }
+    .dc-filter-grid label {
+        display: grid;
+        gap: 5px;
+        color: #9fb0cc;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .dc-filter-grid input {
+        min-width: 0;
+        height: 34px;
+        border: 1px solid rgba(127, 219, 255, .18);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, .22);
+        color: #e8eef9;
+        padding: 0 10px;
+        font-size: 13px;
+    }
+    .dc-filter-grid button,
+    .dc-filter-grid a {
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid rgba(127, 219, 255, .24);
+        background: rgba(127, 219, 255, .10);
+        color: #bff4ff;
+        font-weight: 800;
+        font-size: 12px;
+        text-decoration: none;
+        cursor: pointer;
+        padding: 0 12px;
+    }
     .dc-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(340px, .55fr);
@@ -103,6 +147,17 @@
         color: #9ee8ff;
         overflow-wrap: anywhere;
     }
+    .dc-row small {
+        display: block;
+        color: #9fb0cc;
+        margin-top: 3px;
+    }
+    .dc-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 6px;
+    }
     .dc-badge {
         display: inline-flex;
         width: fit-content;
@@ -115,6 +170,42 @@
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: .04em;
+    }
+    .dc-badge.muted {
+        color: #cbd5e1;
+        border-color: rgba(203, 213, 225, .18);
+        background: rgba(203, 213, 225, .08);
+    }
+    .dc-json-row {
+        border-top: 1px solid rgba(127, 219, 255, .09);
+        padding: 10px 0;
+    }
+    .dc-json-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        color: #cbd5e1;
+        font-size: 12px;
+    }
+    .dc-json-head strong {
+        color: #fff;
+    }
+    .dc-json-sample {
+        margin-top: 8px;
+        border: 1px solid rgba(127, 219, 255, .12);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, .16);
+        padding: 8px;
+    }
+    .dc-json-sample pre {
+        margin: 6px 0 0;
+        max-height: 220px;
+        overflow: auto;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: #dbeafe;
+        font-size: 12px;
     }
     .dc-breadcrumbs {
         display: flex;
@@ -159,7 +250,11 @@
     @media (max-width: 900px) {
         .dc-head,
         .dc-grid { display: block; }
+        .dc-filter-grid { grid-template-columns: 1fr 1fr; }
         .dc-actions { justify-content: flex-start; margin-top: 12px; }
+    }
+    @media (max-width: 620px) {
+        .dc-filter-grid { grid-template-columns: 1fr; }
     }
 </style>
 {% endblock %}
@@ -184,7 +279,9 @@
             <div><span class="dc-badge">{{ db_snapshot.vendor }}</span><br><strong>{{ db_snapshot.engine }}</strong></div>
             <div><span>NAME</span><br><strong>{{ db_snapshot.name }}</strong></div>
             <div><span>HOST</span><br><strong>{{ db_snapshot.host }}</strong></div>
-            <div><span>TABLES</span><br><strong>{{ db_snapshot.tables|length }}</strong></div>
+            <div><span>TABLES</span><br><strong>{{ db_snapshot.counts.tables_filtered }}/{{ db_snapshot.counts.tables_total }}</strong></div>
+            <div><span>MODELS</span><br><strong>{{ db_snapshot.counts.models_filtered }}/{{ db_snapshot.counts.models_total }}</strong></div>
+            <div><span>JSON FIELDS</span><br><strong>{{ db_snapshot.counts.json_fields_filtered }}/{{ db_snapshot.counts.json_fields_total }}</strong></div>
             {% if db_snapshot.is_postgres %}
             <div><span>POSTGRES SIZE</span><br><strong>{{ db_snapshot.postgres.size|default:"-" }}</strong></div>
             {% else %}
@@ -196,6 +293,30 @@
         {% endif %}
     </section>
 
+    <section class="dc-card dc-filter">
+        <h2>Filters</h2>
+        <form class="dc-filter-grid" method="get">
+            <label>
+                <span>Models</span>
+                <input type="search" name="model_q" value="{{ db_snapshot.filters.model_q }}" placeholder="SchematicProject">
+            </label>
+            <label>
+                <span>Tables</span>
+                <input type="search" name="table_q" value="{{ db_snapshot.filters.table_q }}" placeholder="Dolg_APP_">
+            </label>
+            <label>
+                <span>Files</span>
+                <input type="search" name="field_q" value="{{ db_snapshot.filters.field_q }}" placeholder="avatar">
+            </label>
+            <label>
+                <span>JSON</span>
+                <input type="search" name="json_q" value="{{ db_snapshot.filters.json_q }}" placeholder="scheme_data">
+            </label>
+            <button type="submit">Apply</button>
+            <a href="{% url 'hello:staff_data_console' %}">Reset</a>
+        </form>
+    </section>
+
     <div class="dc-grid">
         <div>
             <section class="dc-card">
@@ -204,8 +325,17 @@
                     {% for model in db_snapshot.models %}
                     <div class="dc-row">
                         <div>
+                            {% if model.admin_url %}
                             <a class="dc-link" href="{{ model.admin_url }}">{{ model.label }}</a>
+                            {% else %}
+                            <strong>{{ model.label }}</strong>
+                            {% endif %}
                             <small><code>{{ model.db_table }}</code></small>
+                            <div class="dc-tags">
+                                <span class="dc-badge muted">{{ model.fields_count }} fields</span>
+                                {% if model.file_fields %}<span class="dc-badge muted">{{ model.file_fields|length }} files</span>{% endif %}
+                                {% if model.json_fields %}<span class="dc-badge muted">{{ model.json_fields|length }} json</span>{% endif %}
+                            </div>
                         </div>
                         <strong>{{ model.rows|default:"-" }}</strong>
                     </div>
@@ -224,6 +354,42 @@
                     {% endfor %}
                 </div>
             </section>
+
+            <section class="dc-card">
+                <h2>JSON fields</h2>
+                <div class="dc-table">
+                    {% for field in db_snapshot.json_fields %}
+                    <div class="dc-json-row">
+                        <div class="dc-json-head">
+                            <div>
+                                {% if field.admin_url %}
+                                <a class="dc-link" href="{{ field.admin_url }}">{{ field.model }}.{{ field.field }}</a>
+                                {% else %}
+                                <strong>{{ field.model }}.{{ field.field }}</strong>
+                                {% endif %}
+                                <small><code>{{ field.db_table }}</code></small>
+                            </div>
+                            <strong>{{ field.filled|default:"-" }}</strong>
+                        </div>
+                        {% for sample in field.samples %}
+                        <div class="dc-json-sample">
+                            {% if sample.admin_url %}
+                            <a class="dc-link" href="{{ sample.admin_url }}">#{{ sample.pk }} {{ sample.title }}</a>
+                            {% else %}
+                            <strong>#{{ sample.pk }} {{ sample.title }}</strong>
+                            {% endif %}
+                            <span class="dc-badge muted">{{ sample.value_type }}</span>
+                            <pre>{{ sample.preview }}</pre>
+                        </div>
+                        {% empty %}
+                        <small>Нет заполненных значений для preview.</small>
+                        {% endfor %}
+                    </div>
+                    {% empty %}
+                    <p>JSONField не найдены по текущему фильтру.</p>
+                    {% endfor %}
+                </div>
+            </section>
         </div>
 
         <div>
@@ -231,9 +397,12 @@
                 <h2>Media storage</h2>
                 <div class="dc-meta">
                     <div><span>ROOT</span><br><strong>{{ storage_snapshot.root }}</strong></div>
-                    <div><span>FILES</span><br><strong>{{ storage_snapshot.total_files }}</strong></div>
+                    <div><span>FILES</span><br><strong>{{ storage_snapshot.total_files }}{% if storage_snapshot.scan_capped %}+{% endif %}</strong></div>
                     <div><span>SIZE</span><br><strong>{{ storage_snapshot.total_size_label }}</strong></div>
                 </div>
+                {% if storage_snapshot.scan_capped %}
+                <p>Media scan capped at {{ storage_snapshot.scan_limit }} files.</p>
+                {% endif %}
                 <div class="dc-breadcrumbs">
                     <a class="dc-link" href="{% url 'hello:staff_data_console' %}">media</a>
                     {% for crumb in storage_snapshot.breadcrumbs %}
