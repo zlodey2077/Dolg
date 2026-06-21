@@ -255,29 +255,34 @@ def execute_engine_job(job: EngineJob) -> tuple[dict[str, Any], list[str], list[
 def _run_engine_router_adapter(job: EngineJob) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
     """First real server-engine router: stable local route now, Docker routes later."""
     options = job.options or {}
-    target_engine = str(options.get('target_engine') or options.get('delegate_engine') or 'dolg-numpy-mna').strip()
-    if target_engine not in {'', 'dolg-numpy-mna'}:
+    target_engine = str(
+        options.get('target_engine') or options.get('delegate_engine') or 'dolg-numpy-mna'
+    ).strip()
+    pyspice_routes = {'pyspice', 'dolg-pyspice', 'pyspice-worker', 'dolg-ngspice', 'ngspice'}
+    if target_engine in pyspice_routes:
+        _touch_job(job, progress_percent=45, message='Router delegated job to PySpice (ngspice) adapter.')
+        result, warnings, artifacts = _run_pyspice_adapter(job)
+        delegated = 'pyspice-ngspice'
+    elif target_engine in {'', 'dolg-numpy-mna'}:
+        _touch_job(job, progress_percent=45, message='Router delegated job to NumPy MNA adapter.')
+        result, warnings, artifacts = _run_numpy_mna_adapter(job)
+        delegated = 'dolg-numpy-mna'
+    else:
         raise EngineJobExecutionError(
             f'dolg-engine-router route "{target_engine}" is not connected yet; use a dedicated worker.'
         )
 
-    _touch_job(job, progress_percent=45, message='Router delegated job to NumPy MNA adapter.')
-    result, warnings, artifacts = _run_numpy_mna_adapter(job)
     metrics = result.setdefault('metrics', {})
     metrics['router_engine'] = 'dolg-engine-router'
-    metrics['delegated_engine'] = 'dolg-numpy-mna'
+    metrics['delegated_engine'] = delegated
     result['engine_router'] = {
         'id': 'dolg-engine-router',
-        'delegated_engine': 'dolg-numpy-mna',
-        'route_reason': 'local MVP route for DC/AC/transient/tolerance before Docker workers',
+        'delegated_engine': delegated,
+        'route_reason': 'local route: PySpice (ngspice) или NumPy MNA до Docker-воркеров',
     }
     artifacts = [
         *artifacts,
-        {
-            'kind': 'route',
-            'engine': 'dolg-engine-router',
-            'delegated_engine': 'dolg-numpy-mna',
-        },
+        {'kind': 'route', 'engine': 'dolg-engine-router', 'delegated_engine': delegated},
     ]
     return result, warnings, artifacts
 
@@ -474,6 +479,158 @@ def _run_tolerance(
     }
 
 
+def _run_pyspice_adapter(job: EngineJob) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
+    """In-process PySpice (ngspice) воркер. Тот же формат результата, что NumPy MNA, но
+    физика — индустриальный ngspice. Любой анализ, который PySpice не вернул, падает на MNA."""
+    scheme_data = _scheme_data(job)
+    options = job.options or {}
+    analysis = _normalize_analysis(job.analysis_type, options)
+
+    if analysis == 'dc':
+        result = _run_dc_pyspice(job, scheme_data)
+    elif analysis == 'transient':
+        result = _run_transient_pyspice(job, scheme_data, options)
+    elif analysis == 'ac':
+        result = _run_ac_pyspice(job, scheme_data, options)
+    elif analysis == 'tolerance':
+        result = _run_tolerance(job, scheme_data, options)  # Monte-Carlo — пока через NumPy
+    else:
+        raise EngineJobExecutionError(f'pyspice adapter does not support analysis "{analysis}" yet')
+
+    return result, list(result.get('warnings') or []), list(result.get('artifacts') or [])
+
+
+def _run_dc_pyspice(job: EngineJob, scheme_data: dict[str, Any]) -> dict[str, Any]:
+    from . import pyspice_engine
+
+    volts = pyspice_engine.solve_dc(scheme_data) if pyspice_engine.available() else None
+    if volts is None:
+        return _run_dc(job, scheme_data)  # фолбэк MNA
+
+    voltages = _number_map(volts)
+    circuit = scheme_to_circuit(scheme_data)
+    return {
+        'ok': True,
+        'schema_version': 1,
+        'engine': job.engine_id,
+        'engine_name': job.engine_name,
+        'analysis_type': 'dc',
+        'nodes': [{'id': node, 'voltage_v': value, 'unit': 'V'} for node, value in voltages.items()],
+        'branches': [],
+        'waveforms': [],
+        'metrics': {
+            'node_count': int(circuit.get('n_nodes') or 0),
+            'element_count': len(circuit.get('elements') or []),
+            'backend': 'pyspice-ngspice',
+        },
+        'node_voltages': voltages,
+        'currents_a': {},
+        'warnings': [],
+        'artifacts': [],
+    }
+
+
+def _run_transient_pyspice(
+    job: EngineJob, scheme_data: dict[str, Any], options: dict[str, Any]
+) -> dict[str, Any]:
+    from . import pyspice_engine
+
+    t_stop = _option_number(options, ('t_stop', 'stop_s', 'stop', 'tStop'), default=1e-3, unit='second')
+    dt = _option_number(
+        options,
+        ('dt', 'step_s', 'step', 'time_step', 'timeStep'),
+        default=max(t_stop / 200.0, 1e-9),
+        unit='second',
+    )
+    max_points = _option_int(options, ('max_points', 'maxPoints'), default=1024, minimum=16, maximum=4096)
+
+    transient = (
+        pyspice_engine.solve_transient(scheme_data, t_stop=t_stop, dt=dt)
+        if pyspice_engine.available()
+        else None
+    )
+    if transient is None:
+        return _run_transient(job, scheme_data, options)  # фолбэк MNA
+
+    times = [float(value) for value in transient.get('time') or []]
+    indices = _thin_indices(len(times), max_points)
+    thin_times = [times[i] for i in indices]
+    voltage_series = {}
+    waveforms = []
+    for node, values in (transient.get('voltages') or {}).items():
+        node_id = str(node)
+        thin_values = [float(values[i]) for i in indices]
+        voltage_series[node_id] = thin_values
+        waveforms.append(
+            {
+                'name': f'V({node_id})',
+                'node': node_id,
+                'unit': 'V',
+                'points': [{'x': x, 'y': y} for x, y in zip(thin_times, thin_values)],
+            }
+        )
+    circuit = scheme_to_circuit(scheme_data)
+    return {
+        'ok': True,
+        'schema_version': 1,
+        'engine': job.engine_id,
+        'engine_name': job.engine_name,
+        'analysis_type': 'transient',
+        'time_s': thin_times,
+        'nodes': [{'id': node, 'samples': values, 'unit': 'V'} for node, values in voltage_series.items()],
+        'branches': [],
+        'waveforms': waveforms,
+        'metrics': {
+            'steps': int(transient.get('steps') or len(times)),
+            'returned_points': len(thin_times),
+            'dt_s': float(transient.get('dt') or dt),
+            't_stop_s': t_stop,
+            'node_count': int(circuit.get('n_nodes') or 0),
+            'element_count': len(circuit.get('elements') or []),
+            'backend': 'pyspice-ngspice',
+        },
+        'warnings': [],
+        'artifacts': [],
+    }
+
+
+def _run_ac_pyspice(job: EngineJob, scheme_data: dict[str, Any], options: dict[str, Any]) -> dict[str, Any]:
+    from . import pyspice_engine
+
+    f_start = _option_number(options, ('f_start', 'start_hz', 'start', 'fStart'), default=1.0, unit='hertz')
+    f_stop = _option_number(options, ('f_stop', 'stop_hz', 'stop', 'fStop'), default=1e6, unit='hertz')
+    points = _option_int(options, ('points', 'samples'), default=60, minimum=4, maximum=512)
+    if f_start <= 0:
+        f_start = 1.0
+    if f_stop <= f_start or points <= 1:
+        freqs = [f_start]
+    else:
+        ratio = (f_stop / f_start) ** (1.0 / (points - 1))
+        freqs = [f_start * ratio**i for i in range(points)]
+
+    ac = pyspice_engine.solve_ac(scheme_data, freqs) if pyspice_engine.available() else None
+    if ac is None:
+        return _run_ac(job, scheme_data, options)  # фолбэк MNA
+
+    return {
+        'ok': True,
+        'schema_version': 1,
+        'engine': job.engine_id,
+        'engine_name': job.engine_name,
+        'analysis_type': 'ac',
+        'nodes': _json_safe({str(net): data for net, data in (ac.get('nodes') or {}).items()}),
+        'branches': [],
+        'waveforms': [],
+        'metrics': {
+            'points': len(ac.get('freqs') or []),
+            'backend': 'pyspice-ngspice',
+        },
+        'frequencies_hz': [float(value) for value in ac.get('freqs') or []],
+        'warnings': [],
+        'artifacts': [],
+    }
+
+
 def _mark_running(job: EngineJob, worker_id: str) -> None:
     now = timezone.now()
     EngineJob.objects.filter(pk=job.pk).update(
@@ -527,7 +684,9 @@ def _finish_success(
         meta={'elapsed_ms': elapsed_ms, 'contract_version': ENGINE_RESULT_CONTRACT['version']},
     )
     try:
-        _persist_simulation_run(job, normalized_result, normalized_result.get('warnings') or warnings, elapsed_ms)
+        _persist_simulation_run(
+            job, normalized_result, normalized_result.get('warnings') or warnings, elapsed_ms
+        )
     except Exception as exc:  # pragma: no cover - history is useful, not job-critical.
         saved_warnings = [str(item) for item in warnings]
         saved_warnings.append(f'SimulationRun history save failed: {exc}')
@@ -740,7 +899,7 @@ def _option_int(
         return default
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return max(minimum, min(number, maximum))
 
