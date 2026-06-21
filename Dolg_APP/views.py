@@ -2154,28 +2154,61 @@ def api_simulation_fft(request):
 
 @login_required(login_url='accounts:login')
 def api_simulation_voltage_field(request):
-    """Поле напряжений резисторной сетки N×N для 3D-поверхности (DolgSurface3D).
+    """Поле для 3D-поверхности (DolgSurface3D). kind=wave (по умолч.) | grid.
 
-    GET ?n=25 → {ok, n, n_nodes, elements, field: [[v,...],...]}. Демо «тяжёлой» схемы:
-    сетка N×N (≈2·N² элементов), решается MNA, поле — для 3D-рельефа (z=U, цвет=colormap).
+    kind='wave': LC-лестница, переходный процесс → поле [время][узел] (бегущая волна + отражение
+    от открытого конца). kind='grid': резисторная сетка N×N, DC → поле [позиция][позиция].
+    Возвращает подписи осей/единицы/заголовок — для информативного графика.
     """
     from .services import large_circuits, monte_carlo
 
+    kind = (request.GET.get('kind') or 'wave').strip()
+
+    if kind == 'grid':
+        try:
+            n = int(request.GET.get('n', 25))
+        except TypeError, ValueError:
+            n = 25
+        n = max(4, min(60, n))
+        circuit = large_circuits.generate_resistor_grid_circuit(n, v=10.0, r=100.0)
+        field = large_circuits.voltage_field(monte_carlo.solve_dc(circuit)['voltages'], n)
+        return JsonResponse(
+            {
+                'ok': True,
+                'kind': 'grid',
+                'n': n,
+                'n_nodes': circuit['n_nodes'],
+                'elements': len(circuit['elements']),
+                'field': field,
+                'unit': 'В',
+                'x_label': 'позиция X',
+                'z_label': 'позиция Y',
+                'y_label': 'напряжение, В',
+                'title': 'Распределение напряжения по резисторной сетке',
+            }
+        )
+
     try:
-        n = int(request.GET.get('n', 25))
+        n = int(request.GET.get('n', 24))
     except TypeError, ValueError:
-        n = 25
-    n = max(4, min(60, n))
-    circuit = large_circuits.generate_resistor_grid_circuit(n, v=10.0, r=100.0)
-    voltages = monte_carlo.solve_dc(circuit)['voltages']
-    field = large_circuits.voltage_field(voltages, n)
+        n = 24
+    n = max(8, min(48, n))
+    circuit = large_circuits.generate_lc_ladder_circuit(n, v=5.0, ind=1e-3, c=1e-6)
+    field, meta = large_circuits.transient_wave_field(circuit, t_stop=2e-3, dt=2e-6, max_frames=64)
     return JsonResponse(
         {
             'ok': True,
+            'kind': 'wave',
             'n': n,
             'n_nodes': circuit['n_nodes'],
             'elements': len(circuit['elements']),
             'field': field,
+            'unit': 'В',
+            'meta': meta,
+            'x_label': 'узел (позиция вдоль линии)',
+            'z_label': 'время →',
+            'y_label': 'напряжение, В',
+            'title': 'Бегущая волна по LC-линии (переходный процесс)',
         }
     )
 

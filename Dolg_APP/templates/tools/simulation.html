@@ -16439,19 +16439,31 @@ function onKeyDown(e) {
 {# ============== 3D-ПОВЕРХНОСТЬ ПОЛЯ НАПРЯЖЕНИЙ (DolgSurface3D) ============== #}
 <div id="surface3d-overlay" class="dolg-3d-overlay">
     <div class="dolg-3d-header">
-        <div class="dolg-3d-title">📈 3D-поверхность поля напряжений</div>
+        <div class="dolg-3d-title" id="surface3d-title">📈 3D-график результата</div>
         <span id="surface3d-info" style="color: #9fb0c8; font-size: 12px;"></span>
         <button type="button" onclick="closeVoltageSurface()"
                 style="margin-left: auto; background: #2a3145; color: #e6e9ef; border: 0;
                        border-radius: 6px; padding: 5px 12px; cursor: pointer;">✕ Закрыть</button>
     </div>
     <canvas id="surface3d-canvas" style="flex: 1; display: block; width: 100%;"></canvas>
+    {# Легенда-шкала цвета (информативность): значение по высоте/цвету #}
+    <div id="surface3d-legend" style="position: absolute; right: 22px; top: 72px;
+         display: flex; flex-direction: column; align-items: center; gap: 4px;
+         font: 600 11px system-ui; color: #cfe; pointer-events: none;">
+        <span id="surface3d-vmax">—</span>
+        <div style="width: 18px; height: 180px; border-radius: 4px; border: 1px solid #2f3d57;
+             background: linear-gradient(to top, rgb(0,0,255), rgb(13,128,191), rgb(102,255,102),
+             rgb(191,128,13), rgb(255,0,0));"></div>
+        <span id="surface3d-vmin">—</span>
+        <span id="surface3d-vunit" style="color: #ffd27f; margin-top: 2px;"></span>
+    </div>
 </div>
 <script>
-    function showVoltageSurface() {
+    function showVoltageSurface(kind) {
         const ov = document.getElementById('surface3d-overlay');
         const canvas = document.getElementById('surface3d-canvas');
         const info = document.getElementById('surface3d-info');
+        const title = document.getElementById('surface3d-title');
         ov.classList.add('open');
         document.body.classList.add('dolg-3d-active');
         // Явный размер canvas ДО init (иначе Three возьмёт 0×0 — overlay только что показан).
@@ -16461,19 +16473,30 @@ function onKeyDown(e) {
         canvas.height = H;
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
-        info.textContent = 'считаю сетку…';
-        fetch('/simulation/api/voltage-field/?n=30', { credentials: 'same-origin' })
+        info.textContent = 'считаю…';
+        const url = '/simulation/api/voltage-field/' + (kind ? '?kind=' + kind : '');
+        fetch(url, { credentials: 'same-origin' })
             .then((r) => r.json())
             .then((d) => {
                 if (!d.ok || !window.DolgSurface3D) {
                     info.textContent = 'ошибка данных или модуль не загружен';
                     return;
                 }
-                const res = window.DolgSurface3D.init(canvas, d.field, { height: 6, autoRotate: true });
-                info.textContent = res && res.ok
-                    ? `сетка ${d.n}×${d.n} · ${d.n_nodes} узлов · ${d.elements} элементов · крути мышью`
-                    : 'не удалось отрисовать (нет WebGL?)';
-                window.DolgSurface3D.start();
+                title.textContent = '📈 ' + (d.title || '3D-график результата');
+                const res = window.DolgSurface3D.init(canvas, d.field, {
+                    height: 9, autoRotate: true,
+                    xLabel: d.x_label, zLabel: d.z_label, yLabel: d.y_label, unit: d.unit,
+                });
+                if (res && res.ok) {
+                    info.textContent = `${d.n_nodes} узлов · ${d.elements} элементов · ${res.cols}×${res.rows} · крути мышью`;
+                    const u = d.unit ? ' ' + d.unit : '';
+                    document.getElementById('surface3d-vmax').textContent = res.vmax.toFixed(2) + u;
+                    document.getElementById('surface3d-vmin').textContent = res.vmin.toFixed(2) + u;
+                    document.getElementById('surface3d-vunit').textContent = d.y_label || '';
+                    window.DolgSurface3D.start();
+                } else {
+                    info.textContent = 'не удалось отрисовать (нет WebGL?)';
+                }
             })
             .catch(() => { info.textContent = 'сеть недоступна'; });
     }

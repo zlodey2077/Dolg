@@ -54,3 +54,49 @@ def generate_resistor_grid_circuit(n: int, *, v: float = 10.0, r: float = 100.0)
 def voltage_field(voltages: dict, n: int) -> list[list[float]]:
     """{net: voltage} → 2D-поле n×n напряжений по сетке (для 3D-поверхности)."""
     return [[float(voltages.get(grid_net(i, j, n), 0.0)) for j in range(n)] for i in range(n)]
+
+
+def generate_lc_ladder_circuit(n: int, *, v: float = 5.0, ind: float = 1e-3, c: float = 1e-6) -> dict:
+    """LC-лестница (линия задержки): источник → [L послед. + C шунт]×N → открытый конец.
+
+    Ступенька на входе бежит волной по узлам с задержкой √(LC) и LC-звоном, на открытом конце
+    отражается → богатый переходный процесс. Узлы 1..N вдоль линии. Returns circuit-dict.
+    """
+    n = max(3, int(n))
+    counts = {'V': 0, 'L': 0, 'C': 0}
+    elements: list[dict] = []
+
+    def add(etype: str, a: int, b: int, value: float) -> None:
+        counts[etype] += 1
+        elements.append({'id': f'{etype}{counts[etype]}', 'type': etype, 'nodes': [a, b], 'value': value})
+
+    add('V', 1, 0, v)  # источник-ступенька на входной узел
+    add('C', 1, 0, c)
+    for k in range(1, n):
+        add('L', k, k + 1, ind)  # последовательная катушка k → k+1
+        add('C', k + 1, 0, c)  # шунтовой конденсатор узла k+1
+    return {'n_nodes': n + 1, 'elements': elements}
+
+
+def transient_wave_field(circuit: dict, *, t_stop: float, dt: float, max_frames: int = 70):
+    """circuit → 2D-поле [кадр времени][узел] напряжений для 3D-волновой поверхности.
+
+    Прорежает временной ряд до max_frames кадров; узлы 1..N (без ground). Returns (field, meta).
+    """
+    from Dolg_APP.services import monte_carlo
+
+    tr = monte_carlo.solve_transient(circuit, t_stop=t_stop, dt=dt)
+    times = tr.get('time') or [0.0]
+    volts = tr.get('voltages') or {}
+    n_nodes = int(circuit.get('n_nodes') or 1)
+    step = max(1, len(times) // max_frames)
+    frames = list(range(0, len(times), step))
+    field = []
+    for i in frames:
+        row = []
+        for net in range(1, n_nodes):
+            series = volts.get(net) or volts.get(str(net)) or []
+            row.append(float(series[i]) if i < len(series) else 0.0)
+        field.append(row)
+    meta = {'frames': len(frames), 'nodes': n_nodes - 1, 'steps': len(times), 'dt': dt}
+    return field, meta
