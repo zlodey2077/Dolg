@@ -259,10 +259,15 @@ def _run_engine_router_adapter(job: EngineJob) -> tuple[dict[str, Any], list[str
         options.get('target_engine') or options.get('delegate_engine') or 'dolg-numpy-mna'
     ).strip()
     pyspice_routes = {'pyspice', 'dolg-pyspice', 'pyspice-worker', 'dolg-ngspice', 'ngspice'}
+    xyce_routes = {'xyce', 'dolg-xyce', 'xyce-worker'}
     if target_engine in pyspice_routes:
         _touch_job(job, progress_percent=45, message='Router delegated job to PySpice (ngspice) adapter.')
         result, warnings, artifacts = _run_pyspice_adapter(job)
         delegated = 'pyspice-ngspice'
+    elif target_engine in xyce_routes:
+        _touch_job(job, progress_percent=45, message='Router delegated job to Xyce adapter.')
+        result, warnings, artifacts = _run_xyce_adapter(job)
+        delegated = 'xyce'
     elif target_engine in {'', 'dolg-numpy-mna'}:
         _touch_job(job, progress_percent=45, message='Router delegated job to NumPy MNA adapter.')
         result, warnings, artifacts = _run_numpy_mna_adapter(job)
@@ -626,6 +631,57 @@ def _run_ac_pyspice(job: EngineJob, scheme_data: dict[str, Any], options: dict[s
             'backend': 'pyspice-ngspice',
         },
         'frequencies_hz': [float(value) for value in ac.get('freqs') or []],
+        'warnings': [],
+        'artifacts': [],
+    }
+
+
+def _run_xyce_adapter(job: EngineJob) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
+    """Xyce (Sandia industrial SPICE) воркер: shell-out в Xyce.exe. DC — через Xyce; transient/
+    AC/tolerance пока через NumPy MNA (Xyce-парсеры этих режимов — на доработку)."""
+    scheme_data = _scheme_data(job)
+    options = job.options or {}
+    analysis = _normalize_analysis(job.analysis_type, options)
+
+    if analysis == 'dc':
+        result = _run_dc_xyce(job, scheme_data)
+    elif analysis == 'transient':
+        result = _run_transient(job, scheme_data, options)
+    elif analysis == 'ac':
+        result = _run_ac(job, scheme_data, options)
+    elif analysis == 'tolerance':
+        result = _run_tolerance(job, scheme_data, options)
+    else:
+        raise EngineJobExecutionError(f'xyce adapter does not support analysis "{analysis}" yet')
+
+    return result, list(result.get('warnings') or []), list(result.get('artifacts') or [])
+
+
+def _run_dc_xyce(job: EngineJob, scheme_data: dict[str, Any]) -> dict[str, Any]:
+    from . import xyce_engine
+
+    volts = xyce_engine.solve_dc(scheme_data) if xyce_engine.available() else None
+    if volts is None:
+        return _run_dc(job, scheme_data)  # фолбэк MNA (Xyce не найден/не решил)
+
+    voltages = _number_map(volts)
+    circuit = scheme_to_circuit(scheme_data)
+    return {
+        'ok': True,
+        'schema_version': 1,
+        'engine': job.engine_id,
+        'engine_name': job.engine_name,
+        'analysis_type': 'dc',
+        'nodes': [{'id': node, 'voltage_v': value, 'unit': 'V'} for node, value in voltages.items()],
+        'branches': [],
+        'waveforms': [],
+        'metrics': {
+            'node_count': int(circuit.get('n_nodes') or 0),
+            'element_count': len(circuit.get('elements') or []),
+            'backend': 'xyce',
+        },
+        'node_voltages': voltages,
+        'currents_a': {},
         'warnings': [],
         'artifacts': [],
     }
