@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import time
 
@@ -8,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core import signing
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.core.validators import EmailValidator
@@ -95,6 +97,49 @@ def _max_upload_for_user(user) -> int:
 # раза, не страдает.
 LOGIN_FAIL_LIMIT = 5
 LOGIN_LOCKOUT_SEC = 60
+LOGIN_FAIL_WINDOW_SEC = 15 * 60
+
+
+def _login_cache_identity(request, username: str) -> str:
+    ip = (request.META.get('REMOTE_ADDR') or 'unknown').strip()
+    normalized = (username or '').strip().lower()[:150]
+    digest = hashlib.sha256(f'{normalized}|{ip}'.encode()).hexdigest()
+    return digest
+
+
+def _login_cache_key(kind: str, request, username: str) -> str:
+    return f'dolg:login:{kind}:{_login_cache_identity(request, username)}'
+
+
+def _cached_login_wait_seconds(request, username: str) -> int:
+    locked_until = cache.get(_login_cache_key('locked_until', request, username))
+    if not locked_until:
+        return 0
+    wait = int(float(locked_until) - time.time())
+    if wait <= 0:
+        cache.delete(_login_cache_key('locked_until', request, username))
+        return 0
+    return wait
+
+
+def _record_cached_login_failure(request, username: str) -> tuple[int, bool]:
+    fail_key = _login_cache_key('fails', request, username)
+    fails = int(cache.get(fail_key, 0) or 0) + 1
+    if fails >= LOGIN_FAIL_LIMIT:
+        cache.set(
+            _login_cache_key('locked_until', request, username),
+            time.time() + LOGIN_LOCKOUT_SEC,
+            LOGIN_LOCKOUT_SEC,
+        )
+        cache.delete(fail_key)
+        return fails, True
+    cache.set(fail_key, fails, LOGIN_FAIL_WINDOW_SEC)
+    return fails, False
+
+
+def _clear_cached_login_failures(request, username: str) -> None:
+    cache.delete(_login_cache_key('fails', request, username))
+    cache.delete(_login_cache_key('locked_until', request, username))
 
 
 def _parse_address_fields(post_data):
@@ -229,8 +274,15 @@ def login_view(request):
             messages.error(request, f'Слишком много неудачных попыток. Подождите {wait} с.')
             return render(request, 'accounts/login.html')
 
-        username = request.POST.get('username')
+        username = request.POST.get('username') or ''
         password = request.POST.get('password')
+        cached_wait = _cached_login_wait_seconds(request, username)
+        if cached_wait:
+            messages.error(
+                request, f'Слишком много неудачных попыток для этого логина. Подождите {cached_wait} с.'
+            )
+            return render(request, 'accounts/login.html')
+
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
@@ -238,6 +290,7 @@ def login_view(request):
             # Сбрасываем счётчик неудачных попыток после успешного входа.
             request.session.pop('_login_fail_count', None)
             request.session.pop('_login_locked_until', None)
+            _clear_cached_login_failures(request, username)
             messages.success(request, f'Добро пожаловать, {user.username}!')
             # ?next= может прийти и через GET (если пришли с @login_required),
             # и через POST (если форма сохранила его в hidden input). POST имеет
@@ -249,8 +302,11 @@ def login_view(request):
         else:
             fails = int(request.session.get('_login_fail_count', 0)) + 1
             request.session['_login_fail_count'] = fails
+            _, cache_locked = _record_cached_login_failure(request, username)
             if fails >= LOGIN_FAIL_LIMIT:
                 request.session['_login_locked_until'] = now + LOGIN_LOCKOUT_SEC
+                messages.error(request, f'Превышен лимит попыток. Lockout {LOGIN_LOCKOUT_SEC} с.')
+            elif cache_locked:
                 messages.error(request, f'Превышен лимит попыток. Lockout {LOGIN_LOCKOUT_SEC} с.')
             else:
                 left = LOGIN_FAIL_LIMIT - fails

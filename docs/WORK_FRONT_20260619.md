@@ -258,9 +258,10 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
 6. Сессия 6: закрыта - CAD/simulation UX baseline применяет профильные
    настройки density/layout/render/animations к рабочим страницам и фиксирует
    contract для будущих приборных анимаций.
-7. Сессия 7: следующий активный пункт - security/token limits: довершить
-   ограничения токенов/квот, проверить парольный контур, усилить защиту от
-   brute-force, client-side tampering, прямых API-вызовов и обхода UI.
+7. Сессия 7: in progress - security/token limits. Первый срез закрывает
+   password hashing check, cache-backed login lockout и server-side policy для
+   organization API tokens. Следом: body-size guard, upload sniff/quarantine,
+   AI/CAD import throttles и incident alerts.
 8. Сессия 8: Docker/Postgres после защиты/после BIOS virtualization: не
    блокировать продукт, держать SQLite + local worker как основной dev-flow.
 

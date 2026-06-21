@@ -35,6 +35,14 @@
 
 Следующий уровень риска — MEDIUM (rate limits на `/api/ai/chat/` и `/cad/api/import/`, GDPR cascade delete, log scrubbing, JSON body-size limit, file-upload MIME/size, open-redirect `next=`). Не блокирует защиту.
 
+### Update 2026-06-21 - password/token limits hardening
+
+- Passwords are stored through Django hashers, not as plaintext. Runtime hashers are `pbkdf2_sha256` first, with compatibility for `pbkdf2_sha1`, `argon2`, `bcrypt_sha256` and `scrypt`; tests may override to MD5 only under `IS_TESTING`.
+- Registration already validates passwords through `AUTH_PASSWORD_VALIDATORS` before `User.objects.create_user(...)`.
+- Login brute-force protection is now two-layered: the old session counter remains for UX, and a cache-backed username+IP lockout prevents a fresh cookie/session from bypassing repeated failed attempts.
+- Organization API tokens remain one-time-display and SHA-256 hashed; creation now enforces an active-token cap and an allowlist of scopes server-side.
+- Remaining token/limit work: body-size guards for heavy JSON endpoints, stronger per-IP/per-user throttles for AI/CAD import, upload content sniffing/quarantine, and incident alerts for suspicious login/token/admin activity.
+
 ---
 
 ## Доклад 2026-06-21: комплексная защита данных от целевых атак

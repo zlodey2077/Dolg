@@ -18,6 +18,7 @@ Endpoints:
 import secrets
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
@@ -29,9 +30,37 @@ from .models import AuditLog, Organization, OrganizationInvite, OrganizationMemb
 from .org_permissions import get_user_role, require_org_permission, user_can
 from .services.entitlements import feature_summary, require_feature
 
+ORG_API_TOKEN_ALLOWED_SCOPES = {
+    'projects.read',
+    'projects.write',
+    'bom.read',
+    'bom.write',
+    'simulations.read',
+    'simulations.write',
+    'usage.read',
+    'org.read',
+}
+
 
 def _request_org(request, *args, **kwargs):
     return getattr(request, 'organization', None)
+
+
+def _org_api_token_active_limit() -> int:
+    return max(1, int(getattr(settings, 'ORG_API_TOKEN_ACTIVE_LIMIT', 10)))
+
+
+def _normalize_api_token_scopes(raw_scope: str) -> tuple[list[str], list[str]]:
+    requested = [(scope or '').strip() for scope in (raw_scope or 'projects.read').split(',')]
+    requested = [scope for scope in requested if scope]
+    allowed = []
+    rejected = []
+    for scope in requested or ['projects.read']:
+        if scope in ORG_API_TOKEN_ALLOWED_SCOPES:
+            allowed.append(scope)
+        else:
+            rejected.append(scope[:80])
+    return sorted(set(allowed)), rejected
 
 
 # ============================================================
@@ -544,16 +573,39 @@ def org_api_token_create(request, org_slug):
 
     org = request.organization
     name = (request.POST.get('name') or '').strip()[:120]
-    scope = (request.POST.get('scope') or 'projects.read').split(',')
+    scope, rejected_scope = _normalize_api_token_scopes(request.POST.get('scope') or 'projects.read')
     if not name:
         messages.error(request, 'Имя обязательно')
+        return redirect('hello:org_api_tokens', org_slug=org.slug)
+    if rejected_scope or not scope:
+        messages.error(request, 'Недопустимые scope для API-токена: ' + ', '.join(rejected_scope))
+        return redirect('hello:org_api_tokens', org_slug=org.slug)
+    active_limit = _org_api_token_active_limit()
+    active_count = org.api_tokens.filter(revoked_at__isnull=True).count()
+    if active_count >= active_limit:
+        messages.error(
+            request, f'Достигнут лимит активных API-токенов: {active_limit}. Отзовите старый токен.'
+        )
+        AuditLog.log(
+            actor=request.user,
+            action='api.token.create_denied',
+            organization=org,
+            object_type='OrganizationApiToken',
+            payload={
+                'reason': 'active_limit',
+                'active_count': active_count,
+                'limit': active_limit,
+                'name': name,
+            },
+            request=request,
+        )
         return redirect('hello:org_api_tokens', org_slug=org.slug)
     raw_token = OrganizationApiToken.make_raw_token()
     OrganizationApiToken.objects.create(
         organization=org,
         name=name,
         token=OrganizationApiToken.hash_token(raw_token),
-        scope=[s.strip() for s in scope if s.strip()],
+        scope=scope,
         created_by=request.user,
     )
     # Один раз показываем сырой token (потом только маска)

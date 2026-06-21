@@ -13,7 +13,8 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import TestCase, override_settings
+from django.core.cache import cache
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -209,6 +210,27 @@ class PasswordResetTests(TestCase):
         self.assertEqual(r.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('reset', mail.outbox[0].body.lower())
+
+
+@override_settings(ALLOWED_HOSTS=['*'])
+class LoginRateLimitTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.user = _make_user(username='login_rl', email='login-rl@example.com')
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_login_lockout_survives_new_session(self):
+        url = reverse('accounts:login')
+        for _ in range(5):
+            self.client.post(url, {'username': self.user.username, 'password': 'wrong-password'})
+
+        fresh_client = Client()
+        response = fresh_client.post(url, {'username': self.user.username, 'password': 'Strong-pass-123'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('_auth_user_id', fresh_client.session)
 
 
 @override_settings(ALLOWED_HOSTS=['*'])

@@ -241,6 +241,15 @@
 - Verification: `node -c shop\static\shop\workspace-preferences.js`, `.venv\Scripts\python.exe -m ruff check Dolg_APP\tests_tool_asset_smoke.py`, `.venv\Scripts\python.exe manage.py check`, `.venv\Scripts\python.exe -m pytest Dolg_APP\tests_tool_asset_smoke.py -q --no-header --no-migrations --reuse-db` (`5 passed`), and `git diff --check`.
 - Next active item in `WORK_FRONT_20260619.md`: Session 7, security/token limits and password/brute-force hardening.
 
+### 2026-06-21 - Password and organization token hardening
+
+- Confirmed the password path uses Django hashers and `AUTH_PASSWORD_VALIDATORS`; new registrations go through `validate_password(...)` and `User.objects.create_user(...)`.
+- Added cache-backed login lockout keyed by hashed username+IP, so brute-force attempts cannot bypass the old session counter by starting a fresh browser session.
+- Hardened organization API token creation with a server-side active-token cap and a scope allowlist; raw tokens are still shown once and stored only as hashes.
+- Added focused tests for cross-session login lockout, invalid API-token scopes and active-token limit enforcement.
+- Verification: `.venv\Scripts\python.exe -m ruff check accounts\views.py Dolg_APP\org_views.py Dolg_APP\tests_registered.py Dolg_APP\tests_enterprise.py`, `.venv\Scripts\python.exe -m pytest Dolg_APP\tests_registered.py::LoginRateLimitTests Dolg_APP\tests_enterprise.py::ApiTokenTests -q --no-header --no-migrations --reuse-db` (`4 passed`), `.venv\Scripts\python.exe manage.py check`, and `git diff --check`.
+- Next security item: body-size guard and throttles for heavy JSON/API endpoints.
+
 ## Шаблон новой записи
 
 ```markdown

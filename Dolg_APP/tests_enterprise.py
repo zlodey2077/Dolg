@@ -405,6 +405,45 @@ class ApiTokenTests(TestCase):
         tok.refresh_from_db()
         self.assertFalse(tok.is_active())
 
+    def test_invalid_token_scope_is_rejected(self):
+        org, owner = _make_org_with_owner('tok-scope')
+        _activate_enterprise_org(org)
+        self.client.force_login(owner)
+
+        r = self.client.post(
+            '/orgs/tok-scope/api-tokens/create/', {'name': 'Bad', 'scope': 'projects.read,admin.all'}
+        )
+
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(OrganizationApiToken.objects.filter(organization=org).exists())
+        self.assertIsNone(self.client.session.get('_just_created_token'))
+
+    @override_settings(ORG_API_TOKEN_ACTIVE_LIMIT=2)
+    def test_active_token_limit_is_enforced(self):
+        org, owner = _make_org_with_owner('tok-limit')
+        _activate_enterprise_org(org)
+        self.client.force_login(owner)
+
+        for idx in range(2):
+            raw_token = OrganizationApiToken.make_raw_token()
+            OrganizationApiToken.objects.create(
+                organization=org,
+                name=f'CI {idx}',
+                token=OrganizationApiToken.hash_token(raw_token),
+                scope=['projects.read'],
+                created_by=owner,
+            )
+
+        r = self.client.post(
+            '/orgs/tok-limit/api-tokens/create/', {'name': 'Overflow', 'scope': 'projects.read'}
+        )
+
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(
+            OrganizationApiToken.objects.filter(organization=org, revoked_at__isnull=True).count(), 2
+        )
+        self.assertIsNone(self.client.session.get('_just_created_token'))
+
 
 # ============================================================
 # SSO
