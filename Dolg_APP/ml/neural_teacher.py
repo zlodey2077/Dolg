@@ -31,20 +31,41 @@ _SEVERITY_WEIGHT = {
 }
 
 
-def dc_labels(scheme_data) -> dict | None:
+def dc_labels(scheme_data, *, engine: str = 'mna') -> dict | None:
     """Напряжения узлов + токи DC. None если схема неразрешима.
 
-    Идёт через движковую абстракцию с тем же fallback-порядком, что серверная часть
-    (`server_engines`: Xyce → PySpice → GnuCap → ngspice-wasm → NumPy MNA). Сейчас
-    живой движок один — NumPy MNA (`solve_dc`); когда подключат Xyce/PySpice-воркеры,
-    учитель автоматически начнёт получать золотой SPICE-эталон БЕЗ правок нейромоделей
-    (они берут метки только отсюда). Это и есть «сильный учитель» в пределе.
+    Идёт через движковую абстракцию с fallback-порядком серверной части (`server_engines`:
+    Xyce → PySpice → GnuCap → ngspice-wasm → NumPy MNA).
+
+    engine:
+      • 'mna' (по умолчанию) — NumPy MNA: быстро; на линейных схемах ngspice-идентичен
+        (кросс-проверено: max|Δ|=0), поэтому дефолт — он;
+      • 'pyspice' — индустриальный ngspice (gold SPICE): полезен на нелинейщине
+        (диоды/транзисторы, реальные device-модели). Если PySpice не установлен — тихий
+        фолбэк на MNA. Узловая нумерация совпадает, метки прямо сопоставимы.
     """
-    return _dc_via_engine(scheme_data)
+    return _dc_via_engine(scheme_data, engine=engine)
 
 
-def _dc_via_engine(scheme_data) -> dict | None:
-    """Текущий решатель учителя — NumPy MNA. Seam для Xyce/PySpice (см. dc_labels)."""
+def _dc_via_engine(scheme_data, *, engine: str = 'mna') -> dict | None:
+    """Решатель учителя: 'pyspice' (ngspice, если доступен) → NumPy MNA fallback."""
+    if engine == 'pyspice':
+        try:
+            from Dolg_APP.services import monte_carlo, pyspice_engine
+
+            if pyspice_engine.available():
+                voltages = pyspice_engine.solve_dc(scheme_data)
+                if voltages is not None:
+                    n_nodes = int(monte_carlo.scheme_to_circuit(scheme_data).get('n_nodes') or 0)
+                    return {
+                        'voltages': voltages,
+                        'currents': {},
+                        'n_nodes': n_nodes,
+                        'engine': 'pyspice-ngspice',
+                    }
+        except Exception:
+            pass  # тихий фолбэк на MNA
+
     try:
         from Dolg_APP.services import monte_carlo
 
