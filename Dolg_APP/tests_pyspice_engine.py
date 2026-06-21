@@ -78,6 +78,29 @@ def test_solve_transient_no_source_none():
     assert ps.solve_transient({'components': [], 'connections': []}, t_stop=1e-3, dt=1e-5) is None
 
 
+def test_solve_ac_rc_lowpass():
+    # RC low-pass, источник 1В → mag(узел кондёра) = |H(f)|. fc = 1/(2π·1k·1µ) ≈ 159 Гц.
+    res = ps.solve_ac(_rc_scheme(v=1.0), [10, 159, 100000])
+    assert res is not None
+    assert res['engine'] == 'pyspice-ngspice'
+    assert res['freqs'] == [10.0, 159.0, 100000.0]
+
+    # узел кондёра: passband (@10≈1) → stopband (@100k≈0)
+    cap_node = next(
+        (net for net, d in res['nodes'].items() if net != 0 and d['mag'][0] > 0.9 and d['mag'][2] < 0.1),
+        None,
+    )
+    assert cap_node is not None, 'нет low-pass узла (passband→stopband)'
+    mag = res['nodes'][cap_node]['mag']
+    assert mag[0] > 0.95  # passband ~1
+    assert 0.6 < mag[1] < 0.8  # @fc ~0.707 (−3 дБ)
+    assert mag[2] < 0.05  # stopband ~0
+
+
+def test_solve_ac_no_freqs_none():
+    assert ps.solve_ac(_rc_scheme(), []) is None
+
+
 def test_solve_dc_no_source_returns_none():
     # схема без источника → DC operating point вырожден → None (caller падает на MNA)
     scheme = {

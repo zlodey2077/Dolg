@@ -22,12 +22,15 @@ def available() -> bool:
     return importlib.util.find_spec('PySpice') is not None
 
 
-def _build_circuit(scheme_data: dict):
+def _build_circuit(scheme_data: dict, *, ac_mode: bool = False):
     """scheme → построенный ngspice-нетлист. Узлы = net-индексы (узел '0' = земля).
 
     Returns dict {circuit, n_nodes, has_source, cap_nodes} | {'trivial': True} | None.
     cap_nodes — не-ground узлы с конденсатором (для .ic при transient). None — нет
     PySpice / ошибка построения.
+
+    ac_mode: V-источники строятся через raw_spice как `DC <v> AC <v>` (атрибут
+    PySpice-источника AC-спеку в нетлист не эмитит), чтобы у `.ac` было возбуждение.
     """
     if not available():
         return None
@@ -63,7 +66,10 @@ def _build_circuit(scheme_data: dict):
             if etype == 'R':
                 circuit.R(name, na, nb, value if value > 0 else 1e-3)
             elif etype == 'V':
-                circuit.V(name, na, nb, value)
+                if ac_mode:
+                    circuit.raw_spice += f'\nV{name} {na} {nb} DC {value} AC {value or 1}'
+                else:
+                    circuit.V(name, na, nb, value)
                 has_source = True
             elif etype == 'C':
                 circuit.C(name, na, nb, value if value > 0 else 1e-12)
@@ -139,3 +145,53 @@ def solve_transient(scheme_data: dict, *, t_stop: float, dt: float) -> dict | No
         except Exception:
             voltages[net] = [0.0] * len(time)
     return {'time': time, 'voltages': voltages, 'steps': len(time), 'dt': dt, 'engine': 'pyspice-ngspice'}
+
+
+def solve_ac(scheme_data: dict, freqs) -> dict | None:
+    """Частотный отклик (мод/фаза по узлам) через ngspice. Формат как
+    `monte_carlo.solve_ac`: `{'freqs':[...], 'nodes':{net:{'mag':[...],'phase_deg':[...]}}}`.
+
+    AC-возбуждение источников = их `value` (1В-источник даёт передаточную функцию, как в
+    monte_carlo). На каждую запрошенную частоту — точечный `.ac` (произвольный список freqs,
+    ngspice-сетка тут не нужна). None — нет PySpice / нет источника / схема не считается.
+    """
+    import math as _math
+
+    import numpy as _np
+
+    freq_list = [f for f in (float(x) for x in freqs) if f > 0]
+    if not freq_list:
+        return None
+    built = _build_circuit(scheme_data, ac_mode=True)
+    if built is None or built.get('trivial') or not built['has_source']:
+        return None
+
+    n_nodes = built['n_nodes']
+    nodes_out: dict[int, dict] = {net: {'mag': [], 'phase_deg': []} for net in range(n_nodes)}
+    used_freqs: list[float] = []
+    try:
+        simulator = built['circuit'].simulator()
+        for freq in freq_list:
+            analysis = simulator.ac(
+                start_frequency=freq, stop_frequency=freq, number_of_points=1, variation='lin'
+            )
+            used_freqs.append(freq)
+            for net in range(n_nodes):
+                if net == 0:
+                    nodes_out[net]['mag'].append(0.0)
+                    nodes_out[net]['phase_deg'].append(0.0)
+                    continue
+                try:
+                    # numpy-массив сохраняет комплексное значение; прямое [0]-индексирование
+                    # PySpice-обёртки кастит к float и теряет мнимую часть (|H| → Re(H)).
+                    value = complex(_np.asarray(analysis[str(net)])[0])
+                    nodes_out[net]['mag'].append(float(abs(value)))
+                    nodes_out[net]['phase_deg'].append(
+                        float(_math.degrees(_math.atan2(value.imag, value.real)))
+                    )
+                except Exception:
+                    nodes_out[net]['mag'].append(0.0)
+                    nodes_out[net]['phase_deg'].append(0.0)
+    except Exception:
+        return None
+    return {'freqs': used_freqs, 'nodes': nodes_out, 'engine': 'pyspice-ngspice'}
