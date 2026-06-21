@@ -477,7 +477,7 @@ def billing_activate_pro(request):
 
     try:
         months = max(1, min(12, int(request.POST.get('months', 1))))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         months = 1
 
     if stripe_billing.is_stripe_live():
@@ -638,7 +638,7 @@ def api_ai_find_analogs(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     pid = data.get('product_id')
     query = (data.get('query') or '').strip()
@@ -721,7 +721,7 @@ def api_ai_detect_anomalies(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     anomalies = pipeline.detect_anomalies(scheme_data)
@@ -748,7 +748,7 @@ def api_ai_explain_scheme(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     result = pipeline.explain_scheme(scheme_data)
@@ -768,7 +768,7 @@ def api_ai_recommend_next(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     recs = pipeline.recommend_next_component(scheme_data)
@@ -857,7 +857,7 @@ def api_comments_create(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     if user_is_restricted(request.user, 'write'):
@@ -1112,7 +1112,7 @@ def api_project_share_toggle(request, pk):
     project = _project_for_write(request.user, pk)
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         data = {}
     enable = bool(data.get('enable', True))
     if enable and not project.share_token:
@@ -1331,7 +1331,7 @@ def _read_json_payload(request):
         return {}
     try:
         return json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return {}
 
 
@@ -1543,7 +1543,7 @@ def api_projects_list(request):
 def api_project_create(request):
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     name = data.get('name', '').strip()
@@ -1621,7 +1621,7 @@ def api_project_update(request, pk):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     for field in ('name', 'description', 'category', 'status'):
@@ -1718,7 +1718,7 @@ def api_project_save_scheme(request, pk):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data', {})
@@ -1922,7 +1922,7 @@ def api_project_save_simulation(request, pk):
     project = _project_for_write(request.user, pk)
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     result = data.get('result', {})
@@ -2069,7 +2069,7 @@ def api_project_measurement_create(request, pk):
         return _json_error('metric is required')
     try:
         value = float(data.get('value'))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _json_error('value must be numeric')
 
     expected = data.get('expected_value')
@@ -2082,7 +2082,7 @@ def api_project_measurement_create(request, pk):
         expected_num = float(expected) if expected not in (None, '') else None
         tolerance_abs_num = float(tolerance_abs) if tolerance_abs not in (None, '') else None
         tolerance_percent_num = float(tolerance_percent) if tolerance_percent not in (None, '') else None
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _json_error('expected/tolerance fields must be numeric')
 
     result = data.get('result') if isinstance(data.get('result'), dict) else {}
@@ -2150,6 +2150,34 @@ def api_simulation_fft(request):
         window=data.get('window', 'hann'),
     )
     return JsonResponse(result, status=200 if result.get('ok') else 400)
+
+
+@login_required(login_url='accounts:login')
+def api_simulation_voltage_field(request):
+    """Поле напряжений резисторной сетки N×N для 3D-поверхности (DolgSurface3D).
+
+    GET ?n=25 → {ok, n, n_nodes, elements, field: [[v,...],...]}. Демо «тяжёлой» схемы:
+    сетка N×N (≈2·N² элементов), решается MNA, поле — для 3D-рельефа (z=U, цвет=colormap).
+    """
+    from .services import large_circuits, monte_carlo
+
+    try:
+        n = int(request.GET.get('n', 25))
+    except TypeError, ValueError:
+        n = 25
+    n = max(4, min(60, n))
+    circuit = large_circuits.generate_resistor_grid_circuit(n, v=10.0, r=100.0)
+    voltages = monte_carlo.solve_dc(circuit)['voltages']
+    field = large_circuits.voltage_field(voltages, n)
+    return JsonResponse(
+        {
+            'ok': True,
+            'n': n,
+            'n_nodes': circuit['n_nodes'],
+            'elements': len(circuit['elements']),
+            'field': field,
+        }
+    )
 
 
 @login_required(login_url='accounts:login')
@@ -2522,7 +2550,7 @@ def api_export_scheme_pdf(request):
     A4, pdfmetrics, TTFont, canvas = _reportlab_pdf()
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data', {})
@@ -2662,7 +2690,7 @@ def api_ai_context(request):
 
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     project = None
@@ -2673,7 +2701,7 @@ def api_ai_context(request):
             project = _project_for_read(request.user, int(project_id))
             if not scheme:
                 scheme = project.scheme_data
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             project = None
 
     context = build_ai_scheme_context(
@@ -2696,14 +2724,14 @@ def api_server_engine_recommend(request):
     """Recommend server-side engines for the current in-memory scheme."""
     try:
         data = json.loads(request.body or '{}')
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or data.get('scheme') or {}
     if not isinstance(scheme_data, dict):
         return _json_error('scheme_data must be an object')
     try:
         limit = int(data.get('limit') or 5)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         limit = 5
     engines = recommend_server_engines(scheme_data, limit=max(1, min(limit, 10)))
     return JsonResponse(
@@ -2780,7 +2808,7 @@ def api_engine_jobs(request):
         if project_id:
             try:
                 project = _project_for_read(request.user, int(project_id))
-            except (TypeError, ValueError, Http404):
+            except TypeError, ValueError, Http404:
                 return _json_error('Project not found', status=404)
             jobs = jobs.filter(project=project)
         return JsonResponse(
@@ -2799,7 +2827,7 @@ def api_engine_jobs(request):
     if project_id not in (None, ''):
         try:
             project = _project_for_read(request.user, int(project_id))
-        except (TypeError, ValueError, Http404):
+        except TypeError, ValueError, Http404:
             return _json_error('Project not found', status=404)
 
     scheme_data = data.get('scheme_data') or data.get('scheme') or {}
@@ -2814,7 +2842,7 @@ def api_engine_jobs(request):
     netlist = str(data.get('netlist') or '')
     try:
         max_retries = max(0, min(int(data.get('max_retries', 2)), 10))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         max_retries = 2
     job = EngineJob.objects.create(
         project=project,
@@ -2921,7 +2949,7 @@ def api_monte_carlo(request):
         return denied
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
     scheme_data = data.get('scheme_data') or {}
     if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
@@ -2935,7 +2963,7 @@ def api_monte_carlo(request):
         for key, val in raw_tolerances.items():
             try:
                 converted[str(key)] = float(val) / 100.0
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         component_tolerances = converted or None
     want_worst_case = bool(data.get('worst_case', True))
@@ -2978,14 +3006,14 @@ def api_rf_analysis(request):
         return denied
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     def _num(key):
         val = data.get(key)
         try:
             return float(val) if val is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     try:
@@ -3018,7 +3046,7 @@ def api_export_circuit_python(request):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data') or {}
@@ -3052,7 +3080,7 @@ def api_engineering_review(request):
     """
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     scheme_data = data.get('scheme_data') or {}
@@ -3159,7 +3187,7 @@ def api_generate_protocol(request):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     project = None
@@ -3167,7 +3195,7 @@ def api_generate_protocol(request):
     if project_id not in (None, ''):
         try:
             project = _project_for_read(request.user, int(project_id))
-        except (Http404, TypeError, ValueError):
+        except Http404, TypeError, ValueError:
             return _json_error('Project not found', status=404)
 
     scheme_data = data.get('scheme_data') if isinstance(data.get('scheme_data'), dict) else None
@@ -3224,7 +3252,12 @@ def api_generate_protocol(request):
         filename = f'dolg_protocol_project_{project.id}.md' if project else 'protocol.md'
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
-    payload = {'ok': True, 'markdown': result['markdown'], 'sections': result['sections'], 'meta': result['meta']}
+    payload = {
+        'ok': True,
+        'markdown': result['markdown'],
+        'sections': result['sections'],
+        'meta': result['meta'],
+    }
     if project is not None:
         payload['project'] = {'id': project.id, 'name': project.name}
     return JsonResponse(payload)
@@ -3239,7 +3272,7 @@ def api_ai_chat(request):
 
     try:
         data = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return _json_error('Invalid JSON')
 
     mode = (data.get('mode') or 'recommend').strip()
@@ -3290,7 +3323,7 @@ def api_ai_chat(request):
             project = _project_for_read(request.user, int(project_id))
             if not scheme:
                 scheme = project.scheme_data
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             project = None
 
     if not ai_assistant.is_enabled():

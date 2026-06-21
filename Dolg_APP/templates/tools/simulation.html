@@ -506,6 +506,9 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                 <button class="tool-btn" id="scheme3d-btn" onclick="showScheme3D()" title="3D-просмотр платы (Three.js)">
                     <span>🎬</span> 3D
                 </button>
+                <button class="tool-btn" id="surface3d-btn" onclick="showVoltageSurface()" title="3D-поверхность поля напряжений (тяжёлая резисторная сетка)">
+                    <span>📈</span> 3D-поле
+                </button>
                 <button class="tool-btn" id="pcb-flow-btn" onclick="openProjectPcb()" title="Сохранить текущую схему и открыть PCB-разводку проекта">
                     <span>🧬</span> PCB
                 </button>
@@ -16431,6 +16434,54 @@ function onKeyDown(e) {
 
     if (e.key === 'Escape') { resetMode(); }
 }
+</script>
+
+{# ============== 3D-ПОВЕРХНОСТЬ ПОЛЯ НАПРЯЖЕНИЙ (DolgSurface3D) ============== #}
+<div id="surface3d-overlay" class="dolg-3d-overlay">
+    <div class="dolg-3d-header">
+        <div class="dolg-3d-title">📈 3D-поверхность поля напряжений</div>
+        <span id="surface3d-info" style="color: #9fb0c8; font-size: 12px;"></span>
+        <button type="button" onclick="closeVoltageSurface()"
+                style="margin-left: auto; background: #2a3145; color: #e6e9ef; border: 0;
+                       border-radius: 6px; padding: 5px 12px; cursor: pointer;">✕ Закрыть</button>
+    </div>
+    <canvas id="surface3d-canvas" style="flex: 1; display: block; width: 100%;"></canvas>
+</div>
+<script>
+    function showVoltageSurface() {
+        const ov = document.getElementById('surface3d-overlay');
+        const canvas = document.getElementById('surface3d-canvas');
+        const info = document.getElementById('surface3d-info');
+        ov.classList.add('open');
+        document.body.classList.add('dolg-3d-active');
+        // Явный размер canvas ДО init (иначе Three возьмёт 0×0 — overlay только что показан).
+        const W = window.innerWidth;
+        const H = Math.max(320, window.innerHeight - 48);
+        canvas.width = W;
+        canvas.height = H;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        info.textContent = 'считаю сетку…';
+        fetch('/simulation/api/voltage-field/?n=30', { credentials: 'same-origin' })
+            .then((r) => r.json())
+            .then((d) => {
+                if (!d.ok || !window.DolgSurface3D) {
+                    info.textContent = 'ошибка данных или модуль не загружен';
+                    return;
+                }
+                const res = window.DolgSurface3D.init(canvas, d.field, { height: 6, autoRotate: true });
+                info.textContent = res && res.ok
+                    ? `сетка ${d.n}×${d.n} · ${d.n_nodes} узлов · ${d.elements} элементов · крути мышью`
+                    : 'не удалось отрисовать (нет WebGL?)';
+                window.DolgSurface3D.start();
+            })
+            .catch(() => { info.textContent = 'сеть недоступна'; });
+    }
+    function closeVoltageSurface() {
+        document.getElementById('surface3d-overlay').classList.remove('open');
+        document.body.classList.remove('dolg-3d-active');
+        if (window.DolgSurface3D) window.DolgSurface3D.dispose();
+    }
 </script>
 
 {# ================= 3D-ПРОСМОТР ПЛАТЫ (Three.js, killer-фича #4) ================= #}

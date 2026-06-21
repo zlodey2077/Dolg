@@ -209,6 +209,11 @@ urlpatterns = [
         'simulation/api/pro/fft/', lazy_view('Dolg_APP.views.api_simulation_fft'), name='api_simulation_fft'
     ),
     path(
+        'simulation/api/voltage-field/',
+        lazy_view('Dolg_APP.views.api_simulation_voltage_field'),
+        name='api_simulation_voltage_field',
+    ),
+    path(
         'simulation/api/pro/bode/',
         lazy_view('Dolg_APP.views.api_simulation_bode'),
         name='api_simulation_bode',
