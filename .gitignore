@@ -100,3 +100,7 @@ backups/
 # Audit/temp screenshot folders
 .tmp_catalog_shots/
 **/tmp_image_audit/
+
+# Bundled native engine binaries (Xyce etc.) — велики для git, едут с проектом локально.
+# Скачать/распаковать: см. docs/SERVER_ENGINES_INSTALL.md. Движок ищет engines/xyce/Xyce.exe.
+engines/

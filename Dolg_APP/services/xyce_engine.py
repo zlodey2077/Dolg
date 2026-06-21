@@ -29,6 +29,11 @@ def xyce_path() -> str | None:
     env = os.environ.get('XYCE_EXE')
     if env and Path(env).exists():
         return env
+    # Project-local (bundled engines/xyce) — приоритетно: движок самодостаточен, бинарь едет
+    # с проектом (gitignored, не в git из-за размера). См. docs/SERVER_ENGINES_INSTALL.md.
+    project_xyce = Path(__file__).resolve().parents[2] / 'engines' / 'xyce' / 'Xyce.exe'
+    if project_xyce.exists():
+        return str(project_xyce)
     found = shutil.which('Xyce') or shutil.which('Xyce.exe')
     if found:
         return found
