@@ -1353,6 +1353,68 @@
         return _thermalOverlayObjects.length > 0;
     }
 
+    // Generic per-component value overlay (напряжение/ток) — переиспользует halo-механизм
+    // thermal (тот же _thermalOverlayObjects + clearThermalOverlay). valueMap: { compId: number }.
+    // opts: { vmin, vmax } (иначе авто по диапазону). Colormap — сине-красный по нормированному
+    // значению (низ=синий → верх=красный), удобно для распределения напряжения/тока по плате.
+    function _valueColor(t) {
+        t = Math.max(0, Math.min(1, t));
+        const r = Math.max(0, Math.min(1, 1.4 * t - 0.3));
+        const g = Math.max(0, Math.min(1, 1 - Math.abs(t - 0.5) * 2));
+        const b = Math.max(0, Math.min(1, 1.1 - 1.4 * t));
+        return new THREE.Color(r, g, b);
+    }
+
+    function setNodeOverlay(valueMap, opts) {
+        if (!_scene || !_root || !valueMap) return { ok: false, applied: 0 };
+        clearThermalOverlay();
+        opts = opts || {};
+        const keys = Object.keys(valueMap).filter(
+            (k) => _componentMeshes[k] && isFinite(valueMap[k])
+        );
+        if (!keys.length) return { ok: true, applied: 0 };
+        let vmin = isFinite(opts.vmin) ? opts.vmin : Infinity;
+        let vmax = isFinite(opts.vmax) ? opts.vmax : -Infinity;
+        if (!isFinite(opts.vmin) || !isFinite(opts.vmax)) {
+            keys.forEach((k) => {
+                const v = valueMap[k];
+                if (v < vmin) vmin = v;
+                if (v > vmax) vmax = v;
+            });
+        }
+        const span = vmax - vmin || 1;
+        const box = new THREE.Box3();
+        let applied = 0;
+        keys.forEach((key) => {
+            const mesh = _componentMeshes[key];
+            const t = (valueMap[key] - vmin) / span;
+            const color = _valueColor(t);
+            box.setFromObject(mesh);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            const radius = Math.max(size.x, size.z) * 0.78 + 0.35;
+            const geo = new THREE.SphereGeometry(radius, 24, 12);
+            const mat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.45,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+            });
+            const halo = new THREE.Mesh(geo, mat);
+            halo.position.set(center.x, Math.max(center.y, 0.4), center.z);
+            halo.userData._isThermal = true;
+            halo.userData.dolgComponentId = key;
+            halo.userData.nodeValue = valueMap[key];
+            _root.add(halo);
+            _thermalOverlayObjects.push(halo);
+            applied += 1;
+        });
+        return { ok: true, applied: applied };
+    }
+
     // ----- Cross-probing 2D↔3D -----
     // 2D-схема вызывает highlightComponent(id) когда пользователь выбирает
     // компонент в редакторе. Мы рисуем светящийся cyan-каркас вокруг bbox
@@ -1666,6 +1728,7 @@
         exportGlb,
         downloadGlb,
         setThermalOverlay,
+        setNodeOverlay,
         clearThermalOverlay,
         hasThermalOverlay,
         highlightComponent,
