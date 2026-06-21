@@ -13,6 +13,7 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<link rel="stylesheet" href="{% static 'shop/workspace-preferences.css' %}?v=20260621">
 {% endblock %}
 
 {% block content %}
@@ -24,6 +25,7 @@ scheme-* всё равно доступны для inline-JS в нашем DOMCo
 размер (pixi 456 КБ + three 600 КБ = >1 МБ блокирующего JS).
 {% endcomment %}
 <script src="{% static 'lib/pixi.min.js' %}?v=7.4.2" defer></script>
+<script src="{% static 'shop/workspace-preferences.js' %}?v=20260621" defer></script>
 <script src="{% static 'lib/three.min.js' %}?v=r140" defer></script>
 <script src="{% static 'lib/OrbitControls.js' %}?v=r140" defer></script>
 <script src="{% static 'lib/GLTFExporter.js' %}?v=r140" defer></script>
@@ -4360,10 +4362,24 @@ function _saveSimSettings() {
         }));
     } catch (e) { /* приватный режим — игнорируем */ }
 }
+function _profileSimRenderModeOverride() {
+    const prefs = window.DolgWorkspacePreferences || {};
+    const mode = document.body?.dataset?.renderMode || prefs.renderMode;
+    if (mode === 'webgl') return 'pixi';
+    if (mode === 'canvas2d') return 'canvas2d';
+    return null;
+}
+
 function loadSimSettings() {
     try {
         const raw = localStorage.getItem('dolg.sim.settings');
-        if (!raw) return;
+        const profileRenderMode = _profileSimRenderModeOverride();
+        if (!raw) {
+            renderModeOverride = profileRenderMode;
+            const renderSelect = document.getElementById('sim-render-mode');
+            if (renderSelect) renderSelect.value = renderModeOverride || 'auto';
+            return;
+        }
         const s = JSON.parse(raw);
         if (s.gridSize)  simGridSize  = s.gridSize;
         if (s.moveStep)  simMoveStep  = s.moveStep;
@@ -4373,7 +4389,7 @@ function loadSimSettings() {
         if (s.renderMode === 'canvas2d' || s.renderMode === 'pixi') {
             renderModeOverride = s.renderMode;
         } else {
-            renderModeOverride = null; // 'auto'
+            renderModeOverride = profileRenderMode; // profile default or 'auto'
         }
         if (typeof s.wireStub === 'number' && s.wireStub >= 8 && s.wireStub <= 40) {
             window.simWireSettings.stub = s.wireStub;

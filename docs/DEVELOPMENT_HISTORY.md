@@ -231,6 +231,16 @@
 - Verification: `ruff check Dolg_APP\ml_admin_views.py Dolg_APP\tests_ml_admin.py`, `py_compile Dolg_APP\ml_admin_views.py`, `manage.py check`, `pytest Dolg_APP\tests_ml_admin.py -q` (`11 passed`), and `git diff --check`.
 - Next active item in `WORK_FRONT_20260619.md`: Session 6, CAD/simulation UX pass.
 
+### 2026-06-21 - CAD/simulation workspace preference baseline
+
+- Added shared `shop/static/shop/workspace-preferences.css` and `workspace-preferences.js`.
+- CAD and simulation now receive profile density/layout/render/motion settings as stable body classes and datasets instead of leaving them as passive `data-*` attributes.
+- Added `window.DolgWorkspaceInstrumentContract` as the baseline contract for future oscilloscope, generator, multimeter and probe animations with reduced-motion support.
+- Simulation now respects an explicit profile render preference (`canvas2d` or `webgl`) while keeping the existing auto mode free to choose Pixi only when the current schematic needs it.
+- Extended `Dolg_APP/tests_tool_asset_smoke.py` with static-asset checks and a Node VM contract smoke for the workspace preference module.
+- Verification: `node -c shop\static\shop\workspace-preferences.js`, `.venv\Scripts\python.exe -m ruff check Dolg_APP\tests_tool_asset_smoke.py`, `.venv\Scripts\python.exe manage.py check`, `.venv\Scripts\python.exe -m pytest Dolg_APP\tests_tool_asset_smoke.py -q --no-header --no-migrations --reuse-db` (`5 passed`), and `git diff --check`.
+- Next active item in `WORK_FRONT_20260619.md`: Session 7, security/token limits and password/brute-force hardening.
+
 ## Шаблон новой записи
 
 ```markdown

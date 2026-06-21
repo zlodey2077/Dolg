@@ -1,0 +1,185 @@
+body.dolg-workspace-page {
+    --workspace-gap: 10px;
+    --workspace-panel-padding: 10px;
+    --workspace-control-height: 34px;
+    --workspace-tool-size: 42px;
+    --workspace-tool-panel-width: 76px;
+    --workspace-side-panel-width: 320px;
+    --workspace-dock-height: 218px;
+    --workspace-font-scale: 1;
+}
+
+body.dolg-density-compact {
+    --workspace-gap: 6px;
+    --workspace-panel-padding: 7px;
+    --workspace-control-height: 30px;
+    --workspace-tool-size: 36px;
+    --workspace-tool-panel-width: 66px;
+    --workspace-side-panel-width: 286px;
+    --workspace-dock-height: 178px;
+    --workspace-font-scale: 0.94;
+}
+
+body.dolg-density-spacious {
+    --workspace-gap: 14px;
+    --workspace-panel-padding: 14px;
+    --workspace-control-height: 40px;
+    --workspace-tool-size: 48px;
+    --workspace-tool-panel-width: 88px;
+    --workspace-side-panel-width: 354px;
+    --workspace-dock-height: 260px;
+    --workspace-font-scale: 1.04;
+}
+
+body.dolg-layout-focus {
+    --workspace-side-panel-width: 276px;
+    --workspace-dock-height: 184px;
+}
+
+body.dolg-layout-lab {
+    --workspace-side-panel-width: 340px;
+    --workspace-dock-height: 292px;
+}
+
+body.dolg-layout-review {
+    --workspace-side-panel-width: 372px;
+    --workspace-dock-height: 256px;
+}
+
+body.dolg-workspace-cad #app-container {
+    gap: var(--workspace-gap);
+}
+
+body.dolg-workspace-cad .cad-layout {
+    gap: var(--workspace-gap);
+}
+
+body.dolg-workspace-cad .tools-panel {
+    width: var(--workspace-tool-panel-width);
+    gap: calc(var(--workspace-gap) * 0.65);
+    padding: var(--workspace-panel-padding);
+}
+
+body.dolg-workspace-cad .right-panel {
+    width: var(--workspace-side-panel-width);
+}
+
+body.dolg-workspace-cad .top-controls,
+body.dolg-workspace-cad .panel-section,
+body.dolg-workspace-cad .cad-mode-tabs,
+body.dolg-workspace-cad .cad-view-tabs,
+body.dolg-workspace-cad .cad-drc-panel {
+    font-size: calc(13px * var(--workspace-font-scale));
+}
+
+body.dolg-workspace-cad .tool-btn {
+    min-height: var(--workspace-tool-size);
+    min-width: var(--workspace-tool-size);
+}
+
+body.dolg-workspace-cad .btn-small,
+body.dolg-workspace-cad .cad-mode-tab,
+body.dolg-workspace-cad .cad-view-tab {
+    min-height: var(--workspace-control-height);
+}
+
+body.dolg-workspace-cad.dolg-layout-focus .right-panel {
+    max-width: var(--workspace-side-panel-width);
+}
+
+body.dolg-workspace-cad.dolg-layout-focus .panel-section--collapsible:not(.expanded) .panel-section-content {
+    display: none;
+}
+
+body.dolg-workspace-cad.dolg-layout-review .cad-drc-panel,
+body.dolg-workspace-cad.dolg-layout-review #cadDrcPanel {
+    border-color: rgba(255, 210, 96, 0.75);
+}
+
+body.dolg-workspace-simulation .workspace {
+    gap: var(--workspace-gap);
+}
+
+body.dolg-workspace-simulation .components-panel,
+body.dolg-workspace-simulation .control-panel,
+body.dolg-workspace-simulation .stats-panel,
+body.dolg-workspace-simulation .sim-dock,
+body.dolg-workspace-simulation .analysis-bottom-panel,
+body.dolg-workspace-simulation .float-panel,
+body.dolg-workspace-simulation .server-engine-panel,
+body.dolg-workspace-simulation .dolg-lab-card,
+body.dolg-workspace-simulation .dolg-ai-panel {
+    padding: var(--workspace-panel-padding);
+}
+
+body.dolg-workspace-simulation .components-panel,
+body.dolg-workspace-simulation .control-panel,
+body.dolg-workspace-simulation .stats-panel,
+body.dolg-workspace-simulation .sim-dock {
+    font-size: calc(13px * var(--workspace-font-scale));
+}
+
+body.dolg-workspace-simulation .sim-dock {
+    min-height: var(--workspace-dock-height);
+}
+
+body.dolg-workspace-simulation .component-btn,
+body.dolg-workspace-simulation .tool-btn,
+body.dolg-workspace-simulation .sim-dock-tab,
+body.dolg-workspace-simulation .server-engine-btn,
+body.dolg-workspace-simulation .analysis-btn {
+    min-height: var(--workspace-control-height);
+}
+
+body.dolg-workspace-simulation.dolg-layout-focus .components-panel,
+body.dolg-workspace-simulation.dolg-layout-focus .control-panel {
+    max-width: 280px;
+}
+
+body.dolg-workspace-simulation.dolg-layout-lab .sim-dock,
+body.dolg-workspace-simulation.dolg-layout-lab #dolgLabBody {
+    min-height: var(--workspace-dock-height);
+}
+
+body.dolg-workspace-simulation.dolg-layout-review #analysisBottomPanel,
+body.dolg-workspace-simulation.dolg-layout-review .results-panel,
+body.dolg-workspace-simulation.dolg-layout-review .server-engine-panel {
+    border-color: rgba(255, 210, 96, 0.72);
+}
+
+body.dolg-motion-on.dolg-workspace-page .tool-btn,
+body.dolg-motion-on.dolg-workspace-page .btn-small,
+body.dolg-motion-on.dolg-workspace-page .component-btn,
+body.dolg-motion-on.dolg-workspace-page .sim-dock,
+body.dolg-motion-on.dolg-workspace-page .float-panel,
+body.dolg-motion-on.dolg-workspace-page .panel-section {
+    transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease,
+        background-color 160ms ease;
+}
+
+body.dolg-motion-on.dolg-workspace-page .tool-btn:hover,
+body.dolg-motion-on.dolg-workspace-page .btn-small:hover,
+body.dolg-motion-on.dolg-workspace-page .component-btn:hover {
+    transform: translateY(-1px);
+}
+
+body.dolg-motion-off.dolg-workspace-page *,
+body.dolg-motion-off.dolg-workspace-page *::before,
+body.dolg-motion-off.dolg-workspace-page *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+}
+
+@media (max-width: 900px) {
+    body.dolg-workspace-page {
+        --workspace-gap: 8px;
+        --workspace-panel-padding: 8px;
+        --workspace-side-panel-width: 100%;
+        --workspace-dock-height: 210px;
+    }
+}

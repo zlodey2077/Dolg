@@ -35,6 +35,8 @@ CRITICAL_SIMULATION_ASSETS = {
     'lib/pixi.min.js',
     'lib/qrcode.min.js',
     'lib/three.min.js',
+    'shop/workspace-preferences.css',
+    'shop/workspace-preferences.js',
     'simulation/ml-toolbar.js',
     'simulation/ngspice-worker.js',
     'simulation/ngspice.js',
@@ -116,6 +118,8 @@ class ToolAssetSmokeTests(TestCase):
         self.assertIn('simulation/scheme-3d.js', html)
         self.assertIn('simulation/ml-toolbar.js', html)
         self.assertIn('simulation/server-engine-ui.js', html)
+        self.assertIn('shop/workspace-preferences.css', html)
+        self.assertIn('shop/workspace-preferences.js', html)
 
         self.assertStaticAssetsExist(_html_static_assets(html) | CRITICAL_SIMULATION_ASSETS)
 
@@ -127,6 +131,8 @@ class ToolAssetSmokeTests(TestCase):
         self.assertIn('id="app-container"', html)
         self.assertIn('cad-layout', html)
         self.assertIn('id="canvas"', html)
+        self.assertIn('shop/workspace-preferences.css', html)
+        self.assertIn('shop/workspace-preferences.js', html)
 
         self.assertStaticAssetsExist(_html_static_assets(html))
 
@@ -200,6 +206,80 @@ const card = ui.renderCard({{
 }}, {{ primaryId: 'xyce', recommended: true }});
 assert(card.includes('server-engine-card--primary'), 'primary card class is missing');
 assert(card.includes('рекомендован'), 'recommended marker is missing');
+"""
+        result = subprocess.run(
+            [node, '-e', runner],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_workspace_preferences_js_contract(self):
+        node = shutil.which('node')
+        if node is None:
+            self.skipTest('node is not installed')
+
+        asset_path = Path(settings.BASE_DIR) / 'shop' / 'static' / 'shop' / 'workspace-preferences.js'
+        runner = f"""
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync({json.dumps(str(asset_path))}, 'utf8');
+const CustomEvent = function CustomEvent(type, init) {{
+  this.type = type;
+  this.detail = init && init.detail;
+}};
+const context = {{ window: {{ CustomEvent }}, module: {{ exports: {{}} }}, globalThis: {{}} }};
+context.window.window = context.window;
+vm.createContext(context);
+vm.runInContext(source, context, {{ filename: 'workspace-preferences.js' }});
+const prefsApi = context.module.exports;
+function assert(condition, message) {{
+  if (!condition) throw new Error(message);
+}}
+assert(typeof prefsApi.normalizePreferences === 'function', 'normalizePreferences export is missing');
+const normalized = prefsApi.normalizePreferences({{
+  interfaceDensity: 'compact',
+  workspaceLayout: 'lab',
+  renderMode: 'auto',
+  simEngine: 'xyce',
+  workspaceAnimations: 'off',
+}}, {{ webglSupported: true, workspaceKind: 'simulation' }});
+assert(normalized.density === 'compact', 'density was not normalized');
+assert(normalized.layout === 'lab', 'layout was not normalized');
+assert(normalized.effectiveRenderMode === 'webgl', 'auto render mode did not prefer WebGL');
+assert(normalized.motionEnabled === false, 'animation-off profile did not disable motion');
+assert(normalized.classes.includes('dolg-workspace-simulation'), 'workspace class is missing');
+const contract = prefsApi.createInstrumentContract(normalized);
+assert(contract.version === 1, 'instrument contract version is wrong');
+assert(contract.instruments.oscilloscope.motion === 'static', 'oscilloscope did not inherit reduced motion');
+const classes = new Set();
+const body = {{
+  dataset: {{
+    interfaceDensity: 'spacious',
+    workspaceLayout: 'review',
+    renderMode: 'canvas2d',
+    reduceMotion: 'on',
+  }},
+  classList: {{
+    add: (name) => classes.add(name),
+    remove: (name) => classes.delete(name),
+  }},
+}};
+const doc = {{
+  body,
+  querySelector: (selector) => selector === '#canvas' ? {{}} : null,
+  createElement: () => ({{ getContext: () => null }}),
+  dispatchEvent: (event) => {{ doc.lastEvent = event; }},
+}};
+const booted = prefsApi.boot(doc);
+assert(booted.workspaceKind === 'cad', 'boot did not detect CAD workspace');
+assert(body.dataset.effectiveRenderMode === 'canvas2d', 'body render dataset was not written');
+assert(body.dataset.motionEnabled === 'off', 'motion dataset was not written');
+assert(classes.has('dolg-workspace-cad'), 'CAD body class is missing');
+assert(context.window.DolgWorkspaceInstrumentContract.pages.cad.scope === '#canvas', 'CAD instrument scope is wrong');
+assert(doc.lastEvent.type === 'dolg:workspace-preferences-ready', 'ready event was not dispatched');
 """
         result = subprocess.run(
             [node, '-e', runner],

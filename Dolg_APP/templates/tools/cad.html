@@ -3,6 +3,10 @@
 
 {% block title %}2D САПР - DOLG{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'shop/workspace-preferences.css' %}?v=20260621">
+{% endblock %}
+
 {% block extra_css %}
 <style>
     /* После перехода на shop/base.html у нас нет cosmic_flex.css, где жили
@@ -1446,6 +1450,7 @@
     overlay через DolgScheme3D.init().
 {% endcomment %}
 <script src="{% static 'lib/three.min.js' %}?v=r140" defer></script>
+<script src="{% static 'shop/workspace-preferences.js' %}?v=20260621" defer></script>
 <script src="{% static 'lib/OrbitControls.js' %}?v=r140" defer></script>
 <script src="{% static 'lib/GLTFExporter.js' %}?v=r140" defer></script>
 <script src="{% static 'simulation/scheme-3d-materials.js' %}?v=20260526a" defer></script>

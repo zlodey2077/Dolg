@@ -142,7 +142,7 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
 
 ## P1 - продуктовый слой, который можно делать без Docker
 
-1. CAD/simulation UX polish.
+1. [x] CAD/simulation UX polish - Session 6 baseline.
    - Исправлять проблемы интерфейса через маленькие, проверяемые блоки:
      overflow, панели, пустые состояния, ошибки, tooltips, mobile/tablet.
    - Довести настройки профиля до реального влияния на рабочие страницы:
@@ -150,6 +150,10 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
      только лежать в `body[data-*]`.
    - Сформировать стабильный contract для будущих приборов: scope, generator,
      multimeter, probes, state badges, reduced motion.
+   - [x] Added shared `shop/static/shop/workspace-preferences.{css,js}`.
+   - [x] CAD and simulation now consume profile density/layout/render/motion settings through stable body classes and datasets.
+   - [x] Added `window.DolgWorkspaceInstrumentContract` for future oscilloscope/generator/multimeter/probe animations.
+   - Remaining UX work stays incremental: split the huge templates, then polish specific panels with screenshots.
 
 2. [x] Server engine gateway MVP-2.
    - [x] Добавить нормальный stale/retry flow для `EngineJob`: heartbeat, retry count,
@@ -251,10 +255,13 @@ Docker/WSL, Python, Node или фоновые службы забивают м�
 5. Сессия 5: закрыта - Admin/Data Console v2: безопасный поиск/фильтры,
    JSONField preview, bounded media scan и быстрые ссылки в admin
    changelist/change.
-6. Сессия 6: следующий активный пункт - CAD/simulation UX pass: применить
-   профильные настройки density/layout/render/animations к реальному интерфейсу,
-   подготовить базовый contract для будущих приборных анимаций.
-7. Сессия 7: Docker/Postgres после защиты/после BIOS virtualization: не
+6. Сессия 6: закрыта - CAD/simulation UX baseline применяет профильные
+   настройки density/layout/render/animations к рабочим страницам и фиксирует
+   contract для будущих приборных анимаций.
+7. Сессия 7: следующий активный пункт - security/token limits: довершить
+   ограничения токенов/квот, проверить парольный контур, усилить защиту от
+   brute-force, client-side tampering, прямых API-вызовов и обхода UI.
+8. Сессия 8: Docker/Postgres после защиты/после BIOS virtualization: не
    блокировать продукт, держать SQLite + local worker как основной dev-flow.
 
 ## Правила работы
