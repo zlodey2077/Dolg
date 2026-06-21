@@ -5,6 +5,13 @@
 # Neural backend
 torch==2.12.0
 
+# Server SPICE engines (внешние движки для тяжёлых задач; см. server_engines.py
+# fallback-цепь: xyce -> pyspice -> gnucap -> ngspice-wasm -> numpy-mna).
+# PySpice ставится pip'ом; ngspice DLL — отдельным шагом ПОСЛЕ установки:
+#   pyspice-post-installation --install-ngspice-dll
+# Xyce и GnuCap — нативные бинарники (не pip), см. docs/SERVER_ENGINES_INSTALL.md.
+PySpice>=1.5
+
 # External circuit datasets (опционально — для расширения training base).
 # Используется в `python manage.py import_external_datasets` для подгрузки
 # открытых КиCad-схем с HuggingFace, SPICE-netlist'ов с GitHub и т.п.
