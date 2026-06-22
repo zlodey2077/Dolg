@@ -159,6 +159,69 @@ def nexar_candidates(product) -> list[PhotoCandidate]:
     return out
 
 
+# ── Источник: Mouser Search API (бесплатный ключ MOUSER_API_KEY, лимиты щедрее Nexar) ─────────
+# Регистрация: mouser.com/api-hub → Search API key. Без OAuth — просто apiKey в query.
+def mouser_candidates(product) -> list[PhotoCandidate]:
+    key = os.getenv('MOUSER_API_KEY', '')
+    mpn = _mpn(product)
+    if not key or not mpn:
+        return []
+    payload = json.dumps(
+        {'SearchByKeywordRequest': {'keyword': mpn, 'records': 3, 'searchOptions': 'None'}}
+    ).encode()
+    data = _http_json(
+        'https://api.mouser.com/api/v1/search/keyword?apiKey=' + urllib.parse.quote(key),
+        data=payload,
+        headers={'Content-Type': 'application/json'},
+    )
+    out: list[PhotoCandidate] = []
+    try:
+        for part in ((data or {}).get('SearchResults') or {}).get('Parts') or []:
+            img = part.get('ImagePath')
+            if img:
+                out.append(PhotoCandidate(url=img, source='mouser', title='Mouser product image'))
+    except Exception:
+        return out
+    return out
+
+
+# ── Источник: Farnell/element14 API (бесплатный ключ FARNELL_API_KEY, регион настраивается) ────
+def farnell_candidates(product) -> list[PhotoCandidate]:
+    key = os.getenv('FARNELL_API_KEY', '')
+    store = os.getenv('FARNELL_STORE', 'uk.farnell.com')
+    mpn = _mpn(product)
+    if not key or not mpn:
+        return []
+    qs = urllib.parse.urlencode(
+        {
+            'term': 'manuPartNum:' + mpn,
+            'storeInfo.id': store,
+            'resultsSettings.numberOfResults': '2',
+            'resultsSettings.responseGroup': 'medium',
+            'callInfo.apiKey': key,
+            'callInfo.responseDataFormat': 'json',
+        }
+    )
+    data = _http_json('https://api.element14.com/catalog/products?' + qs)
+    out: list[PhotoCandidate] = []
+    try:
+        for prod in ((data or {}).get('manufacturerPartNumberSearchReturn') or {}).get('products') or []:
+            img = prod.get('image') or {}
+            base = img.get('baseName')
+            vrnt = img.get('vrntPath', '')
+            if base:
+                out.append(
+                    PhotoCandidate(
+                        url=f'https://{store}/productimages/standard/en_GB/{vrnt}{base}',
+                        source='farnell',
+                        title='Farnell/element14 product image',
+                    )
+                )
+    except Exception:
+        return out
+    return out
+
+
 # ── Источник 3: LCSC/EasyEDA поиск по MPN ─────────────────────────────────────────────────────
 # ⚠️ Проверено 20260622: публичные эндпоинты под анти-ботом — easyeda /api/products/search → 403/404,
 # wmsc.lcsc.com → 200 c {"code":404,"msg":"refresh the page"} (нужна браузерная сессия/токен).
@@ -187,11 +250,14 @@ def lcsc_candidates(product) -> list[PhotoCandidate]:
 
 SOURCES = {
     'official-cdn': official_cdn_candidates,
+    'mouser': mouser_candidates,
+    'farnell': farnell_candidates,
     'nexar': nexar_candidates,
     'lcsc': lcsc_candidates,
 }
+# Приоритет: курируемые → Mouser/Farnell (щедрые бесплатные ключи) → Nexar (строгие лимиты — в конец).
 # lcsc исключён из дефолта (анти-бот, см. lcsc_candidates) — доступен явно через --source lcsc.
-DEFAULT_ORDER = ['official-cdn', 'nexar']
+DEFAULT_ORDER = ['official-cdn', 'mouser', 'farnell', 'nexar']
 
 
 def iter_candidates(product, order: list[str] | None = None):

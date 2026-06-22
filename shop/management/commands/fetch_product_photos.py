@@ -13,8 +13,11 @@ products/verified/<slug> и привязывается через media-policy. 
     python manage.py fetch_product_photos --source nexar --source lcsc   # подмножество/порядок источников
     python manage.py fetch_product_photos --limit 20
 
-Ключи Nexar (опционально, иначе источник пропускается):
-    setx NEXAR_CLIENT_ID ...   и   setx NEXAR_CLIENT_SECRET ...
+API-ключи источников (опционально, без ключа источник пропускается):
+    Mouser  (рекомендуется — щедрые лимиты): setx MOUSER_API_KEY ...
+    Farnell (element14):                     setx FARNELL_API_KEY ...   (+ опц. FARNELL_STORE)
+    Nexar/Octopart (строгие лимиты):         setx NEXAR_CLIENT_ID ...  и  setx NEXAR_CLIENT_SECRET ...
+Приоритет: official-cdn → mouser → farnell → nexar. LCSC под анти-ботом (только --source lcsc).
 """
 
 from __future__ import annotations
