@@ -19,11 +19,11 @@
             <div class="flex-row gap-md" style="align-items: center;">
                 <h1 style="margin: 0; font-size: 1.5rem; color: #00d4ff;"><a href="{% url 'shop:index' %}" style="color: #00d4ff; text-decoration: none;">🎓 DOLG</a></h1>
             </div>
-            
+
             <nav class="flex-row gap-lg" style="flex-wrap: wrap;">
                 <a href="{% url 'shop:index' %}" class="nav-link">🏠 Главная</a>
                 <a href="{% url 'hello:billing_plans' %}" class="nav-link">💎 Подписки</a>
-                
+
                 <details class="nav-dropdown">
                     <summary class="nav-link">🛠️ Инструменты</summary>
                     <div class="dropdown-menu">
@@ -58,6 +58,13 @@
     <!-- Основное содержимое -->
     <main class="flex-1">
         <div class="page-container">
+            {% if messages %}
+            <div class="messages-container">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }}" data-tags="{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </div>
     </main>
@@ -73,6 +80,7 @@
         </div>
     </footer>
 
+    <script src="{% static 'shop/dolg-toast.js' %}?v=20260622"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -261,7 +261,7 @@
         <div class="messages-container">
             <div class="container">
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+                    <div class="alert alert-{{ message.tags|default:'info' }}" data-tags="{{ message.tags }}">{{ message }}</div>
                 {% endfor %}
             </div>
         </div>
@@ -534,6 +534,8 @@
         dolgInitHeaderSuggest();
     }
     </script>
+    {# Единая тост-система (фидбек на весь продукт) + мост Django messages → тосты. #}
+    <script src="{% static 'shop/dolg-toast.js' %}?v=20260622"></script>
     <script src="{% static 'shop/consent-ui.js' %}?v=20260524b"></script>
     <script src="{% static 'shop/auth-modal.js' %}?v=20260525a"></script>
     <script src="{% static 'shop/save-cta-banner.js' %}?v=20260516a"></script>

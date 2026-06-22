@@ -493,6 +493,10 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
                         onclick="stopSimulation()" title="Остановить симуляцию">
                     <span>⏹</span> Стоп
                 </button>
+                <button class="tool-btn tool-btn--live" type="button" id="live-sim-btn" aria-pressed="false"
+                        onclick="toggleLiveSim()" title="Симуляция в реальном времени: пересчёт схемы на лету при любой правке">
+                    <span>⚡</span> Live
+                </button>
                 <span class="tool-divider"></span>
 
                 <button class="tool-btn" id="undo-btn" onclick="undoSchemeAction()" title="Отменить (Ctrl+Z)" aria-label="Отменить действие">
@@ -10700,6 +10704,8 @@ function snapshotScheme() {
     else markSchemeSaved();
     // Bottom status-bar: счётчики компонентов/проводов изменились.
     if (typeof updateStatusBar === 'function') updateStatusBar();
+    // Live-режим: правка схемы → тихий авто-пересчёт (debounced внутри).
+    if (typeof scheduleLiveSim === 'function') scheduleLiveSim();
 }
 
 // Save-state: трекаем, есть ли несохранённые на сервере изменения.
@@ -11022,6 +11028,77 @@ function _guestSimIncrement() {
     catch (e) { /* localStorage disabled — нечего считать */ }
 }
 
+// === Симуляция в реальном времени (live-режим) ===========================================
+// При ВКЛ любая правка схемы (через snapshotScheme) запускает тихий авто-пересчёт с debounce —
+// напряжения/токи/графики обновляются «на лету». Тяжёлые схемы (>порога) live не считают.
+let liveSimMode = false;
+let _liveSimTimer = null;
+let _simQuiet = false; // подавляет success-тосты при авто/live-пересчёте (чтобы не спамить)
+const LIVE_SIM_MAX_COMPONENTS = 200;
+
+function scheduleLiveSim() {
+    if (!liveSimMode) return;
+    if (_liveSimTimer) clearTimeout(_liveSimTimer);
+    _liveSimTimer = setTimeout(runLiveSim, 320);
+}
+
+async function runLiveSim() {
+    if (!liveSimMode || !components.length) return;
+    if (components.length > LIVE_SIM_MAX_COMPONENTS) {
+        showNotification(`⚠ Схема велика (${components.length}) — live-пересчёт отключён, запускайте вручную`, 'warning');
+        return;
+    }
+    _simQuiet = true;
+    try {
+        await runSimulation();
+    } catch (e) {
+        console.warn('[live-sim] re-run failed:', e);
+    } finally {
+        _simQuiet = false;
+    }
+}
+
+function _ensureLiveSimStyle() {
+    if (document.getElementById('live-sim-style')) return;
+    const s = document.createElement('style');
+    s.id = 'live-sim-style';
+    s.textContent =
+        '.tool-btn--live.live-on{background:linear-gradient(135deg,#46e08a,#1fbf67);color:#06121d;border-color:#1fbf67;' +
+        'animation:liveSimPulse 1.7s ease-out infinite}' +
+        '@keyframes liveSimPulse{0%{box-shadow:0 0 0 0 rgba(70,224,138,.55)}70%{box-shadow:0 0 0 8px rgba(70,224,138,0)}' +
+        '100%{box-shadow:0 0 0 0 rgba(70,224,138,0)}}' +
+        '@media (prefers-reduced-motion: reduce){.tool-btn--live.live-on{animation:none}}';
+    document.head.appendChild(s);
+}
+
+function _updateLiveSimUi() {
+    _ensureLiveSimStyle();
+    const btn = document.getElementById('live-sim-btn');
+    if (btn) {
+        btn.classList.toggle('live-on', liveSimMode);
+        btn.setAttribute('aria-pressed', liveSimMode ? 'true' : 'false');
+    }
+}
+
+function toggleLiveSim() {
+    liveSimMode = !liveSimMode;
+    try { localStorage.setItem('dolg.sim.live', liveSimMode ? '1' : '0'); } catch (e) {}
+    _updateLiveSimUi();
+    if (liveSimMode) {
+        showNotification('⚡ Реальное время: ВКЛ — схема пересчитывается на лету', 'success');
+        runLiveSim();
+    } else {
+        showNotification('Реальное время: выкл', 'info');
+    }
+}
+
+try {
+    if (localStorage.getItem('dolg.sim.live') === '1') {
+        liveSimMode = true;
+        document.addEventListener('DOMContentLoaded', _updateLiveSimUi);
+    }
+} catch (e) {}
+
 // Состояние «идёт расчёт» на кнопке запуска: спиннер вместо ▶ + disable.
 function setRunBusy(busy) {
     if (!document.getElementById('sim-run-busy-style')) {
@@ -11091,7 +11168,7 @@ async function _runSimulationImpl() {
         window._lastSimResultForLab = cached.result;
         window._lastSimResult = cached.result;
         if (window.DolgLab) { try { window.DolgLab.refresh(); } catch (e) {} }
-        showNotification('✓ из кэша (0 мс)', 'success');
+        if (!_simQuiet) showNotification('✓ из кэша (0 мс)', 'success');
         return;
     }
 
@@ -11164,7 +11241,7 @@ async function _runSimulationImpl() {
                 _simCache.set(_cacheKey, { result: r.result, built, elapsedMs: r.elapsedMs, engineVersion: r.engineVersion });
             }
             await recordSimulationRun(r.result, built, r.elapsedMs, r.engineVersion, 'success');
-            showNotification(`✓ ngspice.wasm завершил за ${r.elapsedMs} мс`, 'success');
+            if (!_simQuiet) showNotification(`✓ ngspice.wasm завершил за ${r.elapsedMs} мс`, 'success');
             return;
         }
     } catch (wasmErr) {
@@ -11198,7 +11275,7 @@ async function _runSimulationImpl() {
         if (window.DolgLab) { try { window.DolgLab.refresh(); } catch (e) {} }
         if (window._updateAnalysisStatus) window._updateAnalysisStatus(_analysisType, r.elapsedMs, r.result);
         await recordSimulationRun(r.result, built, r.elapsedMs, r.engineVersion, 'success');
-        showNotification(`✓ JS-MNA завершил за ${r.elapsedMs} мс (fallback)`, 'success');
+        if (!_simQuiet) showNotification(`✓ JS-MNA завершил за ${r.elapsedMs} мс (fallback)`, 'success');
     } catch (err) {
         panel.innerHTML = renderSimulationFailure(wasmFailure, err);
         resetSimulationState();
@@ -16204,62 +16281,28 @@ function exportResults() {
     showNotification('✓ Экспортировано', 'success');
 }
 
-// Тосты: типы с цветом (info/success/warning/error), стекинг, иконка, прогресс-бар, клик-закрытие.
-// Сигнатура совместима со всеми существующими вызовами showNotification(msg, type).
+// Делегирует в единый DolgToast (грузится в shop/base.html). Сигнатура сохранена для ~185 вызовов.
+// Фолбэк-тост на случай, если общий модуль не загрузился.
 function showNotification(msg, type = 'info') {
-    let cont = document.getElementById('sim-toast-container');
-    if (!cont) {
-        const style = document.createElement('style');
-        style.textContent = `
-            #sim-toast-container { position: fixed; top: 76px; right: 18px; z-index: 99999;
-                display: flex; flex-direction: column; gap: 10px; max-width: 380px; pointer-events: none; }
-            .sim-toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 9px;
-                padding: 12px 16px; border-radius: 10px; color: #06121d; font-weight: 600; font-size: 13px;
-                line-height: 1.35; box-shadow: 0 8px 26px rgba(0,0,0,.45); cursor: pointer; position: relative;
-                overflow: hidden; animation: simToastIn .32s cubic-bezier(.2,.9,.3,1);
-                border-left: 4px solid rgba(0,0,0,.22); }
-            .sim-toast.closing { animation: simToastOut .26s ease forwards; }
-            .sim-toast .sim-toast-ic { font-size: 15px; line-height: 1.25; flex-shrink: 0; }
-            .sim-toast .sim-toast-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%;
-                background: rgba(0,0,0,.30); transform-origin: left; animation: simToastBar linear forwards; }
-            .sim-toast.info    { background: linear-gradient(135deg,#34d8ff,#16b2e6); }
-            .sim-toast.success { background: linear-gradient(135deg,#46e08a,#1fbf67); }
-            .sim-toast.warning { background: linear-gradient(135deg,#ffd24a,#f3b015); }
-            .sim-toast.error   { background: linear-gradient(135deg,#ff6a6a,#e93636); color: #fff; }
-            @keyframes simToastIn { from { opacity: 0; transform: translateX(42px) scale(.95); } to { opacity: 1; transform: none; } }
-            @keyframes simToastOut { to { opacity: 0; transform: translateX(42px) scale(.95); margin-top: -10px; max-height: 0; padding-top: 0; padding-bottom: 0; } }
-            @keyframes simToastBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-        `;
-        document.head.appendChild(style);
-        cont = document.createElement('div');
-        cont.id = 'sim-toast-container';
-        document.body.appendChild(cont);
+    if (window.DolgToast) {
+        window.DolgToast.show(msg, type);
+        return;
     }
-
-    const ICONS = { info: 'ℹ', success: '✓', warning: '⚠', error: '✕' };
-    const kind = ['info', 'success', 'warning', 'error'].includes(type) ? type : 'info';
-    const dur = kind === 'error' ? 5000 : 3200;
-
+    let c = document.getElementById('sim-toast-fallback');
+    if (!c) {
+        c = document.createElement('div');
+        c.id = 'sim-toast-fallback';
+        c.style.cssText = 'position:fixed;top:76px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:8px';
+        document.body.appendChild(c);
+    }
+    const bg = { success: '#1fbf67', warning: '#f3b015', error: '#e93636' }[type] || '#16b2e6';
     const t = document.createElement('div');
-    t.className = 'sim-toast ' + kind;
-    // Если сообщение уже начинается с emoji/символа — не дублируем встроенную иконку.
-    const lead = (msg || '').trim().codePointAt(0) || 0;
-    const hasGlyph = lead > 0x2100;
-    t.innerHTML =
-        (hasGlyph ? '' : `<span class="sim-toast-ic">${ICONS[kind]}</span>`) +
-        '<span class="sim-toast-msg"></span>' +
-        `<span class="sim-toast-bar" style="animation-duration:${dur}ms"></span>`;
-    t.querySelector('.sim-toast-msg').textContent = msg;
-
-    const close = () => {
-        if (t.classList.contains('closing')) return;
-        t.classList.add('closing');
-        setTimeout(() => t.remove(), 270);
-    };
-    t.addEventListener('click', close);
-    cont.appendChild(t);
-    while (cont.children.length > 6) cont.firstChild.remove(); // ограничиваем стек
-    setTimeout(close, dur);
+    t.style.cssText =
+        `background:${bg};color:#06121d;padding:12px 16px;border-radius:10px;font-weight:600;` +
+        'font-size:13px;box-shadow:0 8px 26px rgba(0,0,0,.45)';
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), type === 'error' ? 5000 : 3200);
 }
 
 function goToProjects() {
