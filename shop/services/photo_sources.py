@@ -159,7 +159,11 @@ def nexar_candidates(product) -> list[PhotoCandidate]:
     return out
 
 
-# ── Источник 3: LCSC/EasyEDA поиск по MPN (неофициальный API, best-effort) ────────────────────
+# ── Источник 3: LCSC/EasyEDA поиск по MPN ─────────────────────────────────────────────────────
+# ⚠️ Проверено 20260622: публичные эндпоинты под анти-ботом — easyeda /api/products/search → 403/404,
+# wmsc.lcsc.com → 200 c {"code":404,"msg":"refresh the page"} (нужна браузерная сессия/токен).
+# Простым urllib не берётся. Поэтому LCSC ИСКЛЮЧЁН из DEFAULT_ORDER (вызывается только через
+# --source lcsc). Для рабочего LCSC нужен headless-браузер/cookies или официальный API-ключ — TODO.
 def lcsc_candidates(product) -> list[PhotoCandidate]:
     mpn = _mpn(product)
     if not mpn:
@@ -186,7 +190,8 @@ SOURCES = {
     'nexar': nexar_candidates,
     'lcsc': lcsc_candidates,
 }
-DEFAULT_ORDER = ['official-cdn', 'nexar', 'lcsc']
+# lcsc исключён из дефолта (анти-бот, см. lcsc_candidates) — доступен явно через --source lcsc.
+DEFAULT_ORDER = ['official-cdn', 'nexar']
 
 
 def iter_candidates(product, order: list[str] | None = None):
