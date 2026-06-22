@@ -549,6 +549,23 @@ if SENTRY_DSN and not IS_TESTING:
             RuntimeWarning,
         )
 
+# Ops-алерты (ошибки/безопасность) в отдельный канал — НЕ в чат. См. Dolg_APP/services/ops_alerts.py
+# Канал выбирается одной env-переменной (webhook авто-формат Slack/Discord/Telegram), иначе email ADMINS.
+OPS_ALERT_WEBHOOK_URL = os.getenv('OPS_ALERT_WEBHOOK_URL', '')
+OPS_ALERT_TELEGRAM_CHAT_ID = os.getenv('OPS_ALERT_TELEGRAM_CHAT_ID', '')
+OPS_ALERT_MIN_LEVEL = os.getenv('OPS_ALERT_MIN_LEVEL', 'warning')
+OPS_ALERT_THROTTLE_SEC = int(os.getenv('OPS_ALERT_THROTTLE_SEC', '300'))
+
+# ADMINS для email-фолбэка ops-алертов. Формат env: "Имя <a@b.c>, Имя2 <d@e.f>".
+_ops_admins = os.getenv('DJANGO_ADMINS', '')
+if _ops_admins:
+    ADMINS = [
+        (p.split('<')[0].strip() or 'admin', p.split('<')[1].rstrip('>').strip())
+        for p in _ops_admins.split(',')
+        if '<' in p
+    ]
+    SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+
 # Stripe Payment Configuration
 STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY', 'demo_mode')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'demo_mode')
@@ -680,3 +697,24 @@ LOGGING = {
     },
     'root': {'handlers': ['console'], 'level': os.environ.get('LOG_LEVEL', 'INFO')},
 }
+
+# Ops-алерты через logging: handler пробрасывает WARNING+ в notify_ops (отдельный канал).
+if not IS_TESTING:
+    LOGGING['handlers']['ops_alert'] = {
+        'class': 'Dolg_APP.services.ops_alerts.OpsAlertLogHandler',
+        'level': 'WARNING',
+        'filters': ['scrub_sensitive'],
+    }
+    # Логгер событий безопасности: код шлёт logging.getLogger('dolg.security').warning(...).
+    LOGGING.setdefault('loggers', {})['dolg.security'] = {
+        'handlers': ['console', 'ops_alert'],
+        'level': 'WARNING',
+        'propagate': False,
+    }
+    # 500-е ошибки в ops-канал — только если канал реально настроен (иначе дубль в консоль в dev).
+    if OPS_ALERT_WEBHOOK_URL or globals().get('ADMINS'):
+        LOGGING['loggers']['django.request'] = {
+            'handlers': ['console', 'ops_alert'],
+            'level': 'ERROR',
+            'propagate': False,
+        }
