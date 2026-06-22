@@ -11022,7 +11022,40 @@ function _guestSimIncrement() {
     catch (e) { /* localStorage disabled — нечего считать */ }
 }
 
+// Состояние «идёт расчёт» на кнопке запуска: спиннер вместо ▶ + disable.
+function setRunBusy(busy) {
+    if (!document.getElementById('sim-run-busy-style')) {
+        const s = document.createElement('style');
+        s.id = 'sim-run-busy-style';
+        s.textContent = `
+            .tool-btn--run.sim-running { opacity: .92; cursor: progress; }
+            .tool-btn--run.sim-running > span:first-child { visibility: hidden; position: relative; }
+            .tool-btn--run.sim-running > span:first-child::after { content: ''; visibility: visible;
+                position: absolute; left: 0; top: 50%; width: 12px; height: 12px; margin-top: -6px;
+                border-radius: 50%; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+                animation: simSpin .7s linear infinite; }
+            @keyframes simSpin { to { transform: rotate(360deg); } }
+        `;
+        document.head.appendChild(s);
+    }
+    const btn = document.getElementById('run-sim-quick-btn');
+    if (btn) {
+        btn.classList.toggle('sim-running', !!busy);
+        btn.disabled = !!busy;
+    }
+}
+
+// Обёртка: гарантированно снимает «загрузку» на любом выходе (return/ошибка/fallback).
 async function runSimulation() {
+    setRunBusy(true);
+    try {
+        return await _runSimulationImpl();
+    } finally {
+        setRunBusy(false);
+    }
+}
+
+async function _runSimulationImpl() {
     if (components.length === 0) {
         showNotification('⚠️ Добавьте компоненты на схему', 'warning');
         return;
