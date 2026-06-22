@@ -11045,6 +11045,26 @@ function setRunBusy(busy) {
     }
 }
 
+// Анимация прорисовки графика результата: clip-path reveal слева→направо (как развёртка
+// осциллографа). Чисто CSS поверх canvas — логику рисования/hover не трогает.
+function animateGraphReveal(...ids) {
+    if (!document.getElementById('sim-graph-anim-style')) {
+        const s = document.createElement('style');
+        s.id = 'sim-graph-anim-style';
+        s.textContent =
+            '@keyframes simGraphReveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }' +
+            ' .sim-graph-revealing { animation: simGraphReveal .55s cubic-bezier(.25,.85,.3,1); }';
+        document.head.appendChild(s);
+    }
+    ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('sim-graph-revealing');
+        void el.offsetWidth; // reflow → перезапуск анимации при повторном прогоне
+        el.classList.add('sim-graph-revealing');
+    });
+}
+
 // Обёртка: гарантированно снимает «загрузку» на любом выходе (return/ошибка/fallback).
 async function runSimulation() {
     setRunBusy(true);
@@ -11109,9 +11129,9 @@ async function _runSimulationImpl() {
 
     const renderGraphs = (result) => {
         if (result.type === 'tran' && result.points && result.points.length) {
-            setTimeout(() => drawSimGraph(result.points), 0);
+            setTimeout(() => { drawSimGraph(result.points); animateGraphReveal('sim-graph'); }, 0);
         } else if (result.type === 'ac' && result.points && result.points.length) {
-            setTimeout(() => drawAcGraph(result.points), 0);
+            setTimeout(() => { drawAcGraph(result.points); animateGraphReveal('sim-graph-mag', 'sim-graph-phase'); }, 0);
         }
     };
 
