@@ -16483,9 +16483,12 @@ function onKeyDown(e) {
                     return;
                 }
                 title.textContent = '📈 ' + (d.title || '3D-график результата');
+                const tMs = (d.t_max || 0) * 1000;
                 const res = window.DolgSurface3D.init(canvas, d.field, {
-                    height: 9, autoRotate: true,
+                    height: 11, autoRotate: false,
                     xLabel: d.x_label, zLabel: d.z_label, yLabel: d.y_label, unit: d.unit,
+                    xRange: [0, d.x_max || (d.field[0] || []).length],
+                    zRange: d.kind === 'wave' ? [0, tMs] : [0, d.z_max || d.field.length],
                 });
                 if (res && res.ok) {
                     info.textContent = `${d.n_nodes} узлов · ${d.elements} элементов · ${res.cols}×${res.rows} · крути мышью`;

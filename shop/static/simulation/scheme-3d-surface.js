@@ -102,17 +102,44 @@
     return sp;
   }
 
-  // Декор: сетка-пол, бокс данных, подписи осей + числовые засечки по вертикали.
+  function _line(THREE, ax, ay, az, bx, by, bz, color, opacity) {
+    const g = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(ax, ay, az),
+      new THREE.Vector3(bx, by, bz),
+    ]);
+    return new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  }
+
+  function _fmt(v, unit) {
+    const a = Math.abs(v);
+    let s;
+    if (a !== 0 && (a < 0.01 || a >= 10000)) s = v.toPrecision(2);
+    else s = String(Math.round(v * 100) / 100);
+    return unit ? s + ' ' + unit : s;
+  }
+
+  // Бокс-оси (стиль matplotlib 3D): тонкая сетка на 3 дальних стенах + числовые засечки и
+  // имена на всех трёх осях (X = позиция, Z = время/позиция, Y = значение).
   function _addDecor(THREE, root, height, lo, hi, opts) {
     const half = BASE / 2;
-    const grid = new THREE.GridHelper(BASE, 12, 0x3a4a66, 0x223049);
-    grid.position.y = 0;
-    root.add(grid);
+    const NT = 5;
+    const xr = opts.xRange || [0, 1];
+    const zr = opts.zRange || [0, 1];
+    const GC = 0x2b3a55;
+    const GO = 0.55;
+    const at = (i) => i / (NT - 1);
+    const w = (t) => -half + t * BASE;
 
-    const boxGeo = new THREE.BoxGeometry(BASE, height, BASE);
+    // Пол: тонкая сетка по засечкам (читается с любого угла, не лезет вперёд при вращении).
+    for (let i = 0; i < NT; i++) {
+      const p = w(at(i));
+      root.add(_line(THREE, p, 0, -half, p, 0, half, GC, GO));
+      root.add(_line(THREE, -half, 0, p, half, 0, p, GC, GO));
+    }
+    // Рёбра бокса данных.
     const box = new THREE.LineSegments(
-      new THREE.EdgesGeometry(boxGeo),
-      new THREE.LineBasicMaterial({ color: 0x2f3d57, transparent: true, opacity: 0.5 })
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(BASE, height, BASE)),
+      new THREE.LineBasicMaterial({ color: 0x3a4a66, transparent: true, opacity: 0.45 })
     );
     box.position.y = height / 2;
     root.add(box);
@@ -122,22 +149,17 @@
       sp.position.set(x, y, z);
       root.add(sp);
     };
-    place(opts.xLabel || 'X →', '#8fd6ff', 4.4, 0, -0.9, half + 1.0);
-    place(opts.zLabel || 'Y →', '#a6f0c0', 4.4, -(half + 1.0), -0.9, 0);
-    place(opts.yLabel || 'значение', '#ffd27f', 4.2, half + 0.6, height + 0.9, half);
 
-    // Числовые засечки по вертикали (лог-нейтрально): min / середина / max.
-    const u = opts.unit ? ' ' + opts.unit : '';
-    const ticks = [
-      { y: 0, v: lo },
-      { y: height / 2, v: (lo + hi) / 2 },
-      { y: height, v: hi },
-    ];
-    ticks.forEach((tk) => {
-      const lbl = _label(THREE, tk.v.toFixed(1) + u, '#ffd27f', 3.0);
-      lbl.position.set(half + 0.9, tk.y, -half);
-      root.add(lbl);
-    });
+    for (let i = 0; i < NT; i++) {
+      const t = at(i);
+      place(_fmt(xr[0] + (xr[1] - xr[0]) * t), '#8fd6ff', 1.8, w(t), -0.6, half + 0.5); // X-засечки (перёд)
+      place(_fmt(zr[0] + (zr[1] - zr[0]) * t), '#a6f0c0', 1.8, -half - 0.7, -0.6, w(t)); // Z-засечки (слева)
+      place(_fmt(lo + (hi - lo) * t, opts.unit), '#ffd27f', 2.0, half + 1.1, t * height, -half); // Y-засечки
+    }
+
+    place(opts.xLabel || 'X', '#8fd6ff', 4.0, 0, -1.4, half + 1.5);
+    place(opts.zLabel || 'Z', '#a6f0c0', 4.0, -half - 1.7, -1.4, 0);
+    place(opts.yLabel || 'Y', '#ffd27f', 3.8, half + 1.4, height + 1.0, -half);
   }
 
   const _state = { scene: null, camera: null, renderer: null, controls: null, mesh: null, raf: 0, height: 8, bounds: { lo: 0, hi: 1 } };
@@ -154,27 +176,30 @@
 
     _state.scene = new THREE.Scene();
     _state.scene.background = new THREE.Color(0x0d1017);
-    _state.camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 2000);
-    _state.camera.position.set(13, 9.5, 15);
+    _state.camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 2000);
+    _state.camera.position.set(-17, 10.5, 18); // сбоку к диагонали фронта: волна читается как гребень
 
     _state.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
     _state.renderer.setSize(w, h, false);
     _state.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-    _state.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-    dir.position.set(8, 16, 6);
+    _state.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.78);
+    dir.position.set(10, 18, 8);
     _state.scene.add(dir);
+    const fill = new THREE.DirectionalLight(0x9fc0ff, 0.35); // мягкий заполняющий свет с другой стороны
+    fill.position.set(-12, 6, -8);
+    _state.scene.add(fill);
 
     if (THREE.OrbitControls) {
       _state.controls = new THREE.OrbitControls(_state.camera, canvas);
       _state.controls.enableDamping = true;
-      _state.controls.target.set(0, _state.height * 0.42, 0);
+      _state.controls.target.set(0, _state.height * 0.35, 0);
       _state.controls.autoRotate = !!opts.autoRotate;
       _state.controls.autoRotateSpeed = 0.7;
       _state.controls.update();
     } else {
-      _state.camera.lookAt(0, _state.height * 0.42, 0);
+      _state.camera.lookAt(0, _state.height * 0.35, 0);
     }
 
     const geo = _buildGeometry(THREE, field, _state.height, lo, hi);

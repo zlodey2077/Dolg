@@ -2181,6 +2181,8 @@ def api_simulation_voltage_field(request):
                 'elements': len(circuit['elements']),
                 'field': field,
                 'unit': 'В',
+                'x_max': n,
+                'z_max': n,
                 'x_label': 'позиция X',
                 'z_label': 'позиция Y',
                 'y_label': 'напряжение, В',
@@ -2189,12 +2191,12 @@ def api_simulation_voltage_field(request):
         )
 
     try:
-        n = int(request.GET.get('n', 24))
+        n = int(request.GET.get('n', 36))
     except TypeError, ValueError:
-        n = 24
+        n = 36
     n = max(8, min(48, n))
-    circuit = large_circuits.generate_lc_ladder_circuit(n, v=5.0, ind=1e-3, c=1e-6)
-    field, meta = large_circuits.transient_wave_field(circuit, t_stop=2e-3, dt=2e-6, max_frames=64)
+    circuit = large_circuits.generate_lc_ladder_circuit(n, v=5.0, ind=1e-3, c=1e-6, rs=15.0)
+    field, meta = large_circuits.transient_wave_field(circuit, t_stop=3.5e-3, dt=1.5e-6, max_frames=140)
     return JsonResponse(
         {
             'ok': True,
@@ -2205,8 +2207,10 @@ def api_simulation_voltage_field(request):
             'field': field,
             'unit': 'В',
             'meta': meta,
+            'x_max': circuit['n_line'],
+            't_max': meta['t_max'],
             'x_label': 'узел (позиция вдоль линии)',
-            'z_label': 'время →',
+            'z_label': 'время, мс',
             'y_label': 'напряжение, В',
             'title': 'Бегущая волна по LC-линии (переходный процесс)',
         }

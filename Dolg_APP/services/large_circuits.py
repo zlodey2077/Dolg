@@ -56,47 +56,66 @@ def voltage_field(voltages: dict, n: int) -> list[list[float]]:
     return [[float(voltages.get(grid_net(i, j, n), 0.0)) for j in range(n)] for i in range(n)]
 
 
-def generate_lc_ladder_circuit(n: int, *, v: float = 5.0, ind: float = 1e-3, c: float = 1e-6) -> dict:
-    """LC-лестница (линия задержки): источник → [L послед. + C шунт]×N → открытый конец.
+def generate_lc_ladder_circuit(
+    n: int,
+    *,
+    v: float = 5.0,
+    ind: float = 1e-3,
+    c: float = 1e-6,
+    rs: float = 15.0,
+    r_series: float = 1.0,
+    c_in: float = 6e-6,
+) -> dict:
+    """Лоссовая RLC-линия: источник → Rs → [R_series + L послед., C шунт]×N → открытый конец.
 
-    Ступенька на входе бежит волной по узлам с задержкой √(LC) и LC-звоном, на открытом конце
-    отражается → богатый переходный процесс. Узлы 1..N вдоль линии. Returns circuit-dict.
+    Источник через Rs даёт плавный RC-фронт на входе. Последовательное R_series в каждой секции —
+    распределённые потери: фронт волны расплывается (дисперсия) по мере бега, нет вертикального
+    «обрыва», получаются плавные катящиеся волны + LC-звон + отражение от открытого конца.
+
+    Нумерация нетов: линия 1..N, источник N+1, промежуточные узлы R-L секций N+2..2N (для R+L
+    последовательно нужен узел между ними). Returns circuit-dict с n_line (длина линии).
     """
     n = max(3, int(n))
-    counts = {'V': 0, 'L': 0, 'C': 0}
+    counts = {'V': 0, 'L': 0, 'C': 0, 'R': 0}
     elements: list[dict] = []
 
     def add(etype: str, a: int, b: int, value: float) -> None:
         counts[etype] += 1
         elements.append({'id': f'{etype}{counts[etype]}', 'type': etype, 'nodes': [a, b], 'value': value})
 
-    add('V', 1, 0, v)  # источник-ступенька на входной узел
-    add('C', 1, 0, c)
+    src = n + 1
+    add('V', src, 0, v)  # идеальный источник-ступенька
+    add('R', src, 1, rs)  # сопротивление источника → плавный (RC) фронт
+    add('C', 1, 0, c_in)  # увеличенный входной кондёр: вход нарастает за несколько кадров (без обрыва)
     for k in range(1, n):
-        add('L', k, k + 1, ind)  # последовательная катушка k → k+1
+        mid = n + 1 + k  # промежуточный узел секции k: N+2..2N
+        add('R', k, mid, r_series)  # потери линии (дисперсия фронта)
+        add('L', mid, k + 1, ind)  # последовательная катушка
         add('C', k + 1, 0, c)  # шунтовой конденсатор узла k+1
-    return {'n_nodes': n + 1, 'elements': elements}
+    return {'n_nodes': 2 * n + 1, 'n_line': n, 'elements': elements}
 
 
-def transient_wave_field(circuit: dict, *, t_stop: float, dt: float, max_frames: int = 70):
-    """circuit → 2D-поле [кадр времени][узел] напряжений для 3D-волновой поверхности.
+def transient_wave_field(circuit: dict, *, t_stop: float, dt: float, max_frames: int = 110):
+    """circuit → 2D-поле [кадр времени][узел линии] напряжений для 3D-волновой поверхности.
 
-    Прорежает временной ряд до max_frames кадров; узлы 1..N (без ground). Returns (field, meta).
+    Прорежает временной ряд до max_frames кадров; берёт только узлы линии 1..n_line (без источника
+    и ground). meta содержит t_max (с) для шкалы времени. Returns (field, meta).
     """
     from Dolg_APP.services import monte_carlo
 
     tr = monte_carlo.solve_transient(circuit, t_stop=t_stop, dt=dt)
     times = tr.get('time') or [0.0]
     volts = tr.get('voltages') or {}
-    n_nodes = int(circuit.get('n_nodes') or 1)
+    n_line = int(circuit.get('n_line') or (int(circuit.get('n_nodes') or 1) - 1))
     step = max(1, len(times) // max_frames)
     frames = list(range(0, len(times), step))
     field = []
     for i in frames:
         row = []
-        for net in range(1, n_nodes):
+        for net in range(1, n_line + 1):
             series = volts.get(net) or volts.get(str(net)) or []
             row.append(float(series[i]) if i < len(series) else 0.0)
         field.append(row)
-    meta = {'frames': len(frames), 'nodes': n_nodes - 1, 'steps': len(times), 'dt': dt}
+    t_max = float(times[frames[-1]]) if frames else 0.0
+    meta = {'frames': len(frames), 'nodes': n_line, 'steps': len(times), 'dt': dt, 't_max': t_max}
     return field, meta
