@@ -46,6 +46,16 @@ def env_list(name, default):
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
+def env_int(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 IS_TESTING = 'test' in sys.argv or 'pytest' in sys.argv[0].lower() or any('pytest' in a for a in sys.argv)
 
 DEFAULT_INSECURE_SECRET_KEY = 'django-insecure-local-development-key-change-me'
@@ -199,6 +209,8 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # Fast liveness/readiness path before URLConf imports heavy app routes.
     'Dolg_APP.middleware.HealthzMiddleware',
+    # Reject oversized API/upload bodies before request.body/POST parsing can eat RAM.
+    'Dolg_APP.middleware.RequestBodyLimitMiddleware',
     # 2026-06-01 v22: WhiteNoise — статика напрямую из приложения (Render не
     # запускает nginx). Должен быть СРАЗУ после SecurityMiddleware.
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -285,6 +297,16 @@ if _HAS_SILK:
     SILKY_PERMISSIONS = _silk_admin_only
 
 ROOT_URLCONF = 'Dolg_PR.urls'
+
+DOLG_MAX_JSON_BODY_BYTES = env_int('DOLG_MAX_JSON_BODY_BYTES', 2 * 1024 * 1024)
+DOLG_MAX_UPLOAD_BODY_BYTES = env_int('DOLG_MAX_UPLOAD_BODY_BYTES', 32 * 1024 * 1024)
+DOLG_BODY_LIMIT_API_PREFIXES = tuple(
+    env_list(
+        'DOLG_BODY_LIMIT_API_PREFIXES',
+        '/api/,/accounts/api/,/admin-portal/api/,/cad/api/,'
+        '/projects/api/,/simulation/api/,/staff/ops/api/',
+    )
+)
 
 TEMPLATES = [
     {

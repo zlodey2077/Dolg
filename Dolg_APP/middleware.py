@@ -33,6 +33,67 @@ class HealthzMiddleware:
         return self.get_response(request)
 
 
+class RequestBodyLimitMiddleware:
+    """Reject oversized request bodies before Django reads them into memory."""
+
+    DEFAULT_API_PREFIXES = (
+        '/api/',
+        '/accounts/api/',
+        '/admin-portal/api/',
+        '/cad/api/',
+        '/projects/api/',
+        '/simulation/api/',
+        '/staff/ops/api/',
+    )
+
+    JSON_CONTENT_TYPES = (
+        'application/json',
+        'application/ld+json',
+    )
+
+    UPLOAD_CONTENT_TYPES = (
+        'multipart/form-data',
+        'application/x-www-form-urlencoded',
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        limit = self._limit_for(request)
+        if limit and self._content_length(request) > limit:
+            from django.http import JsonResponse
+
+            return JsonResponse(
+                {
+                    'error': 'request_too_large',
+                    'limit_bytes': limit,
+                },
+                status=413,
+            )
+        return self.get_response(request)
+
+    def _limit_for(self, request):
+        from django.conf import settings
+
+        content_type = request.META.get('CONTENT_TYPE', '').split(';', 1)[0].strip().lower()
+        path = request.path_info or request.path
+        api_prefixes = getattr(settings, 'DOLG_BODY_LIMIT_API_PREFIXES', self.DEFAULT_API_PREFIXES)
+
+        if content_type in self.UPLOAD_CONTENT_TYPES:
+            return int(getattr(settings, 'DOLG_MAX_UPLOAD_BODY_BYTES', 32 * 1024 * 1024))
+        if content_type in self.JSON_CONTENT_TYPES or path.startswith(tuple(api_prefixes)):
+            return int(getattr(settings, 'DOLG_MAX_JSON_BODY_BYTES', 2 * 1024 * 1024))
+        return 0
+
+    @staticmethod
+    def _content_length(request):
+        try:
+            return int(request.META.get('CONTENT_LENGTH') or 0)
+        except (TypeError, ValueError):
+            return 0
+
+
 def _parse_consent(request):
     """Возвращает dict с consent или {} если не задано."""
     raw = request.COOKIES.get('dolg_cookie_consent')
