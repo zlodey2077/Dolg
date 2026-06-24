@@ -231,6 +231,8 @@ class AnonSessionExpiryMiddleware:
         if hasattr(request, 'user') and not request.user.is_authenticated:
             if hasattr(request, 'session'):
                 try:
+                    if not request.session.session_key and not request.session.modified:
+                        return response
                     if request.session.get_expiry_age() != self.GUEST_TTL_SECONDS:
                         request.session.set_expiry(self.GUEST_TTL_SECONDS)
                 except Exception:
