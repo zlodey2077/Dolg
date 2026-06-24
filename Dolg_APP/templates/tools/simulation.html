@@ -51,9 +51,13 @@ scheme-* всё равно доступны для inline-JS в нашем DOMCo
 <style>
 .dolg-shortcuts-overlay {
     position: fixed; inset: 0; background: rgba(8, 12, 24, 0.88);
-    z-index: 9650; display: none; align-items: center; justify-content: center;
+    z-index: 9650; display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
-.dolg-shortcuts-overlay.open { display: flex; }
+.dolg-shortcuts-overlay:not(.open) { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+.dolg-shortcuts-overlay.open { opacity: 1; visibility: visible; }
+.dolg-shortcuts-content { transform: scale(0.96); transition: transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.dolg-shortcuts-overlay.open .dolg-shortcuts-content { transform: scale(1); }
 .dolg-shortcuts-content {
     background: #15192a; color: #e6e9ef; border: 1px solid #2a3145;
     border-radius: 12px; padding: 22px 26px; max-width: 580px; width: 92%;
@@ -143,9 +147,13 @@ scheme-* всё равно доступны для inline-JS в нашем DOMCo
 /* Share-modal с QR-кодом: показывается после нажатия «🔗 Поделиться». */
 .dolg-share-modal {
     position: fixed; inset: 0; background: rgba(8, 12, 24, 0.85);
-    z-index: 9700; display: none; align-items: center; justify-content: center;
+    z-index: 9700; display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
-.dolg-share-modal.open { display: flex; }
+.dolg-share-modal:not(.open) { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+.dolg-share-modal.open { opacity: 1; visibility: visible; }
+.dolg-share-content { transform: scale(0.96); transition: transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.dolg-share-modal.open .dolg-share-content { transform: scale(1); }
 .dolg-share-content {
     background: #15192a; color: #e6e9ef; border: 1px solid #2a3145;
     border-radius: 12px; padding: 18px 22px; width: 320px;
@@ -16641,10 +16649,16 @@ function onKeyDown(e) {
 <style>
 .dolg-3d-overlay {
     position: fixed; inset: 0; background: rgba(10, 14, 30, 0.92);
-    z-index: 120000; display: none; flex-direction: column;
+    z-index: 120000; display: flex; flex-direction: column;
     font-family: 'Segoe UI', system-ui, sans-serif;
+    transition: opacity 0.24s ease, visibility 0.24s ease;
 }
-.dolg-3d-overlay.open { display: flex; }
+.dolg-3d-overlay:not(.open) { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+.dolg-3d-overlay.open { opacity: 1; visibility: visible; }
+@media (prefers-reduced-motion: reduce) {
+    .dolg-shortcuts-overlay, .dolg-share-modal, .dolg-3d-overlay,
+    .dolg-shortcuts-content, .dolg-share-content { transition: none !important; }
+}
 body.dolg-3d-active { overflow: hidden !important; }
 body.dolg-3d-active > header,
 body.dolg-3d-active > footer,
