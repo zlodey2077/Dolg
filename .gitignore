@@ -95,6 +95,13 @@ deploy/cloudflared.exe
 backups/
 *.tar.gz
 
+# Local diploma/presentation artifacts
+docs/diploma_assets/
+docs/final/
+docs/screenshots/
+docs/*.docx
+docs/*.pptx
+
 # Microsoft Office lock files
 ~$*
 

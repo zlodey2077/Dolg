@@ -853,12 +853,17 @@ def index(request):
     # Показываем «Vishay (8) · Yageo (4)» вместо плоского списка фильтров.
     catalog_shelves = []
     if not has_active_filters:
+        # ОПТИМИЗАЦИЯ (2026-06-24): был отдельный SQL на КАЖДУЮ категорию (N+1, ~23 запроса)
+        # — под SQLite-локами множит ожидание. Тащим все товары одним запросом в том же
+        # глобальном порядке (-created_at, name), группируем в Python и берём по 6 на категорию.
+        # Вывод идентичен прежнему per-category .filter().order_by()[:6].
+        shelf_by_cat = {}
+        for p in Product.objects.select_related('category').order_by('-created_at', 'name'):
+            bucket = shelf_by_cat.setdefault(p.category_id, [])
+            if len(bucket) < 6:
+                bucket.append(p)
         for category in all_categories_list:
-            shelf_products = list(
-                Product.objects.select_related('category')
-                .filter(category=category)
-                .order_by('-created_at', 'name')[:6]
-            )
+            shelf_products = shelf_by_cat.get(category.id, [])
             if not shelf_products:
                 continue
             catalog_shelves.append(
@@ -929,7 +934,9 @@ def category_products(request, slug):
     reb_categories = all_categories.filter(slug__in=REB_SLUGS)
     consumer_categories = all_categories.exclude(slug__in=REB_SLUGS)
 
-    products = category.products.all()
+    # select_related('category') — карточка рендерит product.category.slug/name; без него
+    # шаблон делал отдельный SQL на КАЖДЫЙ товар страницы (N+1). В index это уже было.
+    products = category.products.select_related('category').all()
     options_stamp = category.products.count()
     param_filter_options = _engineering_filter_options(
         products, cache_key=f'eng_filter_opts:cat:{category.slug}:{options_stamp}'

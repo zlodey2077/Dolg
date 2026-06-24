@@ -145,7 +145,7 @@
     плоского списка фильтров (через "compute_facets")
   • DB-agnostic — работает и на SQLite, и на Postgres. Можно дополнить
     Postgres FTS ("SearchVector" + русская морфология) при миграции на Postgres
-    — см. docs/SMART_SEARCH.md (memory "smart-search-todo")
+    — см. docs/PROJECT_KNOWLEDGE_BASE.md (memory "smart-search-todo")
 
 Как добавить реальные фото товаров
 Каталог поддерживает три источника изображений (в порядке приоритета):
@@ -503,10 +503,10 @@ Legacy-shorthand (всё ещё работает)
     .\scripts\run_browser_e2e.ps1          # Playwright browser-smoke
 
 
-Детальный отчёт по покрытию — в docs/TESTS_AND_REPORTS.md, активный фронт работ — в docs/WORK_FRONT_20260619.md, история развития — в docs/DEVELOPMENT_HISTORY.md.
+Детальный отчёт по покрытию — в docs/PROJECT_KNOWLEDGE_BASE.md#tests-and-reports, активный фронт работ — в docs/PROJECT_KNOWLEDGE_BASE.md#work-front-20260619, история развития — в docs/PROJECT_KNOWLEDGE_BASE.md#development-history.
 
 Дипломная редакция
-Перед показом наработок 04.05.2026 диплом ведётся в режиме полноценной ВКР-редакции, а не как набор технических дополнений. Правила оформления и переписывания зафиксированы в docs/DIPLOMA_REWRITE_GUIDE.md: основной текст должен быть связным, длинные фрагменты кода и журнальные таблицы переносятся в приложения, а все заявленные технологии получают явный статус «реализовано», «реализовано частично» или «перспектива».
+Перед показом наработок 04.05.2026 диплом ведётся в режиме полноценной ВКР-редакции, а не как набор технических дополнений. Правила оформления и переписывания зафиксированы в docs/PROJECT_KNOWLEDGE_BASE.md: основной текст должен быть связным, длинные фрагменты кода и журнальные таблицы переносятся в приложения, а все заявленные технологии получают явный статус «реализовано», «реализовано частично» или «перспектива».
 
 Рабочая цель ближайших итераций — синхронизировать код, проектные docs и новый DOCX диплома после каждого шага, особенно для модулей симуляции и CAD.
 
@@ -527,13 +527,13 @@ URL: "/admin/". Доступ выполняется под суперпольз�
 Для постоянного домена — завести бесплатный Cloudflare-аккаунт и
 named tunnel (https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/).
 
-Что ещё планируется (см. "docs/WORK_FRONT_20260619.md" и "docs/DEVELOPMENT_HISTORY.md")
+Что ещё планируется (см. "docs/PROJECT_KNOWLEDGE_BASE.md#work-front-20260619" и "docs/PROJECT_KNOWLEDGE_BASE.md#development-history")
 Приоритет 1
 • Развить media-policy V2: при наличии ключей официальных порталов производителей/дистрибьюторов подключить ручной allowlist product-shot, но только как проверенный источник поверх текущих локальных assets/generated-заглушек.
 • Расширить browser/e2e дальше: добавить screenshot-baseline/diff для CAD, projects, панели свойств и расширенных состояний нижней аналитики симуляции, а также проверку demo-проектов.
-• Продолжить ремонт клиентской части по docs/UI_CAD_SIM_AUDIT.md: после выноса "scheme-normalizer.js", "scheme-export.js", "scheme-bom.js" и "scheme-netlist.js" с генерацией SPICE-элементов/analysis directives продолжить разделение rendering/simulation-кода и screenshot-baseline для CAD/projects.
+• Продолжить ремонт клиентской части по docs/PROJECT_KNOWLEDGE_BASE.md#ux-frontend-audit: после выноса "scheme-normalizer.js", "scheme-export.js", "scheme-bom.js" и "scheme-netlist.js" с генерацией SPICE-элементов/analysis directives продолжить разделение rendering/simulation-кода и screenshot-baseline для CAD/projects.
 • Сначала чинить и модернизировать существующие модули симуляции и CAD под современные инженерные требования: probes/курcоры графиков, сохранение результатов, понятные ошибки ngspice.wasm, Multisim-like отрисовку схем, DRC/ERC, save/load, сетку/слои/штамп, размеры, горячие клавиши и переполнения интерфейса.
-• Сверить актуальный текст диплома с фактической реализацией и перенести все заявленные, но отсутствующие функции в "docs/WORK_FRONT_20260619.md".
+• Сверить актуальный текст диплома с фактической реализацией и перенести все заявленные, но отсутствующие функции в "docs/PROJECT_KNOWLEDGE_BASE.md#work-front-20260619".
 
 Приоритет 2
 • PostgreSQL dry-run, Docker + Nginx + Gunicorn для продакшна.
