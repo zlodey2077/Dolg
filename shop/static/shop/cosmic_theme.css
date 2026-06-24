@@ -2763,9 +2763,51 @@ footer .dolg-footer-disclaimer {
 .org-empty { text-align: center; padding: 2rem; color: rgba(220, 240, 255, 0.6); }
 
 /* Navbar org-switcher */
-.nav-org-dropdown .dropdown-menu { min-width: 240px; }
+.nav,
+nav {
+    overflow: visible;
+}
+
+.nav .dropdown,
+nav .dropdown,
+.nav-org-dropdown,
+.nav-user-dropdown {
+    position: relative;
+    overflow: visible;
+    z-index: 1200;
+}
+
+.nav-org-dropdown .dropdown-menu {
+    min-width: 260px;
+    max-width: min(360px, calc(100vw - 24px));
+    z-index: 12000;
+}
+
+.nav-org-dropdown.is-open,
+.nav-org-dropdown:hover,
+.nav-user-dropdown.is-open,
+.nav-user-dropdown:hover {
+    z-index: 12001;
+}
+
+.nav-org-dropdown .dropdown-menu a {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    white-space: normal;
+}
+
+.nav-org-dropdown .dropdown-menu a > span:first-child,
+.nav-org-dropdown .dropdown-menu a strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .org-switcher-role {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
     margin-left: 0.4rem;
     padding: 0.05rem 0.45rem;
     border-radius: 999px;
