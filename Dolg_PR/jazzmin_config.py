@@ -18,10 +18,16 @@ JAZZMIN_SETTINGS = {
     'copyright': 'DOLG · дипломный проект',
     # Глобальный поиск в шапке по ключевым моделям.
     'search_model': ['shop.Product', 'auth.User', 'Dolg_APP.SchematicProject', 'orders.Order'],
-    # Быстрые ссылки в верхнем меню.
+    # Быстрые ссылки в верхнем меню: сайт + observability/тюнинг (staff-вьюхи, Prometheus, Grafana).
+    # Сырые пути (не reverse) — чтобы опечатка в имени не уронила рендер админки.
     'topmenu_links': [
         {'name': 'На сайт', 'url': '/', 'new_window': False},
-        {'name': 'Каталог', 'url': '/', 'new_window': False},
+        {'name': '📊 Ops-дашборд', 'url': '/staff/ops/'},
+        {'name': '🗄 Data-консоль', 'url': '/staff/data-console/'},
+        {'name': '🧠 ML', 'url': '/staff/ml-training/'},
+        {'name': '📈 Метрики', 'url': '/metrics/', 'new_window': True},
+        {'name': 'Grafana', 'url': 'http://localhost:3000', 'new_window': True},
+        {'name': 'Prometheus', 'url': 'http://localhost:9090', 'new_window': True},
         {'app': 'shop'},
     ],
     'usermenu_links': [
@@ -63,8 +69,18 @@ JAZZMIN_SETTINGS = {
         'auth.user': 'collapsible',
         'auth.group': 'vertical_tabs',
     },
-    # UI-кастомайзер показываем только staff в dev — пусть подберут тему на лету.
-    'show_ui_builder': False,
+    # UI-кастомайзер: живая настройка темы/цветов прямо в админке (кнопка-шестерёнка справа).
+    # Подобранные значения копируются в JAZZMIN_UI_TWEAKS. Удобно «подкрутить» под себя.
+    'show_ui_builder': True,
+    # Кастом-ссылки в сайдбаре: observability-вьюхи рядом с моделями (не только в topmenu).
+    'custom_links': {
+        'Dolg_APP': [
+            {'name': 'Ops-дашборд', 'url': '/staff/ops/', 'icon': 'fas fa-gauge-high', 'permissions': ['auth.view_user']},
+            {'name': 'Data-консоль', 'url': '/staff/data-console/', 'icon': 'fas fa-database', 'permissions': ['auth.view_user']},
+            {'name': 'ML-тренировка', 'url': '/staff/ml-training/', 'icon': 'fas fa-brain', 'permissions': ['auth.view_user']},
+            {'name': 'Метрики (Prometheus)', 'url': '/metrics/', 'icon': 'fas fa-chart-line', 'permissions': ['auth.view_user']},
+        ],
+    },
 }
 
 # ── Тема под cosmic-стиль DOLG: тёмная, синий акцент ──────────────────────────────────────────

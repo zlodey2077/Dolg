@@ -1,5 +1,5 @@
 """
-WSGI config for ROMAN_PR project.
+WSGI config for DOLG project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

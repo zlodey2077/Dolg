@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 
-class RomanAppConfig(AppConfig):
+class DolgAppConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'Dolg_APP'
 

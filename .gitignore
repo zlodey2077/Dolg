@@ -61,6 +61,7 @@ media/org_logos/
 logs/
 *.log
 *.tmp
+.codex/project_archive/
 .tmp_*
 *.bak
 *.reg
