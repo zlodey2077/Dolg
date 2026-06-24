@@ -231,7 +231,7 @@ DJANGO_SETTINGS_MODULE=Dolg_PR.settings_prod
 - **Prod-Docker:** `docker compose up -d` → 3 контейнера (db, web, nginx)
 - **Public demo:** `start_public.bat` → cloudflared quick-tunnel
 
-См. [DEPLOYMENT.md](DEPLOYMENT.md) для подробностей.
+См. [DEPLOY.md](DEPLOY.md) для подробностей.
 
 ## Tests
 

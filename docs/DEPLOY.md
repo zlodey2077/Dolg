@@ -11,7 +11,8 @@
 | 3. **Яндекс Compute Cloud** | по `./yc-update.sh` после push | `http://<VM-IP>/` | возможность работать без локалки |
 | 4. **GitHub Actions** | каждый push/PR | CI отчёт | поломка кода |
 
-**Production deployment**: см. отдельный гайд [YC_DEPLOY.md](YC_DEPLOY.md) — пошагово
+**Production deployment**: см. раздел `YC_DEPLOY` в
+[PROJECT_KNOWLEDGE_BASE.md](PROJECT_KNOWLEDGE_BASE.md#yc-deploy) — пошагово
 от создания VM до HTTPS-домена.
 
 ---

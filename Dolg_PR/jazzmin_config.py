@@ -70,7 +70,9 @@ JAZZMIN_SETTINGS = {
 # ── Тема под cosmic-стиль DOLG: тёмная, синий акцент ──────────────────────────────────────────
 JAZZMIN_UI_TWEAKS = {
     'theme': 'darkly',  # тёмная Bootswatch-тема, близкая к cosmic-стилю сайта
-    'dark_mode_theme': 'darkly',
+    # jazzmin 3.x: dark_mode_theme устарел и игнорируется. Принудительно тёмный режим
+    # через default_theme_mode (иначе darkly рендерится в светлом data-bs-theme → светлый фон).
+    'default_theme_mode': 'dark',
     'navbar': 'navbar-dark',
     'navbar_fixed': True,
     'sidebar_fixed': True,

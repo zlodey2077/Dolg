@@ -119,7 +119,7 @@ docker compose logs -f web
 # Открой http://localhost (порт 80 → nginx → gunicorn)
 ```
 
-Полная документация по prod-деплою — [DEPLOYMENT.md](DEPLOYMENT.md).
+Полная документация по prod-деплою — [DEPLOY.md](DEPLOY.md).
 
 ## PostgreSQL для локальной разработки
 
@@ -185,7 +185,7 @@ dolg/
 ├── docs/                   # Документация
 │   ├── ARCHITECTURE.md
 │   ├── DEPLOY.md
-│   ├── CONTAINERS_AND_KUBERNETES.md
+│   ├── PROJECT_KNOWLEDGE_BASE.md
 │   ├── RUNBOOK.md
 │   └── LOCAL_SETUP.md (это)
 ├── scripts/                # Утилиты
@@ -263,6 +263,6 @@ DEBUG=False SECRET_KEY=secret123 python manage.py check_prod_settings
 ## Что почитать дальше
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — карта системы
-- [DEPLOYMENT.md](DEPLOYMENT.md) — prod-деплой через Docker + Cloudflare
+- [DEPLOY.md](DEPLOY.md) — prod-деплой через Docker + Cloudflare
 - [RUNBOOK.md](RUNBOOK.md) — что делать если что-то сломалось
 - `pyproject.toml` — конфиг линтера
