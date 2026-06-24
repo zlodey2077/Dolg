@@ -20,16 +20,21 @@ import json
 class HealthzMiddleware:
     """Return health probes before URLConf imports the whole application."""
 
-    PROBE_PATHS = {'/healthz', '/healthz/', '/readyz', '/readyz/'}
+    HEALTH_PATHS = {'/healthz', '/healthz/'}
+    READY_PATHS = {'/readyz', '/readyz/'}
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.path_info in self.PROBE_PATHS:
+        if request.path_info in self.HEALTH_PATHS:
             from .health import healthz
 
             return healthz(request)
+        if request.path_info in self.READY_PATHS:
+            from .health import readyz
+
+            return readyz(request)
         return self.get_response(request)
 
 

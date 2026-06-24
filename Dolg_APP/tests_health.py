@@ -1,4 +1,4 @@
-"""Tests for the /healthz liveness/readiness probe."""
+"""Tests for health liveness/readiness probes."""
 
 from __future__ import annotations
 
@@ -11,8 +11,15 @@ class HealthzTests(TestCase):
         self.client = Client()
 
     def test_healthz_ok_anonymous(self):
-        """Проба анонимна и возвращает 200 с проверками БД и кеша."""
         resp = self.client.get('/healthz')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertEqual(data['checks']['app'], 'ok')
+        self.assertNotIn('database', data['checks'])
+
+    def test_readyz_checks_dependencies(self):
+        resp = self.client.get('/readyz')
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data['status'], 'ok')

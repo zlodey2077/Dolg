@@ -15,6 +15,11 @@ from django.views.decorators.cache import never_cache
 
 @never_cache
 def healthz(request):
+    return JsonResponse({'status': 'ok', 'checks': {'app': 'ok'}})
+
+
+@never_cache
+def readyz(request):
     checks: dict[str, str] = {}
     ok = True
 
