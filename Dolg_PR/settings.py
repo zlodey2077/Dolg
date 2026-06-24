@@ -52,7 +52,7 @@ def env_int(name, default):
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -110,6 +110,10 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'DOLG <noreply@dolg.local>'
 # Application definition
 
 INSTALLED_APPS = [
+    # jazzmin — тема админки (drop-in AdminLTE). ПЕРВЫМ В СПИСКЕ: у Dolg_APP есть свой
+    # templates/admin/base_site.html — чтобы jazzmin-шаблоны имели приоритет (а не
+    # перекрывались), jazzmin должен идти РАНЬШЕ Dolg_APP. Конфиг — Dolg_PR/jazzmin_config.py.
+    'jazzmin',
     # daphne ДО django.contrib.staticfiles — Django requirement для ASGI.
     # daphne подменяет runserver на ASGI-сервер, что даёт WebSocket-поддержку
     # в dev-режиме без отдельного процесса. В production — отдельный daphne/uvicorn.
@@ -305,8 +309,7 @@ DOLG_MAX_UPLOAD_BODY_BYTES = env_int('DOLG_MAX_UPLOAD_BODY_BYTES', 32 * 1024 * 1
 DOLG_BODY_LIMIT_API_PREFIXES = tuple(
     env_list(
         'DOLG_BODY_LIMIT_API_PREFIXES',
-        '/api/,/accounts/api/,/admin-portal/api/,/cad/api/,'
-        '/projects/api/,/simulation/api/,/staff/ops/api/',
+        '/api/,/accounts/api/,/admin-portal/api/,/cad/api/,/projects/api/,/simulation/api/,/staff/ops/api/',
     )
 )
 
@@ -742,3 +745,7 @@ if not IS_TESTING:
             'level': 'ERROR',
             'propagate': False,
         }
+
+# Тема админки jazzmin: брендинг/тёмная тема/иконки/поиск вынесены в отдельный модуль.
+# Имена читаются Django из namespace настроек (settings.JAZZMIN_SETTINGS / JAZZMIN_UI_TWEAKS).
+from .jazzmin_config import JAZZMIN_SETTINGS, JAZZMIN_UI_TWEAKS  # noqa: F401
