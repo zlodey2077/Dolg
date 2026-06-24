@@ -1,3 +1,4 @@
+from django.db import DatabaseError
 from django.db.models import Q
 
 from .models import CartItem
@@ -22,15 +23,18 @@ def cart_count(request):
     if cached is not None:
         return {'cart_count': cached}
 
-    if request.user.is_authenticated:
-        session_id = request.session.session_key
-        q = Q(user=request.user)
-        if session_id:
-            q |= Q(session_id=session_id, user__isnull=True)
-        count = CartItem.objects.filter(q).count()
-    else:
-        session_id = request.session.session_key
-        count = CartItem.objects.filter(session_id=session_id).count() if session_id else 0
+    try:
+        if request.user.is_authenticated:
+            session_id = request.session.session_key
+            q = Q(user=request.user)
+            if session_id:
+                q |= Q(session_id=session_id, user__isnull=True)
+            count = CartItem.objects.filter(q).count()
+        else:
+            session_id = request.session.session_key
+            count = CartItem.objects.filter(session_id=session_id).count() if session_id else 0
+    except DatabaseError:
+        count = 0
 
     request._cart_count_cache = count
     return {'cart_count': count}
