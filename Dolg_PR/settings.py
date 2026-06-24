@@ -63,8 +63,10 @@ SECRET_KEY = os.getenv('SECRET_KEY', DEFAULT_INSECURE_SECRET_KEY)
 
 DEBUG = env_bool('DEBUG', True)
 ALLOW_MOCK_SSO = env_bool('ALLOW_MOCK_SSO', DEBUG or IS_TESTING)
-SKIP_OPTIONAL_APP_PROBES = env_bool('DOLG_SKIP_OPTIONAL_APP_PROBES', False)
-SKIP_SOCIALACCOUNT_PROVIDERS = env_bool('DOLG_SKIP_SOCIALACCOUNT_PROVIDERS', False)
+# Local defense/dev runs should start fast and keep middleware light.
+# Production keeps optional probes/providers unless explicitly disabled.
+SKIP_OPTIONAL_APP_PROBES = env_bool('DOLG_SKIP_OPTIONAL_APP_PROBES', DEBUG or IS_TESTING)
+SKIP_SOCIALACCOUNT_PROVIDERS = env_bool('DOLG_SKIP_SOCIALACCOUNT_PROVIDERS', DEBUG or IS_TESTING)
 
 ALLOWED_HOSTS = env_list(
     'ALLOWED_HOSTS',
