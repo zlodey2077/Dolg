@@ -19,6 +19,7 @@ DOCKERFILE = DEPLOY / 'Dockerfile'
 ENTRYPOINT = DEPLOY / 'entrypoint.sh'
 NGINX_CONF = DEPLOY / 'nginx.conf'
 PROMETHEUS = DEPLOY / 'prometheus.yml'
+GRAFANA_DASHBOARDS = DEPLOY / 'grafana' / 'dashboards'
 CI_WORKFLOW = ROOT / '.github' / 'workflows' / 'django.yml'
 K8S = DEPLOY / 'k8s'
 ROOT_DOCKERIGNORE = ROOT / '.dockerignore'
@@ -98,6 +99,9 @@ def main() -> int:
             ('  nginx:', 'nginx edge service'),
             ('  prometheus:', 'Prometheus service'),
             ('  grafana:', 'Grafana service'),
+            ('  postgres-exporter:', 'Postgres exporter service'),
+            ('  redis-exporter:', 'Redis exporter service'),
+            ('  cadvisor:', 'cAdvisor container metrics service'),
             ('redis://redis:6379/0', 'Redis URL for Channels'),
             ('CELERY_BROKER_URL', 'Celery broker configured'),
             ('METRICS_TOKEN', 'Prometheus token passed to Django'),
@@ -108,6 +112,9 @@ def main() -> int:
             ('${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:8080', 'nginx binds high internal port'),
             ('${GRAFANA_ADMIN_PASSWORD:?need GRAFANA_ADMIN_PASSWORD in .env}', 'Grafana password fail-fast'),
             ('${EMAIL_BACKEND:?need non-console EMAIL_BACKEND in .env}', 'email backend fail-fast'),
+            ('prometheuscommunity/postgres-exporter', 'Postgres exporter image'),
+            ('oliver006/redis_exporter', 'Redis exporter image'),
+            ('gcr.io/cadvisor/cadvisor', 'cAdvisor image'),
         ],
     )
 
@@ -186,8 +193,36 @@ def main() -> int:
             ('authorization:', 'Prometheus authenticates to protected /metrics'),
             ('local-metrics-token-change-me', 'local metrics token is explicit'),
             ("targets: ['web:8000']", 'Prometheus scrapes internal web service'),
+            ("job_name: 'postgres'", 'Postgres exporter scrape job'),
+            ("job_name: 'redis'", 'Redis exporter scrape job'),
+            ("job_name: 'containers'", 'container metrics scrape job'),
+            ("targets: ['postgres-exporter:9187']", 'Prometheus can reach Postgres exporter'),
+            ("targets: ['redis-exporter:9121']", 'Prometheus can reach Redis exporter'),
+            ("targets: ['cadvisor:8080']", 'Prometheus can reach cAdvisor'),
         ],
     )
+
+    section('Grafana dashboards')
+    if check(GRAFANA_DASHBOARDS.exists(), 'deploy/grafana/dashboards'):
+        dashboards = '\n'.join(path.name for path in GRAFANA_DASHBOARDS.glob('*.json'))
+        failed += require_contains(
+            dashboards,
+            [
+                ('dolg_overview.json', 'baseline overview dashboard'),
+                ('dolg_operations_sections.json', 'sectioned operations dashboard'),
+            ],
+        )
+        operations = read(GRAFANA_DASHBOARDS / 'dolg_operations_sections.json')
+        failed += require_contains(
+            operations,
+            [
+                ('Графики приложения', 'application charts section'),
+                ('База данных PostgreSQL', 'database section'),
+                ('Redis / cache', 'cache section'),
+                ('Контейнеры и инфраструктура', 'container section'),
+                ('AI / симуляции / движки', 'AI/simulation section'),
+            ],
+        )
 
     section('CI workflow')
     ci = read(CI_WORKFLOW)

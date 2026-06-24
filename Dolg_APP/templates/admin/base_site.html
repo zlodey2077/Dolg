@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/dolg_admin_design.css' %}?v=20260624">
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="{% static 'admin/dolg_admin_design.js' %}?v=20260624" defer></script>
+{% endblock %}
+
+{% block branding %}
+<div id="site-name" class="dolg-admin-brand">
+  <a href="{% url 'admin:index' %}">
+    <span class="dolg-admin-brand-mark">D</span>
+    <span>
+      <strong>{{ site_header|default:_('Django administration') }}</strong>
+      <small>control center</small>
+    </span>
+  </a>
+</div>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block nav-global %}
+<nav class="dolg-admin-topnav" aria-label="DOLG admin quick navigation">
+  <a href="{% url 'admin:index' %}">Dashboard</a>
+  <a href="{% url 'hello:staff_ops_dashboard' %}">Ops</a>
+  <a href="{% url 'hello:staff_data_console' %}">Data</a>
+  <a href="{% url 'hello:ml_training_page' %}">ML</a>
+  <a href="{% url 'hello:ml_dataset_quality_page' %}">Dataset</a>
+  <a href="/metrics">Metrics</a>
+</nav>
+{% endblock %}

@@ -1,0 +1,186 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"title": "Django admin", "url": "/admin/", "targetBlank": true},
+    {"title": "Prometheus", "url": "http://localhost:9090", "targetBlank": true}
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Графики приложения",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Requests / sec",
+      "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4},
+      "targets": [{"expr": "sum(rate(django_http_requests_total_by_method_total[1m]))", "legendFormat": "req/s", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 30}, {"color": "red", "value": 120}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "type": "stat",
+      "title": "5xx / sec",
+      "gridPos": {"x": 6, "y": 1, "w": 6, "h": 4},
+      "targets": [{"expr": "sum(rate(django_http_responses_total_by_status_total{status=~\"5..\"}[5m]))", "legendFormat": "5xx/s", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.05}, {"color": "red", "value": 0.5}]}}, "overrides": []},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99",
+      "gridPos": {"x": 12, "y": 1, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP statuses",
+      "gridPos": {"x": 0, "y": 5, "w": 12, "h": 7},
+      "targets": [{"expr": "sum(rate(django_http_responses_total_by_status_total[5m])) by (status)", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+    {
+      "type": "row",
+      "title": "База данных PostgreSQL",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 1},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Postgres up",
+      "gridPos": {"x": 0, "y": 13, "w": 4, "h": 4},
+      "targets": [{"expr": "pg_up", "legendFormat": "up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "type": "timeseries",
+      "title": "DB connections",
+      "gridPos": {"x": 4, "y": 13, "w": 8, "h": 7},
+      "targets": [{"expr": "sum(pg_stat_database_numbackends) by (datname)", "legendFormat": "{{datname}}", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "Transactions commit / rollback",
+      "gridPos": {"x": 12, "y": 13, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "sum(rate(pg_stat_database_xact_commit[5m])) by (datname)", "legendFormat": "commit {{datname}}", "refId": "A"},
+        {"expr": "sum(rate(pg_stat_database_xact_rollback[5m])) by (datname)", "legendFormat": "rollback {{datname}}", "refId": "B"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Django SQL queries / sec",
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 7},
+      "targets": [{"expr": "sum(rate(django_db_execute_total_total[1m]))", "legendFormat": "queries/s", "refId": "A"}]
+    },
+    {
+      "type": "timeseries",
+      "title": "DB cache hit ratio",
+      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 7},
+      "targets": [{"expr": "sum(pg_stat_database_blks_hit) / clamp_min(sum(pg_stat_database_blks_hit + pg_stat_database_blks_read), 1)", "legendFormat": "hit ratio", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []}
+    },
+    {
+      "type": "row",
+      "title": "Redis / cache",
+      "gridPos": {"x": 0, "y": 27, "w": 24, "h": 1},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Redis up",
+      "gridPos": {"x": 0, "y": 28, "w": 4, "h": 4},
+      "targets": [{"expr": "redis_up", "legendFormat": "up", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis memory",
+      "gridPos": {"x": 4, "y": 28, "w": 8, "h": 7},
+      "targets": [{"expr": "redis_memory_used_bytes", "legendFormat": "used", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []}
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis commands / clients",
+      "gridPos": {"x": 12, "y": 28, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "rate(redis_commands_processed_total[1m])", "legendFormat": "commands/s", "refId": "A"},
+        {"expr": "redis_connected_clients", "legendFormat": "clients", "refId": "B"}
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Контейнеры и инфраструктура",
+      "gridPos": {"x": 0, "y": 35, "w": 24, "h": 1},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Container CPU",
+      "gridPos": {"x": 0, "y": 36, "w": 12, "h": 8},
+      "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[1m])) by (name)", "legendFormat": "{{name}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []}
+    },
+    {
+      "type": "timeseries",
+      "title": "Container memory",
+      "gridPos": {"x": 12, "y": 36, "w": 12, "h": 8},
+      "targets": [{"expr": "container_memory_working_set_bytes{name!=\"\"}", "legendFormat": "{{name}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []}
+    },
+    {
+      "type": "row",
+      "title": "AI / симуляции / движки",
+      "gridPos": {"x": 0, "y": 44, "w": 24, "h": 1},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Model mutations",
+      "gridPos": {"x": 0, "y": 45, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum(rate(django_model_inserts_total[1m]))", "legendFormat": "inserts", "refId": "A"},
+        {"expr": "sum(rate(django_model_updates_total[1m]))", "legendFormat": "updates", "refId": "B"},
+        {"expr": "sum(rate(django_model_deletes_total[1m]))", "legendFormat": "deletes", "refId": "C"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Headroom proxy",
+      "gridPos": {"x": 12, "y": 45, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum(rate(requests_total[5m]))", "legendFormat": "requests", "refId": "A"},
+        {"expr": "sum(rate(cached_total[5m]))", "legendFormat": "cached", "refId": "B"},
+        {"expr": "sum(rate(rate_limited_total[5m]))", "legendFormat": "rate-limited", "refId": "C"}
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["dolg", "ops", "database", "containers"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "",
+  "title": "DOLG · Operations Sections",
+  "uid": "dolg-operations-sections",
+  "version": 1,
+  "weekStart": ""
+}

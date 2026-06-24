@@ -188,6 +188,12 @@ services:
     depends_on:
       web:
         condition: service_healthy
+      postgres-exporter:
+        condition: service_started
+      redis-exporter:
+        condition: service_started
+      cadvisor:
+        condition: service_started
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -200,6 +206,47 @@ services:
     restart: unless-stopped
     mem_limit: 512m
     cpus: "0.5"
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-dolg}:${POSTGRES_PASSWORD:?need POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-dolg}?sslmode=disable"
+    expose:
+      - "9187"
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: "0.25"
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    expose:
+      - "9121"
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: "0.25"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    expose:
+      - "8080"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: "0.35"
 
   grafana:
     image: grafana/grafana:11.4.0

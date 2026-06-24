@@ -1,0 +1,257 @@
+:root {
+  --dolg-admin-bg: #0b1220;
+  --dolg-admin-panel: #111a2e;
+  --dolg-admin-panel-2: #16233b;
+  --dolg-admin-line: rgba(125, 211, 252, 0.2);
+  --dolg-admin-text: #e5eefc;
+  --dolg-admin-muted: #98a8c4;
+  --dolg-admin-cyan: #22d3ee;
+  --dolg-admin-green: #34d399;
+  --dolg-admin-amber: #fbbf24;
+  --dolg-admin-red: #fb7185;
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.12), transparent 26rem),
+    linear-gradient(180deg, #08111f 0%, var(--dolg-admin-bg) 38rem);
+}
+
+#header {
+  background: rgba(8, 17, 31, 0.94);
+  border-bottom: 1px solid var(--dolg-admin-line);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.26);
+  min-height: 56px;
+}
+
+.dolg-admin-brand a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--dolg-admin-text) !important;
+  text-decoration: none;
+}
+
+.dolg-admin-brand-mark {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #06b6d4, #34d399);
+  color: #07111f;
+  font-weight: 900;
+}
+
+.dolg-admin-brand strong {
+  display: block;
+  line-height: 1.1;
+}
+
+.dolg-admin-brand small {
+  display: block;
+  margin-top: 2px;
+  color: var(--dolg-admin-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dolg-admin-topnav {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dolg-admin-topnav a {
+  color: #bff4ff;
+  text-decoration: none;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 7px;
+  background: rgba(34, 211, 238, 0.08);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dolg-admin-topnav a:hover {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #d7fff0;
+}
+
+#content {
+  padding: 22px 28px 42px;
+}
+
+#content-main,
+#content-related,
+.module,
+.inline-group,
+.submit-row,
+#changelist,
+.paginator {
+  border-radius: 8px;
+}
+
+.module,
+#changelist,
+.inline-group,
+#content-related .module {
+  background: rgba(17, 26, 46, 0.94);
+  border: 1px solid var(--dolg-admin-line);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.18), rgba(52, 211, 153, 0.08));
+  color: var(--dolg-admin-text);
+  border-bottom: 1px solid var(--dolg-admin-line);
+}
+
+div.breadcrumbs {
+  background: rgba(17, 26, 46, 0.76);
+  border-bottom: 1px solid var(--dolg-admin-line);
+  color: var(--dolg-admin-muted);
+}
+
+div.breadcrumbs a,
+a:link,
+a:visited {
+  color: #67e8f9;
+}
+
+#changelist-filter,
+#toolbar,
+.object-tools a,
+.submit-row {
+  background: rgba(11, 18, 32, 0.88);
+  border-color: var(--dolg-admin-line);
+}
+
+#changelist-filter {
+  border-radius: 8px;
+}
+
+#changelist-filter h2,
+#changelist-filter h3 {
+  color: var(--dolg-admin-text);
+}
+
+#changelist table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#changelist table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #111a2e;
+  border-bottom: 1px solid var(--dolg-admin-line);
+}
+
+tr:nth-child(odd),
+.row-form-errors {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+td,
+th,
+.form-row,
+.aligned label {
+  color: var(--dolg-admin-text);
+}
+
+.help,
+p.help,
+.quiet,
+.mini {
+  color: var(--dolg-admin-muted) !important;
+}
+
+input,
+textarea,
+select,
+.vTextField {
+  background: #08111f !important;
+  color: var(--dolg-admin-text) !important;
+  border: 1px solid rgba(125, 211, 252, 0.26) !important;
+  border-radius: 6px !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(34, 211, 238, 0.72) !important;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+  border-radius: 7px !important;
+  border: 1px solid rgba(34, 211, 238, 0.26) !important;
+  background: rgba(34, 211, 238, 0.13) !important;
+  color: #e5fbff !important;
+  font-weight: 800;
+}
+
+.button.default,
+input[type="submit"].default,
+.submit-row input.default {
+  background: linear-gradient(135deg, #06b6d4, #10b981) !important;
+  border-color: transparent !important;
+  color: #06111f !important;
+}
+
+.deletelink,
+.deletelink-box a {
+  color: #fecdd3 !important;
+}
+
+.messagelist li {
+  border-radius: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.24);
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--dolg-admin-text);
+}
+
+.dolg-admin-model-filter {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--dolg-admin-line);
+  border-radius: 8px;
+  background: rgba(17, 26, 46, 0.78);
+}
+
+.dolg-admin-model-filter input {
+  flex: 1 1 280px;
+  height: 34px;
+}
+
+.dolg-admin-muted-row {
+  opacity: 0.28;
+}
+
+@media (max-width: 900px) {
+  #content {
+    padding: 14px;
+  }
+
+  #header {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .dolg-admin-topnav {
+    width: 100%;
+  }
+}
