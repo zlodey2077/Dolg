@@ -108,8 +108,10 @@ header {
     box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: 9200;
     backdrop-filter: blur(10px);
+    overflow: visible;
+    isolation: isolate;
 }
 
 .header-content {
@@ -119,6 +121,7 @@ header {
     padding: 1rem 0;
     gap: 1rem;
     flex-wrap: wrap;
+    overflow: visible;
 }
 /* 2026-05-30: на широких экранах nav должен быть по центру, а не прижат
    к правому краю flex space-between'ом. auto-margin'ы по бокам забирают
@@ -314,6 +317,80 @@ nav a:hover::after {
 nav a:hover {
     color: var(--accent-cyan);
     text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+}
+
+/* 2026-06-25: stable header dropdown layer.
+   The old global nav a::after underline also hit dropdown toggles and nested links,
+   so the underline could turn into a long diagonal mark over the page. */
+#dolg-main-nav,
+#dolg-main-nav > ul,
+#dolg-main-nav > ul > li {
+    overflow: visible;
+}
+
+#dolg-main-nav {
+    position: relative;
+    z-index: 9210;
+}
+
+#dolg-main-nav > ul > li {
+    position: relative;
+}
+
+#dolg-main-nav > ul > li.dropdown:hover,
+#dolg-main-nav > ul > li.dropdown.is-open {
+    z-index: 9230;
+}
+
+#dolg-main-nav > ul > li > a:not(.dropdown-toggle)::after {
+    left: 0;
+    right: 0;
+    width: auto !important;
+    transform: scaleX(0);
+    transform-origin: center;
+    pointer-events: none;
+}
+
+#dolg-main-nav > ul > li > a:not(.dropdown-toggle):hover::after,
+#dolg-main-nav > ul > li > a:not(.dropdown-toggle):focus-visible::after {
+    width: auto !important;
+    transform: scaleX(1);
+}
+
+#dolg-main-nav > ul > li > a.dropdown-toggle::after {
+    content: '' !important;
+    position: static !important;
+    display: inline-block !important;
+    width: 0.42rem !important;
+    height: 0.42rem !important;
+    margin-left: 0.45rem !important;
+    border-right: 2px solid currentColor !important;
+    border-bottom: 2px solid currentColor !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: rotate(45deg) translateY(-2px) !important;
+    transition: transform 0.18s ease, opacity 0.18s ease !important;
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+#dolg-main-nav > ul > li.dropdown:hover > a.dropdown-toggle::after,
+#dolg-main-nav > ul > li.dropdown.is-open > a.dropdown-toggle::after {
+    transform: rotate(225deg) translateY(-2px) !important;
+    opacity: 1;
+}
+
+#dolg-main-nav .dropdown-menu {
+    z-index: 9240;
+}
+
+#dolg-main-nav .dropdown-menu a::after {
+    content: none !important;
+    display: none !important;
+}
+
+#dolg-main-nav .dropdown-menu a {
+    padding-bottom: 0.8rem;
 }
 
 /* ===== MAIN CONTENT ===== */

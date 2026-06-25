@@ -70,8 +70,8 @@ body.dolg-workspace-cad .right-panel {
 }
 
 body.dolg-workspace-cad #app-container {
-    height: calc(100vh - 116px);
-    min-height: 620px;
+    height: calc(100vh - 96px);
+    min-height: 660px;
     overflow: hidden;
 }
 
@@ -85,6 +85,7 @@ body.dolg-workspace-cad .top-controls {
 body.dolg-workspace-cad .canvas-area {
     min-width: 0;
     min-height: 0;
+    flex: 1 1 auto;
 }
 
 body.dolg-workspace-cad #canvas {
@@ -178,8 +179,9 @@ body.dolg-workspace-simulation #probes-panel {
 }
 
 body.dolg-workspace-simulation .canvas-container {
-    min-height: 300px;
-    max-height: calc(100vh - 420px);
+    min-height: clamp(360px, 52vh, 720px);
+    max-height: none;
+    flex: 1 1 auto;
 }
 
 body.dolg-workspace-simulation #schematicCanvas,
@@ -207,6 +209,105 @@ body.dolg-workspace-simulation .analysis-btn {
 body.dolg-workspace-simulation.dolg-layout-focus .components-panel,
 body.dolg-workspace-simulation.dolg-layout-focus .control-panel {
     max-width: 280px;
+}
+
+/* 2026-06-25: defense demo workspace sizing.
+   Keep the editors first-class on large screens: side panels remain usable, but
+   the drawing/schematic canvas gets the viewport instead of a cramped strip. */
+body.dolg-workspace-page .main-content {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+body.dolg-workspace-cad .main-content > .container,
+body.dolg-workspace-simulation .main-content > .container {
+    width: 100%;
+    max-width: 100% !important;
+    padding-left: clamp(8px, 1.2vw, 18px) !important;
+    padding-right: clamp(8px, 1.2vw, 18px) !important;
+}
+
+body.dolg-workspace-cad #app-container {
+    height: calc(100vh - 92px) !important;
+    min-height: min(760px, calc(100vh - 92px));
+}
+
+body.dolg-workspace-cad .cad-layout {
+    min-height: 0;
+}
+
+body.dolg-workspace-cad .tools-panel {
+    flex: 0 0 var(--workspace-tool-panel-width);
+}
+
+body.dolg-workspace-cad .right-panel {
+    flex: 0 0 var(--workspace-side-panel-width);
+    max-width: min(var(--workspace-side-panel-width), 23vw);
+}
+
+body.dolg-workspace-cad .canvas-area {
+    flex: 1 1 min(1100px, 72vw);
+    min-height: 520px;
+}
+
+body.dolg-workspace-cad #canvas {
+    min-height: 100%;
+}
+
+body.dolg-workspace-simulation .simulator-container {
+    min-height: calc(100vh - 104px);
+}
+
+body.dolg-workspace-simulation .workspace {
+    align-items: stretch;
+}
+
+body.dolg-workspace-simulation .canvas-container {
+    min-height: clamp(420px, 56vh, 780px) !important;
+    height: auto;
+}
+
+body.dolg-workspace-simulation #schematicCanvas,
+body.dolg-workspace-simulation #schematicCanvasPixi {
+    width: 100% !important;
+    min-height: 100%;
+}
+
+body.dolg-workspace-simulation .analysis-bottom-panel {
+    max-height: min(30vh, 280px);
+    min-height: 150px;
+}
+
+body.dolg-workspace-simulation .sim-dock {
+    max-height: min(28vh, 260px);
+}
+
+@media (min-width: 1360px) {
+    body.dolg-workspace-page {
+        --workspace-side-panel-width: 300px;
+        --workspace-tool-panel-width: 70px;
+        --workspace-dock-height: 190px;
+    }
+
+    body.dolg-workspace-cad #app-container {
+        height: calc(100vh - 84px) !important;
+    }
+
+    body.dolg-workspace-simulation .canvas-container {
+        min-height: clamp(460px, 60vh, 820px) !important;
+    }
+}
+
+@media (max-width: 980px) {
+    body.dolg-workspace-cad #app-container {
+        height: auto !important;
+        min-height: 0;
+    }
+
+    body.dolg-workspace-cad .canvas-area,
+    body.dolg-workspace-simulation .canvas-container {
+        min-height: 430px !important;
+    }
 }
 
 body.dolg-workspace-simulation.dolg-layout-lab .sim-dock,
