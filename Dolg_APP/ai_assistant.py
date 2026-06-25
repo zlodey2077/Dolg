@@ -1,22 +1,17 @@
 """
-AI-ассистент DOLG: три специализированных «агента» поверх Claude API.
+Local AI assistant for DOLG.
 
-Каждый режим — это отдельный профиль с собственной персоной, моделью,
-температурой и системным промптом. Идея: модель, заточенная под одну задачу,
-даёт более полезный ответ, чем универсальный prompt:
-
-- recommend → инженер-схемотехник: подбирает компоненты под расчёт
-- explain   → schematic-reviewer: разбирает схему, ищет ошибки
-- replace   → supply-chain-эксперт: подбирает замену EOL по корпусу/pin-out
-
-Без ANTHROPIC_API_KEY модуль остаётся в demo-режиме: UI работает, endpoint
-возвращает понятное сообщение, что ключ не настроен.
+Runtime is intentionally self-hosted: Ollama generates text, PyTorch tiny
+models provide circuit hints, and rule/retrieval layers remain the fallback.
+The public API keeps the old function names where useful, but cloud providers
+are not part of the active runtime.
 """
 
 import hashlib
 import json
 import logging
 import os
+import sys
 
 import requests
 from django.conf import settings
@@ -26,21 +21,15 @@ from shop.models import Product
 
 logger = logging.getLogger(__name__)
 
-ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
-# 2024-10-22 — стабильная версия API на момент сборки. Включает prompt
-# caching (cache_control) без beta-флага, files API, computer-use.
-ANTHROPIC_VERSION = '2024-10-22'
-TIMEOUT_SEC = 30
+TIMEOUT_SEC = int(os.getenv('LOCAL_AI_TIMEOUT_SEC') or os.getenv('OLLAMA_TIMEOUT_SEC') or '75')
 
 # Бюджет JSON-snapshot, передаваемого в system prompt: больше токенов = дороже,
 # меньше = модель не видит достаточно вариантов. 6000 символов ≈ 1.5к токенов.
 CATALOG_BYTES_BUDGET = 6000
 SCHEME_BYTES_BUDGET = 4000
 
-# Минимальный размер system-блока для prompt caching на haiku-4-5: 1024 токена.
-# Кириллица в Anthropic-токенайзере — ≈ 0.4 токена/символ, поэтому 4500 chars ≈
-# 1800 токенов — гарантированно выше порога даже на коротких CATALOG-snapshot-ах.
-# Раньше стояло 3000 — было borderline (~1200 токенов), иногда не попадало.
+# Минимальный размер стабильного system-блока. Для Ollama cache_control не
+# отправляется, но порог оставлен как совместимый ориентир для compact prompt.
 PROMPT_CACHE_MIN_CHARS = 4500
 
 
@@ -56,47 +45,41 @@ class AIError(Exception):
 
 class AINotConfiguredError(AIError):
     http_status = 503
-    user_message = 'AI-ассистент не настроен (ANTHROPIC_API_KEY или OLLAMA_BASE_URL).'
+    user_message = 'Локальный AI не настроен: проверьте OLLAMA_BASE_URL.'
 
 
 class AIAuthError(AIError):
     http_status = 502
-    user_message = 'Ключ Anthropic недействителен. Свяжитесь с администратором.'
+    user_message = 'Локальный AI отклонил запрос. Проверьте настройки runtime.'
 
 
 class AIRateLimitError(AIError):
     http_status = 429
-    user_message = 'Anthropic временно лимитирует запросы. Подождите 30 секунд.'
+    user_message = 'Локальный AI временно перегружен. Подождите 30 секунд.'
 
 
 class AINetworkError(AIError):
     http_status = 504
-    user_message = 'Сеть недоступна или Claude API не отвечает.'
+    user_message = 'Локальный AI/Ollama не отвечает.'
 
 
 class AIServerError(AIError):
     http_status = 502
-    user_message = 'Anthropic вернул ошибку сервера. Попробуйте ещё раз.'
-
-
-def _api_key():
-    return os.getenv('ANTHROPIC_API_KEY') or getattr(settings, 'ANTHROPIC_API_KEY', '')
+    user_message = 'Локальный AI вернул ошибку. Попробуйте ещё раз.'
 
 
 def is_enabled():
-    return bool(_api_key())
+    return ollama_enabled()
 
 
 def active_backend():
-    if is_enabled():
-        return 'anthropic'
     if ollama_enabled():
         return 'ollama'
     return 'rule_based'
 
 
 def live_enabled():
-    return active_backend() in {'anthropic', 'ollama'}
+    return active_backend() == 'ollama'
 
 
 def _product_to_dict(p):
@@ -158,8 +141,8 @@ def build_catalog_snapshot(category_slugs=None, lifecycle_in=None, exclude_pn=No
 
 # --- Профили агентов ----------------------------------------------------
 #
-# Каждый профиль — самодостаточная конфигурация Claude API:
-#   model      — конкретная модель (haiku для скорости, sonnet для глубины)
+# Каждый профиль — самодостаточная конфигурация локального AI-агента:
+#   model      — логическое имя профиля; фактическая модель берётся из OLLAMA_MODEL
 #   temperature — креативность (низкая для технических задач)
 #   max_tokens — размер ответа
 #   persona    — кто отвечает (формирует тон)
@@ -169,7 +152,7 @@ def build_catalog_snapshot(category_slugs=None, lifecycle_in=None, exclude_pn=No
 AGENT_PROFILES = {
     'recommend': {
         'title': 'Инженер-схемотехник',
-        'model': 'claude-haiku-4-5-20251001',
+        'model': 'local-ollama-recommend',
         'temperature': 0.3,
         'max_tokens': 1024,
         'persona': (
@@ -194,7 +177,7 @@ AGENT_PROFILES = {
     },
     'explain': {
         'title': 'Schematic reviewer',
-        'model': 'claude-haiku-4-5-20251001',
+        'model': 'local-ollama-explain',
         'temperature': 0.2,
         'max_tokens': 1200,
         'persona': (
@@ -222,7 +205,7 @@ AGENT_PROFILES = {
     },
     'replace': {
         'title': 'Supply-chain-эксперт',
-        'model': 'claude-haiku-4-5-20251001',
+        'model': 'local-ollama-replace',
         'temperature': 0.2,
         'max_tokens': 900,
         'persona': (
@@ -262,9 +245,8 @@ def build_system_blocks(mode, catalog, scheme=None, target_pn=None):
     2. Volatile — SCHEME (для explain) или target_pn (для replace) — то,
        что меняется per-call.
 
-    Если стабильный блок короче PROMPT_CACHE_MIN_CHARS — cache_control
-    не выставляется (Anthropic всё равно не закеширует, а лишний флаг
-    усложняет диагностику usage).
+    Если стабильный блок длинный, cache_control сохраняется в структуре для
+    совместимости старых тестов, но локальный Ollama-клиент его не отправляет.
     """
     profile = AGENT_PROFILES.get(mode) or AGENT_PROFILES['recommend']
     catalog_json = json.dumps(catalog, ensure_ascii=False, default=str)[:CATALOG_BYTES_BUDGET]
@@ -305,94 +287,11 @@ def build_system_prompt(mode, catalog, scheme=None, target_pn=None):
     return '\n'.join(b['text'] for b in blocks)
 
 
-# Маппинг HTTP-кода Anthropic → исключение домена. Сделано таблицей, чтобы
-# легко расширять (например, отдельный код 529 «overloaded»).
-_ANTHROPIC_STATUS_TO_EXC = {
-    400: AIError,  # bad request — наша вина
-    401: AIAuthError,
-    403: AIAuthError,
-    404: AIError,
-    429: AIRateLimitError,
-}
-
-
-def call_claude(
-    messages,
-    system,
-    *,
-    mode=None,
-    model=None,
-    max_tokens=None,
-    temperature=None,
-    timeout=TIMEOUT_SEC,
-    use_cache=True,
-):
-    """Вызов Anthropic Messages API. Если задан mode — параметры берутся из
-    AGENT_PROFILES[mode]; явно переданные model/max_tokens/temperature их
-    переопределяют (для тестов).
-
-    Параметр system принимается и как str (плоский текст), и как list
-    блоков {type, text, cache_control?}. Если строка и use_cache=True и
-    длиннее PROMPT_CACHE_MIN_CHARS — оборачиваем в один cached-блок.
-    """
-    api_key = _api_key()
-    if not api_key:
-        raise AINotConfiguredError('ANTHROPIC_API_KEY не задан')
-
-    profile = AGENT_PROFILES.get(mode) if mode else None
-    payload = {
-        'model': model or (profile['model'] if profile else 'claude-haiku-4-5-20251001'),
-        'max_tokens': max_tokens or (profile['max_tokens'] if profile else 1024),
-        'messages': messages,
-    }
-    if isinstance(system, list):
-        payload['system'] = system
-    elif use_cache and isinstance(system, str) and len(system) >= PROMPT_CACHE_MIN_CHARS:
-        payload['system'] = [{'type': 'text', 'text': system, 'cache_control': {'type': 'ephemeral'}}]
-    else:
-        payload['system'] = system
-
-    temp = temperature if temperature is not None else (profile['temperature'] if profile else None)
-    if temp is not None:
-        payload['temperature'] = temp
-
-    headers = {
-        'x-api-key': api_key,
-        'anthropic-version': ANTHROPIC_VERSION,
-        'content-type': 'application/json',
-    }
-    try:
-        r = requests.post(ANTHROPIC_URL, headers=headers, json=payload, timeout=timeout)
-    except requests.RequestException as exc:
-        logger.warning('Claude API request error: %s', exc)
-        raise AINetworkError(str(exc)) from exc
-
-    if r.status_code != 200:
-        logger.warning('Claude API %s: %s', r.status_code, r.text[:300])
-        exc_cls = _ANTHROPIC_STATUS_TO_EXC.get(r.status_code, AIServerError)
-        raise exc_cls(f'Claude API вернул {r.status_code}')
-
-    data = r.json()
-    text_chunks = []
-    for block in data.get('content', []):
-        if block.get('type') == 'text':
-            text_chunks.append(block.get('text', ''))
-    return {
-        'text': ''.join(text_chunks).strip() or '(пустой ответ)',
-        'stop_reason': data.get('stop_reason'),
-        'usage': data.get('usage', {}),
-        'model': payload['model'],
-        'agent': profile['title'] if profile else None,
-    }
-
-
 # --- Локальная LLM через Ollama -------------------------------------------
 #
-# Альтернатива Claude API: маленькая локальная модель (Qwen3/Phi) через Ollama
-# (отдельный бинарь на localhost:11434). Обходит боль с torch/wheel на Windows+py3.14,
-# т.к. это HTTP-сервис, а не Python-пакет. «Обучение на данных» = RAG: грудинг
-# (каталог + retrieval-факты) приходит в `system` ровно как у Claude — call_ollama
-# принимает ту же сигнатуру, поэтому это drop-in замена call_claude в api_ai_chat.
+# Ollama даёт локальный генеративный слой (Qwen3/Phi и т.п.) через HTTP на
+# localhost:11434. Обучающие данные проекта подключаются как RAG/grounding:
+# каталог, retrieval-факты и scheme context передаются в system prompt.
 #
 # Включение: OLLAMA_BASE_URL=http://localhost:11434 (+ опц. OLLAMA_MODEL=qwen3:0.6b).
 
@@ -406,11 +305,17 @@ def ollama_model():
 
 
 def ollama_enabled():
+    if _running_tests() and os.getenv('LIVE_LOCAL_AI_IN_TESTS') != '1':
+        return False
     return bool(ollama_base_url())
 
 
+def _running_tests():
+    return any(arg == 'test' or arg.endswith('pytest') for arg in sys.argv)
+
+
 def _flatten_system(system):
-    """system-блоки Claude (list of {type,text,cache_control}) → один system-текст для Ollama."""
+    """Flatten structured system blocks into one Ollama system text."""
     if isinstance(system, list):
         return '\n\n'.join(b.get('text', '') for b in system if isinstance(b, dict))
     return str(system or '')
@@ -425,12 +330,9 @@ def call_ollama(
     max_tokens=None,
     temperature=None,
     timeout=TIMEOUT_SEC,
-    use_cache=True,  # noqa: ARG001 — совместимость сигнатуры с call_claude
+    use_cache=True,
 ):
-    """Вызов локальной LLM через Ollama /api/chat. Сигнатура как у call_claude —
-    тот же messages + тот же грудинг в system (каталог + RAG). Возвращает тот же
-    dict-формат {text, stop_reason, usage, model, agent}.
-    """
+    """Call local Ollama /api/chat with DOLG grounding."""
     base = ollama_base_url()
     if not base:
         raise AINotConfiguredError('OLLAMA_BASE_URL не задан')
@@ -487,6 +389,10 @@ def ollama_status(timeout=2):
         'models': [],
         'error': '',
     }
+    if _running_tests() and os.getenv('LIVE_LOCAL_AI_IN_TESTS') != '1':
+        status['configured'] = False
+        status['error'] = 'disabled during tests'
+        return status
     if not base:
         status['error'] = 'OLLAMA_BASE_URL is empty'
         return status
@@ -515,24 +421,50 @@ def ollama_status(timeout=2):
     return status
 
 
+def pytorch_status():
+    status = {
+        'configured': True,
+        'available': False,
+        'model_exists': False,
+        'model_path': '',
+        'model_version': '',
+        'error': '',
+    }
+    try:
+        from Dolg_APP.ml.neural import MODEL_VERSION, default_model_path, torch_available
+
+        path = default_model_path()
+        status.update(
+            {
+                'available': torch_available(),
+                'model_exists': path.exists(),
+                'model_path': str(path),
+                'model_version': MODEL_VERSION,
+            }
+        )
+    except Exception as exc:
+        status['error'] = str(exc)
+    return status
+
+
 def runtime_status(timeout=2):
     backend = active_backend()
     return {
         'backend': backend,
-        'live_enabled': backend in {'anthropic', 'ollama'},
-        'anthropic': {
-            'configured': is_enabled(),
-            'model': AGENT_PROFILES.get('recommend', {}).get('model', 'claude-haiku-4-5-20251001'),
+        'live_enabled': backend == 'ollama',
+        'cloud': {
+            'enabled': False,
+            'reason': 'disabled_for_local_only_runtime',
         },
         'ollama': ollama_status(timeout=timeout),
+        'pytorch': pytorch_status(),
+        'fallback': 'rule_based',
     }
 
 
 def call_live(messages, system, *, mode=None, **kwargs):
     backend = active_backend()
-    if backend == 'anthropic':
-        result = call_claude(messages, system, mode=mode, **kwargs)
-    elif backend == 'ollama':
+    if backend == 'ollama':
         result = call_ollama(messages, system, mode=mode, **kwargs)
     else:
         raise AINotConfiguredError()

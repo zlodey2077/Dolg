@@ -48,7 +48,7 @@ class UserProfile(models.Model):
     AI_BACKEND_CHOICES = [
         ('auto', 'Автоматически'),
         ('local', 'Локальный AI'),
-        ('cloud', 'Облачный AI'),
+        ('engine_ai', 'Локальный AI + движки'),
         ('disabled', 'Отключить AI'),
     ]
     SIM_ENGINE_CHOICES = [

@@ -11,6 +11,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from Dolg_APP.models import EngineJob, ProjectEvent, SchematicProject, SimulationRun
+from Dolg_APP.services.engine_ai import plan_engine_action
 from Dolg_APP.services.engine_jobs import mark_stale_engine_jobs, run_due_engine_jobs
 from Dolg_APP.services.server_engines import (
     recommend_server_engines,
@@ -75,6 +76,17 @@ class ServerEngineCatalogTests(SimpleTestCase):
         ids = [engine['id'] for engine in recommendations]
         self.assertIn('dolg-scikit-rf', ids)
         self.assertIn('xyce', ids)
+        self.assertIn('ai_score', recommendations[0])
+
+    def test_local_ai_plans_text_command_for_engine_job(self):
+        plan = plan_engine_action('Прогони transient через pyspice 5 ms', scheme_data=_divider_scheme())
+
+        self.assertTrue(plan['ok'])
+        self.assertEqual(plan['intent'], 'queue_engine_job')
+        self.assertEqual(plan['command']['engine_id'], 'pyspice')
+        self.assertEqual(plan['command']['analysis_type'], 'transient')
+        self.assertEqual(plan['job_payload']['source'], 'local_ai_command_planner')
+        self.assertIn('explanation', plan)
 
 
 @override_settings(ALLOWED_HOSTS=['*'])
@@ -92,7 +104,13 @@ class ServerEngineApiTests(TestCase):
     def test_recommend_api_accepts_in_memory_scheme(self):
         response = self.client.post(
             '/api/sim/server-engines/recommend/',
-            data=json.dumps({'scheme_data': _rf_scheme(), 'limit': 3}),
+            data=json.dumps(
+                {
+                    'scheme_data': _rf_scheme(),
+                    'limit': 3,
+                    'message': 'Подбери движок для RF AC sweep',
+                }
+            ),
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
@@ -100,6 +118,8 @@ class ServerEngineApiTests(TestCase):
         self.assertTrue(data['ok'])
         self.assertLessEqual(len(data['engines']), 3)
         self.assertIn('xyce', data['router_profile']['fallback_order'])
+        self.assertEqual(data['action_plan']['command']['analysis_type'], 'ac')
+        self.assertIn('job_payload', data['action_plan'])
 
     def test_engine_job_submit_creates_queued_record(self):
         self.client.force_login(self.user)
@@ -129,6 +149,27 @@ class ServerEngineApiTests(TestCase):
         self.assertEqual(job.max_retries, 2)
         self.assertEqual(job.audit_log[0]['action'], 'queued')
         self.assertIn('xyce', data['router_profile']['fallback_order'])
+
+    def test_engine_job_submit_accepts_text_command(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            '/api/sim/jobs/',
+            data=json.dumps(
+                {
+                    'command_text': 'Прогони DC через локальный numpy',
+                    'scheme_data': _divider_scheme(),
+                }
+            ),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 202)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['job']['engine_id'], 'dolg-numpy-mna')
+        self.assertEqual(data['job']['analysis_type'], 'dc')
+        job = EngineJob.objects.get(pk=data['job']['id'])
+        self.assertTrue(job.input_payload['ai_command_plan']['ok'])
 
     def test_engine_job_detail_and_pending_result(self):
         self.client.force_login(self.user)
@@ -186,6 +227,8 @@ class ServerEngineApiTests(TestCase):
         self.assertEqual(job.progress_percent, 100)
         self.assertTrue(job.result['ok'])
         self.assertEqual(job.result['analysis_type'], 'dc')
+        self.assertIn('local_ai', job.result)
+        self.assertTrue(job.result['metrics']['local_ai_attached'])
         voltages = [float(value) for value in job.result['node_voltages'].values()]
         self.assertTrue(any(abs(value - 5.0) < 1e-6 for value in voltages))
         self.assertEqual(job.result['contract']['kind'], 'dolg.engine.result')

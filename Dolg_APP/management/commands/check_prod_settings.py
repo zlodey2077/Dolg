@@ -57,12 +57,11 @@ class Command(BaseCommand):
         if not getattr(settings, 'SESSION_COOKIE_SECURE', False):
             errors.append('SESSION_COOKIE_SECURE=False — куки уйдут по HTTP.')
 
-        # 6. Anthropic API — warn, не блокируем (AI работает в demo-режиме)
+        # 6. Local AI — warn, не блокируем (rule-based fallback остается рабочим)
         warnings = []
-        if not getattr(settings, 'ANTHROPIC_API_KEY', ''):
+        if not getattr(settings, 'OLLAMA_BASE_URL', ''):
             warnings.append(
-                'ANTHROPIC_API_KEY не задан — AI-ассистент в demo-режиме '
-                '(всем пользователям сообщается «AI временно недоступен»).'
+                'OLLAMA_BASE_URL не задан — live local AI выключен, чат перейдет в rule-based fallback.'
             )
 
         # Вывод

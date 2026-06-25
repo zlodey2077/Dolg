@@ -10,8 +10,8 @@ from Dolg_APP.log_scrub import SensitiveDataFilter, scrub
 
 
 class ScrubTests(SimpleTestCase):
-    def test_redacts_anthropic_key(self):
-        out = scrub('using key sk-ant-abc123DEF456ghi in request')
+    def test_redacts_hosted_llm_style_key(self):
+        out = scrub('using key sk-local-abc123DEF456ghi in request')
         self.assertNotIn('abc123DEF456ghi', out)
         self.assertIn('sk-***', out)
 

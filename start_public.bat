@@ -1,10 +1,10 @@
 @echo off
 REM ============================================================
 REM DOLG - public launcher (Django + ngrok tunnel)
-REM    Delegates to start_server.py (no --local), which:
-REM      1) frees the port, starts Django on 127.0.0.1:8000 (stable mode)
-REM      2) starts ngrok and waits for the https://...ngrok-free.dev URL
-REM      3) probes the URL, then opens the browser
+REM    Delegates to start_public_server.py, which:
+REM      1) checks/repairs ngrok v3 config
+REM      2) starts Django on 127.0.0.1:8000 through the public Python launcher
+REM      3) starts ngrok, waits for the public URL, then opens the browser
 REM    Use this for sharing with reviewers / phone testing.
 REM    For solo work on the same machine - use start_local.bat.
 REM
@@ -25,8 +25,8 @@ if not exist "deploy\ngrok.exe" if not exist "ngrok.exe" if errorlevel 1 (
     pause
     exit /b 1
 )
-if not exist "start_server.py" (
-    echo [ERROR] start_server.py not found. Repo is incomplete.
+if not exist "start_public_server.py" (
+    echo [ERROR] start_public_server.py not found. Repo is incomplete.
     pause
     exit /b 1
 )
@@ -34,7 +34,7 @@ if not exist "start_server.py" (
 echo Starting DOLG public launcher ^(ngrok^) via %PY% ...
 echo.
 
-"%PY%" start_server.py
+"%PY%" start_public_server.py
 
 echo.
 echo === Launcher finished. This window stays open so you can see errors. ===

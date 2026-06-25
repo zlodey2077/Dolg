@@ -811,6 +811,7 @@ def _engine_result_summary(result: dict[str, Any], warnings: list[str]) -> dict[
         'waveform_count': _count_result_rows(result.get('waveforms')),
         'has_warnings': bool(warnings or result.get('warnings')),
         'metrics': _json_safe(result.get('metrics') or {}),
+        'local_ai': _json_safe(result.get('local_ai') or {}),
     }
 
 
@@ -866,6 +867,21 @@ def normalize_engine_result(
     payload.setdefault('branches', [])
     payload.setdefault('waveforms', [])
     payload.setdefault('metrics', {})
+    try:
+        from .engine_ai import attach_engine_ai_result
+
+        payload = attach_engine_ai_result(
+            payload,
+            scheme_data=job.scheme_data or {},
+            engine_id=job.engine_id,
+            analysis_type=job.analysis_type,
+        )
+    except Exception as exc:
+        payload['local_ai'] = {
+            'backend': 'local_ai',
+            'available': False,
+            'error': str(exc)[:180],
+        }
     payload['warnings'] = [str(item) for item in (warnings or payload.get('warnings') or [])]
     payload['artifacts'] = _json_safe(artifacts or payload.get('artifacts') or [])
     return payload

@@ -9,7 +9,7 @@
 #   1. Open http://localhost:3001 → sign-up (offline, без email-verify в self-host)
 #   2. Создать проект "DOLG"
 #   3. Скопировать pk_lf_... + sk_lf_... в .env как LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
-#   4. В Dolg_APP/ai_assistant.py обернуть вызовы Claude через
+#   4. В Dolg_APP/ai_assistant.py обернуть локальные AI-вызовы через
 #      langfuse-python SDK (post-defense — нужен один отдельный pip install
 #      langfuse, не сегодня).
 #

@@ -16,7 +16,7 @@ cloud-metadata (http://169.254.169.254 на AWS/GCP/Yandex Cloud, который
     except UrlBlocked as exc:
         return JsonResponse({'error': str(exc)}, status=400)
 
-Hardcoded URL'ы (Anthropic API, наш собственный CDN) проходят через
+Hardcoded trusted internal/service URL'ы проходят через
 обычные ``requests``-вызовы — для них guard не нужен.
 """
 

@@ -187,7 +187,8 @@ class MLAdminViewsTests(TestCase):
         self.assertIn('db', snapshot['runtime'])
         self.assertIn('cache', snapshot['runtime'])
         self.assertIn('runtime', snapshot['ai_ml'])
-        self.assertIn(snapshot['ai_ml']['runtime']['backend'], {'anthropic', 'ollama', 'rule_based', 'unknown'})
+        self.assertIn(snapshot['ai_ml']['runtime']['backend'], {'ollama', 'rule_based', 'unknown'})
+        self.assertIn('pytorch', snapshot['ai_ml']['runtime'])
 
     def test_staff_ops_snapshot_api_returns_json(self):
         response = self.client.get(reverse('hello:staff_ops_snapshot_api'))

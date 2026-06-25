@@ -41,7 +41,7 @@ _INJECTION_PATTERNS = [
     re.compile(r'\[/INST\]', re.IGNORECASE),
     re.compile(r'<<SYS>>', re.IGNORECASE),
     re.compile(r'<</SYS>>', re.IGNORECASE),
-    # Anthropic-style (наш стек!)
+    # LLM-provider style markers.
     re.compile(r'\bhuman:\s', re.IGNORECASE),
     re.compile(r'\bassistant:\s', re.IGNORECASE),
     re.compile(r'\bsystem:\s', re.IGNORECASE),
@@ -88,7 +88,7 @@ def sanitize_user_input(text: str, *, max_len: int = 4000) -> tuple[str, bool]:
     # 3. Truncate (защита от token-flooding).
     if len(text) > max_len:
         text = text[:max_len]
-    # 4. Детектим injection-паттерны (но не убираем — пусть Claude
+    # 4. Детектим injection-паттерны (но не убираем — пусть локальный LLM
     #    сам прочитает их в `<user_message>` и проигнорирует. Логируем флаг).
     suspicious = any(p.search(text) for p in _INJECTION_PATTERNS)
     return text, suspicious

@@ -91,7 +91,7 @@ class AIAssistantModuleTests(TestCase):
 
         from Dolg_APP import ai_assistant
 
-        with override_settings(ANTHROPIC_API_KEY=''):
+        with override_settings(OLLAMA_BASE_URL=''):
             self.assertFalse(ai_assistant.is_enabled())
 
     def test_agent_profiles_have_required_fields(self):
@@ -839,7 +839,9 @@ class EngineeringReviewTests(TestCase):
 
     def test_generate_protocol_rejects_unreadable_project(self):
         other = User.objects.create_user('protocol-other', 'protocol-other@x', 'pw')
-        project = SchematicProject.objects.create(user=other, name='Private protocol', scheme_data=self.scheme)
+        project = SchematicProject.objects.create(
+            user=other, name='Private protocol', scheme_data=self.scheme
+        )
 
         response = self.client.post(
             reverse('hello:api_generate_protocol'),
@@ -995,7 +997,7 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('learning_suggestions', data['saved_review'])
         self.assertTrue(SchematicProject.objects.filter(user=self.user, name='Imported divider').exists())
 
-    @override_settings(ANTHROPIC_API_KEY='')
+    @override_settings(OLLAMA_BASE_URL='')
     def test_ai_chat_uses_self_hosted_rule_engine_without_external_key(self):
         response = self.client.post(
             reverse('hello:api_ai_chat'),
@@ -1025,7 +1027,7 @@ class EngineeringReviewTests(TestCase):
         self.assertIn('retrieval_context', data)
         self.assertIsInstance(data['quick_actions'][0], dict)
 
-    @override_settings(ANTHROPIC_API_KEY='')
+    @override_settings(OLLAMA_BASE_URL='')
     def test_ai_chat_recommend_without_project_does_not_500(self):
         history = [{'role': 'user', 'content': f'old question {i}'} for i in range(25)]
         response = self.client.post(

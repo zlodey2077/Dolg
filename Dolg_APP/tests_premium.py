@@ -246,7 +246,7 @@ class AIPipelineTests(TestCase):
         self.assertEqual(r.status_code, 403)
         self.assertEqual(r.json().get('plan_required'), 'pro')
 
-    @override_settings(ANTHROPIC_API_KEY='')
+    @override_settings(OLLAMA_BASE_URL='')
     def test_ai_chat_extended_mode_blocked_for_free_and_allowed_for_pro(self):
         import json as _j
 

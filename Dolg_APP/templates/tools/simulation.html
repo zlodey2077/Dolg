@@ -18263,7 +18263,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
 })();
 </script>
 
-{# ================= AI-АССИСТЕНТ DOLG (чат с Claude) ================= #}
+{# ================= AI-АССИСТЕНТ DOLG (локальный Ollama/PyTorch) ================= #}
 <style>
 .dolg-ai-fab {
     position: fixed; right: 20px; top: 128px; bottom: auto; width: 56px; height: 56px;
@@ -19221,7 +19221,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         });
     }
 
-    // Счётчик токенов сессии: для Claude берём real usage, для self-hosted
+    // Счётчик токенов сессии: для Ollama берём usage, для rule-based
     // fallback — оценку с backend, чтобы индикатор не был мёртвым в demo.
     const _tokenStats = { in: 0, cached: 0, out: 0, estimated: false };
     function addTokensToCounter(usage) {
@@ -19713,7 +19713,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                 role: 'assistant',
                 kind: 'demo',
                 content: '🔑 AI-ассистент доступен только авторизованным пользователям. ' +
-                         'Войдите в аккаунт, чтобы пользоваться чатом с Claude.',
+                         'Войдите в аккаунт, чтобы пользоваться локальным AI-чатом.',
             });
             inputEl.value = '';
             return;

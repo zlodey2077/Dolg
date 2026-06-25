@@ -53,7 +53,20 @@ ENGINE_ROUTER_PROFILE = {
         'Redis/Celery queue or Kubernetes Jobs for async runs',
         'PersistentVolume/S3-compatible storage for raw traces and reports',
     ],
-    'fallback_order': ['dolg-engine-router', 'xyce', 'pyspice', 'gnucap', 'dolg-ngspice-wasm', 'dolg-numpy-mna'],
+    'fallback_order': [
+        'dolg-engine-router',
+        'xyce',
+        'pyspice',
+        'gnucap',
+        'dolg-ngspice-wasm',
+        'dolg-numpy-mna',
+    ],
+    'local_ai_links': {
+        'command_planner': 'text -> safe EngineJob JSON payload',
+        'engine_selector': 'scheme + PyTorch/rule hints -> ranked engine list',
+        'result_explainer': 'EngineJob result -> local_ai notes + neural_hint',
+        'execution_policy': 'never execute arbitrary shell; queue validated engine jobs only',
+    },
 }
 
 SERVER_ENGINE_CATALOG = [
@@ -471,6 +484,11 @@ def server_engine_payload(category: str | None = None) -> dict[str, Any]:
         'engines': engines,
         'summary': summarize_engines(engines),
         'router_profile': deepcopy(ENGINE_ROUTER_PROFILE),
+        'local_ai': {
+            'backend': 'ollama+pytorch+rule_ai',
+            'commands': ['recommend_engine', 'plan_engine_job', 'queue_engine_job', 'explain_engine_result'],
+            'safe_contract': ['engine_id', 'analysis_type', 'options', 'scheme_data', 'source'],
+        },
     }
 
 
@@ -496,7 +514,17 @@ def recommend_server_engines(scheme_data: dict[str, Any] | None, *, limit: int =
             ranked.append((score, engine))
 
     ranked.sort(key=lambda item: item[0], reverse=True)
-    return [deepcopy(engine) for _, engine in ranked[:limit]]
+    output = []
+    for score, engine in ranked[:limit]:
+        item = deepcopy(engine)
+        item['ai_score'] = score
+        item['ai_connections'] = {
+            'can_be_selected_by_local_ai': True,
+            'command_target': f'engine:{item["id"]}',
+            'job_payload_field': 'engine_id',
+        }
+        output.append(item)
+    return output
 
 
 def _tags_from_components(components: list[dict[str, Any]]) -> set[str]:

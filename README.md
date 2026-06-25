@@ -19,7 +19,7 @@
   Legal knowledge corpus · Открытые учебники + официальная документация · Источники для энциклопедии, learning, review evidence и AI-контекста без пиратских архивов
   Media Quality Gate · Pillow + ImageHash · Проверка товарных изображений: битость, размер, пустые/однотонные файлы, policy-нарушения и perceptual hash для дублей локальных product-shot
   PDF · "reportlab" · Гарантийные талоны и сертификаты на товары
-  Публичный доступ · Cloudflare Tunnel ("cloudflared.exe") · Один бинарник, без регистрации
+  Публичный доступ · ngrok ("deploy/ngrok.exe") · HTTPS-туннель с локальным конфигом
 
 Структура проекта
     DOLG_Diploma/
@@ -41,9 +41,9 @@
     ├── media/products/       # Товарные изображения: локальные assets + generated-заглушки без Wikimedia/Commons
     ├── requirements.txt
     ├── start_local.bat       # Локальный запуск на 127.0.0.1:8000 (для своей работы)
-    ├── start_public.bat      # Локальный + Cloudflare Tunnel (демо/защита/телефон)
-    ├── start_server.py       # Питон-launcher для start_public.bat
-    └── cloudflared.exe       # Портативный Cloudflare Tunnel (63 МБ)
+    ├── start_public.bat      # Локальный + ngrok tunnel (демо/защита/телефон)
+    ├── start_public_server.py # Публичный Python-launcher для start_public.bat
+    └── start_server.py       # Общий launcher-движок для локального/публичного режима
 
 
 Установка и запуск
@@ -101,9 +101,9 @@
 Открыть: http://127.0.0.1:8000/
 
 С публичной ссылкой (для защиты / телефона / ревью):
-    # Двойной клик на start_public.bat — запустит Django + Cloudflare Tunnel.
+    # Двойной клик на start_public.bat — запустит Django + ngrok tunnel.
     # Скрипт ждёт URL, делает propagation-probe и автоматически открывает браузер.
-    # Публичный URL вида https://random-words-abcd.trycloudflare.com — в окне launcher-а.
+    # Публичный URL вида https://random-words.ngrok-free.dev — в окне launcher-а.
 
 
 Ключевые страницы
@@ -518,14 +518,14 @@ URL: "/admin/". Доступ выполняется под суперпольз�
 адреса, профили, проекты схем, статьи энциклопедии.
 
 Публичная демонстрация
-Скачанный "cloudflared.exe" (Cloudflare Tunnel) создаёт одноразовый HTTPS-домен
-вида "https://xxx.trycloudflare.com" без регистрации и настройки роутера.
-"start_public.bat" запускает всё автоматически.
+"deploy/ngrok.exe" создаёт временный HTTPS-домен вида
+"https://xxx.ngrok-free.dev" без настройки роутера. "start_public.bat"
+запускает всё автоматически через "start_public_server.py".
 
 Для локального дипломного показа "/media/" раздаётся Django даже при "DEBUG=False" через "SERVE_MEDIA=1" по умолчанию. В продакшене за nginx можно поставить "SERVE_MEDIA=0", потому что "nginx.conf" отдаёт "/media/" напрямую.
 
-Для постоянного домена — завести бесплатный Cloudflare-аккаунт и
-named tunnel (https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/).
+Для постоянного домена — закрепить домен в ngrok dashboard или заменить tunnel-слой
+на nginx/Reverse Proxy в prod-режиме.
 
 Что ещё планируется (см. "docs/PROJECT_KNOWLEDGE_BASE.md#work-front-20260619" и "docs/PROJECT_KNOWLEDGE_BASE.md#development-history")
 Приоритет 1

@@ -72,7 +72,11 @@ MAX_AVATAR_SIZE = 5 * 1024 * 1024
 def _profile_choice(profile, field_name, raw_value):
     allowed = {key for key, _label in profile._meta.get_field(field_name).choices}
     value = (raw_value or '').strip()
+    if field_name == 'ai_backend' and value == 'cloud':
+        value = 'local'
     current = getattr(profile, field_name)
+    if field_name == 'ai_backend' and current == 'cloud':
+        current = 'local'
     return value if value in allowed else current
 
 

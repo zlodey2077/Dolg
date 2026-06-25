@@ -11,7 +11,7 @@
 - [Восстановление БД из бэкапа](#восстановление-бд-из-бэкапа)
 - [Закончилось место на диске](#закончилось-место-на-диске)
 - [AI-ассистент возвращает 5xx](#ai-ассистент-возвращает-5xx)
-- [Cloudflare-туннель оборвался](#cloudflare-туннель-оборвался)
+- [Публичный ngrok-туннель оборвался](#публичный-ngrok-туннель-оборвался)
 - [Подозрение на ddos / spam-регистрации](#подозрение-на-ddos--spam-регистрации)
 
 ---
@@ -204,41 +204,41 @@ docker compose logs web | grep -i 'ai_assistant\|anthropic\|claude'
 
 | Симптом в логах | Что делать |
 |---|---|
-| `AIAuthError 401` | Ключ невалиден / отозван. Сгенерируй новый на console.anthropic.com |
-| `AIRateLimitError 429` | Превышен лимит. Жди 60 сек или upgrade-план |
-| `AIError 500` | На стороне Anthropic — проверь status.anthropic.com |
-| Нет логов вообще | Ключ не задан — AI работает в demo-режиме (это норма) |
+| `Ollama unavailable` / timeout | Проверь, запущен ли Ollama: `ollama list` и `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
+| `local_ai` ушёл в fallback | Это безопасно: сайт отвечает rule-based подсказками без внешнего API |
+| PyTorch model missing | Проверь `media/ml/tiny_circuit_ai.pt` или запусти rule-based режим |
+| Нет логов вообще | Локальный AI не вызывается для этого сценария или используется кэш/fallback |
 
-**Временно отключить AI** (если он сыпет ошибками всем):
+**Временно отключить live-AI** (если он сыпет ошибками всем):
 ```bash
-docker compose exec web sh -c 'unset ANTHROPIC_API_KEY'
+docker compose exec web sh -c 'export OLLAMA_BASE_URL='
 docker compose restart web
-# UI юзеров увидит «AI временно недоступен» — это безопасный fallback
+# UI останется на rule-based fallback без внешних запросов
 ```
 
 ---
 
-## Cloudflare-туннель оборвался
+## Публичный ngrok-туннель оборвался
 
-Симптом: `dolg.online` отдаёт 502/timeout, а локально (через `localhost/healthz/`) всё работает.
+Симптом: публичная ссылка `https://...ngrok-free.dev` отдаёт timeout/ошибку, а локально
+через `http://127.0.0.1:8000/healthz/` всё работает.
 
 ```bash
-# Проверь процесс cloudflared
-ps aux | grep cloudflared
+# Проверь процесс ngrok
+ps aux | grep ngrok
 # или (Windows-host):
-Get-Process cloudflared
+Get-Process ngrok
 ```
 
-**Перезапуск Quick Tunnel (start_public.bat):**
+**Перезапуск публичного туннеля (start_public.bat):**
 ```cmd
-taskkill /IM cloudflared.exe /F
+taskkill /IM ngrok.exe /F
 .\start_public.bat
 ```
 
-При оборвавшемся стабильном туннеле:
-```bash
-sudo systemctl restart cloudflared
-sudo journalctl -u cloudflared -n 50
+**Проверка без запуска долгого сервера:**
+```cmd
+.\.venv\Scripts\python.exe start_public_server.py --check-only
 ```
 
 ---
@@ -270,6 +270,6 @@ docker compose exec db psql -U postgres -d "$POSTGRES_DB" -c \
 | Что | Куда |
 |---|---|
 | Sentry alerts | `sentry.io/organizations/dolg/issues/` |
-| Cloudflare dashboard | `dash.cloudflare.com` |
-| Anthropic status | `status.anthropic.com` |
+| ngrok dashboard | `dashboard.ngrok.com` |
+| Ollama local status | `http://127.0.0.1:11434/api/tags` |
 | Postgres docs | `postgresql.org/docs/15/` |

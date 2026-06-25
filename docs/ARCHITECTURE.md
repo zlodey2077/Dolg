@@ -16,7 +16,7 @@
                                    │ HTTPS
                                    ▼
                     ┌────────────────────────────────┐
-                    │   Cloudflare Tunnel / nginx    │
+                    │     ngrok tunnel / nginx       │
                     │  proxy_pass → 127.0.0.1:8000   │
                     │  + статика /static/, /media/   │
                     └──────────────┬─────────────────┘
@@ -33,9 +33,9 @@
                           │                   │
                           ▼                   ▼
                 ┌───────────────┐   ┌────────────────────┐
-                │  PostgreSQL   │   │  Anthropic Claude  │
-                │  (data + JSON │   │  (опц., AI-чат)    │
-                │   schemes)    │   │  haiku-4-5         │
+                │  PostgreSQL   │   │  Local AI runtime  │
+                │  (data + JSON │   │  Ollama + PyTorch  │
+                │   schemes)    │   │  + rule fallback   │
                 └───────────────┘   └────────────────────┘
 ```
 
@@ -156,7 +156,7 @@ fetch POST /api/ai/chat/ {prompt, agent: 'recommend'}
 Dolg_APP.ai_assistant.chat(prompt, agent='recommend')
    • build_system_blocks() — кэшируемые префиксы (cache_control: ephemeral)
    • build_catalog_snapshot() — топ-N товаров из БД (LocMem cache 60 сек)
-   • Anthropic SDK → claude-haiku-4-5
+   • local runtime → Ollama / PyTorch / rule-based fallback
        │
        ▼
 JsonResponse({reply: "..."})
@@ -192,8 +192,8 @@ client: рендер в chat-bubble
 | Сервис | Required? | Что без него |
 |---|---|---|
 | **PostgreSQL** | Да для prod | dev — SQLite-фолбэк |
-| **Anthropic Claude API** | Нет | AI-ассистент в demo-режиме («временно недоступен») |
-| **Cloudflare Tunnel** | Опц. для публичного доступа | работает только localhost |
+| **Ollama / local PyTorch** | Нет | AI-ассистент уходит в rule-based fallback |
+| **ngrok tunnel** | Опц. для публичного доступа | работает только localhost |
 | **Sentry** | Нет | ошибки только в console-logs |
 | **Stripe** | Заглушка | demo-mode payments |
 | **SMTP** | Нет (есть console-backend) | email-verify письма не уходят |
@@ -229,7 +229,7 @@ DJANGO_SETTINGS_MODULE=Dolg_PR.settings_prod
 
 - **Dev:** `python manage.py runserver` + SQLite (см. [LOCAL_SETUP.md](LOCAL_SETUP.md))
 - **Prod-Docker:** `docker compose up -d` → 3 контейнера (db, web, nginx)
-- **Public demo:** `start_public.bat` → cloudflared quick-tunnel
+- **Public demo:** `start_public.bat` → `start_public_server.py` → ngrok tunnel
 
 См. [DEPLOY.md](DEPLOY.md) для подробностей.
 

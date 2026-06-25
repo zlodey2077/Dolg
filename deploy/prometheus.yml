@@ -31,7 +31,7 @@ scrape_configs:
           env: 'production'
 
   # Headroom proxy — для инсталляций с запущенным
-  # ANTHROPIC_BASE_URL=http://127.0.0.1:8787 (либо отдельным
+  # LOCAL_AI_PROXY_URL=http://127.0.0.1:8787 (либо отдельным
   # docker-сервисом). Метрики: requests_total, cached_total,
   # rate_limited_total, compression ratio, token-savings.
   - job_name: 'headroom-proxy'

@@ -535,14 +535,12 @@ SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# AI-ассистент (Claude API). Без ключа endpoint работает в demo-режиме —
-# UI отдаёт пользователю понятное сообщение «AI временно недоступен» и не
-# падает. Боевое значение задаётся через переменную окружения.
-# (Состояние «включён/нет» спрашиваем через ai_assistant.is_enabled() —
-# отдельной переменной не держим, чтобы не было двух источников истины.)
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+# Local AI: Ollama handles text generation, PyTorch tiny models handle circuit
+# hints, rule/retrieval layers stay as deterministic fallback.
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', '')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:0.6b')
+OLLAMA_TIMEOUT_SEC = int(os.getenv('OLLAMA_TIMEOUT_SEC', '75'))
+LOCAL_AI_TIMEOUT_SEC = int(os.getenv('LOCAL_AI_TIMEOUT_SEC', str(OLLAMA_TIMEOUT_SEC)))
 
 # Sentry — opt-in через переменную окружения SENTRY_DSN. Если она задана и
 # sentry_sdk установлен (`pip install sentry-sdk`), инициализируется в

@@ -301,6 +301,7 @@
             <div class="ops-metric-line"><span>Live backend</span><strong>{{ ops_snapshot.ai_ml.runtime.backend }}</strong></div>
             <div class="ops-metric-line"><span>Ollama online</span><strong>{{ ops_snapshot.ai_ml.runtime.ollama.available }}</strong></div>
             <div class="ops-metric-line"><span>Ollama model</span><strong>{{ ops_snapshot.ai_ml.runtime.ollama.model }}</strong></div>
+            <div class="ops-metric-line"><span>PyTorch model</span><strong>{{ ops_snapshot.ai_ml.runtime.pytorch.model_exists }}</strong></div>
         </div>
     </div>
     {% endif %}

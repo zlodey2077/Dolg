@@ -257,7 +257,7 @@ urlpatterns = [
         lazy_view('Dolg_APP.views.api_lithium_import_preview'),
         name='api_lithium_import_preview',
     ),
-    # AI-ассистент DOLG (чат с Claude)
+    # AI-ассистент DOLG (локальный Ollama/PyTorch/rule-based runtime)
     path('api/ai/chat/', lazy_view('Dolg_APP.views.api_ai_chat'), name='api_ai_chat'),
     path('api/ai/context/', lazy_view('Dolg_APP.views.api_ai_context'), name='api_ai_context'),
     # Engineering Review V2: in-memory scheme → JSON-отчёт (no project save).

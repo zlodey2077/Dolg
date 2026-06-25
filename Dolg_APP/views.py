@@ -39,6 +39,7 @@ from .quotas import (
 )
 from .schematic_validation import COMPONENT_TO_CATEGORY, validate_scheme_data
 from .services.cad_import import import_preview
+from .services.engine_ai import plan_engine_action
 from .services.engine_jobs import retry_engine_job
 from .services.entitlements import (
     feature_denied_response,
@@ -2652,10 +2653,10 @@ AI_FREE_HISTORY_TAIL = 6
 AI_HISTORY_TAIL = 20  # сколько предыдущих реплик держит self-hosted AI
 AI_LIVE_HISTORY_TAIL = 16  # live LLM получает меньше истории + session_summary
 
-# Минимальный интервал между вызовами Claude API одним пользователем (в секундах).
+# Минимальный интервал между вызовами локального AI одним пользователем (в секундах).
 # Защищает от случайных дабл-кликов и от спама в окно ввода. Хранится в session.
 AI_MIN_INTERVAL_SEC = 2.0
-# Per-minute tier-aware лимит AI-чата (анти-DoS на кошелёк Anthropic).
+# Per-minute tier-aware лимит AI-чата (анти-DoS на локальный runtime).
 AI_PER_MINUTE_LIMITS = {'guest': 8, 'free': 12, 'pro': 40, 'enterprise': 80}
 
 
@@ -2663,7 +2664,7 @@ def _ai_rate_limit(request):
     """True если запрос отклонён по rate-limit. Состояние — в session.
 
     Два слоя: (1) per-call минимальный интервал (анти-burst) и (2) per-minute
-    tier-aware счётчик (анти-DoS на кошелёк Anthropic) — у Pro/Enterprise лимит
+    tier-aware счётчик (анти-DoS на локальный runtime) — у Pro/Enterprise лимит
     выше, staff (unlimited) без per-minute. Жёсткий дневной потолок — отдельно
     в enforce_daily_quota (БД, per-user). Здесь session-слой как доп. защита.
 
@@ -2771,8 +2772,22 @@ def api_server_engine_recommend(request):
     except TypeError, ValueError:
         limit = 5
     engines = recommend_server_engines(scheme_data, limit=max(1, min(limit, 10)))
+    command_text = str(data.get('message') or data.get('prompt') or data.get('command_text') or '').strip()
+    action_plan = None
+    if command_text:
+        action_plan = plan_engine_action(
+            command_text,
+            scheme_data=scheme_data,
+            preferred_engine=str(data.get('preferred_engine') or data.get('engine_id') or '').strip() or None,
+            limit=max(1, min(limit, 10)),
+        )
     return JsonResponse(
-        {'ok': True, 'engines': engines, 'router_profile': server_engine_payload()['router_profile']},
+        {
+            'ok': True,
+            'engines': engines,
+            'action_plan': action_plan,
+            'router_profile': server_engine_payload()['router_profile'],
+        },
         json_dumps_params={'ensure_ascii': False},
     )
 
@@ -2854,11 +2869,6 @@ def api_engine_jobs(request):
         )
 
     data = _read_json_payload(request)
-    engine_id = str(data.get('engine_id') or data.get('engine') or '').strip().lower()
-    engine = get_server_engine(engine_id)
-    if not engine:
-        return _json_error('Unknown engine_id')
-
     project = None
     project_id = data.get('project_id')
     if project_id not in (None, ''):
@@ -2868,6 +2878,8 @@ def api_engine_jobs(request):
             return _json_error('Project not found', status=404)
 
     scheme_data = data.get('scheme_data') or data.get('scheme') or {}
+    if not scheme_data and project is not None:
+        scheme_data = project.scheme_data or {}
     if scheme_data and not isinstance(scheme_data, dict):
         return _json_error('scheme_data must be an object')
 
@@ -2875,7 +2887,28 @@ def api_engine_jobs(request):
     if options and not isinstance(options, dict):
         return _json_error('options must be an object')
 
-    analysis_type = str(data.get('analysis_type') or data.get('analysis') or 'unknown').strip().lower()[:32]
+    command_text = str(data.get('command_text') or data.get('message') or data.get('prompt') or '').strip()
+    ai_command_plan = None
+    engine_id = str(data.get('engine_id') or data.get('engine') or '').strip().lower()
+    analysis_type = str(data.get('analysis_type') or data.get('analysis') or '').strip().lower()[:32]
+    if command_text:
+        ai_command_plan = plan_engine_action(
+            command_text,
+            scheme_data=scheme_data if isinstance(scheme_data, dict) else {},
+            preferred_engine=engine_id or None,
+            limit=5,
+        )
+        command = ai_command_plan.get('command') or {}
+        engine_id = engine_id or str(command.get('engine_id') or '').strip().lower()
+        analysis_type = analysis_type or str(command.get('analysis_type') or '').strip().lower()[:32]
+        planned_options = command.get('options') if isinstance(command.get('options'), dict) else {}
+        options = {**planned_options, **options}
+
+    engine = get_server_engine(engine_id)
+    if not engine:
+        return _json_error('Unknown engine_id')
+
+    analysis_type = analysis_type or 'unknown'
     netlist = str(data.get('netlist') or '')
     try:
         max_retries = max(0, min(int(data.get('max_retries', 2)), 10))
@@ -2899,6 +2932,8 @@ def api_engine_jobs(request):
             'engine_endpoint': engine.get('endpoint', ''),
             'expected_outputs': engine.get('outputs', []),
             'source': data.get('source') or 'api',
+            'command_text': command_text,
+            'ai_command_plan': ai_command_plan or {},
         },
         audit_log=[
             {
@@ -2906,7 +2941,11 @@ def api_engine_jobs(request):
                 'action': 'queued',
                 'actor': request.user.get_username() or 'user',
                 'message': 'Queued from simulation API.',
-                'meta': {'engine_id': engine['id'], 'source': data.get('source') or 'api'},
+                'meta': {
+                    'engine_id': engine['id'],
+                    'source': data.get('source') or 'api',
+                    'ai_command': bool(ai_command_plan),
+                },
             }
         ],
     )
