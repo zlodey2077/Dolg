@@ -14,12 +14,12 @@
     горизонтально из-за каскадного flex). Без query-string браузер тянет
     закэшированную версию CSS. Подбивать строку при каждом next-fix навигации.
     {% endcomment %}
-    <link rel="stylesheet" href="{% static 'shop/cosmic_theme.css' %}?v=20260625-nav-workspace-fix">
+    <link rel="stylesheet" href="{% static 'shop/cosmic_theme.css' %}?v=20260626-workspace-ux3">
     {% comment %}extra_head: link/script из дочерних шаблонов; extra_css: inline-CSS (каждый шаблон сам в <style>). Без двойной обёртки.{% endcomment %}
     {% block extra_head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>
-<body
+<body class="{% block body_class %}{% endblock %}"
     data-user-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}"
     {% if user.is_authenticated %}
     data-profile-theme="{{ user.profile.preferred_theme|default:'dark' }}"

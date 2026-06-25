@@ -1863,6 +1863,122 @@ span.param-chip { cursor: default; opacity: 0.85; }
 }
 
 /* ============================================================
+   Workspace UX compact mode (CAD / simulator).
+   These pages need vertical pixels for the editor, not marketing chrome.
+   ============================================================ */
+body.dolg-workspace-page header {
+    border-bottom-width: 1px;
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.22);
+}
+
+body.dolg-workspace-page .header-content {
+    padding: 0.45rem 0;
+    gap: 0.7rem;
+}
+
+body.dolg-workspace-page .logo {
+    font-size: clamp(1.1rem, 2vw, 1.55rem);
+    letter-spacing: 1px;
+}
+
+body.dolg-workspace-page .header-search {
+    flex: 0 1 360px;
+    max-width: 360px;
+    min-width: 220px;
+}
+
+body.dolg-workspace-page .header-search input[type="search"],
+body.dolg-workspace-page .header-search button {
+    padding-top: 0.42rem;
+    padding-bottom: 0.42rem;
+}
+
+body.dolg-workspace-page #dolg-main-nav > ul {
+    gap: 1rem;
+    row-gap: 0.25rem;
+}
+
+body.dolg-workspace-page #dolg-main-nav a {
+    padding-bottom: 0.22rem;
+}
+
+body.dolg-workspace-page main {
+    padding: 0.7rem 0 0.5rem;
+    min-height: calc(100vh - 92px);
+}
+
+body.dolg-workspace-page footer {
+    display: none;
+}
+
+body.dolg-workspace-page .dropdown-menu {
+    z-index: 12000;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner {
+    left: 14px;
+    right: auto;
+    bottom: 14px;
+    width: min(380px, calc(100vw - 28px));
+    border: 1px solid rgba(0, 212, 255, 0.34);
+    border-radius: 8px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.48);
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__body {
+    max-width: none;
+    padding: 0.6rem;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__text p {
+    display: none;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__options label {
+    font-size: 0.76rem;
+    min-width: 0;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__btn {
+    padding: 0.42rem 0.5rem;
+    white-space: normal;
+}
+
+body.dolg-workspace-page .dolg-cookie-banner__btn--primary {
+    grid-column: 1 / -1;
+}
+
+body.dolg-simulation-page .dolg-cookie-banner {
+    left: auto;
+    right: 14px;
+}
+
+@media (max-width: 980px) {
+    body.dolg-workspace-page .header-content {
+        align-items: stretch;
+    }
+    body.dolg-workspace-page .header-search {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: none;
+    }
+}
+
+/* ============================================================
    Footer — обновлённый (DOLG, не SchemaLab; legal-links, disclaimer)
    ============================================================ */
 footer .dolg-footer-inner {

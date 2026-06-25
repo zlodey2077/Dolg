@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block title %}2D САПР - DOLG{% endblock %}
+{% block body_class %}dolg-workspace-page dolg-cad-page{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'shop/workspace-preferences.css' %}?v=20260625-canvas-fix">
@@ -1438,10 +1439,143 @@
             min-width: max-content;
         }
     }
+
+    /* 2026-06-26 workspace UX pass: stable CAD geometry.
+       This block intentionally lives last: older CAD styles redefine the same
+       selectors several times. */
+    body.dolg-cad-page .main-content {
+        padding-top: 0.6rem !important;
+    }
+
+    body.dolg-cad-page .main-content > .container {
+        max-width: 100% !important;
+        padding-left: 0.55rem !important;
+        padding-right: 0.55rem !important;
+    }
+
+    body.dolg-cad-page #app-container {
+        height: calc(100svh - 112px) !important;
+        min-height: 620px !important;
+        gap: 7px !important;
+    }
+
+    .cad-mode-tabs,
+    .top-controls {
+        flex: 0 0 auto !important;
+    }
+
+    .cad-mode-tabs {
+        min-height: 48px !important;
+        padding: 7px 8px !important;
+    }
+
+    .top-controls {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 7px !important;
+    }
+
+    .top-controls .control-group,
+    .top-controls .cad-actions-group {
+        min-width: 0 !important;
+    }
+
+    .top-controls .btn-small,
+    .top-controls button,
+    .top-controls select {
+        min-height: 34px !important;
+        max-width: none !important;
+    }
+
+    .cad-layout {
+        display: grid !important;
+        grid-template-columns: 70px minmax(680px, 1fr) minmax(280px, clamp(280px, 20vw, 340px));
+        gap: 8px !important;
+        min-height: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+    }
+
+    .tools-panel,
+    .canvas-area,
+    .right-panel {
+        min-height: 0 !important;
+    }
+
+    .tools-panel {
+        width: auto !important;
+        max-height: 100% !important;
+        overflow-y: auto !important;
+    }
+
+    .canvas-area {
+        min-width: 0 !important;
+        min-height: 500px !important;
+    }
+
+    .cad-view-tabs,
+    .canvas-header {
+        flex: 0 0 auto !important;
+    }
+
+    #canvas {
+        width: 100% !important;
+        min-height: 420px !important;
+        flex: 1 1 auto !important;
+    }
+
+    .right-panel {
+        width: auto !important;
+        min-width: 0 !important;
+        max-height: 100% !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+    }
+
+    .right-panel .panel-section[open] .panel-section-content {
+        min-height: 0;
+    }
+
+    .cad-ai-output,
+    .cad-mini-list {
+        max-height: 170px;
+        overflow: auto;
+    }
+
+    @media (max-width: 1280px) {
+        .cad-layout {
+            grid-template-columns: 66px minmax(0, 1fr) minmax(250px, 300px);
+        }
+        .top-controls {
+            overflow-x: auto !important;
+            flex-wrap: nowrap !important;
+        }
+    }
+
+    @media (max-width: 980px) {
+        body.dolg-cad-page #app-container {
+            height: auto !important;
+            min-height: 760px !important;
+        }
+        .cad-layout {
+            grid-template-columns: 56px minmax(0, 1fr);
+            grid-template-rows: minmax(520px, 62vh) minmax(280px, auto);
+        }
+        .right-panel {
+            grid-column: 1 / -1;
+            max-height: 360px !important;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<script>
+document.body.classList.add('dolg-workspace-page', 'dolg-cad-page');
+</script>
 {% comment %}
     3D-инфраструктура: те же файлы что у симулятора. Загружаются раз
     при открытии страницы. Если пользователь так и не нажмёт «🎬 3D» —
@@ -4169,6 +4303,7 @@ function render() {
 
 function resizeCanvas() {
     const parent = State.canvas.parentElement;
+    const parentRect = parent.getBoundingClientRect();
     const occupied = Array.from(parent.children).reduce((sum, child) => {
         if (child === State.canvas || child.hidden) return sum;
         const style = getComputedStyle(child);
@@ -4177,8 +4312,14 @@ function resizeCanvas() {
         }
         return sum + child.getBoundingClientRect().height;
     }, 0);
-    State.canvas.width = Math.max(320, Math.floor(parent.clientWidth));
-    State.canvas.height = Math.max(260, Math.floor(parent.clientHeight - occupied));
+    const cssWidth = Math.max(320, Math.floor(parentRect.width || parent.clientWidth || 0));
+    const viewportFallback = Math.max(420, Math.floor((window.innerHeight || 760) - 300));
+    const cssHeight = Math.max(
+        420,
+        Math.floor((parentRect.height || parent.clientHeight || viewportFallback) - occupied),
+    );
+    State.canvas.width = cssWidth;
+    State.canvas.height = cssHeight;
     render();
 }
 

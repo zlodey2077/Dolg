@@ -4,6 +4,7 @@
 {# НОВЫЙ РЕДАКТОР СХЕМ С РЕАЛЬНЫМИ КОМПОНЕНТАМИ ГОСТ #}
 
 {% block title %}⚙️ Редактор схем - ДИПЛОМ{% endblock %}
+{% block body_class %}dolg-workspace-page dolg-simulation-page{% endblock %}
 
 {% block extra_head %}
 {% comment %}
@@ -17,6 +18,9 @@
 {% endblock %}
 
 {% block content %}
+<script>
+document.body.classList.add('dolg-workspace-page', 'dolg-simulation-page');
+</script>
 {% comment %}
 Все теги — defer: HTML парсится без блокировки, скрипты исполняются по
 порядку перед DOMContentLoaded (так что глобальные PIXI / THREE / наши
@@ -215,7 +219,7 @@ body.dolg-shared-view .properties-section { opacity: 0.55; pointer-events: none;
         </div>
     </div>
     {% if is_guest_demo %}
-    <div class="alert alert-info" style="margin-bottom: 1rem;">
+    <div class="alert alert-info sim-demo-notice">
         Демо-режим: можно собрать схему, запустить симуляцию и экспортировать файлы. Сохранение проектов доступно после входа.
     </div>
     {% endif %}
@@ -4988,7 +4992,7 @@ const TOUR_STEPS = [
 
 function simShouldShowTour() {
     if (new URLSearchParams(location.search).get('tour') === '1') return true;
-    try { return !localStorage.getItem(TOUR_KEY); } catch (_) { return false; }
+    return false;
 }
 
 function simRestartTour() {
@@ -17727,19 +17731,29 @@ body.dolg-3d-active > footer {
 /* 2026-06-25 demo hotfix: bigger schematic field + readable instruments.
    These rules live late in simulation.html because older inline CSS overrides
    workspace-preferences.css. */
-.simulator-container {
-    grid-template-rows: auto minmax(480px, 1fr) minmax(238px, 31vh) !important;
-    height: calc(100vh - 48px) !important;
-    min-height: 760px !important;
+body.dolg-simulation-page .tools-header {
+    display: none !important;
+}
+body.dolg-simulation-page .sim-demo-notice {
+    margin: 0 0 6px !important;
+    padding: 7px 10px !important;
+    font-size: 0.86rem !important;
+    line-height: 1.25 !important;
+    border-radius: 8px !important;
+}
+body.dolg-simulation-page .simulator-container {
+    grid-template-rows: auto minmax(400px, 1fr) minmax(220px, 27vh) !important;
+    height: calc(100svh - 150px) !important;
+    min-height: 630px !important;
     gap: 6px !important;
-    padding: 8px !important;
+    padding: 7px !important;
 }
 .simulator-container > .components-panel { grid-row: 1 !important; }
 .simulator-container > .workspace { grid-row: 2 !important; min-height: 0 !important; }
 .simulator-container > .analysis-bottom-panel { grid-row: 3 !important; }
 .simulator-container > .simulator-bottom-panel.sim-dock { display: none !important; }
-.canvas-container {
-    min-height: clamp(460px, 61vh, 860px) !important;
+body.dolg-simulation-page .canvas-container {
+    min-height: clamp(400px, 49vh, 740px) !important;
     height: 100% !important;
 }
 #schematicCanvas,
@@ -17747,11 +17761,11 @@ body.dolg-3d-active > footer {
     height: 100% !important;
     min-height: 100% !important;
 }
-.analysis-bottom-panel {
-    --analysis-height: clamp(238px, 31vh, 340px);
-    min-height: 238px !important;
+body.dolg-simulation-page .analysis-bottom-panel {
+    --analysis-height: clamp(220px, 28vh, 300px);
+    min-height: 220px !important;
     height: var(--analysis-height) !important;
-    max-height: min(36vh, 360px) !important;
+    max-height: min(32vh, 320px) !important;
     flex-basis: var(--analysis-height) !important;
 }
 .analysis-bottom-content {
@@ -17762,23 +17776,23 @@ body.dolg-3d-active > footer {
     overflow: visible !important;
 }
 .dolg-lab-grid {
-    min-height: 190px !important;
-    grid-template-columns: minmax(390px, 2fr) minmax(230px, 1fr) minmax(270px, 1fr) !important;
+    min-height: 176px !important;
+    grid-template-columns: minmax(420px, 2fr) minmax(250px, 1fr) minmax(280px, 1fr) !important;
     gap: 10px !important;
 }
 .dolg-lab-grid > .dolg-lab-card {
-    min-height: 178px !important;
-    padding: 10px 12px !important;
+    min-height: 164px !important;
+    padding: 9px 11px !important;
 }
 .dolg-lab-scope-canvas {
-    min-height: 112px !important;
+    min-height: 102px !important;
 }
 .dolg-lab-controls {
     gap: 6px !important;
 }
 @media (max-width: 1180px) {
-    .simulator-container {
-        grid-template-rows: auto minmax(430px, 1fr) minmax(300px, auto) !important;
+    body.dolg-simulation-page .simulator-container {
+        grid-template-rows: auto minmax(460px, 1fr) minmax(320px, auto) !important;
         height: auto !important;
         min-height: 760px !important;
     }
