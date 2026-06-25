@@ -11,7 +11,7 @@
 - [Восстановление БД из бэкапа](#восстановление-бд-из-бэкапа)
 - [Закончилось место на диске](#закончилось-место-на-диске)
 - [AI-ассистент возвращает 5xx](#ai-ассистент-возвращает-5xx)
-- [Публичный Cloudflare-туннель оборвался](#публичный-cloudflare-туннель-оборвался)
+- [Публичный ngrok-туннель оборвался](#публичный-ngrok-туннель-оборвался)
 - [Подозрение на ddos / spam-регистрации](#подозрение-на-ddos--spam-регистрации)
 
 ---
@@ -218,21 +218,21 @@ docker compose restart web
 
 ---
 
-## Публичный Cloudflare-туннель оборвался
+## Публичный ngrok-туннель оборвался
 
-Симптом: публичная ссылка `https://...trycloudflare.com` отдаёт timeout/ошибку, а локально
+Симптом: публичная ссылка `https://...ngrok-free.dev` отдаёт timeout/ошибку, а локально
 через `http://127.0.0.1:8000/healthz/` всё работает.
 
 ```bash
-# Проверь процесс cloudflared
-ps aux | grep cloudflared
+# Проверь процесс ngrok
+ps aux | grep ngrok
 # или (Windows-host):
-Get-Process cloudflared
+Get-Process ngrok
 ```
 
 **Перезапуск публичного туннеля (start_public.bat):**
 ```cmd
-taskkill /IM cloudflared.exe /F
+taskkill /IM ngrok.exe /F
 .\start_public.bat
 ```
 
@@ -270,6 +270,6 @@ docker compose exec db psql -U postgres -d "$POSTGRES_DB" -c \
 | Что | Куда |
 |---|---|
 | Sentry alerts | `sentry.io/organizations/dolg/issues/` |
-| Cloudflare dashboard | `dash.cloudflare.com` |
+| ngrok dashboard | `dashboard.ngrok.com` |
 | Ollama local status | `http://127.0.0.1:11434/api/tags` |
 | Postgres docs | `postgresql.org/docs/15/` |

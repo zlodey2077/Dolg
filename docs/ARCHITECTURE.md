@@ -16,7 +16,7 @@
                                    │ HTTPS
                                    ▼
                     ┌────────────────────────────────┐
-                    │ Cloudflare tunnel / nginx      │
+                    │     ngrok tunnel / nginx       │
                     │  proxy_pass → 127.0.0.1:8000   │
                     │  + статика /static/, /media/   │
                     └──────────────┬─────────────────┘
@@ -193,7 +193,7 @@ client: рендер в chat-bubble
 |---|---|---|
 | **PostgreSQL** | Да для prod | dev — SQLite-фолбэк |
 | **Ollama / local PyTorch** | Нет | AI-ассистент уходит в rule-based fallback |
-| **Cloudflare Quick Tunnel** | Опц. для публичного доступа | работает только localhost |
+| **ngrok tunnel** | Опц. для публичного доступа | работает только localhost |
 | **Sentry** | Нет | ошибки только в console-logs |
 | **Stripe** | Заглушка | demo-mode payments |
 | **SMTP** | Нет (есть console-backend) | email-verify письма не уходят |
@@ -229,7 +229,7 @@ DJANGO_SETTINGS_MODULE=Dolg_PR.settings_prod
 
 - **Dev:** `python manage.py runserver` + SQLite (см. [LOCAL_SETUP.md](LOCAL_SETUP.md))
 - **Prod-Docker:** `docker compose up -d` → 3 контейнера (db, web, nginx)
-- **Public demo:** `start_public.bat` → `start_public_server.py` → Cloudflare Quick Tunnel
+- **Public demo:** `start_public.bat` → `start_public_server.py` → ngrok tunnel
 
 См. [DEPLOY.md](DEPLOY.md) для подробностей.
 

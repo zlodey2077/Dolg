@@ -33,8 +33,9 @@ def p(msg):
 
 ROOT = Path(__file__).resolve().parent
 DJANGO_PORT = 8000
-# ngrok.exe в deploy/. Публичный туннель через ngrok: Cloudflare Quick Tunnel
-# периодически отдаёт error 1033. Токен — в %LOCALAPPDATA%\ngrok\ngrok.yml
+# ngrok.exe в deploy/. Cloudflare Quick Tunnel периодически отдаёт error 1033,
+# поэтому публичный режим по умолчанию снова использует ngrok.
+# Токен — в %LOCALAPPDATA%\ngrok\ngrok.yml
 # (один раз: ngrok config add-authtoken ...).
 def find_ngrok():
     candidates = [
@@ -345,11 +346,35 @@ def _start_django(py, env, hot, log_path):
     """Запустить Django; вернуть (proc, 'hot'|'plain')."""
     django_cmd, hot_active = build_django_cmd(py, hot)
     mode = 'hot' if hot_active else 'plain'
-    log = open(log_path, 'a', encoding='utf-8', buffering=1)
-    log.write('\n--- %s Django start (%s) ---\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), mode))
-    log.write('cmd: %s\n' % subprocess.list2cmdline(django_cmd))
-    proc = subprocess.Popen(django_cmd, cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT)
+    with open(log_path, 'a', encoding='utf-8', buffering=1) as log:
+        log.write('\n--- %s Django start (%s) ---\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), mode))
+        log.write('cmd: %s\n' % subprocess.list2cmdline(django_cmd))
+    proc = subprocess.Popen(
+        django_cmd,
+        cwd=str(ROOT),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+    )
+    echo = env.get('DOLG_SHOW_DJANGO_LOG', '1').lower() not in {'0', 'false', 'no'}
+    threading.Thread(
+        target=_forward_django_output,
+        args=(proc.stdout, log_path, echo),
+        daemon=True,
+    ).start()
     return proc, mode
+
+
+def _forward_django_output(stream, log_path, echo):
+    if stream is None:
+        return
+    with open(log_path, 'a', encoding='utf-8', buffering=1) as log:
+        for raw in iter(stream.readline, b''):
+            line = raw.decode('utf-8', errors='replace').rstrip()
+            log.write(line + '\n')
+            if echo and line:
+                p('[django] ' + line)
 
 
 def _kill_proc(proc):
@@ -398,6 +423,7 @@ def main():
     local_only = ('--local' in sys.argv) or ('--no-tunnel' in sys.argv)
     hot = ('--hot' in sys.argv) and ('--no-hot' not in sys.argv)
     no_browser = '--no-browser' in sys.argv
+    exit_after_ready = '--exit-after-ready' in sys.argv
 
     report = []
 
@@ -441,6 +467,10 @@ def main():
     env['CLICOLOR_FORCE'] = '0'
     env['DOLG_SKIP_ASGI'] = '1'
     env['DOLG_SKIP_OPTIONAL_APP_PROBES'] = '1'
+    if '--quiet-django-log' in sys.argv:
+        env['DOLG_SHOW_DJANGO_LOG'] = '0'
+    else:
+        env.setdefault('DOLG_SHOW_DJANGO_LOG', '1')
     env.setdefault('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
     env.setdefault('OLLAMA_MODEL', 'qwen3:0.6b')
     strict_migrations = env.get('DOLG_LAUNCHER_STRICT_MIGRATIONS') == '1'
@@ -552,18 +582,25 @@ def main():
     rep('OK', 'Сервер отвечает (%s) на 127.0.0.1:%d' % (mode, DJANGO_PORT))
     _write_report(report)
 
+    if exit_after_ready:
+        rep('OK', 'Проверочный запуск завершён: сервер поднялся, теперь останавливаю процесс.')
+        _kill_proc(django)
+        return 0
+
     cf = None
     if local_only:
         local_url = 'http://127.0.0.1:%d/' % DJANGO_PORT
         line = '=' * 60
         p('')
         p(line)
-        p('              >>> DOLG GOTOV K TESTU (lokalno) <<<')
+        p('              >>> DOLG ГОТОВ К РАБОТЕ (локально) <<<')
         p(line)
+        p('')
+        p('   Открыть:')
         p('')
         p('       ' + local_url)
         p('')
-        p('   Plain stable mode bez Django autoreload. Ctrl+C ili zakroyte okno dlya ostanovki.')
+        p('   Стабильный режим без autoreload. Ctrl+C — остановить сервер.')
         p('')
         if not no_browser:
             try:
@@ -650,13 +687,13 @@ def main():
                 p('\n[!] Django process died.')
                 break
             if cf is not None and cf.poll() is not None:
-                p('\n[!] Cloudflared process died.')
+                p('\n[!] Tunnel process died.')
                 break
     except KeyboardInterrupt:
         p('\n[*] Stopping...')
     finally:
         # CTRL_BREAK_EVENT работает только на процессах, запущенных с
-        # CREATE_NEW_PROCESS_GROUP (т.е. cloudflared). Django был запущен
+        # CREATE_NEW_PROCESS_GROUP (т.е. tunnel process). Django был запущен
         # без флага — посылка CTRL_BREAK туда упадёт с ValueError, поэтому
         # для него сразу .terminate().
         graceful = ([(cf, 'ngrok', True)] if cf is not None else []) + [(django, 'django', False)]

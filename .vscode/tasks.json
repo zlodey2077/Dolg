@@ -142,7 +142,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Django: public server (Cloudflare)",
+      "label": "Django: public server (ngrok)",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
       "args": [
@@ -155,7 +155,7 @@
           "DOLG_SKIP_ASGI": "1",
           "DOLG_SKIP_OPTIONAL_APP_PROBES": "1",
           "DOLG_SKIP_SOCIALACCOUNT_PROVIDERS": "1",
-          "DOLG_PUBLIC_TUNNEL_PROVIDER": "cloudflare",
+          "DOLG_PUBLIC_TUNNEL_PROVIDER": "ngrok",
           "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
           "OLLAMA_MODEL": "qwen3:0.6b",
           "PYTHONUTF8": "1"

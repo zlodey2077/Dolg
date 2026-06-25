@@ -1,14 +1,12 @@
 @echo off
 REM ============================================================
-REM DOLG - public launcher (Django + Cloudflare Quick Tunnel)
+REM DOLG - public launcher (Django + ngrok tunnel)
 REM    Delegates to start_public_server.py, which:
-REM      1) starts Django on 127.0.0.1:8000 through the local launcher
-REM      2) starts deploy\cloudflared.exe Quick Tunnel
+REM      1) checks/repairs ngrok v3 config
+REM      2) starts Django on 127.0.0.1:8000 through the Python launcher
 REM      3) waits for the public URL, then opens the browser
 REM    Use this for sharing with reviewers / phone testing.
 REM    For solo work on the same machine - use start_local.bat.
-REM
-REM    ngrok is NOT used by default because free ngrok domains show a warning page.
 REM ============================================================
 title DOLG public launcher
 cd /d "%~dp0"
@@ -16,9 +14,11 @@ cd /d "%~dp0"
 set "PY=python"
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
 
-if not exist "deploy\cloudflared.exe" (
-    echo [ERROR] deploy\cloudflared.exe not found.
-    echo         Public ngrok mode is disabled by default to avoid its browser warning page.
+where ngrok >nul 2>nul
+if not exist "deploy\ngrok.exe" if not exist "ngrok.exe" if errorlevel 1 (
+    echo [ERROR] ngrok.exe not found in deploy\, project folder, or PATH.
+    echo         Install: winget install --id Ngrok.Ngrok --exact
+    echo         Then:    ngrok config add-authtoken YOUR_TOKEN
     pause
     exit /b 1
 )
@@ -28,7 +28,7 @@ if not exist "start_public_server.py" (
     exit /b 1
 )
 
-echo Starting DOLG public launcher ^(Cloudflare Quick Tunnel^) via %PY% ...
+echo Starting DOLG public launcher ^(ngrok^) via %PY% ...
 echo.
 
 "%PY%" start_public_server.py
