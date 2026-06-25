@@ -16,6 +16,8 @@ class ImportReviewLearningBrowserSmoke(StaticLiveServerTestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls._prev_async_unsafe = os.environ.get('DJANGO_ALLOW_ASYNC_UNSAFE')
+        os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = 'true'
         super().setUpClass()
         try:
             from playwright.sync_api import sync_playwright
@@ -35,6 +37,10 @@ class ImportReviewLearningBrowserSmoke(StaticLiveServerTestCase):
             cls.browser.close()
             cls._playwright.stop()
         finally:
+            if cls._prev_async_unsafe is None:
+                os.environ.pop('DJANGO_ALLOW_ASYNC_UNSAFE', None)
+            else:
+                os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = cls._prev_async_unsafe
             super().tearDownClass()
 
     def setUp(self):
@@ -78,7 +84,7 @@ class ImportReviewLearningBrowserSmoke(StaticLiveServerTestCase):
     def test_import_review_learning_path(self):
         context = self._context()
         page = context.new_page()
-        page.goto('/cad/')
+        page.goto('/cad/', wait_until='domcontentloaded', timeout=60000)
         page.wait_for_selector('#importCadBtn')
 
         result = page.evaluate("""async () => {
@@ -104,12 +110,12 @@ class ImportReviewLearningBrowserSmoke(StaticLiveServerTestCase):
         self.assertIn('preview', result)
         self.assertTrue(result['learning_suggestions'])
 
-        page.goto(result['saved_review']['url'])
+        page.goto(result['saved_review']['url'], wait_until='domcontentloaded', timeout=60000)
         page.wait_for_selector('.learning-review')
         self.assertIn('Learning by Review', page.text_content('body'))
         self.assertIn('Нет GND', page.text_content('body'))
 
-        page.goto('/knowledge/learning/')
+        page.goto('/knowledge/learning/', wait_until='domcontentloaded', timeout=60000)
         page.wait_for_selector('.learning-hero')
         self.assertIn('Диагностика', page.text_content('body'))
         context.close()

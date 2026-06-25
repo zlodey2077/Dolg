@@ -7,8 +7,8 @@
 
 import os
 import re
-import signal
 import shutil
+import signal
 import socket
 import subprocess
 import sys

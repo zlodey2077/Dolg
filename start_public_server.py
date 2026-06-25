@@ -1,12 +1,8 @@
-"""Public DOLG launcher.
+"""Public DOLG launcher without ngrok's browser warning by default.
 
-This is a small Python entrypoint for demo/public mode. It keeps the public
-launch separate from the dev/local launcher, repairs the common ngrok v3 config
-mistake, then delegates the actual Django+ngrok lifecycle to start_server.py.
-
-Usage:
-    .venv\\Scripts\\python.exe start_public_server.py
-    .venv\\Scripts\\python.exe start_public_server.py --check-only
+Default provider: Cloudflare Quick Tunnel via deploy/cloudflared.exe.
+Explicit fallback: --provider ngrok, but it can show ngrok's free-domain
+browser interstitial to normal visitors, so it is not used by default.
 """
 
 from __future__ import annotations
@@ -15,9 +11,14 @@ import argparse
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
+import webbrowser
 from pathlib import Path
 
 try:
@@ -28,6 +29,9 @@ except Exception:
 
 
 ROOT = Path(__file__).resolve().parent
+DJANGO_PORT = 8000
+CLOUDFLARE_URL_RE = re.compile(r'https://[a-z0-9-]+\.trycloudflare\.com')
+NGROK_URL_RE = re.compile(r'https://[a-z0-9-]+\.ngrok(?:-free)?\.(?:dev|app|io)')
 NGROK_CONFIG_RE = re.compile(r'^\s*authtoken\s*:\s*(?P<token>.+?)\s*$')
 ROOT_AUTHTOKEN_RE = re.compile(r'^authtoken\s*:\s*(?P<token>.+?)\s*$')
 
@@ -36,20 +40,24 @@ def out(message: str) -> None:
     print(message, flush=True)
 
 
-def mask_secret(value: str) -> str:
-    value = value.strip().strip('"').strip("'")
-    if not value:
-        return ''
-    if len(value) <= 10:
-        return '***'
-    return value[:4] + '...' + value[-4:]
-
-
 def find_python() -> str:
     venv_python = ROOT / '.venv' / 'Scripts' / 'python.exe'
     if venv_python.exists():
         return str(venv_python)
     return sys.executable
+
+
+def find_cloudflared() -> Path | None:
+    candidates = [
+        os.getenv('CLOUDFLARED_BIN', ''),
+        str(ROOT / 'deploy' / 'cloudflared.exe'),
+        str(ROOT / 'cloudflared.exe'),
+        shutil.which('cloudflared') or '',
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return Path(candidate)
+    return None
 
 
 def find_ngrok() -> Path | None:
@@ -88,18 +96,16 @@ def _is_ngrok_v3(lines: list[str]) -> bool:
     return False
 
 
+def mask_secret(value: str) -> str:
+    value = value.strip().strip('"').strip("'")
+    if not value:
+        return ''
+    if len(value) <= 10:
+        return '***'
+    return value[:4] + '...' + value[-4:]
+
+
 def repair_ngrok_config(path: Path) -> tuple[bool, str]:
-    """Move root-level authtoken into agent.authtoken for ngrok config v3.
-
-    ngrok v3 rejects this shape:
-        version: "3"
-        agent:
-          authtoken: xxx
-        authtoken: xxx
-
-    The function preserves the rest of the file and writes a timestamped backup
-    only when it actually changes the config.
-    """
     if not path.exists():
         return False, f'ngrok config not found: {path}'
 
@@ -132,41 +138,33 @@ def repair_ngrok_config(path: Path) -> tuple[bool, str]:
     fixed_lines = [line for index, line in enumerate(lines) if index not in root_token_indexes]
     if not has_indented_token and root_token:
         if has_agent_section and agent_line_index >= 0:
-            insert_at = agent_line_index + 1
-            fixed_lines.insert(insert_at, f'  authtoken: {root_token}')
+            fixed_lines.insert(agent_line_index + 1, f'  authtoken: {root_token}')
         else:
-            insert_at = 1 if fixed_lines else 0
-            fixed_lines[insert_at:insert_at] = ['agent:', f'  authtoken: {root_token}']
+            fixed_lines[1:1] = ['agent:', f'  authtoken: {root_token}']
 
     backup = path.with_suffix(path.suffix + f'.bak-{time.strftime("%Y%m%d-%H%M%S")}')
-    path.parent.mkdir(parents=True, exist_ok=True)
     backup.write_text(raw, encoding='utf-8')
     path.write_text('\n'.join(fixed_lines).rstrip() + '\n', encoding='utf-8')
     return True, f'ngrok config repaired; backup: {backup.name}; token: {mask_secret(root_token)}'
 
 
-def check_ngrok_config(ngrok: Path, config_path: Path, env: dict[str, str]) -> tuple[bool, str]:
-    cmd = [str(ngrok), 'config', 'check']
-    if config_path.exists():
-        cmd.extend(['--config', str(config_path)])
+def check_binary(binary: Path, args: list[str]) -> tuple[bool, str]:
     try:
         result = subprocess.run(
-            cmd,
+            [str(binary), *args],
             cwd=str(ROOT),
-            env=env,
             capture_output=True,
             text=True,
             timeout=25,
         )
     except subprocess.TimeoutExpired:
-        return False, 'ngrok config check timed out'
+        return False, f'{binary.name} check timed out'
     except Exception as exc:
-        return False, f'ngrok config check failed: {exc}'
-
+        return False, f'{binary.name} check failed: {exc}'
     output = (result.stdout or result.stderr or '').strip()
     if result.returncode != 0:
-        return False, output or f'ngrok config check exited with {result.returncode}'
-    return True, output or 'ngrok config is valid'
+        return False, output or f'{binary.name} exited with {result.returncode}'
+    return True, output or f'{binary.name} ok'
 
 
 def build_env() -> dict[str, str]:
@@ -183,8 +181,186 @@ def build_env() -> dict[str, str]:
     return env
 
 
+def wait_tcp(host: str, port: int, timeout: int = 90) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return True
+        except OSError:
+            time.sleep(0.5)
+    return False
+
+
+def probe_url(url: str, timeout: int = 8) -> bool:
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'DOLG-public-launcher/1.0',
+                'ngrok-skip-browser-warning': '1',
+            },
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status < 600
+    except urllib.error.HTTPError as exc:
+        return exc.code not in {530}
+    except Exception:
+        return False
+
+
+def reader_thread(stream, store: dict[str, object], url_re: re.Pattern[str]) -> None:
+    for raw in iter(stream.readline, b''):
+        line = raw.decode('utf-8', errors='replace').rstrip()
+        log = store.setdefault('log', [])
+        if isinstance(log, list):
+            log.append(line)
+            if len(log) > 500:
+                del log[:-500]
+        if not store.get('url'):
+            match = url_re.search(line)
+            if match:
+                store['url'] = match.group(0)
+
+
+def start_with_reader(cmd: list[str], env: dict[str, str], url_re: re.Pattern[str] | None = None):
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(ROOT),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+        creationflags=flags,
+    )
+    store: dict[str, object] = {'url': None, 'log': []}
+    pattern = url_re or re.compile(r'$^')
+    thread = threading.Thread(target=reader_thread, args=(proc.stdout, store, pattern), daemon=True)
+    thread.start()
+    return proc, store
+
+
+def stop_proc(proc: subprocess.Popen | None) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    except Exception:
+        pass
+
+
+def banner(public_url: str, provider: str) -> None:
+    line = '=' * 66
+    out('')
+    out(line)
+    out('              >>> DOLG PUBLIC DEMO READY <<<')
+    out(line)
+    out('')
+    out(f'   Public URL ({provider}):')
+    out('')
+    out(f'       {public_url}')
+    out('')
+    out(f'   Local URL: http://127.0.0.1:{DJANGO_PORT}/')
+    out(line)
+    out('')
+
+
+def run_cloudflare(args, env: dict[str, str], python: str, cloudflared: Path) -> int:
+    out('Starting local Django launcher...')
+    local_cmd = [python, 'start_server.py', '--local', '--no-browser', '--hot' if args.hot else '--no-hot']
+    local_proc, local_log = start_with_reader(local_cmd, env)
+
+    if not wait_tcp('127.0.0.1', DJANGO_PORT, timeout=120):
+        out('[ERROR] Django did not become ready on 127.0.0.1:8000.')
+        for line in list(local_log.get('log', []))[-35:]:
+            out('  ' + str(line))
+        stop_proc(local_proc)
+        return 1
+
+    out('Starting Cloudflare Quick Tunnel (no ngrok warning page)...')
+    tunnel_cmd = [str(cloudflared), 'tunnel', '--url', f'http://127.0.0.1:{DJANGO_PORT}']
+    tunnel_proc, tunnel_log = start_with_reader(tunnel_cmd, env, CLOUDFLARE_URL_RE)
+
+    deadline = time.time() + 75
+    while time.time() < deadline and not tunnel_log.get('url'):
+        if tunnel_proc.poll() is not None:
+            out('[ERROR] cloudflared exited before URL allocation. Log tail:')
+            for line in list(tunnel_log.get('log', []))[-35:]:
+                out('  ' + str(line))
+            stop_proc(local_proc)
+            return 1
+        time.sleep(0.3)
+
+    public_url = str(tunnel_log.get('url') or '')
+    if not public_url:
+        out('[ERROR] cloudflared did not provide a public URL in 75 seconds. Log tail:')
+        for line in list(tunnel_log.get('log', []))[-35:]:
+            out('  ' + str(line))
+        stop_proc(tunnel_proc)
+        stop_proc(local_proc)
+        return 1
+
+    propagated = False
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        if probe_url(public_url):
+            propagated = True
+            break
+        time.sleep(3)
+
+    if not propagated:
+        out('[WARN] Tunnel URL allocated but not reachable yet; it may need 30-60 seconds.')
+
+    banner(public_url, 'cloudflare')
+    if not args.no_browser and propagated:
+        webbrowser.open(public_url)
+
+    try:
+        while True:
+            time.sleep(2)
+            if local_proc.poll() is not None:
+                out('[ERROR] Django local launcher stopped.')
+                return local_proc.returncode or 1
+            if tunnel_proc.poll() is not None:
+                out('[ERROR] Cloudflare tunnel stopped.')
+                return tunnel_proc.returncode or 1
+    except KeyboardInterrupt:
+        out('Stopping public launcher...')
+        return 0
+    finally:
+        stop_proc(tunnel_proc)
+        stop_proc(local_proc)
+
+
+def run_ngrok(args, env: dict[str, str], python: str, ngrok: Path) -> int:
+    out('[WARN] ngrok provider is opt-in only: free domains can show a browser warning page.')
+    config_path = ngrok_config_path()
+    if not args.no_repair_ngrok:
+        repaired, message = repair_ngrok_config(config_path)
+        out(('  repair: ' if repaired else '  ngrok:  ') + message)
+    ok, detail = check_binary(ngrok, ['config', 'check', '--config', str(config_path)])
+    out(('  check:  ' if ok else '[ERROR] ') + detail)
+    if not ok:
+        return 1
+    child = [python, 'start_server.py', '--hot' if args.hot else '--no-hot']
+    if args.no_browser:
+        child.append('--no-browser')
+    return subprocess.call(child, cwd=str(ROOT), env=env)
+
+
 def run() -> int:
-    parser = argparse.ArgumentParser(description='Start public DOLG server through ngrok.')
+    parser = argparse.ArgumentParser(description='Start public DOLG server without ngrok warning by default.')
+    parser.add_argument(
+        '--provider',
+        choices=['cloudflare', 'local', 'ngrok'],
+        default=os.getenv('DOLG_PUBLIC_TUNNEL_PROVIDER', 'cloudflare'),
+        help='public tunnel provider; default: cloudflare',
+    )
     parser.add_argument('--check-only', action='store_true', help='validate launch prerequisites and exit')
     parser.add_argument('--no-browser', action='store_true', help='do not open browser after tunnel is ready')
     parser.add_argument('--hot', action='store_true', help='try jurigged hot patching in Django')
@@ -193,49 +369,56 @@ def run() -> int:
 
     env = build_env()
     python = find_python()
+    cloudflared = find_cloudflared()
     ngrok = find_ngrok()
-    config_path = ngrok_config_path()
 
     out('DOLG public Python launcher')
-    out(f'  python: {python}')
-    out(f'  ngrok:  {ngrok or "not found"}')
-    out(f'  config: {config_path}')
+    out(f'  provider:    {args.provider}')
+    out(f'  python:      {python}')
+    out(f'  cloudflared: {cloudflared or "not found"}')
+    out(f'  ngrok:       {ngrok or "not used"}')
 
     if not (ROOT / 'manage.py').exists():
         out('[ERROR] manage.py not found; run this from the project root.')
         return 1
     if not (ROOT / 'start_server.py').exists():
-        out('[ERROR] start_server.py not found; public lifecycle engine is missing.')
+        out('[ERROR] start_server.py not found; local lifecycle engine is missing.')
         return 1
+
+    if args.provider == 'cloudflare':
+        if not cloudflared:
+            out('[ERROR] cloudflared.exe not found. Expected deploy/cloudflared.exe or CLOUDFLARED_BIN.')
+            out('        To avoid the ngrok warning page, do not fall back to ngrok for public demo.')
+            return 1
+        ok, detail = check_binary(cloudflared, ['--version'])
+        out(('  check:      ' if ok else '[ERROR] ') + detail)
+        if not ok:
+            return 1
+        if args.check_only:
+            out('OK: Cloudflare public launcher prerequisites are ready.')
+            return 0
+        return run_cloudflare(args, env, python, cloudflared)
+
+    if args.provider == 'local':
+        if args.check_only:
+            out('OK: local fallback is ready.')
+            return 0
+        child = [python, 'start_server.py', '--local', '--no-hot']
+        if args.no_browser:
+            child.append('--no-browser')
+        return subprocess.call(child, cwd=str(ROOT), env=env)
+
     if not ngrok:
-        out('[ERROR] ngrok.exe not found in deploy/, project root, PATH, or WinGet package folder.')
-        out('        Install: winget install --id Ngrok.Ngrok --exact')
+        out('[ERROR] ngrok.exe not found.')
         return 1
-
-    if not args.no_repair_ngrok:
-        repaired, message = repair_ngrok_config(config_path)
-        out(('  repair: ' if repaired else '  ngrok:  ') + message)
-
-    ok, detail = check_ngrok_config(ngrok, config_path, env)
-    out(('  check:  ' if ok else '[ERROR] ') + detail)
-    if not ok:
-        return 1
-
     if args.check_only:
-        out('OK: public launcher prerequisites are ready.')
-        return 0
-
-    child = [python, 'start_server.py']
-    child.append('--hot' if args.hot else '--no-hot')
-    if args.no_browser:
-        child.append('--no-browser')
-
-    out('')
-    out('Starting public Django server through ngrok...')
-    out('Local URL will be:  http://127.0.0.1:8000/')
-    out('Public URL appears after ngrok tunnel allocation.')
-    out('')
-    return subprocess.call(child, cwd=str(ROOT), env=env)
+        config_path = ngrok_config_path()
+        if not args.no_repair_ngrok:
+            repair_ngrok_config(config_path)
+        ok, detail = check_binary(ngrok, ['config', 'check', '--config', str(config_path)])
+        out(('  check:      ' if ok else '[ERROR] ') + detail)
+        return 0 if ok else 1
+    return run_ngrok(args, env, python, ngrok)
 
 
 if __name__ == '__main__':
