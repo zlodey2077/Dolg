@@ -3363,7 +3363,7 @@ def api_ai_chat(request):
         except TypeError, ValueError:
             project = None
 
-    if not (ai_assistant.is_enabled() or ai_assistant.ollama_enabled()):
+    if not ai_assistant.live_enabled():
         catalog = ai_assistant.build_catalog_snapshot(limit=20)
         result = build_rule_based_reply(
             user_message,
@@ -3381,6 +3381,7 @@ def api_ai_chat(request):
                 'ok': True,
                 'demo': True,
                 'self_hosted': True,
+                'backend': 'rule_based',
                 'reply': result['reply'],
                 'mode': mode,
                 'plan': effective_plan,
@@ -3399,20 +3400,6 @@ def api_ai_chat(request):
                 'session_summary': result.get('session_summary') or '',
                 'usage': result.get('usage') or {},
                 'token_usage': result.get('usage') or {},
-            }
-        )
-
-    if not (ai_assistant.is_enabled() or ai_assistant.ollama_enabled()):
-        return JsonResponse(
-            {
-                'ok': True,
-                'demo': True,
-                'reply': (
-                    '🔒 AI-ассистент в demo-режиме: ANTHROPIC_API_KEY не настроен на сервере. '
-                    'Задайте переменную окружения ANTHROPIC_API_KEY и перезапустите Django, '
-                    'чтобы активировать live-чат с Claude.'
-                ),
-                'mode': mode,
             }
         )
 
@@ -3484,21 +3471,53 @@ def api_ai_chat(request):
         system_blocks.append({'type': 'text', 'text': context_block})
 
     try:
-        if ai_assistant.is_enabled():
-            result = ai_assistant.call_claude(messages, system_blocks, mode=mode)
-        else:
-            # Локальная LLM (Ollama): тот же грудинг (catalog + RAG) в system_blocks.
-            result = ai_assistant.call_ollama(messages, system_blocks, mode=mode)
+        result = ai_assistant.call_live(messages, system_blocks, mode=mode)
     except ai_assistant.AIError as exc:
+        logger.warning('ai_chat: live backend failed, using rule-based fallback: %s', exc)
+        fallback = build_rule_based_reply(
+            user_message,
+            mode=mode,
+            project=project,
+            scheme=scheme,
+            catalog=catalog,
+            history=history,
+            session_summary=session_summary,
+            last_intent=last_intent,
+            include_deep_hint=has_feature(request.user, 'ai_deep_hint'),
+        )
         return JsonResponse(
-            {'ok': False, 'error': exc.user_message},
-            status=exc.http_status,
+            {
+                'ok': True,
+                'demo': True,
+                'degraded': True,
+                'backend': 'rule_based',
+                'live_error': exc.user_message,
+                'reply': fallback['reply'],
+                'mode': mode,
+                'plan': effective_plan,
+                'entitlements': feature_summary(request.user),
+                'agent': fallback.get('agent'),
+                'intent': fallback.get('intent'),
+                'intent_label': fallback.get('intent_label'),
+                'confidence': fallback.get('confidence'),
+                'quick_actions': fallback.get('quick_actions') or [],
+                'render': fallback.get('render') or [],
+                'skills': fallback.get('skills') or [],
+                'context_sources': fallback.get('context_sources') or retrieval.get('sources') or [],
+                'used_context': fallback.get('used_context') or retrieval.get('counts') or {},
+                'retrieval_context': fallback.get('retrieval_context') or {},
+                'deep_hint': fallback.get('deep_hint') or {},
+                'session_summary': fallback.get('session_summary') or session_summary,
+                'usage': fallback.get('usage') or {'backend': 'rule_based'},
+                'token_usage': fallback.get('usage') or {'backend': 'rule_based'},
+            }
         )
 
     return JsonResponse(
         {
             'ok': True,
             'reply': result['text'],
+            'backend': result.get('backend') or (result.get('usage') or {}).get('backend'),
             'usage': result.get('usage') or {},
             'token_usage': result.get('usage') or {},
             'mode': mode,

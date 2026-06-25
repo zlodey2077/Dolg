@@ -56,7 +56,7 @@ class AIError(Exception):
 
 class AINotConfiguredError(AIError):
     http_status = 503
-    user_message = 'AI-ассистент не настроен (ANTHROPIC_API_KEY).'
+    user_message = 'AI-ассистент не настроен (ANTHROPIC_API_KEY или OLLAMA_BASE_URL).'
 
 
 class AIAuthError(AIError):
@@ -85,6 +85,18 @@ def _api_key():
 
 def is_enabled():
     return bool(_api_key())
+
+
+def active_backend():
+    if is_enabled():
+        return 'anthropic'
+    if ollama_enabled():
+        return 'ollama'
+    return 'rule_based'
+
+
+def live_enabled():
+    return active_backend() in {'anthropic', 'ollama'}
 
 
 def _product_to_dict(p):
@@ -461,3 +473,72 @@ def call_ollama(
         'model': payload['model'],
         'agent': profile['title'] if profile else None,
     }
+
+
+def ollama_status(timeout=2):
+    base = ollama_base_url()
+    model = ollama_model()
+    status = {
+        'configured': bool(base),
+        'available': False,
+        'base_url': base,
+        'model': model,
+        'model_installed': False,
+        'models': [],
+        'error': '',
+    }
+    if not base:
+        status['error'] = 'OLLAMA_BASE_URL is empty'
+        return status
+
+    try:
+        response = requests.get(f'{base}/api/tags', timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as exc:
+        status['error'] = str(exc)
+        return status
+
+    models = [
+        item.get('name') or item.get('model')
+        for item in data.get('models', [])
+        if isinstance(item, dict) and (item.get('name') or item.get('model'))
+    ]
+    status.update(
+        {
+            'available': True,
+            'models': models,
+            'model_installed': model in models or any(name.split(':', 1)[0] == model for name in models),
+            'error': '',
+        }
+    )
+    return status
+
+
+def runtime_status(timeout=2):
+    backend = active_backend()
+    return {
+        'backend': backend,
+        'live_enabled': backend in {'anthropic', 'ollama'},
+        'anthropic': {
+            'configured': is_enabled(),
+            'model': AGENT_PROFILES.get('recommend', {}).get('model', 'claude-haiku-4-5-20251001'),
+        },
+        'ollama': ollama_status(timeout=timeout),
+    }
+
+
+def call_live(messages, system, *, mode=None, **kwargs):
+    backend = active_backend()
+    if backend == 'anthropic':
+        result = call_claude(messages, system, mode=mode, **kwargs)
+    elif backend == 'ollama':
+        result = call_ollama(messages, system, mode=mode, **kwargs)
+    else:
+        raise AINotConfiguredError()
+
+    usage = result.setdefault('usage', {})
+    if isinstance(usage, dict):
+        usage.setdefault('backend', backend)
+    result.setdefault('backend', backend)
+    return result

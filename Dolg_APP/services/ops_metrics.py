@@ -378,11 +378,23 @@ def collect_ai_ml_metrics_fast() -> dict[str, Any]:
     except Exception as exc:
         return {'available': False, 'error': str(exc)}
 
+    try:
+        from Dolg_APP import ai_assistant
+
+        ai_runtime = ai_assistant.runtime_status(timeout=0.8)
+    except Exception as exc:
+        ai_runtime = {
+            'backend': 'unknown',
+            'live_enabled': False,
+            'error': str(exc),
+        }
+
     now = _now()
     active_jobs = MLJob.objects.filter(status__in=['queued', 'running'])
     stale_jobs = active_jobs.filter(heartbeat_at__lt=now - timezone.timedelta(seconds=STALE_JOB_SECONDS))
     return {
         'available': True,
+        'runtime': ai_runtime,
         'examples': AITrainingExample.objects.count(),
         'validated': AITrainingExample.objects.filter(is_validated=True).count(),
         'graph_ready': AITrainingExample.objects.filter(features__graph_training_ready=True).count(),
@@ -541,6 +553,27 @@ def classify_ops_health(snapshot: dict[str, Any]) -> dict[str, Any]:
                 'recommendation': 'Open dataset quality and fix/exclude bad examples.',
             }
         )
+    ai_runtime = ai_ml.get('runtime') or {}
+    if ai_runtime.get('backend') == 'ollama':
+        ollama = ai_runtime.get('ollama') or {}
+        if not ollama.get('available'):
+            alerts.append(
+                {
+                    'severity': 'warning',
+                    'metric': 'ai.ollama',
+                    'message': 'Ollama runtime is configured but unavailable',
+                    'recommendation': 'Start Ollama and check OLLAMA_BASE_URL.',
+                }
+            )
+        elif ollama.get('model') and not ollama.get('model_installed'):
+            alerts.append(
+                {
+                    'severity': 'warning',
+                    'metric': 'ai.ollama_model',
+                    'message': f'Ollama model {ollama.get("model")} is not installed',
+                    'recommendation': f'Run: ollama pull {ollama.get("model")}',
+                }
+            )
 
     moderation = snapshot.get('moderation') or {}
     if (moderation.get('cases_open') or 0) > 10:

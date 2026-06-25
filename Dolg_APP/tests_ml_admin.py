@@ -126,6 +126,7 @@ class MLAdminViewsTests(TestCase):
         self.assertContains(response, 'DOLG Ops Dashboard')
         self.assertContains(response, 'MLJob admin')
         self.assertContains(response, 'Runtime')
+        self.assertContains(response, 'Live backend')
 
     def test_staff_data_console_loads(self):
         response = self.client.get(reverse('hello:staff_data_console'))
@@ -158,13 +159,16 @@ class MLAdminViewsTests(TestCase):
         self.assertContains(response, 'resistor')
 
     def test_django_admin_index_shows_ops_monitoring(self):
+        self.staff.is_superuser = True
+        self.staff.save(update_fields=['is_superuser'])
+
         response = self.client.get(reverse('admin:index'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Операционный мониторинг DOLG')
-        self.assertContains(response, 'RSS memory')
-        self.assertContains(response, 'Открыть полный Ops Dashboard')
-        self.assertContains(response, 'Data Console')
+        self.assertContains(response, 'Ops-дашборд')
+        self.assertContains(response, 'Data-консоль')
+        self.assertContains(response, 'Grafana')
+        self.assertContains(response, 'Prometheus')
 
     def test_ops_snapshot_service_contains_core_sections(self):
         MLJob.objects.create(job_type='training', status='success', progress_percent=100)
@@ -182,6 +186,8 @@ class MLAdminViewsTests(TestCase):
         self.assertIn('process', snapshot['runtime'])
         self.assertIn('db', snapshot['runtime'])
         self.assertIn('cache', snapshot['runtime'])
+        self.assertIn('runtime', snapshot['ai_ml'])
+        self.assertIn(snapshot['ai_ml']['runtime']['backend'], {'anthropic', 'ollama', 'rule_based', 'unknown'})
 
     def test_staff_ops_snapshot_api_returns_json(self):
         response = self.client.get(reverse('hello:staff_ops_snapshot_api'))

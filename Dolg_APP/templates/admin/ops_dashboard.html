@@ -298,7 +298,9 @@
             <div class="ops-metric-line"><span>Validation errors</span><strong>{{ ops_snapshot.ai_ml.validation.errors_count }}</strong></div>
             <div class="ops-metric-line"><span>Active ML jobs</span><strong>{{ ops_snapshot.ai_ml.ml_jobs_active }}</strong></div>
             <div class="ops-metric-line"><span>Stale ML jobs</span><strong>{{ ops_snapshot.ai_ml.ml_jobs_stale }}</strong></div>
-            <div class="ops-metric-line"><span>Tiny model</span><strong>{{ ops_snapshot.ai_ml.tiny_model.exists }}</strong></div>
+            <div class="ops-metric-line"><span>Live backend</span><strong>{{ ops_snapshot.ai_ml.runtime.backend }}</strong></div>
+            <div class="ops-metric-line"><span>Ollama online</span><strong>{{ ops_snapshot.ai_ml.runtime.ollama.available }}</strong></div>
+            <div class="ops-metric-line"><span>Ollama model</span><strong>{{ ops_snapshot.ai_ml.runtime.ollama.model }}</strong></div>
         </div>
     </div>
     {% endif %}
