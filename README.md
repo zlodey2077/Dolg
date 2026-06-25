@@ -40,6 +40,7 @@
     ├── knowledge/            # Энциклопедия (6 категорий, 21 статья, вложенные материалы)
     ├── media/products/       # Товарные изображения: локальные assets + generated-заглушки без Wikimedia/Commons
     ├── requirements.txt
+    ├── DOLG.vbs              # Видимый double-click launcher: открывает терминал и start_public.bat
     ├── start_local.bat       # Локальный запуск на 127.0.0.1:8000 (для своей работы)
     ├── start_public.bat      # Локальный + ngrok tunnel (демо/защита/телефон)
     ├── start_public_server.py # Публичный Python-launcher для start_public.bat
@@ -101,6 +102,7 @@
 Открыть: http://127.0.0.1:8000/
 
 С публичной ссылкой (для защиты / телефона / ревью):
+    # Двойной клик на DOLG.vbs — откроет видимый терминал и запустит public launcher.
     # Двойной клик на start_public.bat — запустит Django + ngrok tunnel.
     # Скрипт ждёт URL, делает propagation-probe и автоматически открывает браузер.
     # Публичный URL вида https://random-words.ngrok-free.dev — в окне launcher-а.

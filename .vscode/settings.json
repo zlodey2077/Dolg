@@ -94,10 +94,29 @@
   ],
   "vs-kubernetes.kubectlVersioning": "user-provided",
   "vs-kubernetes.outputFormat": "yaml",
-  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.windows": "DOLG Public Server",
+  "terminal.integrated.profiles.windows": {
+    "DOLG Public Server": {
+      "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-NoExit",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$Host.UI.RawUI.WindowTitle='DOLG public server'; Set-Location -LiteralPath '${workspaceFolder}'; $env:PYTHONUTF8='1'; if (Test-Path '.\\.venv\\Scripts\\python.exe') { & '.\\.venv\\Scripts\\python.exe' 'start_public_server.py' } else { python 'start_public_server.py' }"
+      ],
+      "icon": "server-process"
+    },
+    "PowerShell": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell"
+    }
+  },
   "terminal.integrated.env.windows": {
     "PYTHONUTF8": "1"
   },
+  "terminal.integrated.cwd": "${workspaceFolder}",
   "search.exclude": {
     "**/.venv": true,
     "**/node_modules": true,
@@ -142,5 +161,6 @@
     "**/Dolg_APP/ml/dataset/cache/**": true,
     "**/*.parquet": true,
     "**/*.tar.gz": true
-  }
+  },
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
