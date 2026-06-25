@@ -1,4 +1,4 @@
-"""DOLG one-click launcher: Django + Cloudflare Quick Tunnel.
+"""DOLG one-click launcher: Django + ngrok tunnel.
 
 ВАЖНО: код namespace ASCII-only (без emoji) — Python на Windows иногда
 падает с UnicodeEncodeError на cp1251-консоли. Эмодзи только в вывод
@@ -8,6 +8,7 @@
 import os
 import re
 import signal
+import shutil
 import socket
 import subprocess
 import sys
@@ -32,14 +33,26 @@ def p(msg):
 
 ROOT = Path(__file__).resolve().parent
 DJANGO_PORT = 8000
-# cloudflared.exe переехал в deploy/ вместе с Docker-инфраструктурой —
-# корень проекта стал чище. Для backward-compat пробуем и старый путь.
-CLOUDFLARED = ROOT / 'deploy' / 'cloudflared.exe'
-if not CLOUDFLARED.exists():
-    legacy = ROOT / 'cloudflared.exe'
-    if legacy.exists():
-        CLOUDFLARED = legacy
-URL_PATTERN = re.compile(r'https://[a-z0-9-]+\.trycloudflare\.com')
+# ngrok.exe в deploy/. Публичный туннель через ngrok: Cloudflare Quick Tunnel
+# периодически отдаёт error 1033. Токен — в %LOCALAPPDATA%\ngrok\ngrok.yml
+# (один раз: ngrok config add-authtoken ...).
+def find_ngrok():
+    candidates = [
+        os.getenv('NGROK_BIN', ''),
+        str(ROOT / 'deploy' / 'ngrok.exe'),
+        str(ROOT / 'ngrok.exe'),
+        shutil.which('ngrok') or '',
+        str(Path(os.getenv('LOCALAPPDATA', '')) / 'Microsoft' / 'WinGet' / 'Packages' / 'Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe' / 'ngrok.exe'),
+    ]
+    for item in candidates:
+        if item and Path(item).exists():
+            return Path(item)
+    return None
+
+
+NGROK = find_ngrok()
+# ngrok --log=stdout пишет logfmt; URL приходит как url=https://xxx.ngrok-free.dev
+URL_PATTERN = re.compile(r'https://[a-z0-9-]+\.ngrok(?:-free)?\.(?:dev|app|io)')
 FAST_MIGRATION_PROBE = r"""
 import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Dolg_PR.settings')
@@ -274,8 +287,8 @@ def kill_orphans():
             name = (pr.info['name'] or '').lower()
             cl = ' '.join(pr.info['cmdline'] or [])
             cl_low = cl.lower()
-            # leftover cloudflared-туннель (не python) — тоже снимаем.
-            is_cloudflared = 'cloudflared' in name
+            # leftover ngrok-туннель (не python) — тоже снимаем.
+            is_cloudflared = 'ngrok' in name or 'cloudflared' in name
             is_devproc = 'python' in name and ('manage.py' in cl or 'jurigged' in cl or 'daphne' in cl_low)
             if not (is_cloudflared or is_devproc):
                 continue
@@ -412,8 +425,8 @@ def main():
     if not (ROOT / 'manage.py').exists():
         rep('ERR', 'manage.py не найден — это не папка проекта DOLG?')
         return _abort(report)
-    if not local_only and not CLOUDFLARED.exists():
-        rep('ERR', 'cloudflared.exe не найден: %s (нужен для публичного режима)' % CLOUDFLARED)
+    if not local_only and not NGROK:
+        rep('ERR', 'ngrok.exe не найден: поставьте Ngrok.Ngrok через winget или задайте NGROK_BIN')
         return _abort(report)
 
     env = os.environ.copy()
@@ -428,9 +441,21 @@ def main():
     env['CLICOLOR_FORCE'] = '0'
     env['DOLG_SKIP_ASGI'] = '1'
     env['DOLG_SKIP_OPTIONAL_APP_PROBES'] = '1'
+    env.setdefault('OLLAMA_BASE_URL', 'http://127.0.0.1:11434')
+    env.setdefault('OLLAMA_MODEL', 'qwen3:0.6b')
     strict_migrations = env.get('DOLG_LAUNCHER_STRICT_MIGRATIONS') == '1'
 
-    # cloudflared — отдельная группа процессов (CTRL_BREAK_EVENT для чистой остановки).
+    if not local_only and env.get('NGROK_AUTHTOKEN'):
+        subprocess.run(
+            [str(NGROK), 'config', 'add-authtoken', env['NGROK_AUTHTOKEN']],
+            cwd=str(ROOT),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=20,
+        )
+
+    # ngrok — отдельная группа процессов (CTRL_BREAK_EVENT для чистой остановки).
     creation_flags_cf = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
 
     # --- Самолечение ---
@@ -547,10 +572,10 @@ def main():
                 pass
     else:
         p('')
-        p('[2/3] Zapuskayu Cloudflare Quick Tunnel...')
+        p('[2/3] Zapuskayu ngrok tunnel...')
 
         cf = subprocess.Popen(
-            [str(CLOUDFLARED), 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:%d' % DJANGO_PORT],
+            [str(NGROK), 'http', str(DJANGO_PORT), '--log=stdout'],
             cwd=str(ROOT),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -566,7 +591,7 @@ def main():
         deadline = time.time() + 40
         while time.time() < deadline and not store['url']:
             if cf.poll() is not None:
-                p('[ERROR] cloudflared upal. Log:')
+                p('[ERROR] ngrok upal. Log:')
                 for ln in store['log'][-25:]:
                     p('  ' + ln)
                 django.terminate()
@@ -575,7 +600,7 @@ def main():
             time.sleep(0.3)
 
         if not store['url']:
-            p('[ERROR] Cloudflare ne dal URL za 40 sek. Log:')
+            p('[ERROR] ngrok ne dal URL za 40 sek. Log:')
             for ln in store['log'][-30:]:
                 p('  ' + ln)
             cf.terminate()
@@ -602,7 +627,7 @@ def main():
             p('      OK, tunnel otvetil.')
         else:
             p('[WARN] Tunnel ne otvetil za 60 sek. URL VSE RAVNO mozhet rabotat -')
-            p('       inogda Cloudflare propagiruet do 2 minut.')
+            p('       inogda ngrok propagiruet do 1 minuty.')
 
         banner(public_url)
 
@@ -634,7 +659,7 @@ def main():
         # CREATE_NEW_PROCESS_GROUP (т.е. cloudflared). Django был запущен
         # без флага — посылка CTRL_BREAK туда упадёт с ValueError, поэтому
         # для него сразу .terminate().
-        graceful = ([(cf, 'cloudflared', True)] if cf is not None else []) + [(django, 'django', False)]
+        graceful = ([(cf, 'ngrok', True)] if cf is not None else []) + [(django, 'django', False)]
         for proc, name, can_ctrl_break in graceful:
             try:
                 if proc.poll() is None:

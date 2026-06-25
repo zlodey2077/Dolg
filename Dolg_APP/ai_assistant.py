@@ -372,3 +372,92 @@ def call_claude(
         'model': payload['model'],
         'agent': profile['title'] if profile else None,
     }
+
+
+# --- Локальная LLM через Ollama -------------------------------------------
+#
+# Альтернатива Claude API: маленькая локальная модель (Qwen3/Phi) через Ollama
+# (отдельный бинарь на localhost:11434). Обходит боль с torch/wheel на Windows+py3.14,
+# т.к. это HTTP-сервис, а не Python-пакет. «Обучение на данных» = RAG: грудинг
+# (каталог + retrieval-факты) приходит в `system` ровно как у Claude — call_ollama
+# принимает ту же сигнатуру, поэтому это drop-in замена call_claude в api_ai_chat.
+#
+# Включение: OLLAMA_BASE_URL=http://localhost:11434 (+ опц. OLLAMA_MODEL=qwen3:0.6b).
+
+
+def ollama_base_url():
+    return (os.getenv('OLLAMA_BASE_URL') or getattr(settings, 'OLLAMA_BASE_URL', '') or '').rstrip('/')
+
+
+def ollama_model():
+    return os.getenv('OLLAMA_MODEL') or getattr(settings, 'OLLAMA_MODEL', '') or 'qwen3:0.6b'
+
+
+def ollama_enabled():
+    return bool(ollama_base_url())
+
+
+def _flatten_system(system):
+    """system-блоки Claude (list of {type,text,cache_control}) → один system-текст для Ollama."""
+    if isinstance(system, list):
+        return '\n\n'.join(b.get('text', '') for b in system if isinstance(b, dict))
+    return str(system or '')
+
+
+def call_ollama(
+    messages,
+    system,
+    *,
+    mode=None,
+    model=None,
+    max_tokens=None,
+    temperature=None,
+    timeout=TIMEOUT_SEC,
+    use_cache=True,  # noqa: ARG001 — совместимость сигнатуры с call_claude
+):
+    """Вызов локальной LLM через Ollama /api/chat. Сигнатура как у call_claude —
+    тот же messages + тот же грудинг в system (каталог + RAG). Возвращает тот же
+    dict-формат {text, stop_reason, usage, model, agent}.
+    """
+    base = ollama_base_url()
+    if not base:
+        raise AINotConfiguredError('OLLAMA_BASE_URL не задан')
+
+    profile = AGENT_PROFILES.get(mode) if mode else None
+    sys_text = _flatten_system(system)
+    chat_messages = ([{'role': 'system', 'content': sys_text}] if sys_text else []) + list(messages)
+    payload = {
+        'model': model or ollama_model(),
+        'messages': chat_messages,
+        'stream': False,
+        'think': False,
+        'options': {
+            'temperature': temperature
+            if temperature is not None
+            else (profile['temperature'] if profile else 0.3),
+            'num_predict': max_tokens or (profile['max_tokens'] if profile else 1024),
+        },
+    }
+    try:
+        r = requests.post(f'{base}/api/chat', json=payload, timeout=timeout)
+    except requests.RequestException as exc:
+        logger.warning('Ollama request error: %s', exc)
+        raise AINetworkError(str(exc)) from exc
+
+    if r.status_code != 200:
+        logger.warning('Ollama %s: %s', r.status_code, r.text[:300])
+        raise AIServerError(f'Ollama вернул {r.status_code}')
+
+    data = r.json()
+    text = ((data.get('message') or {}).get('content') or '').strip() or '(пустой ответ)'
+    return {
+        'text': text,
+        'stop_reason': data.get('done_reason'),
+        'usage': {
+            'input_tokens': data.get('prompt_eval_count', 0),
+            'output_tokens': data.get('eval_count', 0),
+            'backend': 'ollama',
+        },
+        'model': payload['model'],
+        'agent': profile['title'] if profile else None,
+    }

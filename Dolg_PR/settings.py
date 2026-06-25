@@ -74,15 +74,16 @@ ALLOWED_HOSTS = env_list(
     # Современные браузеры резолвят *.localhost в 127.0.0.1 без hosts-файла (RFC 6761).
     # .local оставлен как опциональный fallback (требует правки hosts).
     # .trycloudflare.com — домены Cloudflare Quick Tunnel (для демо публичного доступа).
-    # .ngrok-free.app / .ngrok.io — ngrok (на случай переключения туннеля).
+    # .ngrok-free.app / .ngrok-free.dev / .ngrok.io — ngrok (новые free-домены — .dev).
     'localhost,127.0.0.1,[::1],.localhost,dolg.local,shop.dolg.local,www.dolg.local,'
-    '.trycloudflare.com,.ngrok-free.app,.ngrok.io',
+    '.trycloudflare.com,.ngrok-free.app,.ngrok-free.dev,.ngrok.io',
 )
 
 # CSRF trusted origins — Django 4.0+ требует явно перечислить источники
 # для POST-запросов с https/non-default домена.
 CSRF_TRUSTED_ORIGINS = env_list(
-    'CSRF_TRUSTED_ORIGINS', 'https://*.trycloudflare.com,https://*.ngrok-free.app,https://*.ngrok.io'
+    'CSRF_TRUSTED_ORIGINS',
+    'https://*.trycloudflare.com,https://*.ngrok-free.app,https://*.ngrok-free.dev,https://*.ngrok.io',
 )
 
 if not DEBUG and SECRET_KEY == DEFAULT_INSECURE_SECRET_KEY and not IS_TESTING:
@@ -540,6 +541,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # (Состояние «включён/нет» спрашиваем через ai_assistant.is_enabled() —
 # отдельной переменной не держим, чтобы не было двух источников истины.)
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', '')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen3:0.6b')
 
 # Sentry — opt-in через переменную окружения SENTRY_DSN. Если она задана и
 # sentry_sdk установлен (`pip install sentry-sdk`), инициализируется в

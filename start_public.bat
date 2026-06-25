@@ -1,17 +1,15 @@
 @echo off
 REM ============================================================
-REM DOLG — public launcher (Django + Cloudflare Quick Tunnel)
-REM    Hands off to start_server.py which:
-REM      1) starts Django on 127.0.0.1:8000
-REM      2) starts cloudflared and waits for trycloudflare.com URL
-REM      3) probes the URL until propagated, then opens browser
+REM DOLG - public launcher (Django + ngrok tunnel)
+REM    Delegates to start_server.py (no --local), which:
+REM      1) frees the port, starts Django on 127.0.0.1:8000 (stable mode)
+REM      2) starts ngrok and waits for the https://...ngrok-free.dev URL
+REM      3) probes the URL, then opens the browser
 REM    Use this for sharing with reviewers / phone testing.
-REM    For solo work on the same machine — use start_local.bat.
+REM    For solo work on the same machine - use start_local.bat.
 REM
-REM    Auto-reload AKTIVEN: Django sledit za .py / urls.py / *.html i
-REM    perezapuskaet rebenok-process pri save. Cloudflared tunnel pereletivayet
-REM    avtomaticheski (1-2 sek pasa porta). Perezapusk start_public.bat
-REM    nuzhen tolko esli upal sam parent-process (kraine redko).
+REM    One-time setup: ngrok config add-authtoken YOUR_TOKEN  (token at ngrok.com).
+REM    ngrok.exe is bundled in deploy\. Cloudflare dropped (kept giving error 1033).
 REM ============================================================
 title DOLG public launcher
 cd /d "%~dp0"
@@ -19,10 +17,11 @@ cd /d "%~dp0"
 set "PY=python"
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
 
-REM cloudflared.exe лежит в deploy/ — там же, где Docker-инфра.
-if not exist "deploy\cloudflared.exe" if not exist "cloudflared.exe" (
-    echo [ERROR] cloudflared.exe not found in deploy\ or project folder.
-    echo         Download Windows build: https://github.com/cloudflare/cloudflared/releases
+where ngrok >nul 2>nul
+if not exist "deploy\ngrok.exe" if not exist "ngrok.exe" if errorlevel 1 (
+    echo [ERROR] ngrok.exe not found in deploy\, project folder, or PATH.
+    echo         Install: winget install --id Ngrok.Ngrok --exact
+    echo         Then:    ngrok config add-authtoken YOUR_TOKEN
     pause
     exit /b 1
 )
@@ -32,7 +31,7 @@ if not exist "start_server.py" (
     exit /b 1
 )
 
-echo Starting DOLG public launcher via %PY% ...
+echo Starting DOLG public launcher ^(ngrok^) via %PY% ...
 echo.
 
 "%PY%" start_server.py

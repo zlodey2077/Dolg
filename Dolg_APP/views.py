@@ -3363,7 +3363,7 @@ def api_ai_chat(request):
         except TypeError, ValueError:
             project = None
 
-    if not ai_assistant.is_enabled():
+    if not (ai_assistant.is_enabled() or ai_assistant.ollama_enabled()):
         catalog = ai_assistant.build_catalog_snapshot(limit=20)
         result = build_rule_based_reply(
             user_message,
@@ -3402,7 +3402,7 @@ def api_ai_chat(request):
             }
         )
 
-    if not ai_assistant.is_enabled():
+    if not (ai_assistant.is_enabled() or ai_assistant.ollama_enabled()):
         return JsonResponse(
             {
                 'ok': True,
@@ -3484,7 +3484,11 @@ def api_ai_chat(request):
         system_blocks.append({'type': 'text', 'text': context_block})
 
     try:
-        result = ai_assistant.call_claude(messages, system_blocks, mode=mode)
+        if ai_assistant.is_enabled():
+            result = ai_assistant.call_claude(messages, system_blocks, mode=mode)
+        else:
+            # Локальная LLM (Ollama): тот же грудинг (catalog + RAG) в system_blocks.
+            result = ai_assistant.call_ollama(messages, system_blocks, mode=mode)
     except ai_assistant.AIError as exc:
         return JsonResponse(
             {'ok': False, 'error': exc.user_message},

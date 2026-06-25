@@ -86,6 +86,7 @@ Dolg_APP/ml/dataset/cache/
 
 # Large deploy binaries
 deploy/cloudflared.exe
+deploy/ngrok.exe
 
 # Recovery snapshots
 *.recovery-*
