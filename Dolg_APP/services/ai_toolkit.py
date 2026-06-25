@@ -8,6 +8,7 @@ Carlo, P=U²/R), а не выдумывается языковой модель�
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -84,7 +85,7 @@ def derating_lines(scheme_data: dict | None, *, limit: int = 6) -> list[str]:
             rated_by_id[str(comp.get('id'))] = float(
                 params.get('tdp_w') or params.get('power_w') or params.get('power') or 0
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             rated_by_id[str(comp.get('id'))] = 0.0
     voltages = dc['voltages']
     rows: list[tuple[str, float, float]] = []
@@ -193,7 +194,7 @@ def regulator_lines(scheme_data: dict | None) -> list[str]:
             reg = c
             try:
                 vout = float(params.get('vout') or params.get('output_voltage') or c.get('vout') or 0) or None
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 vout = None
             m = pat78.search(label)
             if vout is None and m:
@@ -282,10 +283,27 @@ def neural_hint_lines(scheme_data: dict | None) -> list[str]:
     """Локальная tiny-AI (PyTorch): топология/риск/следующий компонент.
 
     Expert-first: это ПОДСКАЗКА, финальный контроль — за правилами и человеком.
-    Пустой список, если torch/модель недоступны или схема пустая."""
+    В горячем чат-ответе по умолчанию используем быстрый teacher-baseline без
+    torch import; полный PyTorch включается через LOCAL_AI_TORCH_INLINE=1."""
     global _NEURAL_ADVISOR
     if not scheme_data or not scheme_data.get('components'):
         return []
+    if os.getenv('LOCAL_AI_TORCH_INLINE') != '1':
+        try:
+            from Dolg_APP.ml.neural import teacher_baseline
+        except Exception:
+            return []
+        pred = teacher_baseline(scheme_data or {})
+        lines = [
+            f'топология: {pred.get("topology")} (teacher-baseline)',
+            f'риск: {pred.get("risk_label")} ({float(pred.get("risk_score") or 0):.2f})',
+            f'следующий компонент: {pred.get("next_component")}',
+        ]
+        reasons = pred.get('risk_reasons') or []
+        if reasons:
+            lines.append('причины: ' + ', '.join(map(str, reasons[:4])))
+        lines.append('источник: локальная tiny-AI эвристика — быстрый режим без torch')
+        return lines
     try:
         from Dolg_APP.ml.neural import NeuralCircuitAdvisor, torch_available
 

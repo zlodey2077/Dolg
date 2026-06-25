@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections import Counter
 
 from . import ai_algorithms, ai_render
@@ -294,7 +295,7 @@ def _estimate_tokens(value):
     if isinstance(value, (dict, list, tuple)):
         try:
             text = json.dumps(value, ensure_ascii=False, sort_keys=True)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             text = repr(value)
     else:
         text = str(value)
@@ -338,6 +339,31 @@ def _deep_hint_for_scheme(scheme_data):
     """Optional PyTorch hint. Never final verdict, never required for chat."""
     if not isinstance(scheme_data, dict) or not scheme_data.get('components'):
         return {'available': False, 'reason': 'empty_scheme'}
+    if os.getenv('LOCAL_AI_TORCH_INLINE') != '1':
+        try:
+            from Dolg_APP.ml.neural import teacher_baseline
+
+            baseline = teacher_baseline(scheme_data)
+        except Exception as exc:
+            return {'available': False, 'reason': str(exc)[:180]}
+        return {
+            'available': True,
+            'backend': 'teacher_baseline',
+            'topology': baseline.get('topology'),
+            'topology_confidence': 1.0,
+            'risk_score': baseline.get('risk_score'),
+            'risk_label': baseline.get('risk_label'),
+            'risk_band': baseline.get('risk_band'),
+            'next_components': [
+                {
+                    'component_type': baseline.get('next_component'),
+                    'reason': ', '.join(map(str, (baseline.get('risk_reasons') or [])[:4])),
+                    'confidence': 0.65,
+                }
+            ],
+            'evidence_sources': ['local_teacher_baseline'],
+            'verdict_policy': 'fast rule baseline; set LOCAL_AI_TORCH_INLINE=1 for PyTorch',
+        }
     try:
         from Dolg_APP.ml.neural import NeuralCircuitAdvisor, torch_available
 
@@ -1348,6 +1374,103 @@ def _render_directives(intent, reply, scheme_data):
     return items
 
 
+def _lightweight_review(scheme_data):
+    """Fast inline review for chat payloads without a saved project.
+
+    The full Engineering Review imports heavier expert/fuzzy engines. For the
+    floating AI panel we need a sub-second context snapshot first; users can
+    still run the full review from the dedicated tool action.
+    """
+    scheme_data = scheme_data if isinstance(scheme_data, dict) else {}
+    components = [item for item in (scheme_data.get('components') or []) if isinstance(item, dict)]
+    connections = [item for item in (scheme_data.get('connections') or []) if isinstance(item, dict)]
+    try:
+        from Dolg_APP.services.schematic_graph import analyze_graph_topology
+
+        graph = analyze_graph_topology(scheme_data)
+        connectivity = graph.get('metrics') or {}
+        errors = _clean_list(graph.get('errors') or [])
+        warnings = _clean_list(graph.get('warnings') or [])
+    except Exception:
+        counts = Counter(_component_type(item) for item in components)
+        connectivity = {
+            'topology': 'generic',
+            'component_count': len(components),
+            'connection_count': len(connections),
+            'component_counts': dict(counts),
+            'has_ground': bool(counts.get('ground')),
+            'has_source': bool(counts.get('battery')),
+            'connected_components_count': 0,
+            'floating_components': [],
+            'cycle_count': 0,
+            'paths_to_ground': {},
+            'output_nodes': [],
+            'has_output_node': False,
+        }
+        errors = []
+        warnings = []
+
+    counts = connectivity.get('component_counts') or Counter(_component_type(item) for item in components)
+    if not components:
+        warnings.append('Схема пустая: добавьте источник, GND и нагрузку.')
+    if len(components) > 1 and not connections:
+        warnings.append('Компоненты пока не соединены.')
+    if connectivity.get('has_source') and not connectivity.get('has_ground'):
+        warnings.append('Есть источник, но нет GND.')
+    if not connectivity.get('has_source') and components:
+        warnings.append('Не найден источник питания или входной сигнал.')
+    if counts.get('led') and not counts.get('resistor'):
+        warnings.append('LED без токоограничительного резистора.')
+
+    recommendations = []
+    if not components:
+        recommendations.extend(
+            ['Добавить источник питания.', 'Добавить GND.', 'Добавить нагрузку или тестовый узел.']
+        )
+    elif connectivity.get('has_source') and not connectivity.get('has_ground'):
+        recommendations.append('Подключить общий GND к обратному пути источника.')
+    elif len(components) > 1 and not connections:
+        recommendations.append('Соединить компоненты в замкнутый путь тока.')
+    if counts.get('battery') and counts.get('ground') and not counts.get('capacitor'):
+        recommendations.append('Добавить развязывающий конденсатор или RC-фильтр питания.')
+    if counts.get('transistor') or counts.get('npn') or counts.get('pnp'):
+        recommendations.append('Проверить резистор базы/затвора и защиту нагрузки.')
+    recommendations.append('Запустить DRC++ перед симуляцией и сохранить измерения.')
+
+    score = max(35, 100 - len(errors) * 25 - len(warnings) * 10)
+    status = 'risk' if errors or len(warnings) >= 3 else 'watch' if warnings else 'ok'
+    status_label = {'ok': 'готово', 'watch': 'нужно проверить', 'risk': 'есть риск'}[status]
+    summary = f'{len(components)} компонентов, {len(connections)} соединений, {len(errors)} ошибок, {len(warnings)} предупреждений.'
+    return {
+        'score': score,
+        'status': status,
+        'status_label': status_label,
+        'summary': summary,
+        'errors': errors[:8],
+        'warnings': warnings[:8],
+        'recommendations': recommendations[:8],
+        'faults': [],
+        'expert_findings': [],
+        'sections': {
+            'connectivity': connectivity,
+            'expert_system': {'findings': []},
+            'bom': {},
+            'derating': {'issues': []},
+            'latest_simulation': {},
+            'artifacts': [],
+            'external_cad': {},
+        },
+        'metrics': {
+            'components': len(components),
+            'connections': len(connections),
+            'expert_findings': 0,
+            'measurements': 0,
+            'simulations': 0,
+        },
+        'scheme_data': scheme_data,
+    }
+
+
 def build_rule_based_reply(
     message,
     *,
@@ -1380,13 +1503,7 @@ def build_rule_based_reply(
                 else [],
             )
         else:
-
-            class _InlineProject:
-                pass
-
-            inline_project = _InlineProject()
-            inline_project.scheme_data = scheme_data
-            review = build_design_review(inline_project, simulation_runs=[], measurements=[])
+            review = _lightweight_review(scheme_data)
 
     intent = _detect_intent(
         text,

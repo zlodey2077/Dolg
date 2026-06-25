@@ -11,7 +11,9 @@ import hashlib
 import json
 import logging
 import os
+import queue
 import sys
+import threading
 
 import requests
 from django.conf import settings
@@ -21,7 +23,12 @@ from shop.models import Product
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_SEC = int(os.getenv('LOCAL_AI_TIMEOUT_SEC') or os.getenv('OLLAMA_TIMEOUT_SEC') or '75')
+TIMEOUT_SEC = int(os.getenv('LOCAL_AI_TIMEOUT_SEC') or os.getenv('OLLAMA_TIMEOUT_SEC') or '4')
+OLLAMA_NUM_CTX = int(os.getenv('OLLAMA_NUM_CTX') or '1024')
+OLLAMA_MAX_PREDICT = int(os.getenv('OLLAMA_MAX_PREDICT') or '96')
+OLLAMA_MAX_SYSTEM_CHARS = int(os.getenv('OLLAMA_MAX_SYSTEM_CHARS') or '1800')
+OLLAMA_FAILURE_COOLDOWN_SEC = int(os.getenv('OLLAMA_FAILURE_COOLDOWN_SEC') or '45')
+OLLAMA_COOLDOWN_CACHE_KEY = 'dolg:ollama:cooldown'
 
 # Бюджет JSON-snapshot, передаваемого в system prompt: больше токенов = дороже,
 # меньше = модель не видит достаточно вариантов. 6000 символов ≈ 1.5к токенов.
@@ -321,6 +328,48 @@ def _flatten_system(system):
     return str(system or '')
 
 
+def _compact_ollama_messages(messages, sys_text):
+    """Keep local Ollama prompt small enough for weak demo laptops."""
+    compact = []
+    if sys_text:
+        compact.append({'role': 'system', 'content': sys_text})
+    for item in list(messages or [])[-4:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get('role') if item.get('role') in {'user', 'assistant'} else 'user'
+        content = str(item.get('content') or '').strip()
+        if not content:
+            continue
+        compact.append({'role': role, 'content': content[:1200]})
+    return compact
+
+
+def _post_ollama_chat(base, payload, timeout):
+    """Post to Ollama without letting a stuck runtime freeze the web request."""
+    result_queue = queue.Queue(maxsize=1)
+
+    def worker():
+        try:
+            result_queue.put(
+                (
+                    'ok',
+                    requests.post(f'{base}/api/chat', json=payload, timeout=(3, timeout)),
+                )
+            )
+        except Exception as exc:  # requests timeout/network/etc.
+            result_queue.put(('error', exc))
+
+    thread = threading.Thread(target=worker, name='dolg-ollama-chat', daemon=True)
+    thread.start()
+    thread.join(timeout + 1)
+    if thread.is_alive():
+        raise AINetworkError(f'Ollama timeout after {timeout}s')
+    kind, value = result_queue.get_nowait()
+    if kind == 'error':
+        raise value
+    return value
+
+
 def call_ollama(
     messages,
     system,
@@ -336,35 +385,54 @@ def call_ollama(
     base = ollama_base_url()
     if not base:
         raise AINotConfiguredError('OLLAMA_BASE_URL не задан')
+    if cache.get(OLLAMA_COOLDOWN_CACHE_KEY):
+        raise AINetworkError('Ollama временно пропущен после недавнего таймаута')
 
     profile = AGENT_PROFILES.get(mode) if mode else None
     sys_text = _flatten_system(system)
-    chat_messages = ([{'role': 'system', 'content': sys_text}] if sys_text else []) + list(messages)
+    if len(sys_text) > OLLAMA_MAX_SYSTEM_CHARS:
+        sys_text = (
+            sys_text[:OLLAMA_MAX_SYSTEM_CHARS] + '\n\n[system context truncated for local model latency]'
+        )
+    chat_messages = _compact_ollama_messages(messages, sys_text)
+    predict_limit = max_tokens or (profile['max_tokens'] if profile else 1024)
+    predict_limit = min(int(predict_limit), OLLAMA_MAX_PREDICT)
     payload = {
         'model': model or ollama_model(),
         'messages': chat_messages,
         'stream': False,
         'think': False,
+        'keep_alive': os.getenv('OLLAMA_KEEP_ALIVE') or '10m',
         'options': {
             'temperature': temperature
             if temperature is not None
             else (profile['temperature'] if profile else 0.3),
-            'num_predict': max_tokens or (profile['max_tokens'] if profile else 1024),
+            'num_predict': predict_limit,
+            'num_ctx': OLLAMA_NUM_CTX,
         },
     }
     try:
-        r = requests.post(f'{base}/api/chat', json=payload, timeout=timeout)
+        r = _post_ollama_chat(base, payload, timeout)
     except requests.RequestException as exc:
         logger.warning('Ollama request error: %s', exc)
+        cache.set(OLLAMA_COOLDOWN_CACHE_KEY, '1', OLLAMA_FAILURE_COOLDOWN_SEC)
         raise AINetworkError(str(exc)) from exc
+    except AIError:
+        cache.set(OLLAMA_COOLDOWN_CACHE_KEY, '1', OLLAMA_FAILURE_COOLDOWN_SEC)
+        raise
 
     if r.status_code != 200:
         logger.warning('Ollama %s: %s', r.status_code, r.text[:300])
+        cache.set(OLLAMA_COOLDOWN_CACHE_KEY, '1', OLLAMA_FAILURE_COOLDOWN_SEC)
         raise AIServerError(f'Ollama вернул {r.status_code}')
 
     data = r.json()
-    text = ((data.get('message') or {}).get('content') or '').strip() or '(пустой ответ)'
-    return {
+    message = data.get('message') or {}
+    text = (message.get('content') or '').strip()
+    if not text and message.get('thinking'):
+        text = str(message.get('thinking') or '').strip()
+    text = text or '(пустой ответ)'
+    result = {
         'text': text,
         'stop_reason': data.get('done_reason'),
         'usage': {
@@ -375,6 +443,8 @@ def call_ollama(
         'model': payload['model'],
         'agent': profile['title'] if profile else None,
     }
+    cache.delete(OLLAMA_COOLDOWN_CACHE_KEY)
+    return result
 
 
 def ollama_status(timeout=2):

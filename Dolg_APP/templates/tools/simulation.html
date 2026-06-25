@@ -13,7 +13,7 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<link rel="stylesheet" href="{% static 'shop/workspace-preferences.css' %}?v=20260625-canvas-fix">
+<link rel="stylesheet" href="{% static 'shop/workspace-preferences.css' %}?v=20260625-ai-layout-fix">
 {% endblock %}
 
 {% block content %}
@@ -17723,6 +17723,70 @@ body.dolg-3d-active > footer {
     background: linear-gradient(180deg, #1a2540, #0a0e27);
     margin-bottom: 8px;
 }
+
+/* 2026-06-25 demo hotfix: bigger schematic field + readable instruments.
+   These rules live late in simulation.html because older inline CSS overrides
+   workspace-preferences.css. */
+.simulator-container {
+    grid-template-rows: auto minmax(480px, 1fr) minmax(238px, 31vh) !important;
+    height: calc(100vh - 48px) !important;
+    min-height: 760px !important;
+    gap: 6px !important;
+    padding: 8px !important;
+}
+.simulator-container > .components-panel { grid-row: 1 !important; }
+.simulator-container > .workspace { grid-row: 2 !important; min-height: 0 !important; }
+.simulator-container > .analysis-bottom-panel { grid-row: 3 !important; }
+.simulator-container > .simulator-bottom-panel.sim-dock { display: none !important; }
+.canvas-container {
+    min-height: clamp(460px, 61vh, 860px) !important;
+    height: 100% !important;
+}
+#schematicCanvas,
+#schematicCanvasPixi {
+    height: 100% !important;
+    min-height: 100% !important;
+}
+.analysis-bottom-panel {
+    --analysis-height: clamp(238px, 31vh, 340px);
+    min-height: 238px !important;
+    height: var(--analysis-height) !important;
+    max-height: min(36vh, 360px) !important;
+    flex-basis: var(--analysis-height) !important;
+}
+.analysis-bottom-content {
+    min-height: 0 !important;
+    overflow: auto !important;
+}
+.analysis-bottom-content .dolg-lab-body--docked {
+    overflow: visible !important;
+}
+.dolg-lab-grid {
+    min-height: 190px !important;
+    grid-template-columns: minmax(390px, 2fr) minmax(230px, 1fr) minmax(270px, 1fr) !important;
+    gap: 10px !important;
+}
+.dolg-lab-grid > .dolg-lab-card {
+    min-height: 178px !important;
+    padding: 10px 12px !important;
+}
+.dolg-lab-scope-canvas {
+    min-height: 112px !important;
+}
+.dolg-lab-controls {
+    gap: 6px !important;
+}
+@media (max-width: 1180px) {
+    .simulator-container {
+        grid-template-rows: auto minmax(430px, 1fr) minmax(300px, auto) !important;
+        height: auto !important;
+        min-height: 760px !important;
+    }
+    .dolg-lab-grid {
+        grid-template-columns: 1fr !important;
+        grid-template-areas: "scope" "gen" "mm" !important;
+    }
+}
 </style>
 {% comment %}
 Lab-overlay удалён — лаба переехала в bottom-dock как таб (см. #simDock).
@@ -18433,6 +18497,36 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
     color: #cfe;
     transition: opacity .25s ease;
 }
+.dolg-ai-thinking-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 4px;
+    color: #92a8c6;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11px;
+    font-style: normal;
+}
+.dolg-ai-thinking-meta b {
+    color: #7fdbff;
+    font-weight: 700;
+}
+.dolg-ai-progress {
+    width: min(240px, 100%);
+    height: 4px;
+    margin-top: 7px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(127, 219, 255, 0.12);
+}
+.dolg-ai-progress > span {
+    display: block;
+    width: 4%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #00d4ff, #6e44ff);
+    transition: width 0.35s ease;
+}
 
 /* Typewriter cursor — мигающая каретка во время постепенного вывода. */
 .dolg-ai-msg .typewriter-cursor {
@@ -18951,6 +19045,104 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
             'Альтернатива дешевле, без переразводки PCB',
         ],
     };
+    QUICK_PROMPTS.recommend = [
+        'Подбери делитель напряжения 12В → 5В для входа АЦП',
+        'Подбери делитель 5В → 3.3В с током до 2 мА',
+        'Рассчитай ограничительный резистор для красного LED от 5В',
+        'Подбери резистор для синего LED от 12В',
+        'Собери RC НЧ-фильтр на 1 кГц',
+        'Собери RC ВЧ-фильтр на 100 Гц',
+        'Подбери подтягивающий резистор для кнопки микроконтроллера',
+        'Подбери транзисторный ключ для реле 12В',
+        'Подбери MOSFET-ключ для нагрузки 2А',
+        'Добавь защитный диод для индуктивной нагрузки',
+        'Подбери стабилизатор 3.3В для датчика',
+        'Подбери входную RC-защиту от помех',
+        'Предложи следующий компонент для этой схемы',
+        'Что добавить, чтобы схема стала устойчивее?',
+        'Собери минимальную схему питания с фильтрацией',
+        'Подбери компоненты для измерения напряжения аккумулятора',
+    ];
+    QUICK_PROMPTS.explain = [
+        'Проверь схему и найди критичные ошибки',
+        'Объясни, что делает эта схема простыми словами',
+        'Где здесь токовый путь и где возможен обрыв?',
+        'Есть ли тут плавающие узлы или забытая земля?',
+        'Какие компоненты перегружены по мощности?',
+        'Какой ток примерно течёт через каждый резистор?',
+        'Что покажет осциллограф в этой точке?',
+        'Что будет, если увеличить R1 в два раза?',
+        'Что будет, если убрать конденсатор?',
+        'Почему эта схема может не заработать на практике?',
+        'Составь список улучшений перед защитой',
+        'Объясни схему как для доклада комиссии',
+    ];
+    QUICK_PROMPTS.replace = [
+        'Найди прямой аналог с тем же корпусом',
+        'Нужна замена pin-to-pin без переразводки PCB',
+        'Подбери более дешёвый аналог',
+        'Подбери аналог, который проще купить',
+        'Замени устаревший транзистор на доступный',
+        'Замени диод на современный аналог',
+        'Подбери замену стабилизатора 3.3В',
+        'Подбери аналог с меньшим нагревом',
+        'Подбери компонент с запасом по напряжению',
+        'Сравни 2-3 варианта замены таблицей',
+    ];
+    QUICK_PROMPTS.recommend.push(
+        'Подбери защиту входа от переполюсовки',
+        'Подбери TVS/стабилитрон для защиты входа',
+        'Подбери шунт для измерения тока',
+        'Подбери делитель для измерения 24В микроконтроллером',
+        'Подбери фильтр питания для датчика',
+        'Подбери развязывающий конденсатор около микросхемы',
+        'Подбери RC-цепочку антидребезга кнопки',
+        'Подбери подтяжку I2C для 3.3В',
+        'Подбери нагрузочный резистор для теста блока питания',
+        'Подбери драйвер/ключ для мотора',
+        'Подбери схему защиты катушки реле',
+        'Подбери номиналы для транзисторного ключа',
+        'Подбери резистор затвора MOSFET',
+        'Подбери pull-down для затвора MOSFET',
+        'Подбери простой стабилизатор 5В',
+        'Подбери ограничение тока для входа АЦП',
+        'Подбери RC-снаббер для контактов',
+        'Подбери схему индикации питания',
+        'Подбери контроль разряда аккумулятора',
+        'Подбери минимальный BOM для демонстрации'
+    );
+    QUICK_PROMPTS.explain.push(
+        'Проверь, почему симуляция может не стартовать',
+        'Проверь, почему осциллограф ничего не показывает',
+        'Проверь, где лучше поставить probe',
+        'Проверь, какие узлы стоит подписать',
+        'Проверь, где нужен защитный диод',
+        'Проверь, где может быть перегрев',
+        'Проверь, где нарушен обратный путь тока',
+        'Проверь, достаточно ли питания для нагрузки',
+        'Проверь, корректно ли подключен транзистор',
+        'Проверь, корректно ли подключен конденсатор',
+        'Проверь схему перед экспортом PCB',
+        'Сформируй короткий план фикса P0/P1',
+        'Сделай инженерный review для защиты',
+        'Объясни, какие измерения сохранить в протокол',
+        'Объясни, что показать в 3D/осциллографе',
+        'Объясни, какие вопросы может задать комиссия'
+    );
+    QUICK_PROMPTS.replace.push(
+        'Замени резистор на ближайший стандартный номинал',
+        'Замени конденсатор на доступный типоразмер',
+        'Подбери аналог MOSFET с меньшим Rds(on)',
+        'Подбери аналог транзистора с запасом по току',
+        'Подбери диод Шоттки вместо обычного диода',
+        'Подбери защитный TVS вместо стабилитрона',
+        'Подбери замену реле на MOSFET-ключ',
+        'Подбери замену линейного стабилизатора на DC-DC',
+        'Сравни замену по цене, наличию и рискам',
+        'Сравни аналоги для студенческого демо',
+        'Найди компонент с SPICE/CAD моделью',
+        'Найди замену без изменения протокола испытаний'
+    );
 
     const fab = document.getElementById('dolgAiFab');
     const panel = document.getElementById('dolgAiPanel');
@@ -19250,8 +19442,10 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
             div.innerHTML = `<span class="role">DOLG</span>` +
                 `<div class="dolg-ai-thinking">` +
                   `<div class="dots"><span></span><span></span><span></span></div>` +
-                  `<span class="dolg-ai-thinking-text">думаю…</span>` +
-                `</div>`;
+                  `<span class="dolg-ai-thinking-text">собираю контекст…</span>` +
+                  `<span class="dolg-ai-thinking-meta"><b data-ai-progress>0%</b><span data-ai-elapsed>0.0s</span></span>` +
+                `</div>` +
+                `<div class="dolg-ai-progress"><span data-ai-progress-bar></span></div>`;
             _startThinkingAnimation(div);
             return div;
         }
@@ -19348,6 +19542,7 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         if (phEl) {
             // Останавливаем cycling-анимацию текста перед удалением.
             if (phEl._thinkingTimer) clearInterval(phEl._thinkingTimer);
+            if (phEl._thinkingProgressTimer) clearInterval(phEl._thinkingProgressTimer);
             phEl.remove();
         }
         const i = histories[currentMode].findIndex(m => m._placeholder);
@@ -19357,26 +19552,38 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
     // Cycling-сообщения для thinking-индикатора — создают ощущение «AI реально
     // что-то делает». Меняются каждые 1.6 сек, текст подбирается под текущий режим.
     const THINKING_MESSAGES = {
-        recommend: ['анализирую схему…', 'ищу аналоги в каталоге…', 'проверяю BOM…', 'считаю риски…', 'формулирую ответ…'],
-        explain:   ['разбираю топологию…', 'считаю напряжения…', 'ищу делитель и RC-цепи…', 'проверяю GND…', 'собираю объяснение…'],
-        anomaly:   ['запускаю DRC…', 'ищу плавающие узлы…', 'проверяю полярность…', 'считаю мощности…', 'сравниваю с правилами…'],
-        default:   ['думаю…', 'обрабатываю запрос…', 'проверяю контекст…', 'формулирую ответ…'],
+        recommend: ['собираю компоненты схемы', 'ищу подходящие номиналы', 'проверяю ограничения и запас', 'запрашиваю локальную LLM', 'оформляю рекомендацию'],
+        explain:   ['считываю топологию схемы', 'проверяю питание и GND', 'оцениваю токи и напряжения', 'запрашиваю локальную LLM', 'готовлю объяснение'],
+        replace:   ['считываю part number', 'проверяю корпус и назначение', 'сравниваю варианты замены', 'запрашиваю локальную LLM', 'готовлю таблицу замен'],
+        anomaly:   ['запускаю DRC', 'ищу плавающие узлы', 'проверяю полярность', 'оцениваю риски', 'готовлю список ошибок'],
+        default:   ['собираю контекст', 'проверяю схему', 'запрашиваю локальную LLM', 'проверяю ответ', 'готовлю вывод'],
     };
     function _startThinkingAnimation(msgEl) {
         const textEl = msgEl.querySelector('.dolg-ai-thinking-text');
         if (!textEl) return;
+        const progressEl = msgEl.querySelector('[data-ai-progress]');
+        const elapsedEl = msgEl.querySelector('[data-ai-elapsed]');
+        const barEl = msgEl.querySelector('[data-ai-progress-bar]');
         const phrases = THINKING_MESSAGES[currentMode] || THINKING_MESSAGES.default;
+        const startedAt = Date.now();
         let i = 0;
         textEl.textContent = phrases[0];
         msgEl._thinkingTimer = setInterval(() => {
             i = (i + 1) % phrases.length;
-            // Fade-смена текста: на момент смены → opacity 0 → меняем text → opacity 1
+            // Stable stage text: change slowly so the panel does not visually flicker.
             textEl.style.opacity = '0';
             setTimeout(() => {
                 textEl.textContent = phrases[i];
                 textEl.style.opacity = '1';
             }, 200);
-        }, 1600);
+        }, 4200);
+        msgEl._thinkingProgressTimer = setInterval(() => {
+            const elapsedSec = Math.max(0, (Date.now() - startedAt) / 1000);
+            const progress = Math.min(94, Math.round(8 + (1 - Math.exp(-elapsedSec / 22)) * 86));
+            if (progressEl) progressEl.textContent = progress + '%';
+            if (elapsedEl) elapsedEl.textContent = elapsedSec.toFixed(1) + 's';
+            if (barEl) barEl.style.width = progress + '%';
+        }, 250);
     }
 
     // Typewriter: постепенно дописывает текст в DOM с читаемой скоростью, чтобы
@@ -19683,6 +19890,90 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         }
     }
 
+    function collectClientSchemeFacts() {
+        let scheme = null;
+        try {
+            if (typeof buildSchemeData === 'function') scheme = buildSchemeData();
+        } catch (_) {}
+        const components = Array.isArray(scheme && scheme.components) ? scheme.components : [];
+        const wires = Array.isArray(scheme && scheme.wires) ? scheme.wires
+            : Array.isArray(scheme && scheme.connections) ? scheme.connections : [];
+        const types = components.map(c => String(c.type || c.component_type || '').toLowerCase()).filter(Boolean);
+        return {
+            components,
+            wires,
+            count: components.length,
+            wireCount: wires.length,
+            hasGround: types.some(t => t.includes('ground') || t === 'gnd'),
+            hasSource: types.some(t => t.includes('battery') || t.includes('source') || t.includes('voltage')),
+            hasCapacitor: types.some(t => t.includes('capacitor') || t === 'c'),
+            hasTransistor: types.some(t => t.includes('transistor') || t.includes('npn') || t.includes('pnp') || t.includes('mosfet')),
+        };
+    }
+
+    function buildClientFallbackReply(userText, status, extra) {
+        const facts = collectClientSchemeFacts();
+        const reason = status === 'timeout'
+            ? 'таймаут 90 секунд'
+            : status
+                ? `HTTP ${status}`
+                : 'нет ответа от сервера';
+        const common = [
+            `Локальная LLM сейчас не ответила (${reason}), поэтому я не оставляю тебя с пустой ошибкой и даю быстрый инженерный fallback.`,
+            `В схеме вижу примерно ${facts.count} комп. и ${facts.wireCount} соедин.`,
+            facts.hasGround ? 'GND найден.' : 'Проверь GND: без общей земли симуляция часто не стартует.',
+            facts.hasSource ? 'Источник питания найден.' : 'Добавь источник питания или входной сигнал.',
+        ];
+        let body = [];
+        if (currentMode === 'explain') {
+            body = [
+                'Что проверить первым:',
+                '1. Есть ли замкнутый путь тока от источника через нагрузку обратно к GND.',
+                '2. Нет ли узлов, которые никуда не подключены.',
+                '3. Для RC-цепей проверь постоянную времени tau = R*C и ожидаемую частоту среза.',
+                facts.hasCapacitor ? '4. Конденсатор есть: проверь, не висит ли одна его ножка в воздухе.' : '4. Если нужен фильтр или задержка, добавь конденсатор.',
+            ];
+        } else if (currentMode === 'replace') {
+            body = [
+                'Для замены компонента проверь:',
+                '1. Корпус и pinout.',
+                '2. Запас по напряжению и току не меньше исходного.',
+                '3. Мощность рассеяния и температуру.',
+                '4. Для транзистора/MOSFET: тип канала, Vgs/Vbe, Rds(on) или hFE.',
+            ];
+        } else {
+            body = [
+                'Рекомендация по следующему шагу:',
+                facts.hasSource && facts.hasGround ? '1. Запусти DRC++ и проверь плавающие узлы.' : '1. Сначала добавь источник и GND.',
+                facts.hasTransistor ? '2. Для ключа добавь защитный диод/резистор базы или затвора.' : '2. Если управляешь нагрузкой, добавь транзисторный или MOSFET-ключ.',
+                '3. Для входов микроконтроллера добавь подтяжку и RC-фильтр от дребезга/помех.',
+                '4. После правки запусти симуляцию и посмотри осциллограф.',
+            ];
+        }
+        if (extra && (extra.message || extra.error)) {
+            common.push(`Серверная деталь: ${extra.message || extra.error}`);
+        }
+        return common.concat('', body, '', `Запрос: "${userText.slice(0, 180)}"`).join('\n');
+    }
+
+    function pushClientFallback(pushAndShow, userText, status, extra) {
+        pushAndShow({
+            role: 'assistant',
+            kind: 'demo',
+            content: buildClientFallbackReply(userText, status, extra),
+            actions: [
+                { label: 'Проверить схему', prompt: 'Проверь схему и найди критичные ошибки', mode: 'explain' },
+                { label: 'Следующий компонент', prompt: 'Предложи следующий компонент для этой схемы', mode: 'recommend' },
+                { label: 'Запустить DRC++', kind: 'tool', tool: 'pipeline.run_drc', icon: '⚠', description: 'Запустить локальную проверку схемы' },
+            ],
+        });
+        addTokensToCounter({
+            input_tokens: Math.ceil(userText.length / 4),
+            output_tokens: 180,
+            estimated: true,
+        });
+    }
+
     async function sendMessage() {
         if (pending) return;
         const text = inputEl.value.trim();
@@ -19727,22 +20018,30 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
         pushAndShow({ role: 'assistant', kind: 'bot',
                        content: '…думаю…', _placeholder: true });
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000);
         try {
             const res = await fetch(AI_API_URL, {
                 method: 'POST',
                 credentials: 'same-origin',
+                signal: controller.signal,
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCsrfCookie(),
                 },
                 body: JSON.stringify(buildPayload(text)),
             });
+            clearTimeout(timeoutId);
             const data = await res.json().catch(() => ({}));
             removePlaceholderMessage();
 
             if (!data.ok && !data.demo) {
-                pushAndShow({ role: 'assistant', kind: 'error',
-                              content: '⚠ ' + (data.message || data.error || `HTTP ${res.status}`) });
+                if (!res.ok && res.status >= 500) {
+                    pushClientFallback(pushAndShow, text, res.status, data);
+                } else {
+                    pushAndShow({ role: 'assistant', kind: 'error',
+                                  content: '⚠ ' + (data.message || data.error || `HTTP ${res.status}`) });
+                }
             } else {
                 let replyText = data.reply || '(пустой ответ)';
                 if (data.intent_label) {
@@ -19789,9 +20088,13 @@ Fullscreen-режим теперь — кнопка ⛶ в баре табов, 
                 if (data.token_usage || data.usage) addTokensToCounter(data.token_usage || data.usage);
             }
         } catch (e) {
+            clearTimeout(timeoutId);
             removePlaceholderMessage();
-            pushAndShow({ role: 'assistant', kind: 'error',
-                          content: '⚠ Сеть недоступна: ' + e.message });
+            pushClientFallback(pushAndShow, text, e && e.name === 'AbortError' ? 'timeout' : 0, {
+                message: e && e.name === 'AbortError'
+                    ? 'LLM не ответила за 90 секунд'
+                    : ('Сеть недоступна: ' + (e.message || e)),
+            });
         } finally {
             pending = false;
             sendBtn.disabled = false;

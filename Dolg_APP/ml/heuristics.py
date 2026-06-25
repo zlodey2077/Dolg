@@ -276,12 +276,45 @@ def suggest_next_component_by_rules(scheme_data: dict) -> list:
         except Exception:
             continue
     if not recs:
-        # Default: предложить наиболее частые добавления в схему
-        recs.append(
-            {
-                'component_type': 'resistor',
-                'reason': 'Универсальный compoнент — почти всегда что-то ограничить или развести.',
-                'confidence': 0.4,
-            }
-        )
+        # Default: keep several practical options instead of looping on R-only.
+        fallback = [
+            (
+                'measurement_probe',
+                'Поставьте пробник на ключевой узел и зафиксируйте expected vs measured.',
+                0.5,
+            ),
+            (
+                'capacitor',
+                'Добавьте развязку/RC-фильтр, если схема уже питается и имеет нагрузку.',
+                0.46,
+            ),
+            (
+                'diode',
+                'Для реле, мотора или катушки нужен защитный диод от выбросов.',
+                0.44,
+            ),
+            (
+                'regulator',
+                'Если есть питание выше 5 В, проверьте стабилизатор для логики/датчиков.',
+                0.42,
+            ),
+            (
+                'transistor',
+                'Для управления нагрузкой добавьте транзисторный или MOSFET-ключ.',
+                0.4,
+            ),
+            (
+                'resistor',
+                'Резистор нужен для подтяжки, делителя, ограничения тока или базы/затвора.',
+                0.38,
+            ),
+        ]
+        for component_type, reason, confidence in fallback:
+            recs.append(
+                {
+                    'component_type': component_type,
+                    'reason': reason,
+                    'confidence': confidence,
+                }
+            )
     return recs[:3]
