@@ -148,23 +148,30 @@ def repair_ngrok_config(path: Path) -> tuple[bool, str]:
     return True, f'ngrok config repaired; backup: {backup.name}; token: {mask_secret(root_token)}'
 
 
-def check_binary(binary: Path, args: list[str]) -> tuple[bool, str]:
-    try:
-        result = subprocess.run(
-            [str(binary), *args],
-            cwd=str(ROOT),
-            capture_output=True,
-            text=True,
-            timeout=25,
-        )
-    except subprocess.TimeoutExpired:
-        return False, f'{binary.name} check timed out'
-    except Exception as exc:
-        return False, f'{binary.name} check failed: {exc}'
-    output = (result.stdout or result.stderr or '').strip()
-    if result.returncode != 0:
-        return False, output or f'{binary.name} exited with {result.returncode}'
-    return True, output or f'{binary.name} ok'
+def check_binary(binary: Path, args: list[str], attempts: int = 2) -> tuple[bool, str]:
+    last_detail = ''
+    for attempt in range(1, attempts + 1):
+        try:
+            result = subprocess.run(
+                [str(binary), *args],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                timeout=25,
+            )
+        except subprocess.TimeoutExpired:
+            last_detail = f'{binary.name} check timed out'
+        except Exception as exc:
+            last_detail = f'{binary.name} check failed: {exc}'
+        else:
+            output = (result.stdout or result.stderr or '').strip()
+            if result.returncode == 0:
+                suffix = '' if attempt == 1 else f' (after retry {attempt})'
+                return True, (output or f'{binary.name} ok') + suffix
+            last_detail = output or f'{binary.name} exited with {result.returncode}'
+        if attempt < attempts:
+            time.sleep(1.0)
+    return False, last_detail
 
 
 def build_env() -> dict[str, str]:

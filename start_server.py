@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -33,6 +34,7 @@ def p(msg):
 
 ROOT = Path(__file__).resolve().parent
 DJANGO_PORT = 8000
+HEALTH_URL = 'http://127.0.0.1:%d/healthz' % DJANGO_PORT
 # ngrok.exe в deploy/. Cloudflare Quick Tunnel периодически отдаёт error 1033,
 # поэтому публичный режим по умолчанию снова использует ngrok.
 # Токен — в %LOCALAPPDATA%\ngrok\ngrok.yml
@@ -156,17 +158,26 @@ def wait_tcp(host, port, timeout=25):
 
 def wait_django_ready(proc, host, port, timeout=25):
     deadline = time.time() + timeout
+    last_error = ''
     while time.time() < deadline:
         if proc.poll() is not None:
             return False, 'process exited with code %s' % proc.returncode
         try:
-            with socket.create_connection((host, port), timeout=1):
+            req = urllib.request.Request(HEALTH_URL, headers={'User-Agent': 'DOLG-launcher-health/1.0'})
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                if resp.status < 500:
+                    return True, ''
+                last_error = 'healthz returned HTTP %s' % resp.status
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500:
                 return True, ''
-        except OSError:
+            last_error = 'healthz returned HTTP %s' % exc.code
+        except Exception as exc:
+            last_error = str(exc)
             time.sleep(0.4)
     if proc.poll() is not None:
         return False, 'process exited with code %s' % proc.returncode
-    return False, 'timeout after %ss' % timeout
+    return False, 'timeout after %ss; last probe: %s' % (timeout, last_error or 'no response')
 
 
 def probe_url(url, timeout=8):
@@ -320,6 +331,8 @@ def port_holder(port):
 
 def migration_state(py, env):
     """Return ('ok'|'pending'|'timeout'|'error', detail) for migration preflight."""
+    if env.get('DOLG_SKIP_MIGRATION_PROBE', '1').lower() not in {'0', 'false', 'no'}:
+        return 'skipped', 'migration probe skipped for fast reliable demo startup'
     try:
         timeout = int(env.get('DOLG_MIGRATION_CHECK_TIMEOUT', '10'))
     except ValueError:
@@ -364,6 +377,34 @@ def _start_django(py, env, hot, log_path):
         daemon=True,
     ).start()
     return proc, mode
+
+
+def _start_django_with_retries(py, env, hot, log_path, rep, attempts=3):
+    """Start Django and verify /healthz. Retries remove stale half-started workers."""
+    last_detail = ''
+    try:
+        ready_timeout = int(env.get('DOLG_DJANGO_READY_TIMEOUT', '45'))
+    except ValueError:
+        ready_timeout = 45
+    for attempt in range(1, attempts + 1):
+        django, mode = _start_django(py, env, hot if attempt == 1 else False, log_path)
+        rep(
+            'INFO',
+            'Start Django (%s), attempt %d/%d, waiting for /healthz up to %ss...'
+            % (mode, attempt, attempts, ready_timeout),
+        )
+        ok, detail = wait_django_ready(django, '127.0.0.1', DJANGO_PORT, timeout=ready_timeout)
+        if ok:
+            return django, mode, True, ''
+        last_detail = detail
+        rep('WARN', 'Django is not ready (%s), restarting...' % detail)
+        _kill_proc(django)
+        leftover = kill_orphans()
+        freed = free_port(DJANGO_PORT)
+        if leftover or freed:
+            rep('FIX', 'cleanup retry: stopped PID %s' % ', '.join(map(str, leftover + freed)))
+        time.sleep(1.2)
+    return None, 'plain', False, last_detail
 
 
 def _forward_django_output(stream, log_path, echo):
@@ -467,6 +508,8 @@ def main():
     env['CLICOLOR_FORCE'] = '0'
     env['DOLG_SKIP_ASGI'] = '1'
     env['DOLG_SKIP_OPTIONAL_APP_PROBES'] = '1'
+    env.setdefault('DOLG_SKIP_SOCIALACCOUNT_PROVIDERS', '1')
+    env.setdefault('DOLG_SKIP_MIGRATION_PROBE', '1')
     if '--quiet-django-log' in sys.argv:
         env['DOLG_SHOW_DJANGO_LOG'] = '0'
     else:
@@ -510,7 +553,9 @@ def main():
         rep('OK', 'Порт %d свободен' % DJANGO_PORT)
 
     migrate_state, migrate_detail = migration_state(py, env)
-    if migrate_state in {'timeout', 'error'}:
+    if migrate_state == 'skipped':
+        rep('OK', migrate_detail)
+    elif migrate_state in {'timeout', 'error'}:
         detail = migrate_detail + '; continuing local startup'
         rep('ERR' if strict_migrations else 'WARN', detail)
         if strict_migrations:
@@ -553,33 +598,20 @@ def main():
         django_log_path.write_text('', encoding='utf-8')
     except Exception:
         pass
-    django, mode = _start_django(py, env, hot, django_log_path)
-    rep('INFO', 'Старт Django (%s), жду готовности (до 90с)...' % mode)
-    ok, ready_detail = wait_django_ready(django, '127.0.0.1', DJANGO_PORT, timeout=90)
+    django, mode, ok, ready_detail = _start_django_with_retries(py, env, hot, django_log_path, rep, attempts=3)
     if not ok:
-        ok = False
-        if mode == 'hot':
-            rep('WARN', 'hot/jurigged не поднялся (%s) — fallback на обычный режим...' % ready_detail)
+        tail = ''
+        try:
+            with open(django_log_path, encoding='utf-8') as f:
+                tail = f.read()[-1800:]
+        except Exception:
+            pass
+        rep('ERR', 'Django ne podnyalsya posle 3 popytok (%s). Log tail:\n%s' % (ready_detail, tail))
+        if django is not None:
             _kill_proc(django)
-            leftover = kill_orphans()
-            freed = free_port(DJANGO_PORT)
-            if leftover or freed:
-                rep('FIX', 'hot cleanup: сняты PID %s' % ', '.join(map(str, leftover + freed)))
-            time.sleep(1.0)
-            django, mode = _start_django(py, env, False, django_log_path)
-            ok, ready_detail = wait_django_ready(django, '127.0.0.1', DJANGO_PORT, timeout=90)
-        if not ok:
-            tail = ''
-            try:
-                with open(django_log_path, encoding='utf-8') as f:
-                    tail = f.read()[-1200:]
-            except Exception:
-                pass
-            rep('ERR', 'Django не поднялся (%s). Хвост лога:\n%s' % (ready_detail, tail))
-            _kill_proc(django)
-            return _abort(report)
+        return _abort(report)
 
-    rep('OK', 'Сервер отвечает (%s) на 127.0.0.1:%d' % (mode, DJANGO_PORT))
+    rep('OK', 'Server ready (%s): %s' % (mode, HEALTH_URL))
     _write_report(report)
 
     if exit_after_ready:
