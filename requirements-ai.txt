@@ -3,7 +3,7 @@
 # оставался лёгким (без torch / parquet).
 
 # Neural backend
-torch==2.12.0
+torch==2.13.0
 
 # Server SPICE engines (внешние движки для тяжёлых задач; см. server_engines.py
 # fallback-цепь: xyce -> pyspice -> gnucap -> ngspice-wasm -> numpy-mna).
