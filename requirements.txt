@@ -1,4 +1,4 @@
-Django==6.0.6
+Django==6.0.7
 # 2026-06-01 v22: production-сервер для Render/Heroku/любой PaaS
 gunicorn==23.0.0
 # WhiteNoise — отдача статики из Django без nginx (для Render free tier)
