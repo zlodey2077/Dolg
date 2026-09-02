@@ -111,7 +111,7 @@ django-csp==4.0
 # ─── API framework ─────────────────────────────────────────────────
 # REST endpoints с serializers, permissions, OpenAPI docs. Постепенная
 # миграция с raw JsonResponse-ов в Dolg_APP/views.py.
-djangorestframework==3.16.1
+djangorestframework==3.17.2
 
 # ─── Dev: типизация и хуки ─────────────────────────────────────────
 # Не runtime — отдельно через requirements-dev.txt? Пока сюда.
