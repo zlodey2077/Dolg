@@ -82,7 +82,7 @@ stripe==15.0.1
 sympy==1.14.0
 typing_extensions==4.15.0
 tzdata==2026.1
-urllib3==2.7.0
+urllib3==2.8.0
 # .env подгрузка — settings.py загружает HF_TOKEN, SECRET_KEY и т.п.
 # из BASE_DIR/.env при старте. Без него env-vars нужно задавать в shell.
 python-dotenv==1.2.2
